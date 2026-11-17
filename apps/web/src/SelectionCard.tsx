@@ -20,6 +20,7 @@ import type {
   Resident,
   ResourceKind,
   Stock,
+  WallMaterial,
   Waypoint,
 } from '@csp/shared-types'
 import { BuildingInfo } from './BuildingInfo.js'
@@ -39,6 +40,7 @@ import {
   thiefOf,
   unhitcherOf,
   boaterOf,
+  pusherOf,
   type CardAction,
   type CarriageView,
   type CardList,
@@ -281,9 +283,12 @@ export function PickBanner({
   onConfirm,
   onWaypoints,
   onCancel,
+  material,
 }: {
   prompt: string
   hint?: string
+  /** For a wall line: what it is built of, and how to change it (`CONTEXT.md`: Wood or stone). */
+  material?: { value: WallMaterial; onChange: (m: WallMaterial) => void }
   /** What is under the pointer, or the tile tapped, and what the pick would do there. */
   under?: string
   /** Picks the tile previewed by a tap, on a touch screen. */
@@ -299,6 +304,20 @@ export function PickBanner({
         <strong>{prompt}</strong>
         {line && <span className="small">{line}</span>}
       </div>
+      {material && (
+        <div className="material-pick" role="group" aria-label="Wall of">
+          {(['wood', 'stone'] as const).map((m) => (
+            <button
+              type="button"
+              key={m}
+              aria-pressed={material.value === m}
+              onClick={() => material.onChange(m)}
+            >
+              {m === 'wood' ? 'Wood' : 'Stone'}
+            </button>
+          ))}
+        </div>
+      )}
       {onConfirm && (
         <button type="button" className="primary" onClick={onConfirm}>
           Confirm
@@ -518,6 +537,11 @@ export function TileCard({
   onDriveOff,
   onHitchOff,
   onStealHorse,
+  onCrew,
+  onPush,
+  onTearDownMachine,
+  onRam,
+  onThrow,
   tile,
   waypoints,
   workSettings,
@@ -525,6 +549,7 @@ export function TileCard({
   onAddWaypoint,
   onFeed,
   onPickUp,
+  onRepair,
 }: {
   card: TileCardData
   /** The building the card is named after, for its icon. */
@@ -569,6 +594,19 @@ export function TileCard({
   onHitchOff: (residentId: string) => void
   /** Orders a resident on the tile to steal the horse there by mounting it. */
   onStealHorse: (horseId: string, residentId: string) => void
+  /**
+   * Orders a resident to join the crew of a siege machine of the realm, walking onto it
+   * (`CONTEXT.md`: Siege machine).
+   */
+  onCrew?: (machineId: string, residentId: string) => void
+  /** Has one of a siege machine's crew start pushing it, by picking where to. */
+  onPush?: (machineId: string, residentId: string) => void
+  /** Orders a resident on a siege machine's tile to tear it down. */
+  onTearDownMachine?: (machineId: string, residentId: string) => void
+  /** Has one of a ram's crew swing it at the wall or gate next to it (`CONTEXT.md`: Ram). */
+  onRam?: (machineId: string, residentId: string, targetId: string) => void
+  /** Has one of a catapult's crew aim it, by picking the wall to throw Stone at (`CONTEXT.md`: Catapult). */
+  onThrow?: (machineId: string, residentId: string) => void
   /** The tile the card is for. */
   tile: { x: number; y: number }
   /** The Player's waypoints, for a new one's name and the cap (`CONTEXT.md`: Waypoint). */
@@ -581,6 +619,8 @@ export function TileCard({
   onFeed?: (targetId: string, units: number) => void
   /** Orders one of the Player's residents to take goods from a spot on their tile. */
   onPickUp: (residentId: string, from: GoodsSpot, goods: Stock) => void
+  /** Gives the actor the Repair task for a worn building, wall, gate or road on the tile. */
+  onRepair?: (buildingId: string) => void
 }) {
   const actions = tileActions(card, actor, tick, mapSize)
   const [open, setOpen] = useState<string | undefined>()
@@ -695,6 +735,7 @@ export function TileCard({
           onAction={(a) => {
             if (a.opens) setOpen(shown === a.id ? undefined : a.id)
             if (a.id === 'sendHere') onSendHere()
+            if (a.id === 'repair' && card.repair) onRepair?.(card.repair.buildingId)
             if (a.id === 'build' && card.buildHere?.at)
               onBuildHere(card.buildHere.kind, card.buildHere.at)
             if (a.id === 'gate' && card.gate) onSetGate(card.gate.id, !!card.gate.closed)
@@ -714,6 +755,14 @@ export function TileCard({
             const rider = thiefAmong(card.stealHorse?.residents, actor)
             if (a.id === 'stealHorse' && rider && card.stealHorse)
               onStealHorse(card.stealHorse.horseId, rider.id)
+            const machine = card.machine
+            if (a.id === 'crew' && machine && actor) onCrew?.(machine.id, actor.id)
+            const pusher = pusherOf(card, actor)
+            if (a.id === 'push' && machine && pusher) onPush?.(machine.id, pusher)
+            if (a.id === 'tearDown' && machine && actor) onTearDownMachine?.(machine.id, actor.id)
+            if (a.id === 'ram' && machine?.ramAt && pusher)
+              onRam?.(machine.id, pusher, machine.ramAt.id)
+            if (a.id === 'throw' && machine?.throws && pusher) onThrow?.(machine.id, pusher)
           }}
           beside={(a) =>
             a.id === 'build' &&

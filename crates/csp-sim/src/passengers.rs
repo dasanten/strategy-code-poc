@@ -215,7 +215,7 @@ impl OrderKind for GetOff {
 
 /// The orders that act on a tile, and so get a passenger off their carriage first
 /// (`GETS_OFF_FIRST`).
-pub const GETS_OFF_FIRST: [&str; 33] = [
+pub const GETS_OFF_FIRST: [&str; 35] = [
     "walkTo",
     "relocate",
     "drive",
@@ -228,6 +228,7 @@ pub const GETS_OFF_FIRST: [&str; 33] = [
     "fetch",
     "build",
     "tearDown",
+    "repair",
     "workAt",
     "teach",
     "train",
@@ -249,6 +250,7 @@ pub const GETS_OFF_FIRST: [&str; 33] = [
     "payDebt",
     "acceptOffer",
     "feed",
+    "crew",
 ];
 
 /// An order kind that first gets the ordered resident off their carriage (`getsOffFirst`).
@@ -313,6 +315,7 @@ fn attack_tile(world: &WorldState, order: &OrderRequest) -> Option<(i32, i32)> {
     let (x, y) = match attack_target(world, str_field(order, "targetId")?)? {
         Target::Resident(t) => (world.residents[t].x, world.residents[t].y),
         Target::Building(b) => (world.buildings[b].x, world.buildings[b].y),
+        Target::Machine(m) => (world.siege_machines[m].x, world.siege_machines[m].y),
     };
     Some((x as i32, y as i32))
 }

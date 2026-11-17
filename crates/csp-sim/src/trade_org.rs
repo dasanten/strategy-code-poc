@@ -310,6 +310,10 @@ fn new_building(
         closed: None,
         damage: None,
         breedings: None,
+        decay: None,
+        ruined_at: None,
+        repair: None,
+        material: None,
     }
 }
 
@@ -412,6 +416,7 @@ pub fn found_trade_org_hq(
             at: TileXy { x: fx, y: fy },
             progress: 0.0,
             makes: None,
+            mends: false,
         }));
         r.script = Some(
             serde_json::from_value(serde_json::json!({

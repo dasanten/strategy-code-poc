@@ -17,7 +17,7 @@ use csp_shared::footprint::{covers, footprint_tiles, is_at, Placed, FOOTPRINT};
 use csp_shared::terrain::{wrap, wrap_delta, wrap_distance, TerrainMap};
 use csp_shared::world::{
     Building, BuildingKind, City, CityJobKind, CityProject, Good, GoodsSpot, PickUpOrder,
-    ResidentOrder, Stock, Task, TearDownOrder, Tile, TradeOrgCity, WorldState,
+    ResidentOrder, Stock, Task, TearDownOrder, Tile, TradeOrgCity, WallMaterial, WorldState,
 };
 use serde_json::json;
 
@@ -28,13 +28,15 @@ use crate::npc_chain::{
     short_goods, SurplusWork,
 };
 use crate::npc_inner_wall::{inner_wall_project, outer_walls, Rings as InnerRings};
-use crate::npc_plan::{farmers_wanted, food_short};
+use crate::npc_plan::farmers_to_feed;
 use crate::npc_scouts::knows_node;
+use crate::npc_stone_walls::{outer_ring_of_stone, stone_upgrade_project, wants_stone_for_walls};
 use crate::npc_training::wants_training_ground;
 use crate::placing::Ground;
 use crate::queries::building::{
-    build_materials, build_problem, building_at, materials_needed, max_workers, node_corner,
-    node_good, node_pick_distance, node_workplace, work_needed, workplace_node,
+    build_materials_of, build_problem, building_at, construction_at, is_stone, materials_needed,
+    max_workers, node_corner, node_good, node_pick_distance, node_workplace, work_needed,
+    workplace_node,
 };
 use crate::queries::city::{has_food_surplus, in_city_area, is_city_building};
 use crate::queries::city_area::{city_area_tiles, city_membership, free_housing};
@@ -77,7 +79,17 @@ impl Rings {
 
 /// A building project (`BuildProject`).
 fn build(building: BuildingKind, at: (i32, i32)) -> CityProject {
-    CityProject::Build { building, x: f64::from(at.0), y: f64::from(at.1) }
+    CityProject::Build { building, x: f64::from(at.0), y: f64::from(at.1), material: None }
+}
+
+/// A wall or gate project of `material`: stone for a stone one; any other project as it is.
+fn with_material(p: CityProject, material: Option<WallMaterial>) -> CityProject {
+    match p {
+        CityProject::Build { building, x, y, .. } if is_stone(building, material) => {
+            CityProject::Build { building, x, y, material }
+        }
+        p => p,
+    }
 }
 
 /// Whether a city grows at all (`cityGrows`): an NPC city always, the Trade Organization's cities
@@ -205,7 +217,9 @@ pub fn is_builder(r: &csp_shared::world::Resident) -> bool {
         r.script.as_ref().is_some_and(|s| s.script_id == 0 && s.task == Some(Task::Build));
     building
         || match &r.order {
-            Some(ResidentOrder::Build(_)) | Some(ResidentOrder::TearDown(_)) => true,
+            Some(ResidentOrder::Build(_))
+            | Some(ResidentOrder::TearDown(_))
+            | Some(ResidentOrder::Repair(_)) => true,
             Some(ResidentOrder::Drop(o)) => matches!(o.to, GoodsSpot::Site { .. }),
             Some(ResidentOrder::PickUp(o)) => {
                 matches!(o.from, GoodsSpot::Storage { .. }) && !o.goods.contains_key(&Good::Food)
@@ -258,30 +272,34 @@ pub fn pair_adults(world: &mut WorldState, city: &City, adults: &[usize]) {
 /// Gives a resident their part in a project, if there is one for them (`takePart`): walking to the
 /// tile and tearing down there; or building it by the game's Build default. For a tile of wall they
 /// first take enough for a few tiles from the storage. False when they can't help, or the building
-/// to tear down is gone. With `deliver`, only bringing materials they carry.
+/// to tear down is gone. With `deliver`, only bringing materials they carry. A site further from
+/// the storage than `NPC_NODE_REACH` they set out for with the Food for the walk there and back,
+/// and fetch more before they lack what the walk home eats (`far_site_food`, #1379).
 pub fn take_part(
     world: &mut WorldState,
     i: usize,
     project: &CityProject,
     storage: Option<usize>,
     deliver: bool,
+    terrain: Option<&TerrainMap>,
 ) -> bool {
     let r = &world.residents[i];
     if deliver {
         let carries = match project {
-            CityProject::Build { x, y, .. } => building_at(world, *x as i32, *y as i32, MAP_SIZE)
-                .filter(|s| s.site.is_some())
-                .and_then(|s| pick(Some(&r.carried), &materials_needed(s)))
-                .is_some(),
+            CityProject::Build { building, x, y, material } => {
+                project_site(world, *building, *material, *x, *y)
+                    .and_then(|s| pick(Some(&r.carried), &materials_needed(s)))
+                    .is_some()
+            }
             CityProject::TearDown { .. } => false,
         };
         // Carrying the materials of a few tiles of wall, they help with this one.
-        let wall = matches!(project, CityProject::Build { building, .. } if for_wall(*building, &r.carried));
+        let wall = matches!(project, CityProject::Build { building, material, .. } if for_wall(*building, *material, &r.carried));
         if !carries && !wall {
             return false;
         }
     }
-    let (building, x, y) = match project {
+    let (building, x, y, material) = match project {
         CityProject::TearDown { building_id } => {
             let Some(b) = world.buildings.iter().find(|x| &x.id == building_id) else {
                 return false;
@@ -297,16 +315,53 @@ pub fn take_part(
             }
             return true;
         }
-        CityProject::Build { building, x, y } => (*building, *x, *y),
+        CityProject::Build { building, x, y, material } => (*building, *x, *y, *material),
     };
+    let far_food =
+        storage.and_then(|s| far_site_food(world, i, &world.buildings[s], (x, y), terrain));
+    // For a far site they take their Food from the storage as they start: the Build default walks
+    // to the site before it looks at what they carry, and a pass that came between would put it
+    // away again (as a worker's set-out Food, `take_set_out_food`).
+    let mut set_out: Option<ResidentOrder> = None;
+    if let (Some((_, take)), Some(s)) = (far_food, storage) {
+        let store = &world.buildings[s];
+        let has = held_in(store.stock.as_ref(), Good::Food).floor();
+        let short = (take - held(&world.residents[i].carried, Good::Food)).floor();
+        let fits = crate::queries::goods::units_that_fit(r, Good::Food, world.tick as f64).floor();
+        let units = short.min(has).min(fits);
+        if units >= 1.0 {
+            let (sid, at) = (store.id.clone(), (store.x, store.y));
+            if is_at((r.x as i32, r.y as i32), placed(store), MAP_SIZE) {
+                let from = GoodsSpot::Storage { storage_id: sid };
+                let goods = Stock::from([(Good::Food, units)]);
+                set_out = Some(ResidentOrder::PickUp(PickUpOrder { from, goods }));
+            } else {
+                walk_to(&mut world.residents[i], at);
+                return true;
+            }
+        }
+    }
     let start_build = |world: &mut WorldState| {
-        world.residents[i].order = None;
-        let memory = json!({ "building": kind_name(building), "at": { "x": x, "y": y } });
+        world.residents[i].order = set_out.clone();
+        // Numbers as a script keeps them: a whole one reads back as one (`running-scripts-sound`).
+        let num = csp_lang::plain::number_json;
+        let mut memory =
+            json!({ "building": kind_name(building), "at": { "x": num(x), "y": num(y) } });
+        if is_stone(building, material) {
+            memory["material"] = json!("stone");
+        }
+        if let Some((at, take)) = far_food {
+            memory["foodAt"] = num(at);
+            memory["foodTake"] = num(take);
+        }
+        // Until the Build default walks out, nobody takes them for stuck (`no_way_out`).
+        if set_out.is_some() {
+            memory["setOut"] = json!(true);
+        }
         world.residents[i].script = Some(default_script(Task::Build, memory));
         true
     };
-    let Some(site) = building_at(world, x as i32, y as i32, MAP_SIZE).filter(|s| s.site.is_some())
-    else {
+    let Some(site) = project_site(world, building, material, x, y) else {
         return start_build(world);
     };
     let need = materials_needed(site);
@@ -316,7 +371,7 @@ pub fn take_part(
     // For a tile of wall, enough for a few tiles at once: the rest goes to the next ones.
     let wall = building == BuildingKind::Wall || building == BuildingKind::Gate;
     let store = storage.map(|s| &world.buildings[s]);
-    let stocked = if wall && !for_wall(building, &r.carried) {
+    let stocked = if wall && !for_wall(building, material, &r.carried) {
         pick(store.and_then(|s| s.stock.as_ref()), &times(&need, NPC_WALL_TILES_PER_TRIP))
     } else {
         None
@@ -334,13 +389,62 @@ pub fn take_part(
     can_do_more(world, i, site, store) && start_build(world)
 }
 
-/// Whether a resident carries materials for walls or gates, for a project of `building`
-/// (`forWall`).
-fn for_wall(building: BuildingKind, carried: &Stock) -> bool {
+/// For a builder of a site at `at` further from the storage than `NPC_NODE_REACH`, the Build
+/// default's `foodAt` and `foodTake` (#1379: Larkspur's builders set out for a quarry 360 tiles
+/// away with a few units and went Down on the way back): Food below what the walk home eats, over
+/// what it fetches below anyway (`road_crew_food`), and enough for the walk there and back and a
+/// few days of work on top (`set_out_food`). `None` for a site nearer.
+pub fn far_site_food(
+    world: &WorldState,
+    i: usize,
+    storage: &Building,
+    at: (f64, f64),
+    terrain: Option<&TerrainMap>,
+) -> Option<(f64, f64)> {
+    use csp_shared::balance::{road_crew_food, set_out_food, NPC_NODE_REACH, WALK_TICKS_PER_TILE};
+    let from = (storage.x as i32, storage.y as i32);
+    let to = (at.0 as i32, at.1 as i32);
+    let size = terrain.map_or(MAP_SIZE, |t| t.size);
+    if wrap_distance(size, from, to) <= NPC_NODE_REACH {
+        return None;
+    }
+    let walk = match terrain {
+        Some(t) => {
+            crate::walk_time::walk_time(world, t, &|_, _| true, &world.residents[i], from, to)
+        }
+        None => wrap_distance(size, from, to) * WALK_TICKS_PER_TILE,
+    };
+    let food_at = road_crew_food(walk);
+    Some((food_at, set_out_food(walk) + food_at))
+}
+
+/// Whether a resident carries materials for walls or gates, for a project of `building` of
+/// `material` (`forWall`).
+fn for_wall(building: BuildingKind, material: Option<WallMaterial>, carried: &Stock) -> bool {
     if building != BuildingKind::Wall && building != BuildingKind::Gate {
         return false;
     }
-    pick(Some(carried), &build_materials(building)).is_some()
+    pick(Some(carried), &build_materials_of(building, material)).is_some()
+}
+
+/// The construction site a build project of `building` of `material` at (x, y) works on, if one
+/// is laid out: a stone one over a wooden wall too (`CONTEXT.md`: Wood or stone).
+pub fn project_site(
+    world: &WorldState,
+    building: BuildingKind,
+    material: Option<WallMaterial>,
+    x: f64,
+    y: f64,
+) -> Option<&Building> {
+    construction_at(world, x as i32, y as i32, building).filter(|s| {
+        s.site.is_some()
+            && (!is_wall_kind(s.kind)
+                || is_stone(s.kind, s.material) == is_stone(building, material))
+    })
+}
+
+fn is_wall_kind(kind: BuildingKind) -> bool {
+    matches!(kind, BuildingKind::Wall | BuildingKind::Gate)
 }
 
 /// `n` times the goods (`times`).
@@ -373,6 +477,10 @@ pub fn next_project(
     let rings = wall_rings(world, city, home, terrain.size);
     if let Some(r) = &rings {
         if let Some(old) = old_wall_to_tear_down(world, city, home, terrain, r) {
+            // Its old towers go with it, first (`CONTEXT.md`: Tower).
+            let size = terrain.size;
+            let old = crate::npc_towers::old_tower(world, city, home, r.inner, r.outer, size)
+                .unwrap_or(old);
             return Some(CityProject::TearDown { building_id: old });
         }
     }
@@ -423,14 +531,6 @@ pub fn no_farm(world: &WorldState, city: &City) -> bool {
         })
 }
 
-/// Where a project builds, and what (`want.x`, `want.y`, `want.building`).
-fn build_of(p: &CityProject) -> (BuildingKind, i32, i32) {
-    match p {
-        CityProject::Build { building, x, y } => (*building, *x as i32, *y as i32),
-        CityProject::TearDown { .. } => unreachable!("a build project"),
-    }
-}
-
 /// The project to take on before `want` (`materialsFirst`): when it needs a material the storage
 /// lacks and none of the city's workplaces makes, the workplace for that material first.
 fn materials_first(
@@ -445,10 +545,11 @@ fn materials_first(
     if matches!(want, CityProject::TearDown { .. }) {
         return want;
     }
-    let (building, x, y) = build_of(&want);
-    let need = match building_at(world, x, y, MAP_SIZE).filter(|s| s.site.is_some()) {
+    let CityProject::Build { building, x, y, material } = &want else { return want };
+    // Its site's needs (a stone one over a wooden wall too), else all the building's.
+    let need = match project_site(world, *building, *material, *x, *y) {
         Some(site) => materials_needed(site),
-        None => build_materials(building),
+        None => build_materials_of(*building, *material),
     };
     let storage = world.buildings.iter().find(|b| {
         b.city_id.as_ref() == Some(&city.id) && b.kind == BuildingKind::Storage && b.site.is_none()
@@ -460,14 +561,57 @@ fn materials_first(
         carried_by(world, city)
     };
     for (good, units) in &need {
-        if held(&have, *good) >= *units || makes(world, city, *good) {
+        if held(&have, *good) >= *units {
             continue;
         }
-        if let Some(first) = chain_project(world, city, home, terrain, rings, *good, seen) {
+        let Some(first) = built_first(world, city, home, terrain, rings, &have, *good, seen) else {
+            continue;
+        };
+        let same = matches!(&first, CityProject::Build { building: b, x: fx, y: fy, .. }
+            if b == building && *fx as i32 == *x as i32 && *fy as i32 == *y as i32);
+        if !same {
             return materials_first(world, city, home, terrain, rings, first, seen);
         }
     }
     want
+}
+
+/// What an NPC city builds first so a material it lacks can come, if anything (T100.8): nothing
+/// while a finished workplace of its makes it and what that is made from can come too; a site of
+/// its own begun for it, which no other site may wait on for ever; else the workplace for it
+/// (`chain_project`). Before this, a begun mine waited for Stone from a quarry that was only a
+/// site, and a begun smithy for Iron whose ore came from a mine that was only a site.
+#[allow(clippy::too_many_arguments)]
+fn built_first(
+    world: &WorldState,
+    city: &City,
+    home: &Building,
+    terrain: &TerrainMap,
+    rings: Option<&Rings>,
+    have: &Stock,
+    good: Good,
+    seen: &mut HashSet<Good>,
+) -> Option<CityProject> {
+    if seen.contains(&good) {
+        return None;
+    }
+    let own: Vec<&Building> = own_workplaces(world, city)
+        .into_iter()
+        .filter(|b| chain_good(world, b) == Some(good))
+        .collect();
+    if own.iter().any(|b| b.site.is_none()) {
+        seen.insert(good);
+        let input = chain_input(world, city, good).unwrap_or_default();
+        return input
+            .iter()
+            .filter(|(g, n)| held(have, **g) < **n)
+            .find_map(|(g, _)| built_first(world, city, home, terrain, rings, have, *g, seen));
+    }
+    if let Some(site) = own.first() {
+        seen.insert(good);
+        return Some(build(site.kind, (site.x as i32, site.y as i32)));
+    }
+    chain_project(world, city, home, terrain, rings, good, seen)
 }
 
 /// The workplace an NPC city builds next for a good it is short of (`chainProject`), if it can make
@@ -548,6 +692,31 @@ fn nearest_node(
     best.map(|(k, at, _)| (k, at))
 }
 
+/// Whether an NPC city's storages hold less Food than its reserve (`CONTEXT.md`: NPC reserve, NPC
+/// city): with every farm full it then builds another. One with no storage yet never is.
+pub fn food_below_reserve(world: &WorldState, city: &City) -> bool {
+    if city.trade_org.is_some() || no_storage_yet(world, city) {
+        return false;
+    }
+    held(&npc_city_stock(world, city), Good::Food) < held(&npc_reserve(world, city), Good::Food)
+}
+
+/// Whether an NPC city wants more Food than it holds (`CONTEXT.md`: NPC city, Full city): it is
+/// short of its reserve, or nothing else keeps it from being full and it doesn't yet hold the Food
+/// surplus that comes before its founding party's materials (`holds_food_first`). With every farm
+/// full it then builds another.
+pub fn wants_food(world: &WorldState, city: &City, home: &Building, size: i32) -> bool {
+    use crate::npc_founding::{founding_party, holds_food_first, short_for_founding};
+    if food_below_reserve(world, city) {
+        return true;
+    }
+    city.trade_org.is_none()
+        && !no_storage_yet(world, city)
+        && founding_party(world.city_plans.get(&city.id)).is_empty()
+        && !holds_food_first(world, city)
+        && short_for_founding(world, city, Some(home), size).is_empty()
+}
+
 /// What the city wants built most, where (`wanted`).
 fn wanted(
     world: &WorldState,
@@ -563,7 +732,7 @@ fn wanted(
         _ => first_wall(world, city, home, terrain, rings),
     };
     let in_area = |b: &Building| in_city_area(world, &city.id, b.x as i32, b.y as i32, size);
-    let begun = world.buildings.iter().find(|b| {
+    let is_begun = |b: &Building| {
         b.site.is_some()
             && (((b.kind == BuildingKind::Farm || b.kind == BuildingKind::Stable)
                 && b.city_id.as_ref() == Some(&city.id))
@@ -574,20 +743,46 @@ fn wanted(
                     && city.trade_org.is_none()
                     && is_big_npc_city(world, city)
                     && in_area(b)))
-    });
+    };
+    // A farm already begun is finished before anything else (`CONTEXT.md`: NPC city).
+    let begun =
+        world.buildings.iter().filter(|b| is_begun(b)).min_by_key(|b| b.kind != BuildingKind::Farm);
     let wall_site = ring.iter().find(|t| t.site.is_some());
+    let at = |building: BuildingKind, t: Option<(i32, i32)>| t.map(|t| build(building, t));
+    let first = first_ring();
+    let plan = rings.unwrap_or(&first);
+    if let Some(b) = begun.filter(|b| b.kind == BuildingKind::Farm) {
+        return Some(build(b.kind, (b.x as i32, b.y as i32)));
+    }
+    // Its Food short of its reserve, or of the surplus that comes before its founding party's
+    // materials, with every farm full: another farm, whether or not anyone is idle, and before any
+    // other building it has begun (#1379: a begun mine waiting on far Stone kept Larkspur from the
+    // farm it needed as it grew, and Ashford sat at its reserve on two farms).
+    if farms_full(world, city) && wants_food(world, city, home, size) {
+        if let Some(p) = at(BuildingKind::Farm, farm_tile(world, home, terrain, Some(plan))) {
+            return Some(p);
+        }
+    }
     if let Some(b) = begun {
         return Some(build(b.kind, (b.x as i32, b.y as i32)));
     }
     if let Some(t) = wall_site {
         let site = world.buildings.iter().find(|b| Some(&b.id) == t.site.as_ref()).expect("a site");
-        return Some(build(site.kind, (site.x as i32, site.y as i32)));
+        let p = build(site.kind, (site.x as i32, site.y as i32));
+        return Some(with_material(p, site.material));
     }
-    let at = |building: BuildingKind, t: Option<(i32, i32)>| t.map(|t| build(building, t));
+    // A stone site begun over a wooden wall goes on first, as any begun wall (`CONTEXT.md`: Wood
+    // or stone).
+    if let Some(p) = stone_upgrade_project(world, city, home, size, true) {
+        return Some(p);
+    }
+    // So does a tower begun (`CONTEXT.md`: Tower).
+    if let Some(p) = crate::npc_towers::tower_project(world, city, home, Some(terrain), size, true)
+    {
+        return Some(p);
+    }
     if city.trade_org.is_none() {
         // A daughter starts with its town hall alone.
-        let first = first_ring();
-        let plan = rings.unwrap_or(&first);
         let has = |kind: BuildingKind| {
             world
                 .buildings
@@ -612,12 +807,6 @@ fn wanted(
                 BuildingKind::House,
                 house_tile(world, city, home, terrain, Some(plan), BuildingKind::House),
             ) {
-                return Some(p);
-            }
-        }
-        // Its Food runs short with every farm full: another farm, whether or not anyone is idle.
-        if food_short(world, city) && farms_full(world, city) {
-            if let Some(p) = at(BuildingKind::Farm, farm_tile(world, home, terrain, Some(plan))) {
                 return Some(p);
             }
         }
@@ -655,7 +844,20 @@ fn wanted(
         }
     }
     if let Some(next) = ring.iter().find(|t| !t.done) {
-        return Some(build(next.kind, (next.x, next.y)));
+        // A new outer wall is of the material its old one was (`CONTEXT.md`: Wood or stone).
+        let stone =
+            rings.is_some_and(|r| r.expanding) && outer_ring_of_stone(world, city, home, size);
+        let p = build(next.kind, (next.x, next.y));
+        return Some(with_material(p, stone.then_some(WallMaterial::Stone)));
+    }
+    // Lacking nothing else, its wall up, the workplace for a founding material it has none for
+    // (`CONTEXT.md`: Full city).
+    for short in crate::npc_founding::founding_lacks(world, city, Some(home), size) {
+        if let Some(chain) =
+            chain_project(world, city, home, terrain, rings, short.good, &mut HashSet::new())
+        {
+            return Some(chain);
+        }
     }
     if let Some(second) = second_workplace(world, city, home, terrain) {
         return Some(second);
@@ -669,13 +871,39 @@ fn wanted(
     if let Some(dead) = tear_down_dead_workplace(world, city) {
         return Some(dead);
     }
-    let rings = rings?;
-    let inner = InnerRings {
-        expanding: rings.expanding,
-        gate: rings.gate.as_ref().map(|g| g.1),
-        new_gate: rings.gate_at(),
-    };
-    inner_wall_project(world, city, home, terrain, &inner, npc_builders(world, city))
+    if let Some(r) = rings {
+        let inner = InnerRings {
+            expanding: r.expanding,
+            gate: r.gate.as_ref().map(|g| g.1),
+            new_gate: r.gate_at(),
+        };
+        if let Some(p) =
+            inner_wall_project(world, city, home, terrain, &inner, npc_builders(world, city))
+        {
+            return Some(p);
+        }
+    }
+    // Last, a town upgrades its wall to stone (`CONTEXT.md`: Wood or stone): the outer ring, then
+    // the inner one, from Stone beyond its reserve; with no quarry, one first, its spare hands
+    // working it for the Stone.
+    let expanding = rings.is_none_or(|r| r.expanding);
+    if let Some(p) = stone_upgrade_project(world, city, home, size, expanding) {
+        return Some(p);
+    }
+    // With its outer wall all of stone, a tower by each gate, then at its corners, as it can
+    // spare the Stone (`CONTEXT.md`: Tower).
+    let towers =
+        crate::npc_towers::tower_project(world, city, home, Some(terrain), size, expanding);
+    if let Some(p) = towers {
+        return Some(p);
+    }
+    let wants_tower_stone = || crate::npc_towers::wants_stone_for_towers(world, city, home, size);
+    if (wants_stone_for_walls(world, city) || wants_tower_stone())
+        && !makes(world, city, Good::Stone)
+    {
+        return chain_project(world, city, home, terrain, rings, Good::Stone, &mut HashSet::new());
+    }
+    None
 }
 
 /// Whether a city's last pass left someone idle who is free to work (`handsIdle`).
@@ -977,7 +1205,8 @@ pub fn far_stable_spot(
     free.first().map(|t| (t.0, t.1))
 }
 
-/// Whether the farmers an NPC city wants don't fit on the farms it has (`farmersDontFit`).
+/// Whether the farmers who feed an NPC city don't fit on the farms it has (`farmersDontFit`;
+/// `farmers_to_feed`, not those who only win its reserve back).
 fn farmers_dont_fit(world: &WorldState, city: &City) -> bool {
     let farms = world
         .buildings
@@ -989,7 +1218,7 @@ fn farmers_dont_fit(world: &WorldState, city: &City) -> bool {
     if farms == 0 {
         return false;
     }
-    farmers_wanted(world, city) > farms as f64 * max_workers(BuildingKind::Farm).unwrap_or(0.0)
+    farmers_to_feed(world, city) > farms as f64 * max_workers(BuildingKind::Farm).unwrap_or(0.0)
 }
 
 /// The city's walls as rings round its home (`wallRings`). A city expands once it has a house,

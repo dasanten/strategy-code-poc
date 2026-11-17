@@ -3,11 +3,12 @@ use csp_server::scripts::{game_defaults, DefaultScript};
 use csp_shared::world::default_scripts::Task;
 
 #[allow(dead_code)] // Not every test file that shares this module uses it.
-pub const TASKS: [Task; 11] = [
+pub const TASKS: [Task; 12] = [
     Task::Work,
     Task::Build,
     Task::Haul,
     Task::TearDown,
+    Task::Repair,
     Task::Breed,
     Task::FeedStable,
     Task::Defend,

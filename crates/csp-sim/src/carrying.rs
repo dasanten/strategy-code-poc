@@ -17,11 +17,11 @@ use crate::goods_deps::{
     rob_caravan, rob_trader, update_city_membership, OrderSender,
 };
 use crate::holders::{move_between, stock_of, Holder};
+use crate::queries::building::materials_needed;
 use crate::queries::command::commander_of_resident;
 use crate::queries::goods::{
-    can_handle, down_index_on, free_stock, goods_at_spot, materials_needed, move_goods,
-    pile_index_at, site_at, site_index_at, storage_at, storage_index_at, units_that_fit,
-    units_that_fit_carriage,
+    can_handle, down_index_on, free_stock, goods_at_spot, move_goods, pile_index_at, site_at,
+    site_index_at, storage_at, storage_index_at, units_that_fit, units_that_fit_carriage,
 };
 use crate::queries::guard::outpost_storage_guarded;
 use crate::queries::names::{good_of, held};
@@ -402,7 +402,11 @@ fn guarded_from(world: &WorldState, ri: usize, spot: &GoodsSpot, size: i32) -> b
     let Some(b) = world.buildings.iter().find(|x| &x.id == storage_id) else {
         return false;
     };
-    world.residents[ri].owner != b.realm_id && outpost_storage_guarded(world, b, size)
+    // Anyone at a ruin can take out what is left in it, as from an unguarded outpost storage
+    // (`CONTEXT.md`: Ruin).
+    !crate::ruins::is_ruin(b)
+        && world.residents[ri].owner != b.realm_id
+        && outpost_storage_guarded(world, b, size)
 }
 
 /// Whose goods a spot holds (`spotOrganization`): a storage's, a carriage's or a Down resident's
@@ -445,6 +449,10 @@ fn put(
     let ground = matches!(a.spot, GoodsSpot::Ground);
     let target = if ground { None } else { spot_holder(world, ri, &a.spot) };
     if !ground && target.is_none() {
+        return;
+    }
+    // A ruined storage takes nothing in (`CONTEXT.md`: Ruin).
+    if matches!(target, Some(Holder::Storage(i)) if crate::ruins::is_ruin(&world.buildings[i])) {
         return;
     }
     // A construction site takes only the materials it still needs, a carriage what fits on it.

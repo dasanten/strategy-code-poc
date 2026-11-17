@@ -13,7 +13,7 @@ use crate::sight::InvariantViolation;
 /// Whether a plan's project on a resource node is on one the city knows of (`plansOnKnown`), or
 /// one in a sector it found no way to.
 fn plans_on_known(world: &WorldState, city: &City, plan: &CityPlan, size: i32) -> bool {
-    let Some(CityProject::Build { building, x, y }) = &plan.project else { return true };
+    let Some(CityProject::Build { building, x, y, .. }) = &plan.project else { return true };
     let (px, py) = (*x as i32, *y as i32);
     if building_at(world, px, py, MAP_SIZE).is_some() {
         return true;

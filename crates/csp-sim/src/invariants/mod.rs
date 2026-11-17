@@ -168,6 +168,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "outpost-storage-realms", check: checks::outpost_storage_realms },
         Invariant { name: "carried-within-capacity", check: checks::carried_within_capacity },
         Invariant { name: "equipment-sound", check: checks::equipment_sound },
+        Invariant { name: "wear-sound", check: |w, _| crate::wear::wear_problems(w) },
         Invariant { name: "goods-in-place", check: checks::goods_in_place },
         Invariant { name: "breed-orders-sound", check: checks::breed_orders_sound },
         Invariant { name: "kept-breedings-sound", check: checks::kept_breedings_sound },
@@ -183,6 +184,10 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "tear-down-orders-on-buildings",
             check: checks::tear_down_orders_on_buildings,
         },
+        Invariant { name: "conditions-in-range", check: checks::conditions_in_range },
+        Invariant { name: "repair-orders-on-buildings", check: checks::repair_orders_on_buildings },
+        Invariant { name: "trade-org-kept-up", check: checks::trade_org_kept_up },
+        Invariant { name: "ruins-ruined", check: checks::ruins_ruined },
         Invariant { name: "nodes-on-fitting-terrain", check: checks::nodes_on_fitting_terrain },
         Invariant { name: "realm-logs-in-order", check: checks::realm_logs_in_order },
         Invariant { name: "residents-in-cities", check: checks::residents_in_cities },
@@ -202,6 +207,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "children-dont-work", check: checks::children_dont_work },
         Invariant { name: "children-carry-only-food", check: checks::children_carry_only_food },
         Invariant { name: "carriages-in-place", check: checks::carriages_in_place },
+        Invariant { name: "siege-machines-in-place", check: checks::siege_machines_in_place },
         Invariant { name: "vessels-in-place", check: checks::vessels_in_place },
         Invariant { name: "riders-on-horses", check: checks::riders_on_horses },
         Invariant { name: "passengers-aboard", check: checks::passengers_aboard },
@@ -222,8 +228,10 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, _| crate::horses::horses_down_lie_still(w),
         },
         Invariant { name: "attack-orders-sound", check: checks::attack_orders_sound },
+        Invariant { name: "shots-within-reach", check: checks::shots_within_reach },
         Invariant { name: "up-only-on-walls", check: crate::wall_walk::up_only_on_walls },
         Invariant { name: "up-only-on-own-walls", check: crate::wall_walk::up_only_on_own_walls },
+        Invariant { name: "tower-room", check: crate::wall_walk::tower_room },
         Invariant {
             name: "none-attack-up-from-below",
             check: crate::wall_walk::none_attack_up_from_below,
@@ -280,6 +288,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         },
         Invariant { name: "gates-sound", check: checks::gates_sound },
         Invariant { name: "wall-damage-sound", check: checks::wall_damage_sound },
+        Invariant { name: "wall-materials-sound", check: checks::wall_materials_sound },
         Invariant { name: "climb-orders-sound", check: checks::climb_orders_sound },
         Invariant { name: "teachers-sound", check: checks::teachers_sound },
         Invariant { name: "trainees-sound", check: checks::trainees_sound },
@@ -315,6 +324,10 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant {
             name: "npc-gate-shut-to-its-punishers",
             check: |w, t| crate::npc_defence::npc_gate_shut_to_its_punishers(w, t.size),
+        },
+        Invariant {
+            name: "npc-soldiers-stand-down",
+            check: |w, t| crate::npc_defence::npc_soldiers_stand_down(w, t.size),
         },
         Invariant {
             name: "supply-wagons-sound",
@@ -458,6 +471,10 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant {
             name: "npc-traders-sound",
             check: |w, _t| crate::npc_trader::npc_traders_sound(w),
+        },
+        Invariant {
+            name: "npc-escorts-sound",
+            check: |w, _t| crate::npc_escort::npc_escorts_sound(w),
         },
         Invariant { name: "line-orders-sound", check: checks::line_orders_sound },
         Invariant { name: "paths-are-steps", check: checks::paths_are_steps },

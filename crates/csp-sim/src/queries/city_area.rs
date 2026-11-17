@@ -24,13 +24,14 @@ use super::standing::TRADE_ORG;
 
 /// Kinds of city building (`CITY_BUILDINGS`, `CONTEXT.md`: City building): what a city is made
 /// of. Farms, workplaces and stables are not.
-pub const CITY_BUILDINGS: [BuildingKind; 6] = [
+pub const CITY_BUILDINGS: [BuildingKind; 7] = [
     BuildingKind::TownHall,
     BuildingKind::House,
     BuildingKind::Storage,
     BuildingKind::Warehouse,
     BuildingKind::Wall,
     BuildingKind::Gate,
+    BuildingKind::Tower,
 ];
 
 /// Ticks a city's town hall has to be occupied before it is captured (`OCCUPATION_TICKS`).
@@ -276,7 +277,7 @@ pub fn housing_room(world: &WorldState, city_id: &str) -> f64 {
     world
         .buildings
         .iter()
-        .filter(|b| b.city_id.as_deref() == Some(city_id) && b.site.is_none())
+        .filter(|b| b.city_id.as_deref() == Some(city_id) && crate::ruins::standing(b))
         .fold(0.0, |room, b| room + HOUSING_ROOM.get(kind_name(b.kind)).unwrap_or(0.0))
 }
 

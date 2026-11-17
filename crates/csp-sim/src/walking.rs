@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use csp_shared::balance::{carriage_can_enter, WALL_WALK_TICKS};
+use csp_shared::balance::{carriage_can_enter, TOWER_ROOM, WALL_WALK_TICKS};
 use csp_shared::terrain::{
     beside_step, ground_at, is_passable_terrain, step_length, terrain_at, tile_index, wrap,
     TerrainMap,
@@ -26,6 +26,7 @@ use crate::water_hauling::stop_tile;
 
 use crate::armies::waiting_for_army;
 use crate::caravans::waiting_for_escort;
+use crate::combat::strikes_from_here;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::pathfinding::{
@@ -61,6 +62,9 @@ fn attack_target(world: &WorldState, target_id: &str) -> Option<(f64, f64)> {
     match crate::combat::attack_target(world, target_id)? {
         crate::combat::Target::Resident(i) => Some((world.residents[i].x, world.residents[i].y)),
         crate::combat::Target::Building(i) => Some((world.buildings[i].x, world.buildings[i].y)),
+        crate::combat::Target::Machine(i) => {
+            Some((world.siege_machines[i].x, world.siege_machines[i].y))
+        }
     }
 }
 
@@ -74,6 +78,8 @@ pub struct StepAction {
     pub carriage_id: Option<String>,
     pub horse_id: Option<String>,
     pub vessel_id: Option<String>,
+    /// The siege machine pushed onto the tile, with its crew (`CONTEXT.md`: Siege machine).
+    pub machine_id: Option<String>,
 }
 
 /// The walk-to order (`walkTo`): one of the Player's residents walks to a tile. It only sets the
@@ -145,6 +151,8 @@ pub fn order_path_mut(o: &mut ResidentOrder) -> Option<(&mut Option<TilePath>, &
         ResidentOrder::Relocate(o) => Some((&mut o.path, &mut o.progress)),
         ResidentOrder::Row(o) | ResidentOrder::Sail(o) => Some((&mut o.path, &mut o.progress)),
         ResidentOrder::HaulByWater(o) => Some((&mut o.path, &mut o.progress)),
+        ResidentOrder::Crew(o) => Some((&mut o.path, &mut o.progress)),
+        ResidentOrder::Push(o) => Some((&mut o.path, &mut o.progress)),
         _ => None,
     }
 }
@@ -167,7 +175,9 @@ fn is_moving(o: Option<&ResidentOrder>) -> bool {
             | ResidentOrder::Attack(_)
             | ResidentOrder::Relocate(_)
             | ResidentOrder::Row(_)
-            | ResidentOrder::Sail(_),
+            | ResidentOrder::Sail(_)
+            | ResidentOrder::Crew(_)
+            | ResidentOrder::Push(_),
         ) => true,
         _ => false,
     }
@@ -189,6 +199,8 @@ fn move_path(o: Option<&ResidentOrder>) -> Option<&TilePath> {
         ResidentOrder::Relocate(o) => o.path.as_ref(),
         ResidentOrder::Row(o) | ResidentOrder::Sail(o) => o.path.as_ref(),
         ResidentOrder::HaulByWater(o) => o.path.as_ref(),
+        ResidentOrder::Crew(o) => o.path.as_ref(),
+        ResidentOrder::Push(o) => o.path.as_ref(),
         _ => None,
     }
 }
@@ -225,6 +237,8 @@ fn kind_name(o: &ResidentOrder) -> &'static str {
         ResidentOrder::Row(_) => "row",
         ResidentOrder::Sail(_) => "sail",
         ResidentOrder::HaulByWater(_) => "haulByWater",
+        ResidentOrder::Crew(_) => "crew",
+        ResidentOrder::Push(_) => "push",
         _ => "other",
     }
 }
@@ -247,6 +261,10 @@ fn target_of(world: &WorldState, o: &ResidentOrder) -> Option<(f64, f64)> {
         ResidentOrder::Relocate(o) => Some((o.target.x, o.target.y)),
         ResidentOrder::Row(o) | ResidentOrder::Sail(o) => Some((o.target.x, o.target.y)),
         ResidentOrder::HaulByWater(o) => o.water.map(|t| (t.x, t.y)),
+        ResidentOrder::Crew(o) => {
+            crate::siege::machine_by_id(world, &o.machine_id).map(|m| (m.x, m.y))
+        }
+        ResidentOrder::Push(o) => Some((o.target.x, o.target.y)),
         _ => None,
     }
 }
@@ -455,13 +473,26 @@ fn on_foot(o: &ResidentOrder) -> bool {
             | ResidentOrder::Row(_)
             | ResidentOrder::Sail(_)
             | ResidentOrder::HaulByWater(_)
+            | ResidentOrder::Push(_)
     )
 }
 
 /// A moving order got there (`arrive`): a walk or drive is done, a haul route starts on its stop,
 /// an attack order waits, a line builds on its tile, a store or fetch order puts or takes, a
-/// relocate order waits to move in, a supply wagon's drive lasts as long as its army.
+/// relocate order waits to move in, a supply wagon's drive lasts as long as its army. A crew order
+/// joins its machine's crew on its tile, or goes after it if it was pushed on meanwhile.
 fn arrive(world: &mut WorldState, i: usize) {
+    if let Some(ResidentOrder::Crew(o)) = &world.residents[i].order {
+        let r = &world.residents[i];
+        let there = crate::siege::machine_by_id(world, &o.machine_id)
+            .map(|m| (m.x as i32, m.y as i32) == (r.x as i32, r.y as i32));
+        if there == Some(false) {
+            reset_path_any(world, i);
+        } else {
+            crate::siege::join_crew(world, i);
+        }
+        return;
+    }
     let r = &mut world.residents[i];
     let Some(o) = r.order.as_mut() else { return };
     match o {
@@ -508,8 +539,21 @@ fn arrive(world: &mut WorldState, i: usize) {
 }
 
 /// An attack order that need not walk this tick (`attackHolds`): its target is gone or in
-/// contact. One whose path no longer ends in contact with its target finds a new one.
+/// contact, or an archer can shoot it from where they stand (`CONTEXT.md`: Ranged combat). One
+/// whose path no longer ends in contact with its target finds a new one.
 fn attack_holds(world: &mut WorldState, i: usize, size: i32) -> bool {
+    let r = &world.residents[i];
+    let Some(o) = &r.order else { return false };
+    if let ResidentOrder::Attack(a) = o {
+        let target = world.residents.iter().position(|t| t.id == a.target_id);
+        if target.is_some_and(|t| t != i && strikes_from_here(world, size, i, t)) {
+            if let Some(ResidentOrder::Attack(a)) = &mut world.residents[i].order {
+                a.path = None;
+                a.progress = 0.0;
+            }
+            return true;
+        }
+    }
     let r = &world.residents[i];
     let Some(o) = &r.order else { return false };
     let target = target_of(world, o);
@@ -691,9 +735,13 @@ impl Walking {
             if matches!(r.order, Some(ResidentOrder::Attack(_))) && attack_holds(world, i, size) {
                 holding.insert(world.residents[i].id.clone());
             }
-            // A store or fetch order whose carriage moved on since its path was found finds a new one.
+            // A store or fetch order whose carriage moved on since its path was found finds a new
+            // one, and so does a crew order whose machine was pushed on.
             let r = &world.residents[i];
-            if let Some(o @ (ResidentOrder::Store(_) | ResidentOrder::Fetch(_))) = &r.order {
+            if let Some(
+                o @ (ResidentOrder::Store(_) | ResidentOrder::Fetch(_) | ResidentOrder::Crew(_)),
+            ) = &r.order
+            {
                 if let (Some(to), Some(end)) =
                     (target_of(world, o), move_path(Some(o)).and_then(|p| p.last()))
                 {
@@ -789,6 +837,7 @@ impl Walking {
                         carriage_id: None,
                         horse_id: None,
                         vessel_id: Some(vessel_id),
+                        machine_id: None,
                     });
                 }
                 continue;
@@ -803,7 +852,23 @@ impl Walking {
             }
             let gain;
             let mut learned = 0.0;
-            if !foot {
+            let pushed = match o {
+                ResidentOrder::Push(p) => Some(p.machine_id.clone()),
+                _ => None,
+            };
+            if let Some(machine_id) = &pushed {
+                // A crewed machine goes at its own slow pace, whoever pushes it; below its crew
+                // size it stands where it is (`CONTEXT.md`: Siege machine).
+                let Some(m) = crate::siege::machine_by_id(world, machine_id) else {
+                    world.residents[i].order = None;
+                    continue;
+                };
+                if crate::siege::push_problem(world, r, m).is_some() {
+                    world.residents[i].order = None;
+                    continue;
+                }
+                gain = crate::siege::push_speed(ground);
+            } else if !foot {
                 // The horse sets the pace. Without one the step goes at once, so resolving it ends
                 // the order, as it does when the horse is Down: the carriage stands where it is.
                 let carriage_id = match o {
@@ -825,6 +890,7 @@ impl Walking {
                             carriage_id: Some(carriage_id.clone()),
                             horse_id: None,
                             vessel_id: None,
+                            machine_id: None,
                         });
                         continue;
                     }
@@ -851,7 +917,7 @@ impl Walking {
             let (_, progress) = move_path_mut(r.order.as_mut()).expect("a moving order");
             *progress += gain;
             let progress = *progress;
-            if !foot || horse_id.is_some() {
+            if (!foot && pushed.is_none()) || horse_id.is_some() {
                 let skill = r.skills.get(&SkillName::Driving).copied().unwrap_or(0.0);
                 r.skills.insert(SkillName::Driving, skill + learned);
             }
@@ -871,6 +937,7 @@ impl Walking {
                 carriage_id: if foot { None } else { carriage_id },
                 horse_id,
                 vessel_id: None,
+                machine_id: pushed,
             });
         }
         steps
@@ -982,6 +1049,14 @@ impl Walking {
         let terrain = self.terrain.clone();
         let residents: HashMap<String, usize> =
             world.residents.iter().enumerate().map(|(i, r)| (r.id.clone(), i)).collect();
+        // Who is up on each tower now, kept up to date step by step (`CONTEXT.md`: Tower).
+        let mut towers_up: HashMap<String, usize> = HashMap::new();
+        for r in world.residents.iter().filter(|r| r.up.is_some()) {
+            let t = tile_index(size, r.x as i32, r.y as i32);
+            if let Some(tower) = walls.tiles.get(&t).and_then(|w| w.tower.clone()) {
+                *towers_up.entry(tower).or_insert(0) += 1;
+            }
+        }
         for step in steps {
             let Some(&i) = residents.get(&step.resident_id) else { continue };
             if let Some(vid) = &step.vessel_id {
@@ -1002,7 +1077,8 @@ impl Walking {
             let from = tile_index(size, rx, ry);
             let to = tile_index(size, tx, ty);
             let side = wall_side(r);
-            let on_walls = step.carriage_id.is_none() && step.horse_id.is_none();
+            let on_walls =
+                step.carriage_id.is_none() && step.horse_id.is_none() && step.machine_id.is_none();
             // Up on a wall walk, or getting up or down: straight steps on foot only, along their
             // side's walk, down to the side they came up from (`CONTEXT.md`: Wall walk).
             let up = r.up.filter(|_| on_walls);
@@ -1032,8 +1108,67 @@ impl Walking {
                 reset_path(world, i);
                 continue;
             }
+            // A tower holds only so many up at once (`CONTEXT.md`: Tower): one getting onto a full
+            // one waits where they are, their way kept, until there is room. Along its own top they
+            // go as they like.
+            let tower_of = |t: usize, up: Option<UpSide>| {
+                up.and(walls.tiles.get(&t)).and_then(|w| w.tower.clone())
+            };
+            let (left, onto) = (tower_of(from, up), tower_of(to, to_up));
+            if left != onto {
+                if let Some(t) = &onto {
+                    if towers_up.get(t).copied().unwrap_or(0) >= TOWER_ROOM as usize {
+                        continue;
+                    }
+                    *towers_up.entry(t.clone()).or_insert(0) += 1;
+                }
+                if let Some(n) = left.as_ref().and_then(|t| towers_up.get_mut(t)) {
+                    *n = n.saturating_sub(1);
+                }
+            }
             // Getting up or down uses up its ticks of progress (`request_steps`).
             let length = if up.is_some() != to_up.is_some() { WALL_WALK_TICKS } else { length };
+            if let Some(mid) = &step.machine_id {
+                // The pusher's step needs the machine on their tile, still crewed, onto ground a
+                // carriage could take; the machine and its crew there go along (`CONTEXT.md`:
+                // Siege machine).
+                let mi = crate::siege::machine_index(world, mid);
+                let r = &world.residents[i];
+                let ok = mi.is_some_and(|mi| {
+                    let m = &world.siege_machines[mi];
+                    (m.x as i32, m.y as i32) == (rx, ry)
+                        && crate::siege::push_problem(world, r, m).is_none()
+                });
+                if !ok {
+                    world.residents[i].order = None;
+                    continue;
+                }
+                if !crate::siege::machine_can_enter(ground) {
+                    reset_path(world, i);
+                    continue;
+                }
+                let mi = mi.expect("checked");
+                let crew: Vec<usize> = world.siege_machines[mi]
+                    .crew_ids
+                    .iter()
+                    .filter_map(|id| residents.get(id).copied())
+                    .filter(|&c| {
+                        c != i
+                            && (world.residents[c].x as i32, world.residents[c].y as i32)
+                                == (rx, ry)
+                    })
+                    .collect();
+                (world.siege_machines[mi].x, world.siege_machines[mi].y) = step.to;
+                for c in crew {
+                    let p = &mut world.residents[c];
+                    (p.x, p.y) = step.to;
+                    // Whatever path they were on starts again from the new tile.
+                    if let Some((path, progress)) = p.order.as_mut().and_then(order_path_mut) {
+                        *path = None;
+                        *progress = 0.0;
+                    }
+                }
+            }
             if let Some(cid) = &step.carriage_id {
                 let k = world.carriages.iter().position(|k| k.id == *cid);
                 let horse = k.and_then(|k| horse_for(world, &world.carriages[k]));

@@ -128,7 +128,7 @@ mod delivery_fees_and_quotes {
         let coins = Stock::from([(Good::Coins, 100_000.0)]);
         let hands = TradeHolder { stock: &coins, room: 1_000.0 };
         assert_eq!(
-            quote_trade(&s.world, s.w(), hands, TradeSide::Buy, Good::Iron, 100.0, 25.0).units,
+            quote_trade(&s.world, s.w(), hands, TradeSide::Buy, Good::Iron, 100.0, 25.0, &[]).units,
             5.0
         );
         assert_eq!(

@@ -48,6 +48,10 @@ impl OrderKind for Climb {
             Ok(w) => w,
             Err(e) => return Some(e),
         };
+        // A wall or gate is climbed; a tower is broken (`CONTEXT.md`: Walls in combat, Tower).
+        if wall.kind == csp_shared::world::BuildingKind::Tower {
+            return Some("a tower is broken, not climbed".into());
+        }
         if let Some(no) = crate::lent::refusal(world, r, &wall.id) {
             return Some(no.into());
         }
@@ -108,7 +112,7 @@ pub fn resolve_climbing(
         let Some(ResidentOrder::Climb(o)) = &r.order else { continue };
         let wall = world.buildings.iter().find(|b| b.id == o.wall_id);
         let finished = wall.filter(|w| {
-            matches!(w.kind, BuildingKind::Wall | BuildingKind::Gate) && w.site.is_none()
+            matches!(w.kind, BuildingKind::Wall | BuildingKind::Gate) && crate::ruins::standing(w)
         });
         let stays = finished.is_some_and(|w| {
             r.x == o.at.x && r.y == o.at.y && besides(terrain.size, (r.x, r.y), (w.x, w.y))

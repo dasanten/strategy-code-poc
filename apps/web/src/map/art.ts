@@ -14,6 +14,8 @@ export const BUILDING_ART: Record<BuildingKind, string> = {
   warehouse: 'warehouse.svg',
   wall: 'wall.svg',
   gate: 'gate.svg',
+  // A placeholder until Daniel's art (`CONTEXT.md`: Tower).
+  tower: 'tower.svg',
   farm: 'farm.svg',
   stable: 'stable.svg',
   mine: 'mine.svg',
@@ -27,6 +29,8 @@ export const BUILDING_ART: Record<BuildingKind, string> = {
   carriage: 'cart.svg',
   boat: 'boat.svg',
   ship: 'ship.svg',
+  ram: 'ram.svg',
+  catapult: 'catapult.svg',
   haven: 'haven.svg',
 }
 
@@ -126,6 +130,8 @@ export const UNIT_ART = {
   carriage: 'cart.svg',
   boat: 'boat.svg',
   ship: 'ship.svg',
+  ram: 'ram.svg',
+  catapult: 'catapult.svg',
   horse: 'horse.svg',
   caravan: 'caravan.svg',
   army: 'army-banner.svg',

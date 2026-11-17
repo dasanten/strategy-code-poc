@@ -3,7 +3,9 @@
 
 import { allied, alliedRealms } from './alliance.js'
 import { npcCityRefuses } from './city.js'
-import { BUILD_MATERIALS, WALL_STRENGTH } from './narrowed.js'
+import { STONE_WALL_STRENGTH, WALL_STRENGTH } from './narrowed.js'
+import { isStone, materialsOfKind } from './building.js'
+import { footprintTiles } from './footprint.js'
 import { isPassableTerrain, tileIndex, type TerrainMap, wrap, wrapDelta } from './terrain.js'
 import { TRADE_ORG } from './trade-org.js'
 import { type WorldState } from './world.js'
@@ -54,7 +56,7 @@ export interface WallMap {
 
 /** Whether a building is a finished wall or gate. */
 export function isWallOrGate(b: Building): boolean {
-  return (b.kind === 'wall' || b.kind === 'gate') && !b.site
+  return (b.kind === 'wall' || b.kind === 'gate' || b.kind === 'tower') && !b.site
 }
 
 /** Whether a gate is closed; a gate is open until its city's realm closes it. */
@@ -120,13 +122,16 @@ export function wallMap(
   for (const b of world.buildings) {
     if (!isWallOrGate(b)) continue
     const realmId = (b.cityId && realms.get(b.cityId)) ?? null
-    tiles.set(tileIndex(size, b.x, b.y), {
-      kind: b.kind as 'wall' | 'gate',
-      realmId,
-      realms: side(realmId ?? b.cityId),
-      closed: isClosed(b),
-      shutTo: (b.kind === 'gate' && b.cityId && shut.get(b.cityId)) || [],
-    })
+    // A tower is wall on every tile of its footprint (`CONTEXT.md`: Tower).
+    for (const [x, y] of footprintTiles(b, size)) {
+      tiles.set(tileIndex(size, x, y), {
+        kind: b.kind === 'gate' ? 'gate' : 'wall',
+        realmId,
+        realms: side(realmId ?? b.cityId),
+        closed: isClosed(b),
+        shutTo: (b.kind === 'gate' && b.cityId && shut.get(b.cityId)) || [],
+      })
+    }
   }
   const inside = new Set<number>()
   const outside = new Set<number>()
@@ -255,7 +260,8 @@ export function onOwnWall(
 
 /** Damage a finished wall or gate takes before it falls (`WALL_STRENGTH`). */
 export function wallStrength(b: Building): number {
-  return WALL_STRENGTH[b.kind === 'gate' ? 'gate' : 'wall']
+  const of = isStone(b.kind, b.material) ? STONE_WALL_STRENGTH : WALL_STRENGTH
+  return of[b.kind === 'gate' ? 'gate' : b.kind === 'tower' ? 'tower' : 'wall']
 }
 
 /** Damage a wall or gate can still take before it falls. */
@@ -269,7 +275,10 @@ export function wallStrengthLeft(b: Building): number {
  */
 export function brokenReturns(b: Building): Stock {
   const out: Stock = {}
-  for (const [good, units] of Object.entries(BUILD_MATERIALS[b.kind] ?? {}) as [Good, number][]) {
+  for (const [good, units] of Object.entries(materialsOfKind(b.kind, b.material)) as [
+    Good,
+    number,
+  ][]) {
     const back = Math.floor(units * BROKEN_MATERIALS_RETURNED)
     if (back > 0) out[good] = back
   }

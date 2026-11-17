@@ -134,7 +134,10 @@ fn left_alone_keeps_its_size_and_keeps_itself_fed() {
     let mut walking = Walking::new(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     let without_stock = |w: &WorldState| {
-        w.buildings.iter().map(|b| Building { stock: None, ..b.clone() }).collect::<Vec<_>>()
+        w.buildings
+            .iter()
+            .map(|b| Building { stock: None, decay: None, repair: None, ..b.clone() })
+            .collect::<Vec<_>>()
     };
     let buildings = without_stock(&world);
     let people: Vec<String> = world.residents.iter().map(|r| r.id.clone()).collect();

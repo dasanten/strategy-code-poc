@@ -195,6 +195,7 @@ fn nearly_built(world: &mut WorldState, kind: BuildingKind) -> String {
         building: kind,
         at: Tile { x, y },
         site_id: Some(id.clone()),
+        material: None,
     }));
     id
 }
@@ -302,6 +303,20 @@ fn torn_down_dissolves_the_city_buildings_and_residents_stay_residents_are_homel
     assert_eq!((h.city_id.clone(), h.x, h.y), (None, 5.0, 1.0));
     assert_eq!(world.buildings.iter().find(|b| b.id == farm).unwrap().city_id, None);
     assert!(world.residents.iter().all(|r| r.city_id.is_none() && r.pair.is_none()));
+}
+
+/// A dissolved city leaves no plan behind: a town hall that falls to ruin (Epic 97) dissolves an NPC
+/// city the planner ran.
+#[test]
+fn dissolving_drops_the_citys_plan() {
+    let mut world = setup();
+    add_city(&mut world, "c1", Some("r1"), 1.0, 1.0, None);
+    let plan = serde_json::from_value(serde_json::json!({ "plannedAt": 0.0, "jobs": {} }))
+        .expect("a plan");
+    world.city_plans.insert("c1".into(), plan);
+    world.buildings.retain(|b| b.id != "c1-hall");
+    dissolve_city(&mut world, "c1");
+    assert!(world.city_plans.is_empty());
 }
 
 // `citiesFromBuildings` is `invariants.ts`'s: T86.13. Storages laid out and finished are T86.6's.

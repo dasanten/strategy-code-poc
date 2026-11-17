@@ -152,6 +152,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 null_when: None,
             },
             ScriptField {
+                name: "condition",
+                r#type: ScriptType::View("condition"),
+                description: "The condition of what they have equipped.",
+                null_when: Some("for another realm’s residents"),
+            },
+            ScriptField {
                 name: "order",
                 r#type: ScriptType::View("residentOrder"),
                 description: "What they were ordered to do.",
@@ -198,6 +204,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::Boolean,
                 description: "Whether they are up on a wall walk, on top of a wall or gate, rather than on the ground. Getting up or down takes a while, and they come down only on the side they went up from.",
                 null_when: None,
+            },
+            ScriptField {
+                name: "reach",
+                r#type: ScriptType::Number,
+                description: "How far, in tiles, their Bow or Crossbow shoots from where they stand: further up on a wall. The Arrows they shoot are `carried.arrows`; out of them they fight with their fists.",
+                null_when: Some("without a bow or crossbow equipped"),
             },
             ScriptField {
                 name: "script",
@@ -316,7 +328,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "weapon",
                 r#type: ScriptType::String,
-                description: "The weapon equipped: \"spear\", \"sword\" or \"steelSword\".",
+                description: "The weapon equipped: \"spear\", \"sword\", \"steelSword\", \"bow\" or \"crossbow\". A bow or crossbow takes both hands, so the shield slot stays empty.",
                 null_when: Some("when unarmed"),
             },
             ScriptField {
@@ -330,6 +342,36 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::String,
                 description: "The armour equipped: \"armour\" or \"steelArmour\".",
                 null_when: Some("when they have none equipped"),
+            },
+        ],
+    },
+    ScriptView {
+        name: "condition",
+        description: "The condition of what a resident has equipped: \"good\", \"worn\" or \"nearlyBroken\". Gear wears with each blow struck or taken and a little in training; worn out, it breaks and is gone. It fights as well as new until then.",
+        fields: &[
+            ScriptField {
+                name: "weapon",
+                r#type: ScriptType::String,
+                description: "The equipped weapon's condition.",
+                null_when: Some("when unarmed"),
+            },
+            ScriptField {
+                name: "shield",
+                r#type: ScriptType::String,
+                description: "The equipped shield's condition.",
+                null_when: Some("when they have none equipped"),
+            },
+            ScriptField {
+                name: "armour",
+                r#type: ScriptType::String,
+                description: "The equipped armour's condition.",
+                null_when: Some("when they have none equipped"),
+            },
+            ScriptField {
+                name: "tools",
+                r#type: ScriptType::String,
+                description: "The condition of the set of Tools they work with: it wears with each day's work.",
+                null_when: Some("when they carry none"),
             },
         ],
     },
@@ -493,6 +535,30 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "Units of steel armour.",
                 null_when: Some("when there are none"),
             },
+            ScriptField {
+                name: "tools",
+                r#type: ScriptType::Number,
+                description: "Units of Tools.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "bow",
+                r#type: ScriptType::Number,
+                description: "Units of bow.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "crossbow",
+                r#type: ScriptType::Number,
+                description: "Units of crossbow.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "arrows",
+                r#type: ScriptType::Number,
+                description: "Units of arrows.",
+                null_when: Some("when there are none"),
+            },
         ],
     },
     ScriptView {
@@ -612,6 +678,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::String,
                 description: "What a smithy is to make.",
                 null_when: Some("for other orders, and at other workplaces"),
+            },
+            ScriptField {
+                name: "mends",
+                r#type: ScriptType::Boolean,
+                description: "Whether I mend worn gear at a smithy (`workAt(\"mend\")`) rather than make anything.",
+                null_when: Some("for other orders, and while not mending"),
             },
             ScriptField {
                 name: "carriageId",
@@ -992,6 +1064,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 null_when: Some("until someone strikes it"),
             },
             ScriptField {
+                name: "material",
+                r#type: ScriptType::String,
+                description: "\"stone\" for a stone wall or gate, or its site.",
+                null_when: Some("for one of wood and any other building"),
+            },
+            ScriptField {
                 name: "prices",
                 r#type: ScriptType::List(&ScriptType::View("price")),
                 description: "A Trade Org warehouse’s prices, one for each good it keeps.",
@@ -1032,6 +1110,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::String,
                 description: "How the vein of a workplace on a node stands: \"plenty\", \"thinning\", \"nearlyGone\", or \"endless\" for a node that never runs dry; never a number.",
                 null_when: Some("for any other building, a construction site, a mine whose vein ran dry, and while neither my realm nor an ally has a resident working it"),
+            },
+            ScriptField {
+                name: "condition",
+                r#type: ScriptType::String,
+                description: "How it has decayed: \"good\", \"worn\", \"nearlyRuin\" or \"ruin\"; a worn one, or worse, can be repaired (`repair`), and repairing a ruin rebuilds it.",
+                null_when: Some("for a construction site and a building that never decays"),
             },
         ],
     },
@@ -1780,6 +1864,66 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
         ],
     },
     ScriptView {
+        name: "machine",
+        description: "A siege machine in the field, as the Player sees it.",
+        fields: &[
+            ScriptField {
+                name: "id",
+                r#type: ScriptType::String,
+                description: "The machine’s id, unique in the world.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "kind",
+                r#type: ScriptType::String,
+                description: "What it is: \"ram\".",
+                null_when: None,
+            },
+            ScriptField {
+                name: "realmId",
+                r#type: ScriptType::String,
+                description: "The realm it belongs to.",
+                null_when: Some("for one of nobody"),
+            },
+            ScriptField {
+                name: "x",
+                r#type: ScriptType::Number,
+                description: "The tile it stands on, from west to east.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "y",
+                r#type: ScriptType::Number,
+                description: "The tile it stands on, from north to south.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "damage",
+                r#type: ScriptType::Number,
+                description: "The damage blows have done it; at its strength it breaks.",
+                null_when: Some("while it is unharmed"),
+            },
+            ScriptField {
+                name: "teardown",
+                r#type: ScriptType::Number,
+                description: "The work put into tearing it down so far.",
+                null_when: Some("while nobody has started"),
+            },
+            ScriptField {
+                name: "crewIds",
+                r#type: ScriptType::List(&ScriptType::String),
+                description: "Its crew on its tile, in the order they joined.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "pusherId",
+                r#type: ScriptType::String,
+                description: "The one of its crew pushing it now.",
+                null_when: Some("while it stands still"),
+            },
+        ],
+    },
+    ScriptView {
         name: "pile",
         description: "Goods lying on a tile.",
         fields: &[
@@ -1920,6 +2064,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::Number,
                 description: "Damage a wall or gate has taken from blows.",
                 null_when: Some("for a city, until someone strikes it"),
+            },
+            ScriptField {
+                name: "material",
+                r#type: ScriptType::String,
+                description: "\"stone\" for a stone wall or gate, or its site.",
+                null_when: Some("for a city, for one of wood and any other building"),
             },
             ScriptField {
                 name: "prices",
@@ -2130,6 +2280,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::String,
                 description: "The construction site of the line’s road or wall on it.",
                 null_when: Some("while none is laid out there"),
+            },
+            ScriptField {
+                name: "building",
+                r#type: ScriptType::String,
+                description: "What is built there: the line's \"road\" or \"wall\", or \"gate\" where a stone wall line upgrades a wooden gate.",
+                null_when: None,
             },
         ],
     },
@@ -2359,6 +2515,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::List(&ScriptType::View("vessel")),
     },
     ScriptBinding {
+        name: "machines",
+        is: Is::Query,
+        params: &[],
+        cost: 20.0,
+        description: "The siege machines the Player sees, theirs and others'.",
+        returns: ScriptType::List(&ScriptType::View("machine")),
+    },
+    ScriptBinding {
         name: "traders",
         is: Is::Query,
         params: &[],
@@ -2511,11 +2675,27 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::List(&ScriptType::View("material")),
     },
     ScriptBinding {
+        name: "repairNeeded",
+        is: Is::Query,
+        params: &["building"],
+        cost: 1.0,
+        description: "The materials a repair of a worn building still lacks, as a list like [{good: \"wood\", units: 2}]; empty once it has them all, and for a building in good condition.",
+        returns: ScriptType::List(&ScriptType::View("material")),
+    },
+    ScriptBinding {
+        name: "wornBuildings",
+        is: Is::Query,
+        params: &["cityId"],
+        cost: 20.0,
+        description: "The buildings in that city’s area, a city of my realm’s, that need repairing (worn, nearly a ruin, a ruin, or with a repair under way), worst first, then nearest me; my realm’s own and those of no city and no realm, such as a road. Empty for any other city.",
+        returns: ScriptType::List(&ScriptType::View("building")),
+    },
+    ScriptBinding {
         name: "lineTiles",
         is: Is::Query,
         params: &["line", "from?"],
         cost: 20.0,
-        description: "The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: \"wall\", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out.",
+        description: "The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: \"wall\", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out; a stone wall line (`material: \"stone\"`) takes the wooden wall and gate tiles on its way too.",
         returns: ScriptType::List(&ScriptType::View("lineTile")),
     },
     ScriptBinding {
@@ -2563,7 +2743,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &["workplace", "makes?"],
         cost: 1.0,
-        description: "At a smelter, mint or smithy I see, the goods it lacks for a batch of its recipe (the one making `makes`, else its only one) in its pile and its workers’ hands: of each, as many batches’ worth as fit in my hands, as a list like [{good: \"ironOre\", units: 24}]; empty while it has a batch’s, when none fits, and for any other building.",
+        description: "At a smelter, mint or smithy I see, the goods it lacks for a batch of its recipe (the one making `makes`, else its only one; at a smithy with `makes` \"mend\", what mending its most worn piece takes) in its pile and its workers’ hands: of each, as many batches’ worth as fit in my hands, as a list like [{good: \"ironOre\", units: 24}]; empty while it has a batch’s, when none fits, and for any other building.",
         returns: ScriptType::List(&ScriptType::View("material")),
     },
     ScriptBinding {
@@ -2703,6 +2883,38 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::String,
     },
     ScriptBinding {
+        name: "crew",
+        is: Is::Action,
+        params: &["machine"],
+        cost: 10.0,
+        description: "Join the crew of a siege machine of my realm, by it or its id: I walk onto its tile, following it if it is pushed on, and am one of its crew there until I leave its tile. My order is \"crew\" until I get there.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "ram",
+        is: Is::Action,
+        params: &["machine", "wall"],
+        cost: 10.0,
+        description: "Swing a ram, by it or its id, at the wall or gate next to it, by it or its id: one of another realm's city, or of nobody's. I must be one of its crew on its tile, with at least as many crew as it needs there. It strikes far harder than a blow until the wall falls, and nobody up on a wall reaches its crew under its roof. My order is \"ram\" until then.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "throw",
+        is: Is::Action,
+        params: &["machine", "wallOrX", "y?"],
+        cost: 10.0,
+        description: "Shoot a catapult, by it or its id, at a wall, gate or tower within its reach: by it or its id, or by the tile x, y of it. It must be one of another realm's city, or of nobody's. I must be one of its crew on its tile, with at least as many crew as it needs there. Each shot throws one Stone that its crew carry or that lies on its tile; out of Stone it stops. It hits only the building, never anyone. My order is \"throw\" until the wall falls.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "push",
+        is: Is::Action,
+        params: &["machine", "x", "y"],
+        cost: 10.0,
+        description: "Push a siege machine, by it or its id, to the tile x, y, where a carriage could go. I must be one of its crew on its tile, with at least as many crew as it needs there; they go along with it, slowly, a Step at a time. My order is \"push\" until it gets there.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
         name: "getOff",
         is: Is::Action,
         params: &["x?", "y?"],
@@ -2793,9 +3005,9 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
     ScriptBinding {
         name: "build",
         is: Is::Action,
-        params: &["building"],
+        params: &["building", "material?"],
         cost: 10.0,
-        description: "Lay out or join a construction site of that kind on my tile.",
+        description: "Lay out or join a construction site of that kind on my tile. A wall or gate is of \"wood\" (by default) or \"stone\"; a stone one may be laid out on a wooden one of its kind, which stands until the stone one is finished.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -2807,11 +3019,19 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::String,
     },
     ScriptBinding {
+        name: "repair",
+        is: Is::Action,
+        params: &["buildingId"],
+        cost: 10.0,
+        description: "Repair the worn building on my tile: what I carry of the materials it lacks goes in, then my work; once it has all of both it is good again. My order is \"repair\" until done.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
         name: "workAt",
         is: Is::Action,
         params: &["makes?"],
         cost: 10.0,
-        description: "Work the workplace on my tile; at a smithy, say what to make.",
+        description: "Work the workplace on my tile; at a smithy, say what to make, or \"mend\" to mend the most worn weapon, piece of armour or set of Tools there (carried by its workers or on its pile) back to good, for a share of its recipe.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -2851,7 +3071,15 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Action,
         params: &["targetId"],
         cost: 10.0,
-        description: "Go after a resident I see and strike them, or strike a wall or gate of another realm until it falls.",
+        description: "Go after a resident I see and strike them, or strike a wall or gate of another realm until it falls. With a Bow or Crossbow and Arrows I walk only until they are in my `reach` and shoot from there.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "shoot",
+        is: Is::Action,
+        params: &["targetId"],
+        cost: 10.0,
+        description: "Shoot a resident I see who is in my `reach` now, with my Bow or Crossbow and an Arrow a shot, without a step. The order goes on as an attack: should they get out of reach I go after them, so `stop()` to stay where I am.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -3121,9 +3349,9 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
     ScriptBinding {
         name: "wallLine",
         is: Is::Action,
-        params: &["x", "y"],
+        params: &["x", "y", "material?"],
         cost: 10.0,
-        description: "Build wall on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the materials I carry; tiles with a wall or gate already are skipped.",
+        description: "Build wall of \"wood\" (by default) or \"stone\" on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the materials I carry; tiles with a wall or gate already are skipped, but a stone line upgrades the wooden ones on its way, passing only those of stone.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -3249,6 +3477,14 @@ pub static ARMY_SCRIPT_API: &[ScriptBinding] = &[
         cost: 20.0,
         description: "The boats and ships the Player sees on the water.",
         returns: ScriptType::List(&ScriptType::View("vessel")),
+    },
+    ScriptBinding {
+        name: "machines",
+        is: Is::Query,
+        params: &[],
+        cost: 20.0,
+        description: "The siege machines the Player sees, theirs and others'.",
+        returns: ScriptType::List(&ScriptType::View("machine")),
     },
     ScriptBinding {
         name: "traders",
@@ -3399,7 +3635,7 @@ pub static ARMY_SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &["line", "from?"],
         cost: 20.0,
-        description: "The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: \"wall\", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out.",
+        description: "The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: \"wall\", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out; a stone wall line (`material: \"stone\"`) takes the wooden wall and gate tiles on its way too.",
         returns: ScriptType::List(&ScriptType::View("lineTile")),
     },
     ScriptBinding {
@@ -3675,7 +3911,7 @@ fn buildFirst(site) {
     return true
   }
   if (me.order == null) {
-    let problem = build(site.kind)
+    let problem = build(site.kind, site.material)
     if (problem != null) { end("can't build the " + site.kind + ": " + problem) }
     return true
   }
@@ -4073,22 +4309,31 @@ fn goodsText(load, goods) {
         r#"// Build (default): build a memory.building with the north-west tile of its
 // footprint at memory.at, laying out the site or joining the one there, as
 // the Build order gives it. Without one I join params.site, or while none is
-// picked the construction site on my tile when I start; with none I end.
+// picked the construction site on my tile when I start. With none, and none
+// picked, I repair the worn buildings in my city's area on my own, worst
+// first, one after another, kept in memory.repairId; with none left I end.
 // While the site lacks materials, one of us building it, picked at random,
 // fetches a load of what is missing from params.source, or the nearest
 // storage of my realm that holds it while none is picked, and brings it
-// back. With none there we just build. Below params.foodAt units of Food on
+// back. With none there we just build. A repair's materials I fetch myself
+// the same way. Below params.foodAt units of Food on
 // me I get Food up to params.foodTake at params.food, else params.source,
 // else the nearest storage of my realm with Food, and come back; fetching
 // materials tops my food up to foodTake too. foodAt 0 turns getting food
-// off. At the site we stand spread over its footprint.
-param site: building // the construction site to join; none: the one I stand on
+// off. memory.foodAt and memory.foodTake, set with the task, stand in for
+// those two params (an NPC city sets them for a site far from its storage).
+// At the site we stand spread over its footprint.
+param site: building // the construction site to join; none: the one I stand on, else repairing my city's worn buildings
 param source: storage // where materials come from; a carriage too; none: the nearest storage holding some
 param food: storage // where Food comes from; a carriage too; none: my source, else the nearest storage with Food
 param foodAt: number = 1 // get Food below this many units on me; 0 never
 param foodTake: number = 3 // units of Food to take along
 
-if (!pickSite()) { return }
+if (memory.repairId == null && !pickSite()) { return }
+if (memory.repairId != null) {
+  repairWorn()
+  return
+}
 if (memory.stuck) { return }
 if (me.order != null && me.order.kind != "build") { // on my way
   wait()
@@ -4115,21 +4360,108 @@ memory.siteId = me.order.siteId
 if (site != null) { fetchMissing(site, params.source) }
 
 // Which site I build: the Build order's, else the one picked, else the one I
-// started on. False once I end: neither is a construction site.
+// started on. False once I end, neither being a construction site, or with
+// nothing to build turn to repairing.
 fn pickSite() {
   if (memory.building != null) { return true }
   let join = params.site
   if (join == null) { join = buildingAt(me.x, me.y) }
   if (join == null || join.site == null) {
     if (params.site != null) { end("the " + params.site.kind + " is no construction site") }
-    else { end("no construction site on their tile") }
+    else if (!pickWorn()) { end("no construction site on their tile") }
     return false
   }
   memory.building = join.kind
+  memory.material = join.material
   memory.at = crewTile(join)
   memory.siteId = join.id
   log("joining the site of " + placeName(join))
   return true
+}
+
+// Nothing to build: the worn building in my city's area most in need of a
+// repair, worst first, then nearest, that none of us repairs already. False
+// with none.
+fn pickWorn() {
+  if (me.cityId == null) { return false }
+  for (b of wornBuildings(me.cityId)) {
+    if (withMemory("repairId", b.id).length == 0) {
+      memory.repairId = b.id
+      memory.started = false
+      memory.walked = false
+      log("nothing to build: repairing " + placeName(b))
+      return true
+    }
+  }
+  return false
+}
+
+// Repairing memory.repairId: away from it I walk there first; lacking its
+// materials I fetch them. Once it is good again, or gone, the next one; with
+// none left I end.
+fn repairWorn() {
+  let target = building(memory.repairId)
+  if (target == null || target.condition == "good") {
+    if (target != null && memory.started) { log("repaired " + placeName(target)) }
+    memory.repairId = null
+    if (!pickWorn()) { end("nothing left to repair") }
+    return
+  }
+  if (me.order != null && me.order.kind != "repair") { // on my way, or fetching
+    wait()
+    return
+  }
+  if (getFoodIfLow(params.food || params.source, me)) { return }
+  let missing = repairNeeded(target)
+  if (missing.length > 0 && carriedOf(me, missing) == null) {
+    fetchForRepair(target, missing)
+  } else if (me.order == null) { startRepairing(target) }
+}
+
+// Repairing it; somewhere else, I walk there first, once a leg. Turned
+// down, repair says why: done.
+fn startRepairing(target) {
+  let problem = repair(target.id)
+  if (problem == "the resident is not at that building") {
+    if (memory.walked) {
+      end("no way to " + placeName(target))
+      return
+    }
+    memory.walked = true
+    if (walkTo(target.x, target.y) == null) { wait() } // until I am there
+    log("walking to " + placeName(target) + " to repair it")
+    return
+  }
+  if (problem != null) {
+    log(problem)
+    end()
+    return
+  }
+  memory.started = true
+  memory.walked = false
+  log("repairing " + placeName(target))
+}
+
+// Fetching what the repair lacks: at params.source while it holds some,
+// else the nearest storage of my realm holding some. With none, I end.
+fn fetchForRepair(target, missing) {
+  let goods = goodsOf(missing)
+  let from = materialsFrom(target, goods, params.source)
+  if (from == null) {
+    end("nothing in any storage to repair " + placeName(target))
+    return
+  }
+  let load = {}
+  for (m of missing) { load[m.good] = m.units }
+  let problem = fetch(load, from.id)
+  if (problem != null) {
+    log(problem)
+    end()
+    return
+  }
+  memory.walked = false
+  wait() // until I have it
+  log("fetching " + goodsText(load, goods) + " at " + placeName(from) + " for the repair")
 }
 
 // At the site once it is laid out: finished or gone, building is done. True
@@ -4172,6 +4504,7 @@ fn walkBack() {
   } else {
     if (walkTo(memory.at.x, memory.at.y) == null) { wait() } // until I am there
     if (away != null) { away.walked = true }
+    if (memory.setOut != null) { memory.setOut = null } // set out: my walk may be judged now
   }
   return true
 }
@@ -4179,7 +4512,7 @@ fn walkBack() {
 // Laying out the site, or joining it. Turned down, such as with the tile
 // taken, build says why: done.
 fn startBuilding() {
-  let problem = build(memory.building)
+  let problem = build(memory.building, memory.material)
   if (problem != null) {
     log("can't build: " + problem)
     end()
@@ -4279,8 +4612,8 @@ fn goodsOf(missing) {
 fn getFoodIfLow(from, near) {
   let food = me.carried.food
   if (food == null) { food = 0 }
-  if (food >= params.foodAt) { return false }
-  let units = floor(params.foodTake - food) // fetch takes whole units
+  if (food >= (memory.foodAt || params.foodAt)) { return false }
+  let units = floor((memory.foodTake || params.foodTake) - food) // fetch takes whole units
   if (units < 1) { return false }
   let at = from
   if (at == null || !holdsFood(at)) {
@@ -4305,7 +4638,7 @@ fn holdsFood(at) {
 fn foodToTake() {
   let food = me.carried.food
   if (food == null) { food = 0 }
-  let units = floor(params.foodTake - food)
+  let units = floor((memory.foodTake || params.foodTake) - food)
   if (units < 1) { return 0 }
   return units
 }
@@ -4531,6 +4864,171 @@ fn placeName(b) {
 }
 
 // The units of goods in load for my log: "10 stone, 4 wood".
+fn goodsText(load, goods) {
+  let text = ""
+  for (g of goods) {
+    let n = load[g]
+    if (n != null && n >= 1) {
+      if (text != "") { text = text + ", " }
+      text = text + floor(n) + " " + g
+    }
+  }
+  return text
+}
+"#,
+    ),
+    (
+        Task::Repair,
+        "Repair",
+        r#"// Repair (default): repair params.building, or while none is picked the
+// building on my tile when I start, kept in memory.buildingId, until it is
+// good again; then end. With none, or one in good condition, I end. While
+// the repair lacks materials and I carry none of them, I fetch what it
+// lacks at params.source, else the nearest storage of my realm holding
+// some, and come back; with none in any storage I end, saying so. Away
+// from it, I walk there first.
+param building: building // the building to repair; none: the one I stand on
+param source: storage // where materials come from; a carriage too; none: the nearest storage holding them
+
+if (!pickBuilding()) { return }
+let target = building(memory.buildingId)
+if (target == null) { target = params.building } // picked out of sight: as last seen
+if (target == null) {
+  end("the building is gone")
+  return
+}
+if (memory.started && target.condition == "good") {
+  log("repaired " + placeName(target))
+  end()
+  return
+}
+if (me.order != null && me.order.kind != "repair") { // on my way, or fetching
+  wait()
+  return
+}
+let missing = repairNeeded(target)
+if (missing.length > 0 && carriedOf(me, missing) == null) {
+  fetchMissing(target, missing)
+} else if (me.order == null) { startRepairing(target) }
+
+// What I repair: the one picked, else the one I started on, kept in
+// memory.buildingId. False once I end: there is none.
+fn pickBuilding() {
+  if (params.building != null) { memory.buildingId = params.building.id }
+  if (memory.buildingId == null) {
+    let here = buildingAt(me.x, me.y)
+    if (here == null) {
+      end("no building on their tile")
+      return false
+    }
+    memory.buildingId = here.id
+  }
+  return true
+}
+
+// Repairing it; somewhere else, I walk there first, once a leg. Turned
+// down, such as in good condition, repair says why: done.
+fn startRepairing(target) {
+  let problem = repair(target.id)
+  if (problem == "the resident is not at that building") {
+    if (memory.walked) {
+      end("no way to " + placeName(target))
+      return
+    }
+    memory.walked = true
+    if (walkTo(target.x, target.y) == null) { wait() } // until I am there
+    log("walking to " + placeName(target) + " to repair it")
+    return
+  }
+  if (problem != null) {
+    log(problem)
+    end()
+    return
+  }
+  memory.started = true
+  memory.walked = false
+  log("repairing " + placeName(target))
+}
+
+// Fetching what the repair lacks: at params.source while it holds some,
+// else the nearest storage of my realm holding some. With none, I end.
+fn fetchMissing(target, missing) {
+  let goods = goodsOf(missing)
+  let from = materialsFrom(target, goods)
+  if (from == null) {
+    end("no " + goodsList(goods) + " in any storage")
+    return
+  }
+  let load = {}
+  for (m of missing) { load[m.good] = m.units }
+  let problem = fetch(load, from.id)
+  if (problem != null) {
+    log(problem)
+    end()
+    return
+  }
+  memory.walked = false
+  wait() // until I have it
+  log("fetching " + goodsText(load, goods) + " at " + placeName(from) + " for the repair")
+}
+
+// Where materials come from: params.source while it holds some of goods,
+// else the nearest storage of my realm holding some; null with none.
+fn materialsFrom(target, goods) {
+  let from = params.source
+  if (from != null) {
+    let held = from.stock
+    if (held == null) { held = from.load } // a carriage
+    if (held != null) {
+      for (g of goods) {
+        if (held[g] != null && held[g] > 0) { return from }
+      }
+    }
+  }
+  let stores = storages(target, goods) // nearest first, holding some
+  if (stores.length == 0) { return null }
+  return stores[0]
+}
+
+// What someone carries of what the repair lacks; null if nothing.
+fn carriedOf(r, missing) {
+  let load = null
+  for (m of missing) {
+    let n = r.carried[m.good]
+    if (n != null && n > 0) {
+      if (n > m.units) { n = m.units }
+      if (load == null) { load = {} }
+      load[m.good] = n
+    }
+  }
+  return load
+}
+
+// The goods of what the repair lacks.
+fn goodsOf(missing) {
+  let goods = []
+  for (m of missing) { goods[goods.length] = m.good }
+  return goods
+}
+
+// The goods for my log: "wood or stone".
+fn goodsList(goods) {
+  let text = ""
+  for (g of goods) {
+    if (text != "") { text = text + " or " }
+    text = text + g
+  }
+  return text
+}
+
+// A building or carriage for my log: "the house at 12,6".
+fn placeName(b) {
+  let kind = b.kind
+  if (kind == null) { kind = "carriage" }
+  return "the " + kind + " at " + b.x + "," + b.y
+}
+
+// The units of goods in load for my log: "1 stone, 2 wood".
 fn goodsText(load, goods) {
   let text = ""
   for (g of goods) {
@@ -4868,13 +5366,15 @@ fn goodsText(load, goods) {
 // which goes on once I end. Armed, I fight back at whoever struck me while
 // they are in sight, and end once they are dead, gone or out of sight; a
 // driver walks back to the carriage first, should the fight have led away.
+// With a Bow or Crossbow and Arrows I shoot back from where I stand, walking
+// only until they are in my reach, and from below at someone up on a wall too.
 // Unarmed, or struck from up on a wall while I stand below, where no blow of
 // mine reaches, I walk home to my city's town hall, away from the wall, and
 // end there, or once no blow has landed for calm ticks; but driving I end at once and drive on, and
 // aboard a carriage being driven I end at once and stay aboard.
 let calm = 30 // ticks without a blow before I go back, fleeing
 
-if (armed() && !struckFromAbove()) {
+if (armed() && (!struckFromAbove() || canShoot())) {
   // My drive waits while I fight: kept for the way back to my carriage.
   if (holdsCarriage()) { memory.carriageId = me.order.carriageId }
   fightBack()
@@ -4920,6 +5420,11 @@ fn aboardDriven() {
 // Whether I have a weapon equipped.
 fn armed() {
   return me.equipped.weapon != null
+}
+
+// Whether I shoot: a Bow or Crossbow equipped and Arrows to loose.
+fn canShoot() {
+  return me.reach != null && me.carried.arrows != null
 }
 
 // At whoever struck me, while they are in sight.
@@ -5167,7 +5672,8 @@ fn goodsText(load, goods) {
     (
         Task::BuildLine,
         "Build line",
-        r#"// Build line (default): build memory.line.building, road or wall, on each
+        r#"// Build line (default): build memory.line.building, road or wall (of
+// memory.line.material, wood or stone, for a wall), on each
 // tile of the line from memory.line.from to memory.line.to, straight or
 // diagonal, as the Build line order gives it; started without one I end.
 // Tiles that have one already, or can't take one, are skipped. I take the
@@ -5286,7 +5792,7 @@ fn walkThere(tile) {
 // Laying out the tile's site, or joining the one there. Turned down, I end
 // saying why.
 fn startBuilding(tile) {
-  let problem = build(memory.line.building)
+  let problem = build(tile.building || memory.line.building, memory.line.material)
   if (problem != null) {
     end("can't build at " + tile.x + "," + tile.y + ": " + problem)
   } else if (tile.siteId == null) {
@@ -5720,7 +6226,10 @@ fn goodsText(load, goods) {
 // stand there until no armed outsider is left, which blocks an occupation before
 // it starts; an unarmed outsider I only log. A theft, an attack or an occupation
 // takes me off the hall, and when I end for it I come back here while armed
-// outsiders remain. Unarmed, or for another alarm, I end at once.
+// outsiders remain. With a Bow or Crossbow and Arrows I shoot whoever I go
+// after from where I stand once they are in my reach; until then I go up on
+// the city's wall tile nearest them and wait there rather than come down. Out of
+// Arrows I close in as anyone armed. Unarmed, or for another alarm, I end at once.
 if (me.alarm == null || !armed(me)) {
   end()
 } else if (me.alarm.kind == "occupied") {
@@ -5803,6 +6312,7 @@ fn goAfterCulprit(goneText) {
 }
 
 fn goAfter(foe) {
+  if (canShoot() && shootFromWall(foe)) { return }
   let o = me.order
   if (o != null && o.kind == "attack" && o.targetId == foe.id) { return } // at it
   let problem = attack(foe.id)
@@ -5812,6 +6322,82 @@ fn goAfter(foe) {
   }
   doing("On alarm: going after " + foe.name)
   log("going after " + foe.name)
+}
+
+// An archer shoots from where they stand. On the ground with the city's wall
+// between us, I go up on its tile nearest them first, for its cover; up on the
+// wall, or with no wall between us, I shoot once they are in my reach and up
+// there wait for them rather than come down. False when I can do neither, for me
+// to go after them as anyone armed.
+fn shootFromWall(foe) {
+  let o = me.order
+  let post = null
+  if (!me.up) {
+    // The post I set out for, while they are still in reach of it; else the
+    // wall tile between us now.
+    post = memory.post
+    if (post == null || apart(post, foe) > me.reach) {
+      post = wallTileNear(foe)
+      memory.post = null
+      if (post != null) { memory.post = {x: post.x, y: post.y} }
+    }
+  }
+  if (post == null) {
+    if (apart(me, foe) <= me.reach) {
+      if (o != null && o.kind == "attack" && o.targetId == foe.id) { return true } // at it
+      if (shoot(foe.id) != null) { return false }
+      doing("On alarm: shooting at " + foe.name)
+      log("shooting at " + foe.name)
+      return true
+    }
+    if (!me.up) { return false }
+    // Up on the wall: wait for them to come in reach, rather than go down after them.
+    if (o != null) { stop() }
+    doing("On alarm: on the wall, waiting for " + foe.name + " to come in reach")
+    return true
+  }
+  if (o != null && o.kind == "walkTo" && o.target.x == post.x && o.target.y == post.y) {
+    return true // on my way
+  }
+  if (walkTo(post.x, post.y) != null) { return false }
+  doing("On alarm: up on the wall to shoot at " + foe.name)
+  log("going up on the wall to shoot at " + foe.name)
+  return true
+}
+
+// Whether I shoot: a Bow or Crossbow equipped and Arrows to loose.
+fn canShoot() {
+  return me.reach != null && me.carried.arrows != null
+}
+
+// Tiles between two things as reach counts them: the larger of the two steps.
+fn apart(a, b) {
+  let dx = a.x - b.x
+  let dy = a.y - b.y
+  if (dx < 0) { dx = 0 - dx }
+  if (dy < 0) { dy = 0 - dy }
+  if (dx > dy) { return dx }
+  return dy
+}
+
+// The first finished wall or gate tile of the alarm's city on the way from the
+// foe to me, a step at a time: the one between us, nearest them.
+fn wallTileNear(foe) {
+  let x = foe.x
+  let y = foe.y
+  let steps = 0
+  while (steps < 64 && (x != me.x || y != me.y)) {
+    if (x < me.x) { x = x + 1 }
+    if (x > me.x) { x = x - 1 }
+    if (y < me.y) { y = y + 1 }
+    if (y > me.y) { y = y - 1 }
+    let b = buildingAt(x, y)
+    if (b != null && b.cityId == me.alarm.cityId && (b.kind == "wall" || b.kind == "gate") && b.site == null) {
+      return b
+    }
+    steps = steps + 1
+  }
+  return null
 }
 
 // The occupier I am after while they stand in the area, else another armed one

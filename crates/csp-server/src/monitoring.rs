@@ -200,6 +200,13 @@ impl<L: LogSink> TickReporter for ServerReporter<L> {
         metrics::gauge("tick.residents", health.residents as f64)
             .attribute("world_seed", seed)
             .capture();
+        // Once a game hour: the share of the game-run cities' adults standing idle, soldiers just
+        // standing on a post counted (`CONTEXT.md`: Standing idle; T97.9).
+        if world.tick.is_multiple_of(csp_shared::balance::NPC_PLAN_TICKS as u64) {
+            metrics::gauge("npc.idle_share", csp_sim::queries::npc_idle::npc_idle_share(world))
+                .attribute("world_seed", seed)
+                .capture();
+        }
         metrics::gauge("tick.actions", health.actions as f64)
             .attribute("world_seed", seed)
             .capture();

@@ -414,15 +414,24 @@ fn moves_the_price_as_a_trade_goes_cut_down_to_what_it_holds_and_its_coins() {
     let load = Stock::from([(Good::Wood, 3.0), (Good::Coins, 10.0)]);
     let coins = Stock::from([(Good::Coins, 1_000.0)]);
     let hands = TradeHolder { stock: &coins, room: 100.0 };
-    let buy = quote_trader_trade(escorts(), &load, 400.0, hands, TradeSide::Buy, Good::Wood, 10.0);
+    let buy =
+        quote_trader_trade(escorts(), &load, 400.0, hands, TradeSide::Buy, Good::Wood, 10.0, &[]);
     assert_eq!(buy.units, 3.0);
     assert_eq!(buy.limit, Some(TradeLimit::Stock));
     let sum: f64 = [3.0, 2.0, 1.0].iter().map(|&n| trader_price_for(Good::Wood, n).sell).sum();
     assert_eq!(buy.coins, sum);
     let wood = Stock::from([(Good::Wood, 100.0)]);
     let selling = TradeHolder { stock: &wood, room: 100.0 };
-    let sell =
-        quote_trader_trade(escorts(), &load, 400.0, selling, TradeSide::Sell, Good::Wood, 100.0);
+    let sell = quote_trader_trade(
+        escorts(),
+        &load,
+        400.0,
+        selling,
+        TradeSide::Sell,
+        Good::Wood,
+        100.0,
+        &[],
+    );
     assert_eq!(sell.limit, Some(TradeLimit::TheirCoins));
     assert!(sell.coins <= 10.0);
 }
@@ -432,15 +441,24 @@ fn takes_goods_only_as_far_as_its_carriage_holds() {
     let load = Stock::from([(Good::Stone, 395.0), (Good::Coins, 100.0)]);
     let wood = Stock::from([(Good::Wood, 100.0)]);
     let selling = TradeHolder { stock: &wood, room: 100.0 };
-    let sell =
-        quote_trader_trade(escorts(), &load, 400.0, selling, TradeSide::Sell, Good::Wood, 100.0);
+    let sell = quote_trader_trade(
+        escorts(),
+        &load,
+        400.0,
+        selling,
+        TradeSide::Sell,
+        Good::Wood,
+        100.0,
+        &[],
+    );
     assert_eq!(sell.limit, Some(TradeLimit::TheirRoom));
     assert!(sell.units > 0.0 && sell.units < 10.0);
     // An overloaded carriage may still sell.
     let full = Stock::from([(Good::Stone, 500.0), (Good::Coins, 0.0)]);
     let coins = Stock::from([(Good::Coins, 100.0)]);
     let hands = TradeHolder { stock: &coins, room: 100.0 };
-    let buy = quote_trader_trade(escorts(), &full, 400.0, hands, TradeSide::Buy, Good::Stone, 2.0);
+    let buy =
+        quote_trader_trade(escorts(), &full, 400.0, hands, TradeSide::Buy, Good::Stone, 2.0, &[]);
     assert_eq!(buy.units, 2.0);
 }
 
@@ -449,7 +467,8 @@ fn sells_none_of_the_food_on_board() {
     let load = Stock::from([(Good::Food, CARAVAN_FOOD + 2.0)]);
     let coins = Stock::from([(Good::Coins, 1_000.0)]);
     let hands = TradeHolder { stock: &coins, room: 100.0 };
-    let buy = quote_trader_trade(escorts(), &load, 400.0, hands, TradeSide::Buy, Good::Food, 50.0);
+    let buy =
+        quote_trader_trade(escorts(), &load, 400.0, hands, TradeSide::Buy, Good::Food, 50.0, &[]);
     assert_eq!(buy.units, 2.0);
 }
 

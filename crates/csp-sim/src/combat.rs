@@ -5,11 +5,11 @@
 use std::collections::{HashMap, HashSet};
 
 use csp_shared::balance::{MAP_SIZE, SIGHT_RANGE, STRIKE_TICKS, WALL_DEFENCE};
-use csp_shared::footprint::is_at;
+use csp_shared::footprint::{is_at, near_footprint};
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::{
-    AttackOrder, Building, CrimeKind, DeathCause, Realm, RealmEventWhat, Resident, ResidentOrder,
-    Struck, Task, Tile, WalkOrder, WorldState,
+    AttackOrder, Building, CrimeKind, DeathCause, Good, Realm, RealmEventWhat, Resident,
+    ResidentOrder, Struck, Task, Tile, WalkOrder, WorldState,
 };
 
 use crate::cities::update_city_membership;
@@ -18,6 +18,7 @@ use crate::crimes::{
     CrimeAgainst,
 };
 use crate::defence::{defends_by_script, end_hold_if_over, start_defence, Alarms};
+use crate::equipment::Slot;
 use crate::events::record_event;
 use crate::goods_made::GoodsMade;
 use crate::order_sender::commands;
@@ -26,8 +27,11 @@ use crate::queries::alliance::contract_of;
 use crate::queries::carriages::{driven_carriage_id, stands_still};
 use crate::queries::city::town_hall_of;
 use crate::queries::city_area::{in_city_area, stands_occupying};
-use crate::queries::combat::{attack_power, blow_damage, combat_learned, dodge_chance, in_contact};
-use crate::queries::names::placed;
+use crate::queries::combat::{
+    attack_power, attack_ticks, blow_damage, combat_learned, dodge_chance, in_contact,
+    ranged_weapon, shooting_weapon, shot_damage, shot_reach, tiles_apart,
+};
+use crate::queries::names::{held, placed};
 use crate::queries::residents::{is_armed, is_down};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::trade_org::{in_inner_ring, of_trade_org_hq, trade_org_hq};
@@ -40,6 +44,7 @@ use crate::queries::walls::{
 };
 use crate::random::{hash_str, Mulberry32};
 use crate::survival::{die_all, drop_goods};
+use crate::wear::wear_slot;
 
 /// A blow a resident with an attack order requests once in contact with their target and ready
 /// (`StrikeAction`). The world checks and resolves it at the end of the tick.
@@ -55,13 +60,18 @@ pub struct StrikeAction {
 pub enum Target {
     Resident(usize),
     Building(usize),
+    /// A siege machine (`CONTEXT.md`: Siege machine): broken by blows like a wall.
+    Machine(usize),
 }
 
 /// The target `target_id` names (`attackTarget`): the resident of that id, or else the finished
-/// wall or gate; None once it is gone.
+/// wall or gate, or the siege machine; None once it is gone.
 pub fn attack_target(world: &WorldState, target_id: &str) -> Option<Target> {
     if let Some(i) = world.residents.iter().position(|x| x.id == target_id) {
         return Some(Target::Resident(i));
+    }
+    if let Some(i) = crate::siege::machine_index(world, target_id) {
+        return Some(Target::Machine(i));
     }
     let i = world.buildings.iter().position(|x| x.id == target_id)?;
     is_wall_or_gate(&world.buildings[i]).then_some(Target::Building(i))
@@ -71,6 +81,7 @@ fn spot_of(world: &WorldState, t: Target) -> (f64, f64) {
     match t {
         Target::Resident(i) => (world.residents[i].x, world.residents[i].y),
         Target::Building(i) => (world.buildings[i].x, world.buildings[i].y),
+        Target::Machine(i) => (world.siege_machines[i].x, world.siege_machines[i].y),
     }
 }
 
@@ -82,19 +93,46 @@ fn tile(p: (f64, f64)) -> (i32, i32) {
 /// vessel, High ground): in contact with it, not from one vessel at someone aboard another, and
 /// not from the ground at someone up. Those aboard a vessel are reached from beside it, as if it
 /// were the next land tile; those aboard a docked ship from anywhere on its haven, and the other
-/// way round.
+/// way round. A shot reaches within the archer's reach, from the ground at someone up too: the one
+/// way to hit them from below (`CONTEXT.md`: Ranged combat).
 fn reaches(world: &WorldState, size: i32, ai: usize, t: Target) -> bool {
     let a = &world.residents[ai];
     let contact = in_contact(size, tile((a.x, a.y)), tile(spot_of(world, t)));
     match t {
         Target::Resident(ti) => {
             let b = &world.residents[ti];
-            (contact || across_docked_ship(world, a, b))
-                && !between_vessels(world, a, b)
+            // A ram's crew under its roof can't be struck from above nor shot (`CONTEXT.md`: Ram).
+            let sheltered = crate::siege::under_roof(world, b);
+            let blow = (contact || across_docked_ship(world, a, b))
                 && reaches_for_height(world, a, b)
+                && !(sheltered && is_up(world, a));
+            let shot = !sheltered && within_shot(world, size, a, b);
+            (blow || shot) && !between_vessels(world, a, b)
         }
-        Target::Building(_) => contact,
+        // A wall or gate is struck in contact, never shot at; a tower from beside any tile of it
+        // (`CONTEXT.md`: Tower).
+        Target::Building(bi) => {
+            let b = &world.buildings[bi];
+            contact || near_footprint(placed(b), tile((a.x, a.y)), 1, size)
+        }
+        // So is a siege machine, and only from the ground: defenders come down and out for it.
+        Target::Machine(_) => contact && !is_up(world, a),
     }
+}
+
+/// Whether `a` shoots at `b` from where they stand (`CONTEXT.md`: Ranged combat): a Bow or
+/// Crossbow equipped, an Arrow carried, and `b` within its reach from there (further from up on a
+/// wall). Sight is checked by the attack order itself; nothing else blocks a shot for now.
+fn within_shot(world: &WorldState, size: i32, a: &Resident, b: &Resident) -> bool {
+    shooting_weapon(a).is_some()
+        && shot_reach(world, a)
+            .is_some_and(|reach| tiles_apart(size, tile((a.x, a.y)), tile((b.x, b.y))) <= reach)
+}
+
+/// Whether the resident at `ai` can strike or shoot the resident at `ti` from where they stand:
+/// what an attack order walks until (`attack_holds`). With nothing to shoot, that is contact.
+pub fn strikes_from_here(world: &WorldState, size: i32, ai: usize, ti: usize) -> bool {
+    reaches(world, size, ai, Target::Resident(ti))
 }
 
 /// A fresh attack order on `target_id` (`attackOrder`); `started` when the fight is already in
@@ -202,6 +240,9 @@ fn is_aggression(world: &WorldState, a: &Resident, t: &Resident, size: i32) -> b
 pub struct AttackRequest {
     pub resident_id: Option<String>,
     pub target_id: Option<String>,
+    /// A shot (`shoot`): only from a Bow or Crossbow with Arrows, at a resident in reach from
+    /// where the resident stands, so the order starts without a step (`CONTEXT.md`: Ranged combat).
+    pub shoot: bool,
 }
 
 /// `attack.validate` (`CONTEXT.md`: Combat): one of the Player's residents goes after a resident
@@ -235,9 +276,17 @@ pub fn validate_attack(
     if resident.is_some_and(|r| organization_of(r) == Some(side)) {
         return Some("that is one of your own residents");
     }
-    let target = match resident {
-        Some(r) => (r.x, r.y),
-        None => {
+    let machine = target_id.and_then(|id| crate::siege::machine_by_id(world, id));
+    let target = match (resident, machine) {
+        (Some(r), _) => (r.x, r.y),
+        // Any siege machine but the side's own (`CONTEXT.md`: Siege machine: broken by blows).
+        (None, Some(m)) => {
+            if m.realm_id.as_deref() == Some(side) {
+                return Some("that is one of your own siege machines");
+            }
+            (m.x, m.y)
+        }
+        (None, None) => {
             if npc.is_some() {
                 return Some("no such resident");
             }
@@ -261,16 +310,53 @@ pub fn validate_attack(
         .residents
         .iter()
         .any(|x| ours(x) && wrap_distance(size, tile((x.x, x.y)), tile(target)) <= SIGHT_RANGE);
-    let below = resident.is_some_and(|t| !reaches_for_height(world, me, t));
+    // A ram's crew under its roof can't be struck from above nor shot, and a siege machine is
+    // struck from the ground (`CONTEXT.md`: Ram).
+    let roofed = resident.is_some_and(|t| crate::siege::under_roof(world, t));
+    if seen && roofed && (order.shoot || is_up(world, me)) {
+        return Some("they are under the ram’s roof");
+    }
+    if seen && machine.is_some() && is_up(world, me) {
+        return Some("a siege machine is struck from the ground");
+    }
+    if seen && order.shoot {
+        return shoot_problem(world, size, me, resident);
+    }
+    // An archer shoots up at them (`CONTEXT.md`: Ranged combat); nobody else on the ground reaches.
+    let below = resident.is_some_and(|t| !reaches_for_height(world, me, t))
+        && shooting_weapon(me).is_none();
     if seen && below {
         Some("they are up on the wall")
     } else if seen {
         None
     } else if resident.is_some() {
         Some("that resident is out of sight")
+    } else if machine.is_some() {
+        Some("that siege machine is out of sight")
     } else {
         Some("that wall is out of sight")
     }
+}
+
+/// Why `me` can't shoot `target` from where they stand (`shoot`), None when they can: a Bow or
+/// Crossbow equipped, an Arrow carried, and a resident within its reach, not aboard another vessel.
+fn shoot_problem(
+    world: &WorldState,
+    size: i32,
+    me: &Resident,
+    target: Option<&Resident>,
+) -> Option<&'static str> {
+    if ranged_weapon(me).is_none() {
+        return Some("no bow or crossbow equipped");
+    }
+    if shooting_weapon(me).is_none() {
+        return Some("no arrows");
+    }
+    let Some(t) = target else { return Some("only residents are shot at") };
+    if between_vessels(world, me, t) || !within_shot(world, size, me, t) {
+        return Some("out of reach");
+    }
+    None
 }
 
 use crate::alarms::{answers_attack, goes_after_occupier};
@@ -326,6 +412,18 @@ pub fn request_strikes(world: &mut WorldState, size: i32) -> Vec<StrikeAction> {
         }
         let target = target.expect("not gone");
         if !reaches(world, size, ri, target) {
+            // From up on a wall nothing reaches a ram or its crew under its roof: the order ends
+            // rather than waits up there (`CONTEXT.md`: Ram).
+            let a = &world.residents[ri];
+            let roofed = match target {
+                Target::Resident(t) => crate::siege::under_roof(world, &world.residents[t]),
+                Target::Machine(_) => true,
+                Target::Building(_) => false,
+            };
+            if roofed && is_up(world, a) {
+                world.residents[ri].order = None;
+                continue;
+            }
             // In contact from the ground with someone up: no blow reaches them, so the order ends
             // rather than waits below (`CONTEXT.md`: High ground).
             if let Target::Resident(t) = target {
@@ -337,15 +435,18 @@ pub fn request_strikes(world: &mut WorldState, size: i32) -> Vec<StrikeAction> {
             }
             continue;
         }
-        let target_id = match target {
-            Target::Resident(t) => world.residents[t].id.clone(),
-            Target::Building(b) => world.buildings[b].id.clone(),
+        let (target_id, ticks) = match target {
+            Target::Resident(t) => {
+                (world.residents[t].id.clone(), attack_ticks(&world.residents[ri]))
+            }
+            Target::Building(b) => (world.buildings[b].id.clone(), STRIKE_TICKS),
+            Target::Machine(m) => (world.siege_machines[m].id.clone(), STRIKE_TICKS),
         };
         let r = &mut world.residents[ri];
         let Some(ResidentOrder::Attack(o)) = &mut r.order else { continue };
         o.path = None;
         o.progress = 0.0;
-        o.strike += 1.0 / STRIKE_TICKS;
+        o.strike += 1.0 / ticks;
         if o.strike < 1.0 - 1e-9 {
             continue;
         }
@@ -386,6 +487,7 @@ pub fn resolve_strikes(
     let mut killers: Vec<(String, String)> = Vec::new();
     let mut died: Vec<String> = Vec::new();
     let mut broken: Vec<Building> = Vec::new();
+    let mut machines_broken: Vec<String> = Vec::new();
     let mut blows = 0;
     for StrikeAction { attacker_id, target_id } in strikes {
         let Some(ai) = world.residents.iter().position(|x| x.id == *attacker_id) else { continue };
@@ -398,6 +500,7 @@ pub fn resolve_strikes(
         let real_id = match target {
             Target::Resident(t) => &world.residents[t].id,
             Target::Building(b) => &world.buildings[b].id,
+            Target::Machine(m) => &world.siege_machines[m].id,
         };
         if o.target_id != *real_id || !reaches(world, size, ai, target) {
             continue;
@@ -410,6 +513,15 @@ pub fn resolve_strikes(
                 alarms.raise_wall_attacked(world, attacker_id, &wall_id, size);
                 if let Some(b) = break_wall(world, ai, &wall_id, size, made) {
                     broken.push(b);
+                }
+                wear_slot(world, ai, Slot::Weapon, 1.0);
+                continue;
+            }
+            Target::Machine(mi) => {
+                blows += 1;
+                let machine_id = world.siege_machines[mi].id.clone();
+                if break_machine(world, ai, &machine_id, size, made) {
+                    machines_broken.push(machine_id);
                 }
                 continue;
             }
@@ -456,6 +568,18 @@ pub fn resolve_strikes(
         alarms.raise_resident_attacked(world, attacker_id, &t_id, size);
         // An alarm changes orders and scripts, never who is in the world: the indices hold.
         let tf = tick as f64;
+        // A shot looses one of the Arrows they carry, whether it lands or not (`CONTEXT.md`:
+        // Ranged combat).
+        let shot = shooting_weapon(&world.residents[ai]);
+        if shot.is_some() {
+            let carried = &mut world.residents[ai].carried;
+            let left = held(carried, Good::Arrows) - 1.0;
+            if left > 0.0 {
+                carried.insert(Good::Arrows, left);
+            } else {
+                carried.shift_remove(&Good::Arrows);
+            }
+        }
         let learned_a = combat_learned(&world.residents[ai], tf);
         *world.residents[ai].skills.entry(csp_shared::world::SkillName::Combat).or_insert(0.0) +=
             learned_a;
@@ -470,10 +594,19 @@ pub fn resolve_strikes(
         let t = &world.residents[ti];
         let climbing = matches!(t.order, Some(ResidentOrder::Climb(_)));
         if !down && !climbing && roll < dodge_chance(t, tf) {
+            // The blow was struck, if not taken (`CONTEXT.md`: Wear).
+            wear_slot(world, ai, Slot::Weapon, 1.0);
             continue;
         }
         let cover = if on_own_wall(world, t) { WALL_DEFENCE } else { 1.0 };
-        let damage = blow_damage(&world.residents[ai], t, tf) * cover;
+        let damage = match shot {
+            Some(weapon) => shot_damage(&world.residents[ai], t, weapon),
+            None => blow_damage(&world.residents[ai], t, tf),
+        } * cover;
+        // The gear fights as well as new up to the blow that breaks it (`CONTEXT.md`: Wear).
+        wear_slot(world, ai, Slot::Weapon, 1.0);
+        wear_slot(world, ti, Slot::Shield, 1.0);
+        wear_slot(world, ti, Slot::Armour, 1.0);
         let t = &mut world.residents[ti];
         t.health = 0f64.max(t.health - damage);
         if t.health <= 0.0 {
@@ -497,8 +630,12 @@ pub fn resolve_strikes(
     if !broken.is_empty() {
         update_city_membership(world, size);
     }
-    let gone: HashSet<&str> =
-        died.iter().map(String::as_str).chain(broken.iter().map(|b| b.id.as_str())).collect();
+    let gone: HashSet<&str> = died
+        .iter()
+        .map(String::as_str)
+        .chain(broken.iter().map(|b| b.id.as_str()))
+        .chain(machines_broken.iter().map(String::as_str))
+        .collect();
     for r in &mut world.residents {
         if matches!(&r.order, Some(ResidentOrder::Attack(o)) if gone.contains(o.target_id.as_str()))
         {
@@ -554,6 +691,46 @@ fn break_wall(
     Some(b)
 }
 
+/// A blow from the resident at `ai` at the siege machine `machine_id` (`CONTEXT.md`: Siege
+/// machine): like a blow at a wall it always lands, its attacker's `attackPower` going onto the
+/// machine's damage, and teaches Combat. Once it has taken its strength it breaks: it is gone, its
+/// crew with it no longer, and `BROKEN_MATERIALS_RETURNED` of its materials lie on its tile.
+/// Breaking another Organization's machine is a crime of tearing down by whoever strikes the last
+/// blow. Returns whether it broke.
+fn break_machine(
+    world: &mut WorldState,
+    ai: usize,
+    machine_id: &str,
+    size: i32,
+    made: &mut GoodsMade,
+) -> bool {
+    let tick = world.tick as f64;
+    let learned = combat_learned(&world.residents[ai], tick);
+    *world.residents[ai].skills.entry(csp_shared::world::SkillName::Combat).or_insert(0.0) +=
+        learned;
+    let power = attack_power(&world.residents[ai], tick);
+    let Some(mi) = crate::siege::machine_index(world, machine_id) else { return false };
+    let m = &mut world.siege_machines[mi];
+    let strength = crate::siege::machine_strength(m.kind);
+    let damage = strength.min(m.damage.unwrap_or(0.0) + power);
+    m.damage = Some(damage);
+    if damage < strength {
+        return false;
+    }
+    let against = CrimeAgainst {
+        victim_org: world.siege_machines[mi].realm_id.clone(),
+        building: Some(crate::siege::site_kind(world.siege_machines[mi].kind)),
+        ..CrimeAgainst::default()
+    };
+    let attacker_id = world.residents[ai].id.clone();
+    commit_crime(world, size, CrimeKind::TearDown, &attacker_id, against);
+    let m = world.siege_machines.remove(mi);
+    let returned = crate::siege::broken_machine_returns(m.kind);
+    drop_goods(world, m.x, m.y, &returned, MAP_SIZE);
+    made.note(&returned);
+    true
+}
+
 /// Whether `t` drives a caravan, wandering trader or supply wagon and stands with its carriage
 /// (`withCaravanCarriage`).
 fn with_caravan_carriage(world: &WorldState, t: &Resident) -> bool {
@@ -602,7 +779,9 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
         start_defence(world, ti);
         return;
     }
-    let from_above = is_up(world, &world.residents[ai]) && !is_up(world, t);
+    // Struck from above, only an archer can answer: they shoot back up (`CONTEXT.md`: Ranged combat).
+    let from_above =
+        is_up(world, &world.residents[ai]) && !is_up(world, t) && shooting_weapon(t).is_none();
     let attacking = matches!(t.order, Some(ResidentOrder::Attack(_)));
     if is_armed(t) && (!from_above || attacking) {
         if !attacking {
@@ -649,6 +828,12 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
 }
 
 #[cfg(test)]
+mod archer_defaults_tests;
+#[cfg(test)]
 mod high_ground_tests;
 #[cfg(test)]
+mod shooting_tests;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod wall_shooting_tests;

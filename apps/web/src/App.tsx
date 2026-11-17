@@ -15,6 +15,7 @@ import {
   SHARES_A_TILE,
   takesWorkSettings,
   roadTiles,
+  stoneOverAt,
 } from './shared/building.js'
 import { firstDayShown } from './shared/first-day.js'
 import type {
@@ -34,6 +35,7 @@ import type {
   Stock,
   TrainingSubject,
   SeenResident,
+  WallMaterial,
 } from '@csp/shared-types'
 import {
   carriagePulledBy,
@@ -185,6 +187,7 @@ import {
   rememberedTakeoverSeen,
 } from './realm-log.js'
 import { isNewRealm } from './map/legend.js'
+import { MEND } from './equipment-view.js'
 import {
   GOOD_LABELS,
   GroupCard,
@@ -199,6 +202,7 @@ import { arrivalOf } from './doing-view.js'
 import { CardSheet, PickBanner, TileCard, closeOpenPanel, panelOpen } from './SelectionCard.js'
 import {
   pickHint,
+  picksWallLine,
   pickPrompt,
   pickTap,
   pickTarget,
@@ -380,6 +384,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     tab: rememberedTab(),
   }))
   const [picking, setPicking] = useState<Picking>(false)
+  /** The siege machine the picked resident pushes once a tile is picked (`CONTEXT.md`: Siege machine). */
+  const [pushing, setPushing] = useState<string | undefined>()
   const [haulSetup, setHaulSetup] = useState<HaulSetup>()
   const [orderError, setOrderError] = useState<string | undefined>()
   const [armyPick, setArmyPick] = useState<ArmyPick>()
@@ -436,6 +442,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [groupLineFrom, setGroupLineFrom] = useState<{ x: number; y: number }>()
   // The start picked for the picked resident's Build line, while they pick its end.
   const [lineFrom, setLineFrom] = useState<{ x: number; y: number }>()
+  /** What a wall line is built of, picked on the banner while its ends are picked (`CONTEXT.md`: Wood or stone). */
+  const [wallMaterial, setWallMaterial] = useState<WallMaterial>('wood')
   // Where a pick is previewed: the tile under the pointer, or the one tapped on a touch screen.
   const [pickAt, setPickAt] = useState<{ x: number; y: number; tapped?: boolean }>()
   const [groupBuildAt, setGroupBuildAt] = useState<{ x: number; y: number }>()
@@ -927,6 +935,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return
     }
     if (!selected) return
+    // One of a siege machine's crew pushes it there (`CONTEXT.md`: Siege machine).
+    if (mode === 'push' && pushing) {
+      const order = { kind: 'push', residentId: selected.id, machineId: pushing, x, y }
+      setOrderError(await giveOrder(order, false))
+      return
+    }
+    // One of a catapult's crew aims it at the wall on that tile (`CONTEXT.md`: Catapult).
+    if (mode === 'throw' && pushing) {
+      const order = { kind: 'throw', residentId: selected.id, machineId: pushing, x, y }
+      setOrderError(await giveOrder(order, false))
+      return
+    }
     // Driving and hauling keep to the realm's; only Drive off takes another's (`CONTEXT.md`:
     // Stealing a carriage or horse), whatever else stands on the tile.
     const carriage = ownCarriageHere
@@ -976,7 +996,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if ((mode === 'roadTo' || mode === 'wallTo') && lineFrom) {
       // The Build line task: they run the Player's Build line (default) script (`CONTEXT.md`: Build line).
       const building = mode === 'roadTo' ? 'road' : 'wall'
-      const order = { kind: 'task', task: 'buildLine', residentId: selected.id, building }
+      const order = {
+        kind: 'task',
+        task: 'buildLine',
+        residentId: selected.id,
+        building,
+        ...(building === 'wall' && wallMaterial === 'stone' ? { material: wallMaterial } : {}),
+      }
       setLineFrom(undefined)
       setOrderError(await giveOrder({ ...order, from: lineFrom, to: { x, y } }))
       return
@@ -1052,18 +1078,24 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const request = { ...order, residentId: selected.id }
     setOrderError(await sendOrder(appendRequest(selected, request, at) ?? request))
   }
-  /** Why a kind can't be laid out on a tile, as far as the Player knows (`buildHereProblem`). */
+  /**
+   * Why a kind can't be laid out on a tile, as far as the Player knows (`buildHereProblem`); a
+   * stone wall or gate may go on the wooden one of its kind (`CONTEXT.md`: Wood or stone).
+   */
   const buildProblemAt =
-    (w: NonNullable<typeof world>, x: number, y: number) => (kind: BuildingKind) =>
-      buildHereProblem(
-        kind,
-        x,
-        y,
-        w,
-        (nx, ny) => nodeAt?.(nx, ny),
-        // Terrain not loaded counts as unexplored: nothing is laid out there.
-        { size: w.map.size, at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED },
-      )
+    (w: NonNullable<typeof world>, x: number, y: number) =>
+    (kind: BuildingKind, material?: WallMaterial) =>
+      material === 'stone' && stoneOverAt(w, x, y, kind)
+        ? undefined
+        : buildHereProblem(
+            kind,
+            x,
+            y,
+            w,
+            (nx, ny) => nodeAt?.(nx, ny),
+            // Terrain not loaded counts as unexplored: nothing is laid out there.
+            { size: w.map.size, at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED },
+          )
   /** The queue planner's Add step, on the resident card and the group card. */
   function addStep(w: NonNullable<typeof world>) {
     const seen = { cities: knownCities, buildings: knownBuildings, residents: w.residents }
@@ -1180,6 +1212,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           building: mode === 'roadTo' ? 'road' : 'wall',
           from: groupLineFrom,
           to: { x, y },
+          ...(mode === 'wallTo' && wallMaterial === 'stone' ? { material: wallMaterial } : {}),
         })
       case 'tearDown': {
         // A building before a road sharing its tile.
@@ -1278,16 +1311,22 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * there: they run the Player's Build (default) script, which fetches missing materials from
    * the realm's storages (`CONTEXT.md`: Fetching materials).
    */
-  async function build(building: BuildingKind) {
+  async function build(building: BuildingKind, material?: WallMaterial) {
     if (!selected) return
-    const order = { kind: 'task', task: 'build', residentId: selected.id, building }
+    const order = {
+      kind: 'task',
+      task: 'build',
+      residentId: selected.id,
+      building,
+      ...(material === 'stone' ? { material } : {}),
+    }
     setOrderError(await giveOrder(order))
   }
   /**
    * Gives the picked resident the Work task at the workplace on their tile, making `makes` at a
    * smithy: they run the Player's Work (default) script (`CONTEXT.md`: Default script).
    */
-  async function work(makes?: Good) {
+  async function work(makes?: Good | typeof MEND) {
     if (!selected) return
     const workplaceId = buildingHere?.id
     const order = { kind: 'task', task: 'work', residentId: selected.id, workplaceId, makes }
@@ -1297,6 +1336,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * Gives the picked resident the Tear down task for the building or site on their tile: they
    * run the Player's Tear down (default) script.
    */
+  /**
+   * Gives the picked resident the Repair task for a worn building (`CONTEXT.md`: Repairing): they
+   * run the Player's Repair (default) script, walking there and fetching what it lacks.
+   */
+  async function repair(buildingId: string) {
+    if (!selected) return
+    const order = { kind: 'task', task: 'repair', residentId: selected.id, buildingId }
+    setOrderError(await giveOrder(order))
+  }
   async function tearDown(buildingId: string) {
     if (!selected) return
     const order = { kind: 'task', task: 'tearDown', residentId: selected.id, buildingId }
@@ -1539,7 +1587,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const buildingHere =
     selected && world?.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && isAt(selected, b))
   const roadHere = onTile(world?.buildings.filter((b) => b.kind === 'road'))
-  const carriageSiteHere = onTile(world?.buildings.filter((b) => b.kind === 'carriage'))
+  // A carriage, ram or catapult site on the tile, worked and supplied the same way (`CONTEXT.md`: Siege machine).
+  const carriageSiteHere = onTile(
+    world?.buildings.filter(
+      (b) => b.kind === 'carriage' || b.kind === 'ram' || b.kind === 'catapult',
+    ),
+  )
   const armyCarriages = commandedCarriages(world?.diplomacy.alliance, world?.home.realmId)
   const isStrangers = (k: { id: string; realmId: string | null }) =>
     strangersCarriage(k, world?.home.realmId, armyCarriages)
@@ -2093,6 +2146,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               key={kind}
               prompt={pickPrompt(pick, touch)}
               hint={pickHint(pick)}
+              material={
+                picksWallLine(pick) ? { value: wallMaterial, onChange: setWallMaterial } : undefined
+              }
               under={pick.kind === 'plan' && pick.error ? undefined : preview?.label}
               onConfirm={pickAt?.tapped ? () => pickTile(pickAt.x, pickAt.y) : undefined}
               onWaypoints={
@@ -2174,6 +2230,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 buildings: world.buildings,
                 carriages: world.carriages,
                 vessels: world.vessels,
+                machines: world.machines,
                 horses: world.horses,
                 piles: world.piles,
                 node: nodeAt?.(selectedTile.x, selectedTile.y),
@@ -2266,11 +2323,35 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               select([residentId])
               setPicking('hitchOff')
             }}
+            onCrew={(machineId, residentId) =>
+              void giveOrder({ kind: 'crew', residentId, machineId }, false).then(setOrderError)
+            }
+            onPush={(machineId, residentId) => {
+              select([residentId])
+              setPushing(machineId)
+              setPicking('push')
+            }}
+            onThrow={(machineId, residentId) => {
+              select([residentId])
+              setPushing(machineId)
+              setPicking('throw')
+            }}
+            onRam={(machineId, residentId, targetId) =>
+              void giveOrder({ kind: 'ram', residentId, machineId, targetId }, false).then(
+                setOrderError,
+              )
+            }
+            onTearDownMachine={(machineId, residentId) =>
+              void giveOrder({ kind: 'tearDown', residentId, buildingId: machineId }, false).then(
+                setOrderError,
+              )
+            }
             onStealHorse={(horseId, residentId) =>
               void giveOrder({ kind: 'mount', residentId, horseId }, false).then(setOrderError)
             }
             mapSize={world.map.size}
             onFeed={(targetId, units) => void feed(targetId, units)}
+            onRepair={(buildingId) => void repair(buildingId)}
             onPickUp={async (residentId, spot, goods) =>
               setOrderError(await giveOrder({ kind: 'pickUp', residentId, spot, goods }))
             }

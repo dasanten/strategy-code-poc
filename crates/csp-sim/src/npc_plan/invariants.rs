@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use csp_shared::balance::{MAP_SIZE, NPC_SURPLUS_CAP, RECIPES};
+use csp_shared::balance::{MAP_SIZE, NPC_SURPLUS_CAP, NPC_SURPLUS_PAST_CAP, RECIPES};
 use csp_shared::world::{
     Building, BuildingKind, CityJobKind, CityProject, Good, Stock, WorldState,
 };
@@ -126,8 +126,9 @@ pub fn npc_farmers_kept(world: &WorldState) -> Vec<InvariantViolation> {
 }
 
 /// Invariant `npc-surplus-capped` (`CONTEXT.md`: Spare hands' work): a plan made this tick sends
-/// nobody to a workplace whose good the city holds twice its surplus cap of past its reserve; a
-/// farm keeps the farmers the city wants and one more.
+/// nobody to a workplace whose good the city holds past its reserve by its surplus cap once more
+/// than it works on to (`NPC_SURPLUS_PAST_CAP`); a farm keeps the farmers the city wants and one
+/// more.
 pub fn npc_surplus_capped(world: &WorldState) -> Vec<InvariantViolation> {
     let mut out = Vec::new();
     let empty = Stock::new();
@@ -147,7 +148,7 @@ pub fn npc_surplus_capped(world: &WorldState) -> Vec<InvariantViolation> {
                 continue;
             }
             let cap = base * steps;
-            if held(stock, good) - held(&reserve, good) < 2.0 * cap {
+            if held(stock, good) - held(&reserve, good) < (NPC_SURPLUS_PAST_CAP + 1.0) * cap {
                 continue;
             }
             if place.kind == BuildingKind::Farm && farmers <= farmers_wanted(world, city) + 1.0 {
@@ -237,7 +238,7 @@ pub fn npc_spare_hands_work(world: &WorldState) -> Vec<InvariantViolation> {
 pub fn npc_workplaces_bounded(world: &WorldState) -> Vec<InvariantViolation> {
     let mut out = Vec::new();
     for (city_id, plan) in &world.city_plans {
-        let Some(CityProject::Build { building, x, y }) = &plan.project else { continue };
+        let Some(CityProject::Build { building, x, y, .. }) = &plan.project else { continue };
         if plan.planned_at != world.tick as f64 {
             continue;
         }

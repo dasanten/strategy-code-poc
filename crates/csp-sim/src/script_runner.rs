@@ -16,8 +16,8 @@ use std::sync::Arc;
 use csp_lang::interpreter::{run, RunOptions, RunResult, ValueLimits};
 use csp_lang::{parse, plain_value, script_params, NotPlain, Object, Program, Value};
 use csp_shared::balance::{
-    MAP_SIZE, SCRIPT_LOG_INTERVAL, SCRIPT_MAX_CALL_DEPTH, SCRIPT_MEMORY_MAX,
-    SCRIPT_REALM_STEP_BUDGET, SCRIPT_STEP_BUDGET, SCRIPT_VALUE_LIMITS, WORKPLACE_MAX_WORKERS,
+    MAP_SIZE, SCRIPT_LOG_INTERVAL, SCRIPT_MAX_CALL_DEPTH, SCRIPT_MEMORY_MAX, SCRIPT_STEP_BUDGET,
+    SCRIPT_VALUE_LIMITS, WORKPLACE_MAX_WORKERS,
 };
 use csp_shared::protocol::SeenEntity;
 use csp_shared::terrain::TerrainMap;
@@ -380,8 +380,9 @@ fn as_order(o: &OrderRequest, task: Task) -> OrderRequest {
             ]),
         ),
         Task::TearDown => ("tearDown", pick(&[("buildingId", "buildingId")])),
+        Task::Repair => ("repair", pick(&[("buildingId", "buildingId")])),
         Task::Breed => ("breed", pick(&[("stableId", "stableId"), ("horseIds", "horseIds")])),
-        Task::Build => ("build", pick(&[("building", "building")])),
+        Task::Build => ("build", pick(&[("building", "building"), ("material", "material")])),
         Task::Train => ("train", pick(&[("buildingId", "groundId")])),
         _ => ("workAt", pick(&[("makes", "makes")])),
     };
@@ -434,13 +435,17 @@ fn task_memory(
         }
         Task::Build => {
             m.insert("building".into(), f.get("building").cloned().unwrap_or(Json::Null));
+            if let Some(material) = f.get("material").filter(|v| !v.is_null()) {
+                m.insert("material".into(), material.clone());
+            }
             m.insert("at".into(), tile(f.get("at")).unwrap_or_else(|| json!({ "x": x, "y": y })));
         }
         Task::BuildLine => {
-            m.insert(
-                "line".into(),
-                json!({ "building": f.get("building"), "from": tile(f.get("from")), "to": tile(f.get("to")) }),
-            );
+            let mut line = json!({ "building": f.get("building"), "from": tile(f.get("from")), "to": tile(f.get("to")) });
+            if let Some(material) = f.get("material").filter(|v| !v.is_null()) {
+                line["material"] = material.clone();
+            }
+            m.insert("line".into(), line);
         }
         Task::Haul => {
             m.insert("carriageId".into(), f.get("carriageId").cloned().unwrap_or(Json::Null));
@@ -453,7 +458,7 @@ fn task_memory(
             );
             m.insert("keepFood".into(), f.get("keepFood").cloned().unwrap_or(Json::Null));
         }
-        Task::TearDown => {
+        Task::TearDown | Task::Repair => {
             m.insert("buildingId".into(), f.get("buildingId").cloned().unwrap_or(Json::Null));
         }
         Task::Breed => {
@@ -486,7 +491,9 @@ fn task_target(
     let (id, ty) = match task {
         Task::BuildLine | Task::Explore | Task::Defend | Task::Alarm => return None,
         Task::Work => (field_str(o, "workplaceId").map(str::to_string), ParamType::Building),
-        Task::TearDown => (field_str(o, "buildingId").map(str::to_string), ParamType::Building),
+        Task::TearDown | Task::Repair => {
+            (field_str(o, "buildingId").map(str::to_string), ParamType::Building)
+        }
         Task::Train => (field_str(o, "groundId").map(str::to_string), ParamType::Building),
         Task::Breed | Task::FeedStable => {
             (field_str(o, "stableId").map(str::to_string), ParamType::Storage)
@@ -600,6 +607,17 @@ impl TaskOrder {
                 }
             }
         }
+        if task == Task::Repair {
+            // Given from the building's card, so maybe from afar: its default walks there first.
+            if !can_work(r.born_at, tick) {
+                return Some("children can’t repair buildings".into());
+            }
+            let id = field_str(o, "buildingId");
+            let Some(b) = world.buildings.iter().find(|b| Some(b.id.as_str()) == id) else {
+                return Some("which building?".into());
+            };
+            return crate::repair::repair_problem(world, b.x as i32, b.y as i32, &b.id);
+        }
         let built = work_site_order(world, o, task, r, size)
             .unwrap_or_else(|| as_order(&with_kept_pair(world, o, task, Some(&realm.id)), task));
         let kind = self.builtins.get(&built.kind)?;
@@ -666,7 +684,9 @@ fn build_line_problem(
             csp_shared::balance::ROAD_LINE_MAX_TILES
         ));
     }
-    let line = crate::queries::building::BuildLine { building, from, to };
+    let material = crate::building::material_field(o)
+        .filter(|m| building == BuildingKind::Wall && *m == csp_shared::world::WallMaterial::Stone);
+    let line = crate::queries::building::BuildLine { building, from, to, material };
     if line_to_build(world, &line, terrain).is_empty() {
         return Some(format!("no {} to build on that line", kind_name(building)));
     }
@@ -1096,8 +1116,8 @@ pub struct ScriptRunner {
     kinds: OrderKinds,
     programs: HashMap<u64, (String, Arc<Program>)>,
     waiting: Waiting,
-    /// The scripts that ran the last `run_all`, waiting ones and those a realm's budget skipped
-    /// left out: for tick health (ADR 0004).
+    /// The scripts that ran the last `run_all`, waiting ones left out: for tick
+    /// health (ADR 0004).
     pub runs: usize,
 }
 
@@ -1118,9 +1138,8 @@ impl ScriptRunner {
     }
 
     /// Runs the scripts and applies what they requested (`runAll`). Realm by realm, each script
-    /// gets `SCRIPT_STEP_BUDGET` steps, or what is left of the realm's `SCRIPT_REALM_STEP_BUDGET`;
-    /// once that is used up the rest skip the tick. Who goes first rotates with the tick. With
-    /// `check`, returns the invariant violations found.
+    /// gets `SCRIPT_STEP_BUDGET` steps; a realm has no budget of its own (Daniel, 2026-11-17).
+    /// Who goes first rotates with the tick. With `check`, returns the invariant violations found.
     pub fn run_all(
         &mut self,
         world: &mut WorldState,
@@ -1235,7 +1254,7 @@ impl ScriptRunner {
         out
     }
 
-    /// Runs one realm's scripts in turn, within the realm's step budget (`runRealm`).
+    /// Runs one realm's scripts in turn, each with its own step budget (`runRealm`).
     #[allow(clippy::too_many_arguments)]
     fn run_realm(
         &mut self,
@@ -1249,7 +1268,6 @@ impl ScriptRunner {
         mut violations: Option<&mut Vec<InvariantViolation>>,
     ) {
         let Some(sender) = self.host.sender(user_id) else { return };
-        let mut left = SCRIPT_REALM_STEP_BUDGET;
         let first = (world.tick as usize) % running.len();
         for k in 0..running.len() {
             let r = &running[(first + k) % running.len()];
@@ -1257,41 +1275,21 @@ impl ScriptRunner {
             if r.script(world).is_none() {
                 continue;
             }
-            if left <= 0.0 {
-                let script_id = r.script(world).map_or(0, |s| s.script_id);
-                if let Some(s) = r.script_mut(world) {
-                    s.last_run =
-                        Some(ScriptRunSteps { steps: 0.0, out_of_steps: Some(OutOfSteps::Realm) });
-                }
-                log_limited(
-                    world,
-                    realm_id,
-                    r,
-                    LoggedAt::Budget,
-                    out_of_steps_event(r, script_id, true),
-                );
-                continue;
-            }
             ran.insert(r.id.clone());
-            let steps = SCRIPT_STEP_BUDGET.min(left);
-            match self.run_one(
+            if let Err(error) = self.run_one(
                 world,
                 scratch,
                 realm_id,
                 user_id,
                 &sender,
                 r,
-                steps,
+                SCRIPT_STEP_BUDGET,
                 used,
                 violations.as_deref_mut(),
             ) {
-                Ok(spent) => left -= spent,
-                Err(error) => {
-                    // The game's own bug, not the script's: it ends this one script and the tick
-                    // goes on.
-                    left -= steps;
-                    self.failed_in_game(world, realm_id, r, &error);
-                }
+                // The game's own bug, not the script's: it ends this one script and the tick
+                // goes on.
+                self.failed_in_game(world, realm_id, r, &error);
             }
         }
     }
@@ -1823,8 +1821,8 @@ fn scout_ended(world: &mut WorldState, city_id: &str, reason: Option<&str>) {
 
 /// An NPC city's residents run the game's default of their task (`runNpcScripts`, `CONTEXT.md`:
 /// NPC city, Default script; ADR 0009), through the same interpreter and game API as a Player's
-/// scripts, with the city as the sender: it sees what its residents see, explored or not, and
-/// has no realm budget. Returns how many scripts ran, for tick health.
+/// scripts, with the city as the sender: it sees what its residents see, explored or not.
+/// Returns how many scripts ran, for tick health.
 pub fn run_npc_scripts(
     world: &mut WorldState,
     terrain: &TerrainMap,
@@ -2094,7 +2092,8 @@ fn target_known(task: Task) -> Option<(&'static str, &'static [&'static str], &'
 }
 
 /// Invariant (`defaultsHaveATarget`): a resident running the Work, Build, Haul or Build line
-/// default as the game ships it knows its target once it has run.
+/// default as the game ships it knows its target once it has run: for Build, a site or the
+/// building it repairs.
 pub fn defaults_have_a_target(
     world: &WorldState,
     task_of: &dyn Fn(&Resident) -> Option<Task>,
@@ -2103,7 +2102,13 @@ pub fn defaults_have_a_target(
     for r in &world.residents {
         let Some(s) = &r.script else { continue };
         let Some((invariant, keys, without)) = task_of(r).and_then(target_known) else { continue };
-        if keys.iter().all(|k| s.memory.get(*k).is_some_and(|v| !v.is_null())) {
+        let known = |k: &str| s.memory.get(k).is_some_and(|v| !v.is_null());
+        if keys.iter().all(|k| known(k)) {
+            continue;
+        }
+        // With nothing to build, the Build default repairs (`CONTEXT.md`: Repairing): the
+        // building it repairs is its target then.
+        if task_of(r) == Some(Task::Build) && known("repairId") {
             continue;
         }
         out.push(InvariantViolation {

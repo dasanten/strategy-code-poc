@@ -20,6 +20,7 @@ import type {
   StartParamValues,
   Stock,
   TrainingSubject,
+  WallMaterial,
 } from '@csp/shared-types'
 import { appendRequests, storeAll } from './queue-view.js'
 import { ACTION_KEYS, type ActionId, type CardAction, type OrderGroup } from './selection-view.js'
@@ -31,7 +32,13 @@ import { ACTION_KEYS, type ActionId, type CardAction, type OrderGroup } from './
 export type GroupOrder =
   | { kind: 'walkTo'; x: number; y: number }
   | ({ kind: 'work'; workplace: Pick<Building, 'id' | 'kind' | 'x' | 'y'>; name: string } & Starts)
-  | ({ kind: 'build'; building: BuildingKind; at: { x: number; y: number } } & Starts)
+  | ({
+      kind: 'build'
+      building: BuildingKind
+      at: { x: number; y: number }
+      /** What a wall or gate is built of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or stone). */
+      material?: WallMaterial
+    } & Starts)
   /** Everything carried to the nearest storage, or to the one picked (`to`). */
   | { kind: 'store'; to?: Place }
   /** As much as fits of a good from the nearest storage holding it, or from the one picked. */
@@ -118,6 +125,8 @@ export type GroupOrder =
       building: 'road' | 'wall'
       from: { x: number; y: number }
       to: { x: number; y: number }
+      /** What a wall line builds of; none is wood. */
+      material?: WallMaterial
     } & Starts)
   /** Those standing at the building tear it down. */
   | ({
@@ -555,7 +564,14 @@ export function groupRequests(
         break
       case 'build':
         // The Build task walks there first and joins the site once one of them has laid it out.
-        send(r, { kind: 'task', task: 'build', building: order.building, at: order.at, ...params })
+        send(r, {
+          kind: 'task',
+          task: 'build',
+          building: order.building,
+          at: order.at,
+          ...(order.material ? { material: order.material } : {}),
+          ...params,
+        })
         break
       case 'store': {
         // Everything they carry to the nearest storage; their own food stays in their hands.
@@ -652,8 +668,16 @@ export function groupRequests(
         })
         break
       case 'line': {
-        const { building, from, to } = order
-        send(r, { kind: 'task', task: 'buildLine', building, from, to, ...params })
+        const { building, from, to, material } = order
+        send(r, {
+          kind: 'task',
+          task: 'buildLine',
+          building,
+          from,
+          to,
+          ...(material ? { material } : {}),
+          ...params,
+        })
         break
       }
       case 'tearDown':
@@ -838,7 +862,18 @@ export const GROUP_BUTTONS: readonly { id: GroupButton; label: string; group: Or
 /** The resident card's own orders: every action it offers but the tile card's. */
 export type ResidentOrderId = Exclude<
   ActionId,
-  'sendHere' | 'gate' | 'openCity' | 'tradeHere' | 'renameCity' | 'renameHorse' | 'addWaypoint'
+  | 'sendHere'
+  | 'gate'
+  | 'openCity'
+  | 'tradeHere'
+  | 'renameCity'
+  | 'renameHorse'
+  | 'addWaypoint'
+  | 'repair'
+  | 'crew'
+  | 'ram'
+  | 'throw'
+  | 'push'
 >
 
 /**

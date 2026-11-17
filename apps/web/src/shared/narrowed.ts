@@ -91,7 +91,22 @@ export const SKILL_PER_DAY = B.SKILL_PER_DAY as unknown as Readonly<Record<Skill
  * of wall alone in about five minutes; ten soldiers with swords in well under one. A gate holds
  * out half as long again.
  */
-export const WALL_STRENGTH = B.WALL_STRENGTH as unknown as Record<'wall' | 'gate', number>
+export const WALL_STRENGTH = B.WALL_STRENGTH as unknown as Record<'wall' | 'gate' | 'tower', number>
+
+/** Damage a stone wall or gate takes before it falls (`CONTEXT.md`: Wood or stone). */
+export const STONE_WALL_STRENGTH = B.STONE_WALL_STRENGTH as unknown as Record<
+  'wall' | 'gate' | 'tower',
+  number
+>
+
+/** What a stone wall or gate takes instead of `BUILD_MATERIALS`: Stone. */
+export const STONE_BUILD_MATERIALS = B.STONE_BUILD_MATERIALS as unknown as Record<
+  'wall' | 'gate' | 'tower',
+  Stock
+>
+
+/** Work a stone wall or gate takes instead of `BUILD_WORK`. */
+export const STONE_BUILD_WORK = B.STONE_BUILD_WORK as unknown as Record<'wall' | 'gate' | 'tower', number>
 
 /**
  * What a warehouse sells a unit of each good for, in coins, when it holds `PRICE_REFERENCE_FLOORS`

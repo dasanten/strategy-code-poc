@@ -14,11 +14,14 @@ import {
   TICKS_PER_GAME_YEAR,
   PASSENGER_WEIGHT,
   BOAT_CAPACITY,
+  RAM_CREW,
+  RAM_STRENGTH,
   SHIP_CAPACITY,
   SHIP_MIN_CREW,
   ticksForAge,
   RICHNESS_FACTOR,
 } from '@csp/balance'
+import { rebuildWork } from './shared/decay.js'
 import { FOOTPRINT, footprintTiles } from './shared/footprint.js'
 import { MAX_WORKERS, NODE_GOOD, buildMenu } from './shared/building.js'
 import { TICKS_PER_GAME_HOUR } from './shared/time.js'
@@ -76,6 +79,7 @@ import {
   hitchChoice,
   unhitcherOf,
   boaterOf,
+  pusherOf,
   type ActionId,
   HAUL_STARTS_ASHORE,
   type CardAction,
@@ -820,6 +824,11 @@ describe('the rows of a card that stays open', () => {
         'renameCity',
         'renameHorse',
         'addWaypoint',
+        'repair',
+        'crew',
+        'push',
+        'ram',
+        'throw',
       ]
       if (tileCard.includes(id)) continue
       if (['relocate', 'makeLeader', 'rename'].includes(id)) continue
@@ -861,6 +870,99 @@ const things = (more: Partial<TileThings> = {}): TileThings => ({
   ...more,
 })
 const tile = (more: Partial<TileThings> = {}) => describeTile(things(more), GOOD_LABELS)
+
+describe('the card for a tower (CONTEXT.md: Tower)', () => {
+  it('shows on every tile of it, saying what it is of', () => {
+    const tower = { id: 't1', kind: 'tower' as const, cityId: 'c-me', x: 4, y: 4 }
+    expect(tile({ buildings: [tower] }).lines).toContain('Of wood')
+    const stone = tile({ buildings: [{ ...tower, material: 'stone' as const }] })
+    expect(stone.lines).toContain('Of stone')
+    expect(stone.what).toBe('building')
+  })
+})
+
+describe('the card for a tile with a siege machine', () => {
+  const ram = {
+    id: 'm1',
+    kind: 'ram' as const,
+    realmId: 'me',
+    x: 5,
+    y: 5,
+    crewIds: ['a', 'b'],
+  }
+  const actor = (id: string, x = 9, more: Partial<Resident> = {}) =>
+    ({ id, name: id, x, y: 5, bornAt: -1e9, ...more }) as unknown as Resident
+
+  it('shows a ram with its owner, its crew against what it needs, and its damage', () => {
+    const card = tile({ machines: [{ ...ram, damage: RAM_STRENGTH / 4 }] })
+    expect(card).toMatchObject({ title: 'Ram', rel: 'own', what: 'carriage' })
+    expect(card.lines).toEqual([
+      'Yours',
+      `Crew 2 of ${RAM_CREW}: needs ${RAM_CREW - 2} more to be pushed`,
+      'Damaged: 25%',
+      'Tile 5, 5',
+    ])
+    expect(card.machine).toMatchObject({ id: 'm1', own: true, short: RAM_CREW - 2 })
+    const theirs = tile({ machines: [{ ...ram, realmId: 'r2' }] })
+    expect(theirs.machine?.own).toBe(false)
+  })
+
+  it('shows a ram site in the field on a card of its own, with what it still needs', () => {
+    const site = {
+      id: 'rs',
+      kind: 'ram' as const,
+      cityId: null,
+      x: 5,
+      y: 5,
+      site: { delivered: { wood: 10 }, work: 0 },
+    }
+    const card = tile({ buildings: [site] })
+    expect(card).toMatchObject({ title: 'Ram site', what: 'building' })
+    expect(card.sites?.length).toBe(1)
+  })
+
+  it('offers its crew to ram the gate of another realm next to it, once enough (CONTEXT.md: Ram)', () => {
+    const gate = { id: 'g1', kind: 'gate' as const, cityId: 'c-npc', x: 6, y: 5 }
+    const wall = { id: 'w1', kind: 'wall' as const, cityId: 'c-npc', x: 6, y: 4 }
+    const own = { id: 'w2', kind: 'wall' as const, cityId: 'c-me', x: 4, y: 5 }
+    const card = tile({ machines: [ram], buildings: [wall, gate, own] })
+    expect(card.machine?.ramAt).toEqual({ id: 'g1', name: 'gate' })
+    const row = tileActions(card, actor('a')).find((a) => a.id === 'ram')
+    expect(row).toMatchObject({
+      label: 'Ram the gate',
+      disabled: true,
+      reason: `the ram needs ${RAM_CREW - 2} more crew to strike`,
+    })
+    // Nothing of another realm next to it: nothing to ram.
+    expect(tile({ machines: [ram], buildings: [own] }).machine?.ramAt).toBeUndefined()
+  })
+
+  it('lets the resident picked last crew it, its crew push it once enough, its realm tear it down', () => {
+    const card = tile({ machines: [ram] })
+    const ids = (r: Resident | undefined) => tileActions(card, r).map((a) => a.id)
+    // From anywhere a resident of the realm walks over to crew it.
+    expect(ids(actor('c'))).toEqual(expect.arrayContaining(['crew', 'push']))
+    expect(ids(actor('a'))).not.toContain('crew')
+    // Below its crew size the push is greyed out, saying why.
+    const push = tileActions(card, actor('a')).find((a) => a.id === 'push')
+    expect(push).toMatchObject({
+      label: 'Push the ram to…',
+      disabled: true,
+      reason: `the ram needs ${RAM_CREW - 2} more crew to be pushed`,
+    })
+    const full = tile({ machines: [{ ...ram, crewIds: ['a', 'b', 'c', 'd'].slice(0, RAM_CREW) }] })
+    expect(tileActions(full, actor('a')).find((a) => a.id === 'push')?.disabled).toBeUndefined()
+    expect(pusherOf(full, actor('b'))).toBe('b')
+    expect(pusherOf(full, actor('z'))).toBe('a')
+    // Only on its tile is it torn down.
+    expect(ids(actor('a'))).not.toContain('tearDown')
+    expect(ids(actor('a', 5))).toContain('tearDown')
+    // Another realm's ram offers none of it.
+    const theirs = tile({ machines: [{ ...ram, realmId: 'r2' }] })
+    expect(ids(actor('c', 5))).toContain('crew')
+    expect(tileActions(theirs, actor('c', 5)).map((a) => a.id)).not.toContain('crew')
+  })
+})
 
 describe('the card for a tile', () => {
   it('shows a boat on the water with its owner and load, what it holds only to its own realm', () => {
@@ -1344,7 +1446,7 @@ describe('the card for a tile', () => {
     expect(card).toMatchObject({ title: 'Oakhollow storage', rel: 'npcCity', what: 'building' })
     expect(card.lastSeen).toEqual({
       when: 'Last seen: day 1, 00:00 (3 days ago)',
-      lines: ['NPC city'],
+      lines: ['NPC city', 'Condition: good'],
       lists: [expect.objectContaining({ title: 'Goods', goods: { food: 3 } })],
     })
     // What is in sight there now stays apart from it.
@@ -1513,6 +1615,64 @@ describe('horses on the tile card', () => {
     const hitched = tile({ carriages: [{ ...carriage, horseId: 'h2' }], horses: [down], tick })
     expect(hitched.carriage?.horse?.rows[0]?.detail).toBe(
       `Down from hunger: ${timeLeft(23 * 3600)} · a resident with Food can Feed it · Speed 12, Strength 8, Endurance 10 · 0 game days old`,
+    )
+  })
+
+  it('says how a building has decayed and offers the resident picked last to repair a worn one (`CONTEXT.md`: Repairing)', () => {
+    const tick = 100 * TICKS_PER_GAME_YEAR
+    const house = (more: Partial<Building>) =>
+      ({ id: 'h1', kind: 'house', cityId: 'c-npc', x: 5, y: 5, ...more }) as Building
+    const ada = { id: 'r1', name: 'Ada', x: 1, y: 1, bornAt: 0, carried: {} } as unknown as Resident
+    const good = tile({ buildings: [house({})], tick })
+    expect(good.lines).toContain('Condition: good')
+    expect(good.repair).toBeUndefined()
+    expect(tileActions(good, ada, tick).find((a) => a.id === 'repair')).toBeUndefined()
+    const worn = tile({ buildings: [house({ decay: 0.5 })], tick })
+    expect(worn.lines).toContain('Condition: worn')
+    expect(worn.repair).toEqual({ buildingId: 'h1', name: 'house' })
+    expect(tileActions(worn, ada, tick).find((a) => a.id === 'repair')).toEqual({
+      id: 'repair',
+      label: 'Repair house',
+      key: ACTION_KEYS.repair,
+    })
+    const child = { ...ada, bornAt: tick } as Resident
+    expect(tileActions(worn, child, tick).find((a) => a.id === 'repair')).toMatchObject({
+      disabled: true,
+      reason: 'children can’t repair buildings',
+    })
+    const repairing = tile({
+      buildings: [house({ decay: 0.8, repair: { delivered: { wood: 5 }, work: 180 } })],
+      tick,
+    })
+    expect(repairing.lines).toContain(
+      'Condition: nearly a ruin · being repaired, 50% of the work done',
+    )
+    // A worn road under nothing else: the road is repaired.
+    const road = { id: 'rd', kind: 'road', cityId: null, x: 5, y: 5, decay: 0.3 } as Building
+    expect(tile({ buildings: [road], tick }).repair).toEqual({ buildingId: 'rd', name: 'road' })
+  })
+
+  it('says a ruin does nothing and offers to rebuild it (`CONTEXT.md`: Ruin)', () => {
+    const tick = 100 * TICKS_PER_GAME_YEAR
+    const ruin = (more: Partial<Building>) =>
+      ({ id: 'h1', kind: 'house', cityId: 'c-npc', x: 5, y: 5, decay: 1, ruinedAt: 0, ...more }) as Building
+    const ada = { id: 'r1', name: 'Ada', x: 1, y: 1, bornAt: 0, carried: {} } as unknown as Resident
+    const card = tile({ buildings: [ruin({})], tick })
+    expect(card.lines).toContain('A ruin: it does nothing until it is rebuilt, and collapses if left')
+    expect(card.repair).toEqual({ buildingId: 'h1', name: 'house', rebuild: true })
+    expect(tileActions(card, ada, tick).find((a) => a.id === 'repair')).toEqual({
+      id: 'repair',
+      label: 'Rebuild house',
+      key: ACTION_KEYS.repair,
+    })
+    // A quarter of a house's rebuild work is a quarter done.
+    const work = rebuildWork('house')
+    const rebuilding = tile({
+      buildings: [ruin({ repair: { delivered: {}, work: work / 4 } })],
+      tick,
+    })
+    expect(rebuilding.lines).toContain(
+      'A ruin: it does nothing until it is rebuilt, and collapses if left · being rebuilt, 25% of the work done',
     )
   })
 

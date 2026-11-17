@@ -90,7 +90,7 @@ fn same_realm(
     }
 }
 
-/// The names of the living residents of the realm a resident of `owner` living in `city_id`
+/// The names of the living residents, the Down among them, of the realm a resident of `owner` living in `city_id`
 /// belongs to (`residentNamesTaken`): the Player's realm, or for one of no realm the NPC city they
 /// live in. One of no realm and no city shares a realm with nobody.
 pub fn resident_names_taken(
@@ -105,7 +105,8 @@ pub fn resident_names_taken(
         .residents
         .iter()
         .filter(|r| {
-            r.health > 0.0 && same_realm(r.owner.as_deref(), r.city_id.as_deref(), owner, city_id)
+            (r.health > 0.0 || r.down_until.is_some())
+                && same_realm(r.owner.as_deref(), r.city_id.as_deref(), owner, city_id)
         })
         .map(|r| r.name.clone())
         .collect()
@@ -282,5 +283,15 @@ mod tests {
         assert_eq!(resident_names_taken(&world, None, Some("c1")), set(&["Ivo"]));
         assert_eq!(resident_names_taken(&world, None, None), HashSet::new());
         assert_eq!(city_names_taken(&world), set(&[world.cities[0].name.as_str()]));
+    }
+
+    #[test]
+    fn takes_the_name_of_one_who_is_down() {
+        // #1379: a child born while their namesake lay Down shared the name once they were revived.
+        let (mut world, _) = world_with_city();
+        let mut down = npc("n1", Some("c1"));
+        (down.health, down.down_until) = (0.0, Some(100.0));
+        world.residents.push(down);
+        assert_eq!(resident_names_taken(&world, None, Some("c1")), set(&["Ivo"]));
     }
 }

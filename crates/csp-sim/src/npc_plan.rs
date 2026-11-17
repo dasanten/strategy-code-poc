@@ -8,7 +8,8 @@
 use std::collections::{HashMap, HashSet};
 
 use csp_shared::balance::{
-    FOOD_PER_DAY, MAP_SIZE, NPC_FOOD_SHORT_DAYS, NPC_PLAN_TICKS, WORK_OUTPUT_PER_DAY,
+    FOOD_PER_DAY, MAP_SIZE, NPC_FOOD_REFILL_DAYS, NPC_FOOD_SHORT_DAYS, NPC_PLAN_TICKS,
+    WORK_OUTPUT_PER_DAY,
 };
 use csp_shared::terrain::{wrap_distance, TerrainMap};
 use csp_shared::world::{
@@ -21,7 +22,7 @@ use crate::npc_behaviour::{npc_home, workplace_of, Jobs};
 use crate::npc_chain::{
     chain_good, chain_input, chain_store_index, holds_batch, shortages, SurplusWork,
 };
-use crate::npc_founding::{founding_party, plan_founding, FoundingPeople};
+use crate::npc_founding::{founding_lacks, founding_party, plan_founding, FoundingPeople};
 use crate::npc_growth::{
     city_grows, city_project, end_pairs, farms_full, is_builder, no_farm, npc_builders, pair_adults,
 };
@@ -35,7 +36,9 @@ use crate::npc_stable::{feed_job_kept, plan_feeder};
 use crate::npc_trader::{send_traders, traders_out};
 use crate::npc_training::plan_training;
 use crate::queries::alliance::contract_of;
-use crate::queries::building::{building_at, materials_needed, max_workers, workplace_good};
+use crate::queries::building::{
+    building_at, construction_at, is_stone, materials_needed, max_workers, workplace_good,
+};
 use crate::queries::city::{city_food_use, city_residents, has_food_surplus, stored_food};
 use crate::queries::names::{held, held_in};
 use crate::queries::npc_trade::npc_storages;
@@ -319,6 +322,26 @@ pub fn plan_city(
         size,
         &old_jobs,
     );
+    // Those gathering its founding party's materials are still spare hands to its founding
+    // (`CONTEXT.md`: Full city), though they hold their places.
+    let mut unneeded = unneeded;
+    let gathered: HashSet<Good> =
+        founding_lacks(world, &city, home.as_ref(), size).into_iter().map(|s| s.good).collect();
+    if !gathered.is_empty() {
+        for &i in &adults {
+            let gathers = jobs.get(&world.residents[i].id).is_some_and(|j| {
+                j.kind == CityJobKind::Work
+                    && j.building_id.as_ref().is_some_and(|id| {
+                        world.buildings.iter().find(|b| &b.id == id).is_some_and(|b| {
+                            chain_good(world, b).is_some_and(|g| gathered.contains(&g))
+                        })
+                    })
+            });
+            if gathers && !unneeded.contains(&i) {
+                unneeded.push(i);
+            }
+        }
+    }
     // Trading posts and the HQ don't feed their stables this way.
     if city.trade_org.is_none() && !feeding {
         plan_feeder(world, &city, &adults, &mut jobs);
@@ -351,10 +374,35 @@ pub fn plan_city(
 }
 
 /// How many farmers an NPC city keeps (`farmersWanted`): as many as feed all its residents, and
-/// one more while it has no food surplus.
+/// one more while it has no food surplus (`farmers_to_feed`); below its reserve, as many more as
+/// win back what its Food lacks of it in `NPC_FOOD_REFILL_DAYS` until it runs short, if that is
+/// more (#1379: on those who feed everyone alone, its Food sank to where it runs short and stayed
+/// there).
 pub fn farmers_wanted(world: &WorldState, city: &City) -> f64 {
-    feeders(city_residents(world, &city.id).len())
-        + if has_food_surplus(world, city) { 0.0 } else { 1.0 }
+    let more: f64 = if has_food_surplus(world, city) { 0.0 } else { 1.0 };
+    feeders(city_residents(world, &city.id).len()) + more.max(refill_farmers(world, city))
+}
+
+/// The farmers who feed all an NPC city's residents, and one more while it has no food surplus
+/// (`farmers_wanted` but for those who win back its reserve): it builds a farm when they don't fit
+/// on its farms (`farmers_dont_fit`), not for those who only refill it.
+pub fn farmers_to_feed(world: &WorldState, city: &City) -> f64 {
+    let more = if has_food_surplus(world, city) { 0.0 } else { 1.0 };
+    feeders(city_residents(world, &city.id).len()) + more
+}
+
+/// The farmers more an NPC city keeps to win back what its Food lacks of its reserve
+/// (`farmers_wanted`), rounded up. None once its Food runs short: then its workers go to the farms
+/// with room and its spare hands still buy Food and revive those who are Down (`share_out`).
+fn refill_farmers(world: &WorldState, city: &City) -> f64 {
+    if city.trade_org.is_some() || food_short(world, city) {
+        return 0.0;
+    }
+    use crate::queries::npc_trade::{npc_city_stock, npc_reserve};
+    let lacks = held(&npc_reserve(world, city), Good::Food)
+        - held(&npc_city_stock(world, city), Good::Food);
+    let per = WORK_OUTPUT_PER_DAY.get("food").unwrap_or(1.0) * NPC_FOOD_REFILL_DAYS;
+    (lacks / per - 1e-9).ceil().max(0.0)
 }
 
 /// Farmers who feed `residents`, rounded up (`feeders`).
@@ -403,7 +451,7 @@ fn share_out(
     let project = world.city_plans[&city.id].project.clone();
     let own: Vec<usize> = crate::npc_chain::own_workplace_indices(world, city)
         .into_iter()
-        // Nobody is sent where the vein ran dry (`CONTEXT.md`: Running dry).
+        // A workplace whose node ran dry is no one's place any more (`CONTEXT.md`: Running dry).
         .filter(|&b| {
             world.buildings[b].site.is_none()
                 && !crate::npc_growth::on_dry_node(world, &world.buildings[b])
@@ -418,6 +466,9 @@ fn share_out(
     let farms: Vec<usize> =
         own.iter().copied().filter(|&b| world.buildings[b].kind == BuildingKind::Farm).collect();
     let short = shortages(world, city, size, project.as_ref());
+    // Lacking nothing else, its founding party's materials (`CONTEXT.md`: Full city). Those who
+    // gather them keep their places by going back to them, as with surplus work.
+    let founding_short = founding_lacks(world, city, roads.0, size);
     let share_of: HashMap<Good, f64> = short.iter().map(|s| (s.good, s.share)).collect();
     // What weighs on a job at a workplace besides what it is for (`CONTEXT.md`: Stance; ADR 0039):
     // the way from the storage, the danger places by it, and the crew already there. `mine` when
@@ -527,6 +578,7 @@ fn share_out(
     for &i in adults {
         if held_score(world, jobs, held, i) <= only_back
             && jobs.contains_key(&world.residents[i].id)
+            && !crate::npc_mending::mends(&world.residents[i])
         {
             release(world, jobs, held, &mut kept, &mut spare, i);
         }
@@ -567,6 +619,8 @@ fn share_out(
         .map(|i| (i, held_score(world, jobs, held, i)))
         .collect();
     let storage = chain_store_index(world, city);
+    // With nothing to build, its builders repair its buildings (`CONTEXT.md`: Repairing).
+    let repairs = crate::npc_repair::repair_due(world, city, storage, false);
     let (home, mut ways, terrain) = roads;
     let mut state = Share { builders, farming };
     let mut unneeded: Vec<usize> = Vec::new();
@@ -635,13 +689,13 @@ fn share_out(
                         .collect()
                 }
                 Offer::Project => {
-                    let project = project.clone().expect("a project");
+                    let project = project.clone();
                     takers
                         .into_iter()
                         .filter(|&i| {
-                            if state.builders >= npc_builders(world, city)
-                                || !can_take_part(world, city, i, &project)
-                            {
+                            let part =
+                                project.as_ref().is_some_and(|p| can_take_part(world, city, i, p));
+                            if state.builders >= npc_builders(world, city) || !(part || repairs) {
                                 return false;
                             }
                             give(world, jobs, held, i, job_at(CityJobKind::Build, None), None);
@@ -711,7 +765,10 @@ fn share_out(
                             let worth = surplus.as_ref().is_none_or(|s| {
                                 chain_good(world, b).is_none() || s.full(world, b).is_some()
                             });
-                            if held.room(b) <= 0.0 || !worth {
+                            // Never back where the vein ran dry (`CONTEXT.md`: Running dry): it makes
+                            // nothing, so no surplus says so.
+                            let dry = crate::npc_growth::on_dry_node(world, b);
+                            if held.room(b) <= 0.0 || !worth || dry {
                                 return false;
                             }
                             give(world, jobs, held, i, back, Some(place));
@@ -743,7 +800,7 @@ fn share_out(
         (job_score(ScoredJob::Farm { food_short: false }), Offer::Farm),
         (job_score(ScoredJob::Revive), Offer::Revive),
     ];
-    if project.is_some() {
+    if project.is_some() || repairs {
         first.push((job_score(ScoredJob::Project), Offer::Project));
     }
     // Work on a good that is short is worth what the workplace it would go to costs.
@@ -758,23 +815,61 @@ fn share_out(
     if unneeded.is_empty() {
         return unneeded;
     }
-    // Nothing short has a use for them (`CONTEXT.md`: Spare hands' work).
-    let mut second: Vec<(f64, Offer)> = vec![
-        (job_score(ScoredJob::Road), Offer::Road),
-        (job_score(ScoredJob::Scout), Offer::Scout),
-        (job_score(ScoredJob::Back), Offer::Back),
-    ];
+    // Nothing short has a use for them (`CONTEXT.md`: Spare hands' work): work at its workplaces,
+    // going back to their own first, and for surplus, each less what its place costs.
+    let mut workplaces: Vec<(f64, Offer)> = vec![(job_score(ScoredJob::Back), Offer::Back)];
     if city.trade_org.is_none() {
         let surplus = SurplusWork::of(world, city, storage.map(|s| &world.buildings[s]));
         for &place in &own {
             if let Some(full) = surplus.full(world, &world.buildings[place]) {
                 let at = at(world, held, place, false);
                 let score = blended_score(ScoredJob::Surplus { full }, at, &weights);
-                second.push((score, Offer::Surplus(place)));
+                workplaces.push((score, Offer::Surplus(place)));
             }
         }
     }
-    let idle = fill(world, jobs, held, &kept, &mut state, &mut ways, second, unneeded.clone());
+    let mut second = vec![
+        (job_score(ScoredJob::Road), Offer::Road),
+        (job_score(ScoredJob::Scout), Offer::Scout),
+    ];
+    second.extend(workplaces);
+    let left = fill(world, jobs, held, &kept, &mut state, &mut ways, second, unneeded.clone());
+    // Lacking nothing else, its founding party's materials count as short (`CONTEXT.md`: Full
+    // city), but its spare hands' work comes first (Daniel, 2026-11-16, T100.8): only the hands
+    // left over gather for the party. All are still spare hands to its founding.
+    let founding: Vec<(f64, Offer)> = founding_short
+        .iter()
+        .map(|s| {
+            let job = ScoredJob::Short { share: s.share };
+            let place = short_place(world, city, s.good, &own, held, storage, &cost);
+            let at = place.map_or_else(Considerations::default, |b| at(world, held, b, false));
+            (blended_score(job, at, &weights), Offer::Short(s.good))
+        })
+        .collect();
+    let mut idle = if founding.is_empty() || left.is_empty() {
+        left
+    } else {
+        fill(world, jobs, held, &kept, &mut state, &mut ways, founding, left)
+    };
+    // With every good they could work for at its cap and nothing left to gather for a founding
+    // party, they work on past the cap, the good least far past first (`NPC_SURPLUS_PAST_CAP`).
+    if city.trade_org.is_none() && !idle.is_empty() {
+        let surplus = SurplusWork::of(world, city, storage.map(|s| &world.buildings[s]));
+        let past: Vec<(f64, Offer)> = own
+            .iter()
+            .filter_map(|&place| {
+                let full = surplus.past(world, &world.buildings[place])?;
+                let at = at(world, held, place, false);
+                Some((
+                    blended_score(ScoredJob::Surplus { full }, at, &weights),
+                    Offer::Surplus(place),
+                ))
+            })
+            .collect();
+        if !past.is_empty() {
+            idle = fill(world, jobs, held, &kept, &mut state, &mut ways, past, idle);
+        }
+    }
     for i in idle {
         jobs.insert(world.residents[i].id.clone(), job_at(CityJobKind::Idle, None));
     }
@@ -846,13 +941,13 @@ fn short_place(
 /// Whether a resident could help with a project now (`canTakePart`): anything but a site that needs
 /// materials neither they carry nor the storage holds.
 fn can_take_part(world: &WorldState, city: &City, i: usize, project: &CityProject) -> bool {
-    let (x, y) = match project {
+    let x = match project {
         CityProject::TearDown { building_id } => {
             return world.buildings.iter().any(|b| &b.id == building_id)
         }
-        CityProject::Build { x, y, .. } => (*x as i32, *y as i32),
+        CityProject::Build { building, x, y, material } => (*building, *x, *y, *material),
     };
-    let Some(site) = building_at(world, x, y, MAP_SIZE).filter(|s| s.site.is_some()) else {
+    let Some(site) = crate::npc_growth::project_site(world, x.0, x.3, x.1, x.2) else {
         return true;
     };
     let need = materials_needed(site);
@@ -872,8 +967,17 @@ pub fn project_done(world: &WorldState, project: &CityProject) -> bool {
         CityProject::TearDown { building_id } => {
             !world.buildings.iter().any(|b| &b.id == building_id)
         }
-        CityProject::Build { building, x, y } => building_at(world, *x as i32, *y as i32, MAP_SIZE)
-            .is_some_and(|b| b.kind != *building || b.site.is_none()),
+        CityProject::Build { building, x, y, material } if is_stone(*building, *material) => {
+            // Done once a finished stone one of its kind stands there, or something else does
+            // (`CONTEXT.md`: Wood or stone); the wooden one it upgrades and its site go on.
+            construction_at(world, *x as i32, *y as i32, *building).is_some_and(|b| {
+                b.kind != *building || (b.site.is_none() == is_stone(b.kind, b.material))
+            })
+        }
+        CityProject::Build { building, x, y, .. } => {
+            building_at(world, *x as i32, *y as i32, MAP_SIZE)
+                .is_some_and(|b| b.kind != *building || b.site.is_none())
+        }
     }
 }
 

@@ -3,8 +3,31 @@ import type { BuildingKind } from "./BuildingKind.js";
 import type { ConstructionSite } from "./ConstructionSite.js";
 import type { Good } from "./Good.js";
 import type { KeptBreeding } from "./KeptBreeding.js";
+import type { WallMaterial } from "./WallMaterial.js";
 
 /**
  * A building or construction site (`Building`).
  */
-export type Building = { id: string, kind: BuildingKind, cityId: string | null, realmId?: string, x: number, y: number, stock?: { [key in Good]?: number }, site?: ConstructionSite, teardown?: number, closed?: true, damage?: number, breedings?: Array<KeptBreeding>, };
+export type Building = { id: string, kind: BuildingKind, cityId: string | null, realmId?: string, x: number, y: number, stock?: { [key in Good]?: number }, site?: ConstructionSite, teardown?: number, closed?: true, damage?: number, breedings?: Array<KeptBreeding>, 
+/**
+ * Share of its condition a finished building has lost to decay (`CONTEXT.md`: Decay), from 0
+ * (good, as built) to 1 (nothing left). Left out of a save while it has lost none, so a
+ * building from before format 130 reads as good.
+ */
+decay?: number, 
+/**
+ * A repair under way (`CONTEXT.md`: Repairing): the materials brought and the work put in so
+ * far. Gone once it is done.
+ */
+repair?: ConstructionSite, 
+/**
+ * The tick a building nobody repaired became a ruin (`CONTEXT.md`: Ruin): it stands but does
+ * nothing, and collapses `RUIN_COLLAPSE_DAYS` game days later. Gone once it is rebuilt; left
+ * out of a save while it is none, so a building from before format 135 is no ruin.
+ */
+ruinedAt?: number, 
+/**
+ * What a wall, gate or tower, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate,
+ * Wood or stone, Tower). Only walls, gates and towers have one.
+ */
+material?: WallMaterial, };

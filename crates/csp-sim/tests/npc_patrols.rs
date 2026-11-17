@@ -178,8 +178,8 @@ mod patrols {
 
     #[test]
     fn sends_a_share_of_those_on_the_wall_up_to_the_limit_however_many_there_are() {
-        assert_eq!(patrols_wanted(NPC_SOLDIERS_PER_PATROL as usize - 1), 0);
-        assert_eq!(patrols_wanted(NPC_SOLDIERS_PER_PATROL as usize), 1);
+        assert_eq!(patrols_wanted(NPC_SOLDIERS_PER_PATROL.ceil() as usize - 1), 0);
+        assert_eq!(patrols_wanted(NPC_SOLDIERS_PER_PATROL.ceil() as usize), 1);
         assert_eq!(patrols_wanted(1000), NPC_PATROLS_MAX as usize);
     }
 
@@ -327,8 +327,9 @@ mod patrols {
 
     #[test]
     fn takes_the_next_by_id_when_a_round_ends_after_the_last_and_comes_round_again() {
-        let mut s =
-            on_posts(NPC_SOLDIERS_ON_HALL as usize + 1 + 2 * NPC_SOLDIERS_PER_PATROL as usize);
+        let mut s = on_posts(
+            NPC_SOLDIERS_ON_HALL as usize + 1 + (2.0 * NPC_SOLDIERS_PER_PATROL).ceil() as usize,
+        );
         let on_wall: Vec<String> =
             soldiers_of(&s.world)[NPC_SOLDIERS_ON_HALL as usize + 1..].to_vec();
         let wanted = patrols_wanted(on_wall.len());
@@ -367,7 +368,8 @@ mod patrols {
 
     #[test]
     fn leaves_out_one_still_walking_back_to_their_post_and_gives_the_turn_to_the_next() {
-        let mut s = staged(NPC_SOLDIERS_ON_HALL as usize + 1 + NPC_SOLDIERS_PER_PATROL as usize);
+        let mut s =
+            staged(NPC_SOLDIERS_ON_HALL as usize + 1 + NPC_SOLDIERS_PER_PATROL.ceil() as usize);
         pass(&mut s.world, &s.city);
         arrive(&mut s.world);
         let first = soldiers_of(&s.world)[NPC_SOLDIERS_ON_HALL as usize + 1].clone();
@@ -523,7 +525,8 @@ mod in_the_running_world {
     #[test]
     #[ignore = "7.3 s alone; see #1132"]
     fn no_more_than_the_limit_walk_at_once_they_take_turns_and_nobody_starves() {
-        let armed = NPC_SOLDIERS_ON_HALL as usize + 1 + 2 * NPC_SOLDIERS_PER_PATROL as usize;
+        let armed =
+            NPC_SOLDIERS_ON_HALL as usize + 1 + (2.0 * NPC_SOLDIERS_PER_PATROL).ceil() as usize;
         let mut s = staged(armed);
         let mut walking = Walking::new(Arc::new(s.terrain.clone()));
         let mut scratch = Scratch::default();
@@ -582,8 +585,9 @@ mod in_the_running_world {
 
     #[test]
     fn a_walled_in_round_doesnt_stick_its_stops_go_by_and_the_next_takes_a_turn() {
-        let mut s =
-            staged(NPC_SOLDIERS_ON_HALL as usize + 1 + 2 * NPC_SOLDIERS_PER_PATROL as usize);
+        let mut s = staged(
+            NPC_SOLDIERS_ON_HALL as usize + 1 + (2.0 * NPC_SOLDIERS_PER_PATROL).ceil() as usize,
+        );
         pass(&mut s.world, &s.city);
         arrive(&mut s.world);
         let first = soldiers_of(&s.world)[NPC_SOLDIERS_ON_HALL as usize + 1].clone();

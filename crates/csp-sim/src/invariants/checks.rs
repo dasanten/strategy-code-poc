@@ -24,7 +24,7 @@ use csp_shared::terrain::{
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
     BuildingKind, Good, HaulPhase, HaulStop, LinePhase, ResidentOrder, ResourceKind, SkillName,
-    Stock, VesselKind, WorldState,
+    Stock, VesselKind, WallMaterial, WorldState,
 };
 
 use super::{js_json, js_number, violation, InvariantViolation};
@@ -34,10 +34,10 @@ use crate::pairing::carrying_blocks;
 use crate::queries::alliance::{allied_realms, carriage_commander_of, commander_of};
 use crate::queries::balance::carry_capacity;
 use crate::queries::building::{
-    build_materials, build_work_of, building_at, carriage_can_go_to, has_choice, line_building,
-    line_order, materials_needed, max_workers, node_workplace, recipe_for, teardown_work,
-    work_needed, workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES, ON_PLAINS, ON_SHORE,
-    PROCESSING, SHARES_A_TILE,
+    building_at, carriage_can_go_to, has_choice, is_stone, line_building, line_order,
+    materials_needed, materials_of, max_workers, node_workplace, recipe_for, teardown_work,
+    wooden_wall_index_at, work_needed, work_of, workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES,
+    ON_PLAINS, ON_SHORE, PROCESSING, SHARES_A_TILE,
 };
 use crate::queries::city_area::{city_membership, is_city_building};
 use crate::queries::command::commander_of_resident;
@@ -115,6 +115,7 @@ pub fn positions_on_map(world: &WorldState, terrain: &TerrainMap) -> Out {
     things.extend(world.horses.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.carriages.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.vessels.iter().map(|t| (t.id.as_str(), t.x, t.y)));
+    things.extend(world.siege_machines.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.buildings.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.nodes.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.piles.iter().map(|t| (t.id.as_str(), t.x, t.y)));
@@ -188,8 +189,18 @@ pub fn buildings_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
         let kind = kind_name(b.kind);
         for &(x, y) in &footprint {
             let key = format!("{x},{y}");
-            let layer =
-                if SHARES_A_TILE.contains(&b.kind) { format!("{kind} {key}") } else { key.clone() };
+            // A stone wall or gate site over the finished wooden one of its kind it upgrades has a
+            // layer of its own (`CONTEXT.md`: Wood or stone); anywhere else it overlaps as any.
+            let upgrades = b.site.is_some()
+                && is_stone(b.kind, b.material)
+                && wooden_wall_index_at(world, x, y, b.kind).is_some();
+            let layer = if SHARES_A_TILE.contains(&b.kind) {
+                format!("{kind} {key}")
+            } else if upgrades {
+                format!("upgrade {key}")
+            } else {
+                key.clone()
+            };
             if let Some(other) = tiles.get(&layer) {
                 fail(&b.id, format!("overlaps {other} on tile ({key})"));
             }
@@ -205,6 +216,26 @@ pub fn buildings_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
             }
             if b.stock.is_some() {
                 fail(&b.id, "is a road with a stock".into());
+            }
+        } else if matches!(b.kind, BuildingKind::Ram | BuildingKind::Catapult) {
+            // `CONTEXT.md`: Siege machine: a site in the field, where a carriage could stand.
+            if b.site.is_none() {
+                fail(&b.id, format!("is a finished {kind} site"));
+            }
+            if !carriage_can_go_to(world, terrain, b.x as i32, b.y as i32) {
+                fail(&b.id, format!("is a {kind} site where no carriage can go"));
+            }
+            if !nodes.is_empty() {
+                fail(&b.id, format!("is a {kind} site on a resource node"));
+            }
+            if let Some(c) = city {
+                fail(&b.id, format!("is a ram site of city {c}"));
+            }
+            if b.stock.is_some() {
+                fail(&b.id, "is a ram site with a stock".into());
+            }
+            if let Some(under) = building_at(world, b.x as i32, b.y as i32, size) {
+                fail(&b.id, format!("is a ram site on a {}", kind_name(under.kind)));
             }
         } else if b.kind == BuildingKind::Carriage {
             if b.site.is_none() {
@@ -881,7 +912,7 @@ pub fn sites_within_needs(world: &WorldState, _: &TerrainMap) -> Out {
     let mut fail = |id: &str, m: String| out.push(violation(name, format!("{id} {m}"), &[id]));
     for b in &world.buildings {
         let Some(site) = &b.site else { continue };
-        let needs = build_materials(b.kind);
+        let needs = materials_of(b);
         for (good, units) in &site.delivered {
             let need = needs.get(good).copied().unwrap_or(0.0);
             if *units > need {
@@ -896,7 +927,7 @@ pub fn sites_within_needs(world: &WorldState, _: &TerrainMap) -> Out {
                 );
             }
         }
-        let work = build_work_of(b.kind);
+        let work = work_of(b);
         if !(site.work >= 0.0 && site.work <= work) {
             fail(&b.id, format!("has work {} of {}", js_number(site.work), js_number(work)));
         }
@@ -955,11 +986,117 @@ pub fn tear_down_orders_on_buildings(world: &WorldState, _: &TerrainMap) -> Out 
         if b.is_some_and(|b| at_building(r.x, r.y, b)) {
             continue;
         }
+        // A siege machine is torn down from its tile (`CONTEXT.md`: Siege machine).
+        let m = crate::siege::machine_by_id(world, &o.building_id);
+        if m.is_some_and(|m| (m.x as i32, m.y as i32) == (r.x as i32, r.y as i32)) {
+            continue;
+        }
         let msg =
             format!("resident {} tears down {}, which they don’t stand at", r.id, o.building_id);
         out.push(violation(name, msg, &[&r.id, &o.building_id]));
     }
     out
+}
+
+/// A building's condition stays within its range: what it lost to decay is between nothing and
+/// all of it, only on a finished building of a kind that decays; a repair under way is on one too,
+/// and holds no more of each material, nor work, than a repair takes (`CONTEXT.md`: Decay,
+/// Repairing).
+pub fn conditions_in_range(world: &WorldState, _: &TerrainMap) -> Out {
+    use crate::repair::{decays, repair_materials_of, repair_work_of};
+    let name = "conditions-in-range";
+    let mut out = Vec::new();
+    for b in &world.buildings {
+        let mut fail = |m: String| out.push(violation(name, format!("{} {m}", b.id), &[&b.id]));
+        if let Some(d) = b.decay {
+            if !(0.0..=1.0).contains(&d) {
+                fail(format!("has lost {} of its condition", js_number(d)));
+            }
+            if !decays(b) {
+                fail("has decayed but never decays".into());
+            }
+        }
+        let Some(repair) = &b.repair else { continue };
+        if !decays(b) {
+            fail("is being repaired but never decays".into());
+        }
+        let materials = repair_materials_of(b);
+        for (good, units) in &repair.delivered {
+            let most = materials.get(good).copied().unwrap_or(0.0);
+            if !(*units >= 0.0 && *units <= most) {
+                fail(format!("has {} {good:?} for its repair of {}", js_number(*units), most));
+            }
+        }
+        let work = repair_work_of(b);
+        if !(repair.work >= 0.0 && repair.work <= work) {
+            fail(format!("has repair work {} of {}", js_number(repair.work), js_number(work)));
+        }
+    }
+    out
+}
+
+/// A ruin is a finished building of a kind that decays and has lost all its condition, takes no
+/// blows, and has stood no longer than `RUIN_COLLAPSE_DAYS` (`CONTEXT.md`: Ruin).
+pub fn ruins_ruined(world: &WorldState, _: &TerrainMap) -> Out {
+    use csp_shared::balance::RUIN_COLLAPSE_DAYS;
+    use csp_shared::time::TICKS_PER_GAME_DAY;
+    let name = "ruins-ruined";
+    let tick = world.tick as f64;
+    let mut out = Vec::new();
+    for b in &world.buildings {
+        let Some(at) = b.ruined_at else { continue };
+        let mut fail = |m: String| out.push(violation(name, format!("{} {m}", b.id), &[&b.id]));
+        if !crate::repair::decays(b) {
+            fail("is a ruin but never decays".into());
+        }
+        if b.decay != Some(1.0) {
+            fail(format!(
+                "is a ruin with {} of its condition lost",
+                js_number(b.decay.unwrap_or(0.0))
+            ));
+        }
+        if b.damage.is_some() {
+            fail("is a ruin with damage".into());
+        }
+        if !(at <= tick && tick - at < RUIN_COLLAPSE_DAYS * TICKS_PER_GAME_DAY) {
+            fail(format!("became a ruin at tick {}", js_number(at)));
+        }
+    }
+    out
+}
+
+/// A resident with a repair order stands at that building, and it is still there.
+pub fn repair_orders_on_buildings(world: &WorldState, _: &TerrainMap) -> Out {
+    let name = "repair-orders-on-buildings";
+    let mut out = Vec::new();
+    for r in &world.residents {
+        let Some(ResidentOrder::Repair(o)) = &r.order else { continue };
+        let b = world.buildings.iter().find(|x| x.id == o.building_id);
+        if b.is_some_and(|b| at_building(r.x, r.y, b)) {
+            continue;
+        }
+        let msg = format!("resident {} repairs {}, which they don’t stand at", r.id, o.building_id);
+        out.push(violation(name, msg, &[&r.id, &o.building_id]));
+    }
+    out
+}
+
+/// The Trade Organization repairs its own at the turn of each day, so no building of the HQ or a
+/// trading post is ever nearly a ruin, let alone a ruin (`CONTEXT.md`: Decay).
+pub fn trade_org_kept_up(world: &WorldState, _: &TerrainMap) -> Out {
+    use crate::repair::{condition_of, Condition};
+    let name = "trade-org-kept-up";
+    let theirs: Vec<&str> =
+        world.cities.iter().filter(|c| c.trade_org.is_some()).map(|c| c.id.as_str()).collect();
+    world
+        .buildings
+        .iter()
+        .filter(|b| b.city_id.as_deref().is_some_and(|c| theirs.contains(&c)))
+        .filter(|b| matches!(condition_of(b), Some(Condition::NearlyRuin | Condition::Ruin)))
+        .map(|b| {
+            violation(name, format!("the Trade Org’s {} is nearly a ruin or worse", b.id), &[&b.id])
+        })
+        .collect()
 }
 
 /// Realm logs stay in order and in bounds (`realmLogsInOrder`).
@@ -1011,8 +1148,18 @@ pub fn work_orders_on_workplaces(world: &WorldState, _: &TerrainMap) -> Out {
         let makes = o.makes.map(good_name);
         match place {
             Some(p) if p.site.is_none() && max_workers(p.kind).is_some() => {
-                // A smithy's workers say what they make; a smelter's may (Steel), else Iron.
-                if makes.is_none() && has_choice(p.kind) && recipe_for(p.kind, None).is_none() {
+                // A smithy's workers say what they make or mend (`CONTEXT.md`: Mending); a
+                // smelter's may say Steel, else Iron.
+                if o.mends && (p.kind != BuildingKind::Smithy || makes.is_some()) {
+                    fail("mending, which only a smithy's worker making nothing else does".into());
+                } else if o.mends {
+                    if !at_building(r.x, r.y, p) || o.at.x != r.x || o.at.y != r.y {
+                        fail("which they don’t stand at".into());
+                    }
+                } else if makes.is_none()
+                    && has_choice(p.kind)
+                    && recipe_for(p.kind, None).is_none()
+                {
                     fail("making nothing".into());
                 } else if makes.is_some() && !has_choice(p.kind) {
                     fail(format!("making {} with nothing to choose", makes.unwrap_or_default()));
@@ -1117,6 +1264,103 @@ pub fn carriages_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
             fail(&k.id, m, &[&k.id, other, horse_id]);
         }
         pulling.insert(horse_id, &k.id);
+    }
+    out
+}
+
+/// A siege machine stands where a carriage could and is not broken, and its crew are residents of
+/// its realm on its tile (`CONTEXT.md`: Siege machine).
+pub fn siege_machines_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
+    let name = "siege-machines-in-place";
+    let mut out = Vec::new();
+    for m in &world.siege_machines {
+        let at = format!("({}, {})", js_number(m.x), js_number(m.y));
+        if !carriage_can_go_to(world, terrain, m.x as i32, m.y as i32) {
+            let msg = format!("siege machine {} stands where no carriage can go at {at}", m.id);
+            out.push(violation(name, msg, &[&m.id]));
+        }
+        if m.damage.unwrap_or(0.0) >= crate::siege::machine_strength(m.kind) {
+            out.push(violation(name, format!("siege machine {} is broken", m.id), &[&m.id]));
+        }
+        let mut seen: HashSet<&str> = HashSet::new();
+        for id in &m.crew_ids {
+            if !seen.insert(id) {
+                let msg = format!("siege machine {} has {id} in its crew twice", m.id);
+                out.push(violation(name, msg, &[&m.id, id]));
+            }
+            // A crew member is within reach of their machine: on its tile, of its realm.
+            let with_it = world.residents.iter().find(|r| r.id == *id).is_some_and(|r| {
+                (r.x as i32, r.y as i32) == (m.x as i32, m.y as i32)
+                    && r.owner.is_some()
+                    && r.owner == m.realm_id
+            });
+            if !with_it {
+                let msg = format!("{id} of siege machine {}’s crew is not with it at {at}", m.id);
+                out.push(violation(name, msg, &[&m.id, id]));
+            }
+        }
+    }
+    // A machine moves only with its crew: whoever pushes one is of its crew on its tile, with as
+    // many crew as it needs there, and one at a time.
+    let mut pushed: HashSet<&str> = HashSet::new();
+    for r in &world.residents {
+        let Some(ResidentOrder::Push(o)) = &r.order else { continue };
+        let Some(m) = crate::siege::machine_by_id(world, &o.machine_id) else {
+            let msg =
+                format!("resident {} pushes siege machine {}, which is gone", r.id, o.machine_id);
+            out.push(violation(name, msg, &[&r.id]));
+            continue;
+        };
+        if let Some(p) = crate::siege::push_problem(world, r, m) {
+            let msg = format!("resident {} pushes siege machine {}, but {p}", r.id, m.id);
+            out.push(violation(name, msg, &[&r.id, &m.id]));
+        }
+        if !pushed.insert(&m.id) {
+            let msg = format!("siege machine {} has two pushers", m.id);
+            out.push(violation(name, msg, &[&m.id, &r.id]));
+        }
+    }
+    // A ram strikes only with its crew, at a foreign wall or gate next to it (`CONTEXT.md`: Ram).
+    for r in &world.residents {
+        let Some(ResidentOrder::Ram(o)) = &r.order else { continue };
+        let problem = match crate::siege::machine_by_id(world, &o.machine_id) {
+            None => "which is gone".to_string(),
+            Some(m) => match crate::siege::ram_problem(world, r, m, &o.target_id) {
+                None => continue,
+                Some(p) => p,
+            },
+        };
+        let msg =
+            format!("resident {} rams {} with {}, but {problem}", r.id, o.target_id, o.machine_id);
+        out.push(violation(name, msg, &[&r.id]));
+    }
+    // A catapult throws only with its crew and a Stone at hand, at a foreign wall or gate in its
+    // reach (`CONTEXT.md`: Catapult).
+    for r in &world.residents {
+        let Some(ResidentOrder::Throw(o)) = &r.order else { continue };
+        let problem = match crate::siege::machine_by_id(world, &o.machine_id) {
+            None => "which is gone".to_string(),
+            Some(m) => match crate::siege::throw_problem(world, r, m, &o.target_id) {
+                None => continue,
+                Some(p) => p,
+            },
+        };
+        let msg = format!(
+            "resident {} throws at {} with {}, but {problem}",
+            r.id, o.target_id, o.machine_id
+        );
+        out.push(violation(name, msg, &[&r.id]));
+    }
+    // Nobody up struck one of a ram's crew under its roof this tick.
+    for r in world.residents.iter().filter(|r| crate::siege::under_roof(world, r)) {
+        let Some(s) = r.struck.as_ref().filter(|s| s.tick + 1.0 == world.tick as f64) else {
+            continue;
+        };
+        let by = world.residents.iter().find(|a| a.id == s.by);
+        if by.is_some_and(|a| crate::queries::walls::is_up(world, a)) {
+            let msg = format!("{} under a ram's roof was struck from above by {}", r.id, s.by);
+            out.push(violation(name, msg, &[&r.id, &s.by]));
+        }
     }
     out
 }
@@ -1731,6 +1975,11 @@ pub fn owners_exist(world: &WorldState, _: &TerrainMap) -> Out {
             problem(&v.id, format!("belongs to ended realm {realm}"));
         }
     }
+    for m in &world.siege_machines {
+        if let Some(realm) = m.realm_id.as_deref().filter(|o| !realms.contains(o)) {
+            problem(&m.id, format!("belongs to ended realm {realm}"));
+        }
+    }
     for (id, realm, city) in things {
         if let Some(realm) = realm.as_deref().filter(|o| !realms.contains(o)) {
             problem(id, format!("belongs to ended realm {realm}"));
@@ -2002,9 +2251,9 @@ pub fn carrying_doesnt_work(world: &WorldState, _: &TerrainMap) -> Out {
 }
 
 /// Orders only a grown resident can hold (`ADULT_ORDERS`).
-const ADULT_ORDERS: [&str; 10] = [
-    "build", "roadLine", "wallLine", "tearDown", "workAt", "teach", "train", "breed", "drive",
-    "feed",
+const ADULT_ORDERS: [&str; 15] = [
+    "build", "roadLine", "wallLine", "tearDown", "repair", "workAt", "teach", "train", "breed",
+    "drive", "feed", "crew", "push", "ram", "throw",
 ];
 
 /// Children don't work until they are grown (`childrenDontWork`).
@@ -2096,6 +2345,41 @@ pub fn attack_orders_sound(world: &WorldState, _: &TerrainMap) -> Out {
         };
         if let Some(p) = problem {
             out.push(violation(name, format!("resident {} {p}", r.id), &[&r.id]));
+        }
+    }
+    out
+}
+
+/// Nobody strikes or shoots from beyond their reach (`CONTEXT.md`: Ranged combat; ADR 0004): a
+/// resident struck in the tick just stepped stands within their striker's `strike_reach`, contact
+/// without a Bow or Crossbow. One tile of slack, as a fall from a broken wall tile can move either
+/// of them a tile after the blow. Those aboard a vessel are left out: from a docked ship anyone on
+/// its haven is in reach (`CONTEXT.md`: Fighting at a vessel).
+pub fn shots_within_reach(world: &WorldState, terrain: &TerrainMap) -> Out {
+    let name = "shots-within-reach";
+    let last = world.tick as f64 - 1.0;
+    let mut out = Vec::new();
+    for t in &world.residents {
+        let Some(s) = t.struck.as_ref().filter(|s| s.tick == last) else { continue };
+        let Some(a) = world.residents.iter().find(|a| a.id == s.by) else { continue };
+        if a.aboard.is_some() || t.aboard.is_some() {
+            continue;
+        }
+        let apart = crate::queries::combat::tiles_apart(
+            terrain.size,
+            (a.x as i32, a.y as i32),
+            (t.x as i32, t.y as i32),
+        );
+        let reach = crate::queries::combat::strike_reach(world, a);
+        if apart > reach + 1.0 {
+            let msg = format!(
+                "resident {} struck {} from {} tiles away, beyond their reach of {}",
+                a.id,
+                t.id,
+                js_number(apart),
+                js_number(reach)
+            );
+            out.push(violation(name, msg, &[&a.id, &t.id]));
         }
     }
     out
@@ -2512,8 +2796,15 @@ pub fn line_orders_sound(world: &WorldState, terrain: &TerrainMap) -> Out {
         }
         let Some(site_id) = &o.site_id else { continue };
         let site = world.buildings.iter().find(|b| &b.id == site_id);
-        let on_it =
-            site.is_some_and(|s| s.site.is_some() && s.kind == kind && s.x == r.x && s.y == r.y);
+        // A stone wall line builds a gate where it upgrades a wooden one (`CONTEXT.md`: Wood or
+        // stone).
+        let fits = |s: &csp_shared::world::Building| {
+            s.kind == kind
+                || (kind == BuildingKind::Wall
+                    && s.kind == BuildingKind::Gate
+                    && is_stone(s.kind, s.material))
+        };
+        let on_it = site.is_some_and(|s| s.site.is_some() && fits(s) && s.x == r.x && s.y == r.y);
         if !on_it || r.x != first.0 || r.y != first.1 {
             fail(format!(
                 "builds {site_id}, which is not the {building} site on their tile and the order’s next"
@@ -2667,4 +2958,27 @@ pub fn outsiders_sound(world: &WorldState, terrain: &TerrainMap) -> Out {
         }
     }
     out
+}
+
+/// Only a wall, gate or tower, or its site, is of stone, and only stone is written down: none is wood
+/// (`CONTEXT.md`: Wall / Gate, Wood or stone).
+pub fn wall_materials_sound(world: &WorldState, _: &TerrainMap) -> Out {
+    let name = "wall-materials-sound";
+    world
+        .buildings
+        .iter()
+        .filter(|b| {
+            b.material.is_some_and(|m| {
+                m != WallMaterial::Stone
+                    || !matches!(
+                        b.kind,
+                        BuildingKind::Wall | BuildingKind::Gate | BuildingKind::Tower
+                    )
+            })
+        })
+        .map(|b| {
+            let msg = format!("{} {} is of {:?}", kind_name(b.kind), b.id, b.material);
+            violation(name, msg, &[&b.id])
+        })
+        .collect()
 }

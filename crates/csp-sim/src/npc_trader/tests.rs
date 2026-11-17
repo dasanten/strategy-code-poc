@@ -9,7 +9,7 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    NpcCitySize, NPC_RESIDENTS_PER_TRADER, NPC_TOWN, NPC_TRADER_GIVE_UP_DAYS, NPC_VILLAGE,
+    NpcCitySize, NPC_RESIDENTS_PER_TRADER, NPC_TOWN, NPC_TRADER_GIVE_UP_DAYS, NPC_VILLAGE, OWN_FOOD,
 };
 use csp_shared::footprint::is_at;
 use csp_shared::terrain::TerrainMap;
@@ -241,6 +241,40 @@ fn with_nothing_short_it_has_no_node_for_the_trader_comes_back_with_coins() {
 }
 
 #[test]
+fn a_village_selling_food_takes_its_load_and_keeps_what_the_walk_home_eats() {
+    // Food is its only surplus. The Food a trader carries for themselves is not the load: they
+    // used to walk out with only that, sell it and starve going to and fro (T100.8).
+    let mut f = village_and_post(false);
+    let reserve = f.reserve();
+    let stock = f.stock_mut();
+    stock.insert(Good::Food, held(&reserve, Good::Food) + 60.0);
+    stock.insert(Good::Wood, held(&reserve, Good::Wood));
+    stock.insert(Good::Stone, held(&reserve, Good::Stone));
+    let food_before = f.held(&f.warehouse.clone(), Good::Food);
+    let mut hungry = false;
+    let mut trader: Option<String> = None;
+    let mut most_food: f64 = 0.0;
+    run(&mut f, 12, &mut |f| {
+        let t = f.runs().into_iter().next();
+        if let Some(t) = &t {
+            trader.get_or_insert_with(|| t.resident_id.clone());
+            let r = f.world.residents.iter().find(|r| r.id == t.resident_id).unwrap();
+            hungry |= r.hunger <= 0.0;
+            most_food = most_food.max(held(&r.carried, Good::Food));
+        }
+        trader.is_some() && t.is_none()
+    });
+    let trader = trader.expect("a trader");
+    assert!(f.runs().is_empty(), "the run is over");
+    assert!(most_food > OWN_FOOD + 10.0, "took a load of Food: {most_food}");
+    assert!(f.held(&f.warehouse.clone(), Good::Food) > food_before + 10.0);
+    assert!(!hungry);
+    let r = f.world.residents.iter().find(|r| r.id == trader).unwrap();
+    assert!(r.health > 0.0);
+    assert!(at_storage(&f, &trader), "home again");
+}
+
+#[test]
 fn a_trader_who_dies_is_replaced_only_after_the_give_up_time() {
     let mut f = village_and_post(true);
     f.plan();
@@ -410,6 +444,7 @@ fn counts_a_load_already_fetched_as_gone_from_the_storage_not_as_spoken_for() {
     // Fetched, it has left the storage, and what is there now makes the next one's load.
     let r = f.world.residents.iter_mut().find(|r| r.id == trader).unwrap();
     r.carried.insert(Good::Wood, one);
+    f.runs_mut()[0].loaded = Some(true);
     f.plan();
     // More go; how many depends on the spare hands not out scouting, and with its Food at the
     // reserve none goes scouting (`CONTEXT.md`: Scout).

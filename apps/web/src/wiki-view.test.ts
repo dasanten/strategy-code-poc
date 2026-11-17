@@ -7,6 +7,11 @@ import {
   BATCHES_PER_DAY,
   BUILD_MATERIALS,
   BUILD_WORK,
+  RAM_CREW,
+  CATAPULT_REACH,
+  SHOT_REACH,
+  WALL_SHOT_REACH_BONUS,
+  WALK_TICKS_PER_TILE,
   DELIVERY_LOAD,
   FOOD_PER_DAY,
   RECIPES,
@@ -28,9 +33,15 @@ import {
 import {
   AVERAGE,
   buildCosts,
+  breakTicks,
+  stoneWallCosts,
   carriageCost,
   boatCost,
   shipCost,
+  ramCost,
+  ramPushTicks,
+  ramBreakTicks,
+  catapultBreak,
   coinsPerMintWorkerDay,
   daysToWorkSkillMax,
   trainingDays,
@@ -92,6 +103,18 @@ describe('wiki figures', () => {
     }
   })
 
+  it('gives stone walls and gates their own rows: Stone, more work, longer to break', () => {
+    const stone = stoneWallCosts()
+    expect(stone.map((b) => b.name)).toEqual(['Stone wall', 'Stone gate'])
+    for (const b of stone) {
+      const wood = buildCosts().find((w) => w.kind === b.kind)!
+      expect(b.materials).toEqual(balance.STONE_BUILD_MATERIALS[b.kind])
+      expect(b.buildTicks).toBeGreaterThan(wood.buildTicks)
+      expect(breakTicks(b.kind, true)).toBeGreaterThan(breakTicks(b.kind))
+    }
+    expect(render()).toContain('Stone wall')
+  })
+
   it('lists a carriage apart from the buildings, timed like them', () => {
     expect(buildCosts().map((b) => b.kind)).not.toContain('carriage')
     expect(carriageCost()).toEqual({
@@ -116,6 +139,41 @@ describe('wiki figures', () => {
     })
     expect(shipCost().buildTicks).toBeGreaterThan(boatCost().buildTicks)
     expect(shipCost().materials.iron).toBeGreaterThan(0)
+  })
+
+  it('lists a ram apart from the buildings, with what it leaves broken or torn down', () => {
+    expect(buildCosts().map((b) => b.kind)).not.toContain('ram')
+    const ram = ramCost()
+    expect(ram.materials).toEqual(BUILD_MATERIALS.ram)
+    expect(ram.materials.iron).toBeGreaterThan(0)
+    expect(ram.buildTicks).toBe(BUILD_WORK.ram! / buildWork(AVERAGE, 0))
+    expect(ram.teardownTicks).toBeLessThan(ram.buildTicks)
+    // Broken it leaves less than torn down, as with walls.
+    expect(ram.broken.wood!).toBeLessThan(ram.tornDown.wood!)
+    expect(RAM_CREW).toBeGreaterThan(1)
+  })
+
+  it('has a ram break a wall far sooner than one resident’s blows, stone slower', () => {
+    expect(ramBreakTicks('wall') * 4).toBeLessThan(breakTicks('wall'))
+    expect(ramBreakTicks('gate', true)).toBeGreaterThan(ramBreakTicks('gate'))
+  })
+
+  it('builds a catapult of Wood, Iron and Stone that outshoots a wall archer, a Stone a shot', () => {
+    expect(buildCosts().map((b) => b.kind)).not.toContain('catapult')
+    const catapult = ramCost('catapult')
+    expect(catapult.materials).toEqual(BUILD_MATERIALS.catapult)
+    expect(catapult.materials.stone).toBeGreaterThan(0)
+    expect(CATAPULT_REACH).toBeGreaterThan((SHOT_REACH.bow ?? 0) + WALL_SHOT_REACH_BONUS)
+    const stone = catapultBreak('gate', true)
+    expect(stone.shots).toBeGreaterThan(catapultBreak('wall').shots)
+    expect(stone.ticks).toBeGreaterThan(ramBreakTicks('gate', true))
+  })
+
+  it('pushes a ram slower than walking, slowest in forest', () => {
+    const [plains, forest, road] = ramPushTicks()
+    expect(plains!.ticks).toBeGreaterThan(WALK_TICKS_PER_TILE)
+    expect(forest!.ticks).toBeGreaterThan(plains!.ticks)
+    expect(road!.ticks).toBeLessThan(plains!.ticks)
   })
 
   it('moves more goods by carriage on plains than on foot, and none into mountains', () => {

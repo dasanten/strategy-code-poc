@@ -458,9 +458,12 @@ fn invariants_for_tick_runs_all_of_them_when_every_tick_is_sampled_none_at_a_rat
     // `starting-sites-sound` (T100.4), `steel-only-with-coal` (T101.6), `veins-sound` (T102.1),
     // `veins-counted` (T102.2), `npc-leaves-dry-workplaces` (T102.4), `equipment-sound` (T107.1),
     // `up-only-on-walls` and `up-only-on-own-walls` (T105.2), `none-attack-up-from-below` (T105.3),
-    // `threat-sound` (T98.2),
+    // `conditions-in-range` and `repair-orders-on-buildings` (T97.5), `npc-escorts-sound` (T97.8),
+    // `ruins-ruined` (T97.6), `wear-sound` (T97.1), `trade-org-kept-up` (T97.7),
+    // `shots-within-reach` (T108.2), `wall-materials-sound` (T106.1), `npc-soldiers-stand-down`
+    // (T97.9), `tower-room` (T109.1), `siege-machines-in-place` (T110.1), `threat-sound` (T98.2),
     // `trading-posts-have-no-temperament` (T98.1), `npc-hunts-sound` (T98.6).
-    assert_eq!(all.len(), 174);
+    assert_eq!(all.len(), 185);
 }
 
 /// A starting city with everyone idle on the storage's tile, carrying nothing (`atHome` of

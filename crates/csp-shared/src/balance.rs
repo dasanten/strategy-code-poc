@@ -687,7 +687,8 @@ pub const NPC_STARTING_SITE_CLEARANCE: f64 = 96.0;
 pub const NPC_WAY_CLEARANCE: i32 = 24;
 
 /// NPC cities lie at least this many tiles from every other city, starting cities and NPC cities
-/// alike (about an hour's walk on plains), the short way round the map.
+/// alike (about an hour's walk on plains), the short way round the map. A daughter keeps it scaled
+/// with the side on a map of half to all of `MAP_SIZE`'s side (`daughter_min_distance`, T100.8).
 pub const NPC_CITY_MIN_DISTANCE: f64 = 480.0;
 
 /// What an NPC city is placed with, by its size: a walled square like a starting city's.
@@ -742,6 +743,11 @@ pub const CITY_PRICE_BY_BUILDING: Table<f64> = Table(&[
 /// residents eat in this many game days. It then puts residents on its farms first.
 pub const NPC_FOOD_SHORT_DAYS: f64 = 5.0;
 
+/// Game days in which the farmers an NPC city keeps win back what its Food lacks of its reserve
+/// (`CONTEXT.md`: NPC city, #1379): below its reserve it keeps a farmer more for every
+/// `WORK_OUTPUT_PER_DAY` food times this many it lacks, besides those who feed everyone.
+pub const NPC_FOOD_REFILL_DAYS: f64 = 10.0;
+
 /// Units of Food a farm's pile keeps when a worker carries its output away (`CONTEXT.md`:
 /// Carrying the output), so the workers there can still refill at their workplace (Refilling at a
 /// workplace). Written into the Work default's source, where a Player can change it.
@@ -755,6 +761,14 @@ pub const NPC_SOLDIER_SHARE: f64 = 0.25;
 /// forged in this order: its smithy forges the first its soldiers still lack. A city with no coal
 /// node in reach keeps to the iron spear (`NPC_SMITHY_WEAPON`).
 pub const NPC_STEEL_KIT: [&str; 3] = ["steelSword", "steelArmour", "steelShield"];
+
+/// Share of an NPC city's soldiers it arms with a Bow once it has a smithy (`CONTEXT.md`: Ranged
+/// combat, NPC reserve), rounded down: a town's 4 soldiers have 2 archers, a village's 2 one.
+pub const NPC_ARCHER_SHARE: f64 = 0.5;
+
+/// The Arrows an NPC city's archer carries, fetched from its storage as they run low; its reserve
+/// keeps as many again in its storages for each archer it wants (`CONTEXT.md`: NPC reserve).
+pub const NPC_ARCHER_ARROWS: f64 = 20.0;
 
 /// How many of an NPC city's soldiers stand on its town hall between fights, the first to be posted
 /// (`CONTEXT.md`: Soldier posts). One there is enough to block an occupation; a second keeps it held
@@ -773,11 +787,14 @@ pub const NPC_POST_AROUND_HALL: f64 = 2.0;
 pub const NPC_TRAIN_TURN_TICKS: f64 = 5.0 * TICKS_PER_GAME_DAY;
 
 /// The most of an NPC city's soldiers walking a round at once, whatever its size (`CONTEXT.md`: Soldier
-/// posts). They walk every tick, the dearest of a soldier's jobs, so a city's cost stops growing here.
-pub const NPC_PATROLS_MAX: f64 = 3.0;
+/// posts). They walk every tick, the dearest of a soldier's jobs, so a city's cost stops growing here;
+/// eight keep a big city's soldiers busy in peace (`CONTEXT.md`: Soldiers in peace), those just
+/// standing on a post about a tenth of its adults.
+pub const NPC_PATROLS_MAX: f64 = 8.0;
 
-/// One soldier walks a round for every this many on an NPC city's wall, up to `NPC_PATROLS_MAX`.
-pub const NPC_SOLDIERS_PER_PATROL: f64 = 4.0;
+/// One soldier walks a round for every this many on an NPC city's wall, up to `NPC_PATROLS_MAX`:
+/// two in three of them, so in peace few just stand on a post (`CONTEXT.md`: Soldiers in peace).
+pub const NPC_SOLDIERS_PER_PATROL: f64 = 1.5;
 
 /// How far from its home an NPC city sends soldiers after a thief it knows of (`CONTEXT.md`:
 /// Acting first), in tiles: its set reach (`NPC_NODE_REACH`). A thief further off is let go.
@@ -797,6 +814,11 @@ pub const NPC_PATROL_ROAD_STOPS: f64 = 3.0;
 /// Coins an NPC city keeps as its war chest for each of its residents (`CONTEXT.md`: NPC reserve):
 /// a town of 16 keeps 160, what four mint workers strike in two game days (`RECIPES`).
 pub const NPC_WAR_CHEST_PER_RESIDENT: f64 = 10.0;
+
+/// Spare sets of Tools an NPC city keeps in its reserve beyond one for each of its workers and
+/// builders who carries none (`CONTEXT.md`: Tools, NPC reserve): enough for the next sets that
+/// break before its smithy forges more.
+pub const NPC_TOOLS_SPARE: f64 = 2.0;
 
 /// How near to an NPC city's gate, in tiles, an armed outsider makes it close its gates
 /// (`CONTEXT.md`: NPC city): a little inside sight, so the gate shuts before they reach it.
@@ -936,7 +958,9 @@ pub const NPC_REVIVE_REACH: f64 = 48.0;
 /// of its needs (`npcNeedsScale`; `CONTEXT.md`: Spare hands' work). Several of a trader's full loads
 /// (about 30 kg, `CARRY_BASE`), so its trader has something to sell, and above the materials a Full city wants (`townHall` and
 /// `storage` in `BUILD_MATERIALS`), or it could never found; few weapons, which its trader never
-/// sells. A good not named here is not worked for surplus.
+/// sells. Tools (`CONTEXT.md`: Tools) are forged only this way: below its reserve of them they are
+/// the first surplus work, and past it a couple spare. A good not named here is not worked for
+/// surplus.
 pub const NPC_SURPLUS_CAP: Table<f64> = Table(&[
     ("food", 100.0),
     ("wood", 150.0),
@@ -946,7 +970,15 @@ pub const NPC_SURPLUS_CAP: Table<f64> = Table(&[
     ("goldOre", 60.0),
     ("coins", 300.0),
     ("spear", 4.0),
+    ("tools", 2.0),
 ]);
+
+/// How many times its surplus cap (`NPC_SURPLUS_CAP`) an NPC city's spare hands work on to, once
+/// every good they could work for is at its cap and nothing else wants them (`CONTEXT.md`: Spare
+/// hands' work): the good least far past its cap first, farms aside. Enough that a big city with no
+/// one to sell to and no room to found keeps its crews at work for a game month or more while wear
+/// and decay use its goods up, and bounded, so its storage never fills without end.
+pub const NPC_SURPLUS_PAST_CAP: f64 = 4.0;
 
 /// How many tiles further out an NPC city puts up its new wall when it has no room left inside
 /// the old one (`CONTEXT.md`: NPC city), on every side, with the gate in the same place. At most
@@ -981,6 +1013,11 @@ pub const CITY_QUARTER_ROWS: f64 = 4.0;
 /// storage (`CONTEXT.md`: NPC city, Fetching materials): a 40 m stretch's worth, so a long wall is
 /// not one walk per tile. What a tile doesn't take goes to the next.
 pub const NPC_WALL_TILES_PER_TRIP: f64 = 4.0;
+
+/// Residents an NPC city has from which it is a town and upgrades its wall to stone (`CONTEXT.md`:
+/// Wall / Gate, Wood or stone): as many as a town has when the world is made, so a village goes
+/// stone once it has grown into one.
+pub const NPC_STONE_WALL_RESIDENTS: f64 = NPC_TOWN.residents;
 
 /// How far from its home an NPC city looks for a resource node to build a workplace on when it
 /// needs a material it has no workplace for (`CONTEXT.md`: NPC city), in tiles: about twenty
@@ -1043,6 +1080,12 @@ pub const NPC_FULL_DAYS_LEAST: f64 = 2.0;
 /// Full city): Food its scouts and road crew take out and bring back doesn't count.
 pub const NPC_FULL_DIP_DAYS: f64 = 1.0;
 
+/// How much of its Food surplus cap (`NPC_SURPLUS_CAP`) past its reserve an NPC city holds before
+/// its founding party's materials count as short (`CONTEXT.md`: Full city): Food, its surplus
+/// too, comes first (Daniel, 2026-11-15). Half, so a birth or a party's Food doesn't take it below
+/// its reserve, and spoilage still lets it get there.
+pub const NPC_FOUND_FOOD_SURPLUS_SHARE: f64 = 0.5;
+
 /// Residents past `NPC_FOUND_VILLAGE_RESIDENTS` that add one adult to a founding party
 /// (`npcFoundingPartySize`): a city of 110 sends the most, about one in eight of it.
 pub const NPC_FOUND_RESIDENTS_PER_MEMBER: f64 = 10.0;
@@ -1051,6 +1094,19 @@ pub const NPC_FOUND_RESIDENTS_PER_MEMBER: f64 = 10.0;
 /// village's worth (`foundingMaterials`), its materials stay under the surplus caps
 /// (`NPC_SURPLUS_CAP`), or a big city could never found on what it makes.
 pub const NPC_FOUND_PARTY_MOST: f64 = 14.0;
+
+/// Residents from which an NPC city counts as a town and sends soldiers along with its traders
+/// (`CONTEXT.md`: Escort); a village's trader goes alone. Between a village's start (`NPC_VILLAGE`)
+/// and a town's (`NPC_TOWN`).
+pub const NPC_ESCORT_TOWN_RESIDENTS: f64 = 12.0;
+
+/// Soldiers a town's trader takes along on a run (`CONTEXT.md`: Escort), on a way not known to be
+/// dangerous.
+pub const NPC_TRADER_ESCORTS: f64 = 1.0;
+
+/// Soldiers a founding party takes per member (`CONTEXT.md`: Escort), rounded down and at least
+/// one, in place of its one armed member: a village's worth (6) takes one, the largest party two.
+pub const NPC_FOUND_ESCORT_SHARE: f64 = 0.2;
 
 /// Random tiles a full NPC city tries in one search for its daughter's site (`CONTEXT.md`:
 /// Founding), once a game day: enough to find free Plains on most maps, cheap enough to do while
@@ -1183,6 +1239,7 @@ pub const TRADING_POST: TradingPost = TradingPost {
         ("sword", 2.0),
         ("shield", 4.0),
         ("armour", 2.0),
+        ("tools", 4.0),
     ]),
 };
 
@@ -1208,6 +1265,10 @@ pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("steelSword", 1.0),
     ("steelShield", 1.0),
     ("steelArmour", 1.0),
+    ("tools", 2.0),
+    ("bow", 1.0),
+    ("crossbow", 1.0),
+    ("arrows", 40.0),
 ]);
 
 /// How many times a trading post's floor (`WAREHOUSE_FLOOR`) the Trade Org HQ's warehouses keep.
@@ -1240,6 +1301,10 @@ pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("steelSword", 50.0),
     ("steelShield", 30.0),
     ("steelArmour", 160.0),
+    ("tools", 25.0),
+    ("bow", 12.0),
+    ("crossbow", 30.0),
+    ("arrows", 1.0),
 ]);
 
 /// Stock, in floors, at which a warehouse sells at its base price; less stock costs more.
@@ -1289,9 +1354,10 @@ pub const CARAVAN_FOOD: f64 = 72.0;
 
 /// How much longer than a plain walk a carriage's way to its next stop may take, for the Food it waits
 /// for at the HQ (`CONTEXT.md`: Waiting for Food): the escort sets its pace, and its way winds and
-/// crosses slower ground. With this a full-size map's longest way, about 4,000 tiles, wants about all
-/// of `CARAVAN_FOOD`.
-pub const WAY_FOOD_MARGIN: f64 = 1.5;
+/// crosses slower ground. On the new land (ADR 0035) a trader's leg took 1.7 to 2.7 times the plain
+/// walk in a game year's run (T100.8), its way going round Mountain ranges to a pass; 1.5 starved a
+/// crew short of its post. A full-size map's longest ways want all of `CARAVAN_FOOD`, its cap.
+pub const WAY_FOOD_MARGIN: f64 = 3.0;
 
 /// What a carriage leaves in the HQ's storage (`CONTEXT.md`: Waiting for Food), in game days of what
 /// its people off the carriages eat. No more than `NPC_FOOD_SHORT_DAYS`, below which the HQ puts
@@ -1382,18 +1448,64 @@ pub const GOOD_WEIGHT: Table<f64> = Table(&[
     ("steelSword", 3.0),
     ("steelShield", 4.0),
     ("steelArmour", 8.0),
+    ("tools", 2.0),
+    ("bow", 2.0),
+    ("crossbow", 4.0),
+    ("arrows", 0.1),
 ]);
 
 /// Attack each weapon adds to a resident's blow (`CONTEXT.md`: Weapons and armour, Combat). A
 /// sword hits harder than a spear, a steel sword half again as hard as an iron one (`CONTEXT.md`:
-/// Coal); combat (T10.2) adds it to Strength and Combat skill.
-pub const WEAPON_ATTACK: Table<f64> = Table(&[("spear", 4.0), ("sword", 6.0), ("steelSword", 9.0)]);
+/// Coal); combat (T10.2) adds it to Strength and Combat skill. A Bow or Crossbow adds nothing to
+/// a blow: it is a weapon for shooting (`CONTEXT.md`: Ranged combat), and in a blow its archer
+/// fights with their fists.
+pub const WEAPON_ATTACK: Table<f64> =
+    Table(&[("spear", 4.0), ("sword", 6.0), ("steelSword", 9.0), ("bow", 0.0), ("crossbow", 0.0)]);
 
 /// Damage each piece of protection takes off a blow (`CONTEXT.md`: Weapons and armour, Combat).
 /// Armour takes off more than a shield but weighs twice as much; steel takes off more than iron
 /// at the same weight. Only the best shield and the best armour carried count (`PROTECTION_KINDS`).
 pub const PROTECTION_DEFENCE: Table<f64> =
     Table(&[("shield", 3.0), ("armour", 5.0), ("steelShield", 5.0), ("steelArmour", 8.0)]);
+
+/// How many blows each piece of gear lasts before it breaks (`CONTEXT.md`: Wear): a weapon's
+/// blows struck, a shield's or armour's blows taken. A fight to the death is some 15 to 30 blows,
+/// so an iron sword sees about twenty fights; steel lasts half again as long as iron.
+pub const WEAR_BLOWS: Table<f64> = Table(&[
+    ("spear", 400.0),
+    ("sword", 600.0),
+    ("steelSword", 900.0),
+    ("shield", 300.0),
+    ("steelShield", 450.0),
+    ("armour", 400.0),
+    ("steelArmour", 600.0),
+]);
+
+/// How many blows' wear a game day of training puts on each piece a trainee has equipped
+/// (`CONTEXT.md`: Wear): a little, so a soldier training every day wears out an iron sword in
+/// well over a game year.
+pub const TRAINING_WEAR_BLOWS_PER_DAY: f64 = 1.0;
+
+/// Share of its life worn away from which a piece's condition reads "worn" (`CONTEXT.md`: Wear).
+pub const WORN_FROM: f64 = 0.5;
+
+/// Share of its life worn away from which a piece's condition reads "nearly broken".
+pub const NEARLY_BROKEN_FROM: f64 = 0.85;
+
+/// Share of a piece's smithy recipe that mending it takes (`CONTEXT.md`: Mending): each input's
+/// units times this, rounded, and at least one unit of its biggest input. A worn Sword takes 1
+/// Iron, worn Armour 2 Iron, a worn Spear or Shield 1 Wood.
+pub const MEND_RECIPE_SHARE: f64 = 0.3;
+
+/// Share of a batch's work that mending a piece takes (`CONTEXT.md`: Mending): a smithy worker
+/// mends twice as many pieces a day as they forge.
+pub const MEND_WORK_SHARE: f64 = 0.5;
+
+/// What a worn piece sells and buys for, as a share of a new one's price (`CONTEXT.md`: Wear).
+pub const WORN_PRICE_SHARE: f64 = 0.6;
+
+/// What a nearly broken piece sells and buys for, as a share of a new one's price.
+pub const NEARLY_BROKEN_PRICE_SHARE: f64 = 0.25;
 
 /// Carry capacity of a resident with no Strength at all, in kg.
 pub const CARRY_BASE: f64 = 10.0;
@@ -1937,6 +2049,8 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
     ("townHall", Table(&[("wood", 60.0), ("stone", 40.0)])),
     // A tile of wall: about a quarter of what a 40 m stretch took.
     ("wall", Table(&[("wood", 3.0)])),
+    // A tower (`CONTEXT.md`: Tower): a 2×2 timber keep with room on top, about seven tiles of wall.
+    ("tower", Table(&[("wood", 20.0)])),
     // A gate, of a wall's tile.
     ("gate", Table(&[("wood", 4.0)])),
     // A tile of road (`CONTEXT.md`: Road): a little Stone, so a quarry pays for a long road; about a
@@ -1965,6 +2079,12 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
     // A ship, built at a haven on the Sea (`CONTEXT.md`: Building a ship): a hull, a mast and
     // rigging, iron-fastened, so Wood and some Iron; six boats' timber.
     ("ship", Table(&[("wood", 120.0), ("iron", 15.0)])),
+    // A ram (`CONTEXT.md`: Siege machine, Ram): a roofed frame on wheels round a heavy beam with an
+    // iron head, so a little more timber than a carriage and as much Iron; built in the field.
+    ("ram", Table(&[("wood", 40.0), ("iron", 5.0)])),
+    // A catapult (`CONTEXT.md`: Siege machine, Catapult): a timber frame and throwing arm on wheels,
+    // iron-bound, weighted with Stone for its counterweight; a little less timber than a ram.
+    ("catapult", Table(&[("wood", 30.0), ("iron", 5.0), ("stone", 10.0)])),
 ]);
 
 /// Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
@@ -1972,7 +2092,8 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
 /// a mint 5, a smithy 5, a town hall 6, a training ground 3 (about a stable), a haven 4. A tile of wooden
 /// wall takes a sixteenth of a game day, a gate an eighth, a tile of road a sixteenth (a quarter of
 /// what a 40 m tile took), a house one game day, a storage two and a farm half of one; a carriage
-/// two, a boat one, a ship ten. More or stronger workers finish it sooner (`buildWork`).
+/// two, a boat one, a ship ten, a ram two, a catapult two. More or stronger workers finish it
+/// sooner (`buildWork`).
 pub const BUILD_WORK: Table<f64> = Table(&[
     ("lumberCamp", 2.0 * TICKS_PER_GAME_DAY),
     ("quarry", 3.0 * TICKS_PER_GAME_DAY),
@@ -1983,6 +2104,7 @@ pub const BUILD_WORK: Table<f64> = Table(&[
     ("smithy", 5.0 * TICKS_PER_GAME_DAY),
     ("townHall", 6.0 * TICKS_PER_GAME_DAY),
     ("wall", TICKS_PER_GAME_DAY / 16.0),
+    ("tower", TICKS_PER_GAME_DAY / 2.0),
     ("gate", TICKS_PER_GAME_DAY / 8.0),
     ("road", TICKS_PER_GAME_DAY / 16.0),
     ("house", TICKS_PER_GAME_DAY),
@@ -1993,6 +2115,25 @@ pub const BUILD_WORK: Table<f64> = Table(&[
     ("carriage", 2.0 * TICKS_PER_GAME_DAY),
     ("boat", TICKS_PER_GAME_DAY),
     ("ship", 10.0 * TICKS_PER_GAME_DAY),
+    ("ram", 2.0 * TICKS_PER_GAME_DAY),
+    ("catapult", 2.0 * TICKS_PER_GAME_DAY),
+]);
+
+/// What a stone wall or gate takes instead of `BUILD_MATERIALS` (`CONTEXT.md`: Wall / Gate, Wood
+/// or stone): Stone, a little more of it than a wooden one takes Wood, so a quarry pays for a
+/// stone ring.
+pub const STONE_BUILD_MATERIALS: Table<Table<f64>> = Table(&[
+    ("wall", Table(&[("stone", 4.0)])),
+    ("gate", Table(&[("stone", 6.0)])),
+    ("tower", Table(&[("stone", 28.0)])),
+]);
+
+/// Work a stone wall or gate takes instead of `BUILD_WORK`: three times a wooden one's, so a
+/// tile of stone wall takes an unskilled resident about a fifth of a game day.
+pub const STONE_BUILD_WORK: Table<f64> = Table(&[
+    ("wall", 3.0 * TICKS_PER_GAME_DAY / 16.0),
+    ("gate", 3.0 * TICKS_PER_GAME_DAY / 8.0),
+    ("tower", 3.0 * TICKS_PER_GAME_DAY / 2.0),
 ]);
 
 /// How many times `BUILD_WORK.road` a road tile on Mountain takes (`CONTEXT.md`: Road): the same
@@ -2084,7 +2225,9 @@ pub struct Recipe {
 /// of armour, each from Iron and Wood weighing what the good weighs (`GOOD_WEIGHT`): a spear is
 /// mostly wood, a sword mostly iron, a shield wood bound with iron, armour nearly all iron. The
 /// steel Sword, Shield and Armour (`CONTEXT.md`: Coal) take Steel where the iron ones take Iron,
-/// and the same Wood; the Spear is iron only.
+/// and the same Wood; the Spear is iron only. A Bow is all wood, a Crossbow wood with an iron
+/// bow and trigger, and a batch of 40 Arrows mostly wood with a little iron for the heads
+/// (`CONTEXT.md`: Smithy).
 pub const RECIPES: Table<&[Recipe]> = Table(&[
     (
         "smelter",
@@ -2128,6 +2271,19 @@ pub const RECIPES: Table<&[Recipe]> = Table(&[
                 input: Table(&[("steel", 7.0), ("wood", 1.0)]),
                 output: Table(&[("steelArmour", 1.0)]),
             },
+            Recipe {
+                input: Table(&[("iron", 1.0), ("wood", 1.0)]),
+                output: Table(&[("tools", 1.0)]),
+            },
+            Recipe { input: Table(&[("wood", 2.0)]), output: Table(&[("bow", 1.0)]) },
+            Recipe {
+                input: Table(&[("iron", 1.0), ("wood", 3.0)]),
+                output: Table(&[("crossbow", 1.0)]),
+            },
+            Recipe {
+                input: Table(&[("iron", 1.0), ("wood", 3.0)]),
+                output: Table(&[("arrows", 40.0)]),
+            },
         ],
     ),
 ]);
@@ -2162,6 +2318,16 @@ pub const WORK_SKILL_LIMIT: f64 = 1.0;
 /// The most of a workplace's skill a resident can have: where it reaches `WORK_SKILL_LIMIT`.
 pub const WORK_SKILL_MAX: f64 = WORK_SKILL_LIMIT / WORK_SKILL_EFFECT;
 
+/// How much faster a resident carrying Tools works (`CONTEXT.md`: Tools), as a share of their
+/// plain pace: a quarter, at a workplace (what they make) and at a construction site (building,
+/// tearing down, repairing). One set counts; a second adds nothing.
+pub const TOOLS_WORK_BONUS: f64 = 0.25;
+
+/// Game days of work a set of Tools lasts before it breaks (`CONTEXT.md`: Tools, Wear): some two
+/// months of daily work, so a set made from an Iron and a Wood (`RECIPES`) pays for itself many
+/// times over before a worker needs the next.
+pub const TOOLS_WORK_DAYS: f64 = 60.0;
+
 /// Skill a worker of average Intellect gains per game day of work at a workplace: the cap takes
 /// about a game year (one real week).
 pub const WORK_SKILL_PER_DAY: f64 = 100.0 / 420.0;
@@ -2183,6 +2349,65 @@ pub const TEARDOWN_WORK_SHARE: f64 = 0.5;
 /// Share of a finished building's materials left in its pile when it is torn down, rounded down
 /// to whole units. An unfinished site leaves all its delivered materials.
 pub const TEARDOWN_MATERIALS_RETURNED: f64 = 0.5;
+
+/// Game days a finished building of each kind takes to lose all its condition, unrepaired
+/// (`CONTEXT.md`: Decay): it loses an even share each game day, used or not. A city left alone for
+/// a real month (1800 game days) is still there: its buildings may be worn, but none has fallen to
+/// ruin from decay alone (Daniel, 2026-11-17). Decay only: Food and defence while away are the
+/// Player's own scripts. Roads and the wooden walls and gates go fastest, in
+/// 45 real days; farms in 60; timber buildings in 75; storages, workplaces on a node, training
+/// grounds and havens in 90; the town hall in 120; those mostly of stone (warehouse, smelter, mint,
+/// smithy) in 180. A kind not listed (a carriage, boat or ship site) never decays.
+pub const DECAY_DAYS: Table<f64> = Table(&[
+    ("road", 2700.0),
+    ("wall", 2700.0),
+    ("gate", 2700.0),
+    ("farm", 3600.0),
+    ("house", 4500.0),
+    ("stable", 4500.0),
+    ("lumberCamp", 4500.0),
+    ("storage", 5400.0),
+    ("trainingGround", 5400.0),
+    ("haven", 5400.0),
+    ("quarry", 5400.0),
+    ("mine", 5400.0),
+    ("townHall", 7200.0),
+    ("warehouse", 10800.0),
+    ("smelter", 10800.0),
+    ("mint", 10800.0),
+    ("smithy", 10800.0),
+]);
+
+/// Share of its condition lost from which a building reads worn, rather than good
+/// (`CONTEXT.md`: Decay), and can be repaired: a road after about eleven real days.
+pub const DECAY_WORN: f64 = 0.25;
+
+/// Share of its condition lost from which a building reads nearly a ruin.
+pub const DECAY_NEARLY_RUIN: f64 = 0.75;
+
+/// Share of a building's materials a repair takes (`CONTEXT.md`: Repairing), rounded up to whole
+/// units of each good: a tile of road or wall a unit, a house 5 Wood.
+pub const REPAIR_MATERIALS_SHARE: f64 = 0.25;
+
+/// Share of a building's `BUILD_WORK` a repair takes: less than building it, and less than
+/// tearing it down (`TEARDOWN_WORK_SHARE`).
+pub const REPAIR_WORK_SHARE: f64 = 0.25;
+
+/// Game days a ruin stands before it collapses (`CONTEXT.md`: Ruin): "a long while more", a real
+/// month (Daniel, 2026-11-17), time enough to notice it and rebuild it.
+pub const RUIN_COLLAPSE_DAYS: f64 = 1800.0;
+
+/// Share of a building's materials rebuilding its ruin takes (`CONTEXT.md`: Ruin), rounded up to
+/// whole units: more than a repair, less than a new one.
+pub const REBUILD_MATERIALS_SHARE: f64 = 0.5;
+
+/// Share of a building's `BUILD_WORK` rebuilding its ruin takes: more than a repair, less than
+/// building it new.
+pub const REBUILD_WORK_SHARE: f64 = 0.5;
+
+/// Share of a building's materials that lies on its tiles once its ruin collapses, rounded down
+/// to whole units, as when it is torn down (`TEARDOWN_MATERIALS_RETURNED`).
+pub const COLLAPSE_MATERIALS_LEFT: f64 = 0.25;
 
 /// How long after a realm says it leaves an alliance, or the alliance leader removes it, it stops
 /// being a member (`CONTEXT.md`: Alliance): one real hour, time enough for the others to react.
@@ -2242,6 +2467,32 @@ pub const COMBAT_SKILL_LIMIT: f64 = 1.0;
 /// The least damage a blow that lands does, however well the one hit is protected.
 pub const MIN_BLOW_DAMAGE: f64 = 1.0;
 
+/// How far a Bow or Crossbow shoots, in tiles (`CONTEXT.md`: Ranged combat), on the ground: a
+/// Bow further than a Crossbow. Contact counts too.
+pub const SHOT_REACH: Table<f64> = Table(&[("bow", 8.0), ("crossbow", 5.0)]);
+
+/// Ticks between two shots (`CONTEXT.md`: Ranged combat): a Bow looses one every three seconds, a
+/// Crossbow, slow to span, one every six. A blow in contact comes every `STRIKE_TICKS`.
+pub const SHOT_TICKS: Table<f64> = Table(&[("bow", 3.0), ("crossbow", 6.0)]);
+
+/// Damage a shot does before Combat skill and armour (`CONTEXT.md`: Ranged combat): Strength adds
+/// nothing. An unskilled Bow does about what an average fist does, a Crossbow hits hard.
+pub const SHOT_DAMAGE: Table<f64> = Table(&[("bow", 6.0), ("crossbow", 14.0)]);
+
+/// The furthest Combat skill raises a shot, as a share of it, reached at the same skill as a blow's
+/// `COMBAT_SKILL_LIMIT`: a master bowman shoots three times as hard as a beginner, a Crossbow
+/// needs little skill.
+pub const SHOT_SKILL_LIMIT: Table<f64> = Table(&[("bow", 2.0), ("crossbow", 0.25)]);
+
+/// Share of the target's shield and armour a shot goes through (`CONTEXT.md`: Ranged combat): a
+/// Crossbow's bolt half of it, an arrow from a Bow none.
+pub const SHOT_PIERCE: Table<f64> = Table(&[("bow", 0.0), ("crossbow", 0.5)]);
+
+/// Tiles of reach an archer up on a wall walk gets on top of their weapon's (`CONTEXT.md`: Ranged
+/// combat, Walls in combat): half a Bow's again, so a Bow on the wall outshoots one on the ground
+/// by four tiles and a Crossbow on the wall outshoots a Bow below.
+pub const WALL_SHOT_REACH_BONUS: f64 = 4.0;
+
 /// What a blow that lands does to a defender standing on their own city's wall, as a share of its
 /// damage (`CONTEXT.md`: Walls in combat): a quarter, so a wall's defenders hold out four times
 /// as long.
@@ -2252,19 +2503,83 @@ pub const WALL_DEFENCE: f64 = 0.25;
 pub struct WallStrength {
     pub wall: f64,
     pub gate: f64,
+    /// A whole tower (`CONTEXT.md`: Tower): three tiles of its wall's worth, so it holds out longer.
+    pub tower: f64,
 }
+
+/// How many residents a tower holds up on top at once (`CONTEXT.md`: Tower: a few): one to each
+/// of its four tiles, so a small realm can man one; more wait on the walk or below.
+pub const TOWER_ROOM: f64 = 4.0;
+
+/// How far, in tiles, a resident up on a tower sees (`CONTEXT.md`: Tower, Sight): half as far
+/// again as `SIGHT_RANGE`, so a tower warns of an army well before it reaches the wall. At most
+/// twice `SIGHT_RANGE`, which the sight squares are cut for.
+pub const TOWER_SIGHT_RANGE: f64 = 72.0;
+
+/// How much further, in tiles, an archer up on a tower shoots than on the ground
+/// (`CONTEXT.md`: Tower, Ranged combat): beyond a wall archer's `WALL_SHOT_REACH_BONUS`.
+pub const TOWER_SHOT_REACH_BONUS: f64 = 7.0;
 
 /// Damage a wall or gate takes from blows before it falls (`CONTEXT.md`: Walls in combat,
 /// broken). An average unarmed resident (4 a blow, one blow every `STRIKE_TICKS`) breaks a stretch
 /// of wall alone in about 25 minutes, one with a Spear in about 12. A gate holds out half as long
 /// again. Long enough that a starting city's defenders get from their town hall up onto the wall
 /// and beat the breakers first, at twice their numbers too (T105.6).
-pub const WALL_STRENGTH: WallStrength = WallStrength { wall: 3000.0, gate: 4500.0 };
+pub const WALL_STRENGTH: WallStrength = WallStrength { wall: 3000.0, gate: 4500.0, tower: 9000.0 };
+
+/// Damage a stone wall or gate takes before it falls: four times a wooden one's (`CONTEXT.md`:
+/// Wall / Gate, Wood or stone), so a Spear breaks a tile of stone wall alone in about 50 minutes.
+pub const STONE_WALL_STRENGTH: WallStrength =
+    WallStrength { wall: 12000.0, gate: 18000.0, tower: 36000.0 };
 
 /// Share of a broken wall's or gate's materials left on its tile, rounded down to whole units:
 /// less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered;
 /// enough that a tile of wall leaves a unit of Wood.
 pub const BROKEN_MATERIALS_RETURNED: f64 = 0.34;
+
+/// The fewest crew on a ram's tile for it to be pushed (`CONTEXT.md`: Siege machine): a few
+/// residents, as many as a ship's, so a ram takes a realm's hands from other work.
+pub const RAM_CREW: f64 = 4.0;
+
+/// How fast a crewed siege machine is pushed, as a share of a carriage's pace on the same ground
+/// (`CONTEXT.md`: Siege machine: slowly, like a carriage with no horse): half of walking on Plains,
+/// a crawl in Forest and Hills, a little faster on a road, and onto Mountain only by road.
+pub const SIEGE_PUSH_SHARE: f64 = 0.25;
+
+/// Damage a ram takes from blows before it breaks (`CONTEXT.md`: Siege machine): twice a tile of
+/// wooden wall, so defenders who come out need a while at it, but less than a stone wall tile.
+pub const RAM_STRENGTH: f64 = 6000.0;
+
+/// Ticks between a crewed ram's strikes at the wall, gate or tower next to it (`CONTEXT.md`: Ram):
+/// a heavy beam swung back and forth by its crew, slower than a resident's blows.
+pub const RAM_STRIKE_TICKS: f64 = 10.0;
+
+/// Damage each strike of a ram does to the wall, gate or tower it is at (`CONTEXT.md`: Ram: many
+/// times harder than a blow): it breaks a tile of wooden wall in 20 strikes, a little over three
+/// minutes, and one of stone in about thirteen, where a Spear alone takes 12 and 50.
+pub const RAM_BLOW: f64 = 150.0;
+
+/// The fewest crew on a catapult's tile for it to be pushed or to shoot (`CONTEXT.md`: Catapult): one
+/// fewer than a ram's, a lighter frame to push and an arm to wind and load.
+pub const CATAPULT_CREW: f64 = 3.0;
+
+/// Damage a catapult takes from blows before it breaks (`CONTEXT.md`: Siege machine): a tile of
+/// wooden wall's, half a ram's, having no roof of planks over it.
+pub const CATAPULT_STRENGTH: f64 = 3000.0;
+
+/// How far a catapult throws, in tiles (`CONTEXT.md`: Catapult: beyond a bow's from a wall): a Bow
+/// reaches 8, 12 from up on a wall, so a catapult shoots from well out of any archer's reach.
+pub const CATAPULT_REACH: f64 = 20.0;
+
+/// Ticks between a crewed catapult's shots (`CONTEXT.md`: Catapult): its arm wound down and a
+/// Stone loaded each time, six times a ram's strikes, so it does less to a wall a minute than a
+/// ram at it.
+pub const CATAPULT_SHOT_TICKS: f64 = 60.0;
+
+/// Damage each Stone a catapult throws does to the wall, gate or tower it hits (`CONTEXT.md`:
+/// Catapult): a tile of wooden wall falls to 5 in five minutes, one of stone to 20 in twenty,
+/// slower than a ram at the wall but from out of reach.
+pub const CATAPULT_BLOW: f64 = 600.0;
 
 /// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): six
 /// minutes, all the while unable to dodge or strike back, so a starting city's defenders get up
@@ -2470,11 +2785,6 @@ pub const SCRIPT_HELPER_COST: f64 = 1.0;
 
 /// Extra steps a script pays to request an action (`walkTo`, `pickUp`, …), accepted or not.
 pub const SCRIPT_ACTION_COST: f64 = 10.0;
-
-/// How many interpreter steps all of a realm's running scripts may use together each tick
-/// (`CONTEXT.md`: Step budget): ten residents at their full `SCRIPT_STEP_BUDGET`. When it runs
-/// out, the rest skip the tick; who goes first rotates, so the same ones don't always skip.
-pub const SCRIPT_REALM_STEP_BUDGET: f64 = 20000.0;
 
 /// The most a running script's memory may hold, in characters of its JSON (`CONTEXT.md`:
 /// Memory). Enough for a role, a few tiles and ids; a run that leaves more keeps the old memory.
@@ -2801,9 +3111,12 @@ pub fn balance_json() -> Value {
         to_value(CITY_PRICE_BY_BUILDING).expect("serialisable"),
     );
     m.insert("NPC_FOOD_SHORT_DAYS".into(), json!(NPC_FOOD_SHORT_DAYS));
+    m.insert("NPC_FOOD_REFILL_DAYS".into(), json!(NPC_FOOD_REFILL_DAYS));
     m.insert("WORK_FOOD_KEPT".into(), json!(WORK_FOOD_KEPT));
     m.insert("NPC_SOLDIER_SHARE".into(), json!(NPC_SOLDIER_SHARE));
     m.insert("NPC_STEEL_KIT".into(), json!(NPC_STEEL_KIT));
+    m.insert("NPC_ARCHER_SHARE".into(), json!(NPC_ARCHER_SHARE));
+    m.insert("NPC_ARCHER_ARROWS".into(), json!(NPC_ARCHER_ARROWS));
     m.insert("NPC_SOLDIERS_ON_HALL".into(), json!(NPC_SOLDIERS_ON_HALL));
     m.insert("NPC_SOLDIERS_AT_GATE".into(), json!(NPC_SOLDIERS_AT_GATE));
     m.insert("NPC_POST_AROUND_HALL".into(), json!(NPC_POST_AROUND_HALL));
@@ -2815,6 +3128,7 @@ pub fn balance_json() -> Value {
     m.insert("NPC_PATROL_WALL_STOPS".into(), json!(NPC_PATROL_WALL_STOPS));
     m.insert("NPC_PATROL_ROAD_STOPS".into(), json!(NPC_PATROL_ROAD_STOPS));
     m.insert("NPC_WAR_CHEST_PER_RESIDENT".into(), json!(NPC_WAR_CHEST_PER_RESIDENT));
+    m.insert("NPC_TOOLS_SPARE".into(), json!(NPC_TOOLS_SPARE));
     m.insert("NPC_GATE_WATCH_RANGE".into(), json!(NPC_GATE_WATCH_RANGE));
     m.insert("NPC_ADULTS_PER_PAIR".into(), json!(NPC_ADULTS_PER_PAIR));
     m.insert("CARRYING_DAYS".into(), json!(CARRYING_DAYS));
@@ -2831,6 +3145,7 @@ pub fn balance_json() -> Value {
     m.insert("NPC_ROAD_LONGEST".into(), json!(NPC_ROAD_LONGEST));
     m.insert("NPC_REVIVE_REACH".into(), json!(NPC_REVIVE_REACH));
     m.insert("NPC_SURPLUS_CAP".into(), to_value(NPC_SURPLUS_CAP).expect("serialisable"));
+    m.insert("NPC_SURPLUS_PAST_CAP".into(), json!(NPC_SURPLUS_PAST_CAP));
     m.insert("NPC_WALL_STEP".into(), json!(NPC_WALL_STEP));
     m.insert("NPC_INNER_WALL_REACH".into(), json!(NPC_INNER_WALL_REACH));
     m.insert("CITY_GRID_BLOCK".into(), json!(CITY_GRID_BLOCK));
@@ -2838,6 +3153,7 @@ pub fn balance_json() -> Value {
     m.insert("CITY_SIDE_LANE_GAP".into(), json!(CITY_SIDE_LANE_GAP));
     m.insert("CITY_QUARTER_ROWS".into(), json!(CITY_QUARTER_ROWS));
     m.insert("NPC_WALL_TILES_PER_TRIP".into(), json!(NPC_WALL_TILES_PER_TRIP));
+    m.insert("NPC_STONE_WALL_RESIDENTS".into(), json!(NPC_STONE_WALL_RESIDENTS));
     m.insert("NPC_NODE_REACH".into(), json!(NPC_NODE_REACH));
     m.insert("NPC_RESIDENTS_PER_SCOUT".into(), json!(NPC_RESIDENTS_PER_SCOUT));
     m.insert("NPC_SCOUT_LIMIT".into(), json!(NPC_SCOUT_LIMIT));
@@ -2852,8 +3168,12 @@ pub fn balance_json() -> Value {
     m.insert("NPC_FULL_RESIDENTS_PER_DAY".into(), json!(NPC_FULL_RESIDENTS_PER_DAY));
     m.insert("NPC_FULL_DAYS_LEAST".into(), json!(NPC_FULL_DAYS_LEAST));
     m.insert("NPC_FULL_DIP_DAYS".into(), json!(NPC_FULL_DIP_DAYS));
+    m.insert("NPC_FOUND_FOOD_SURPLUS_SHARE".into(), json!(NPC_FOUND_FOOD_SURPLUS_SHARE));
     m.insert("NPC_FOUND_RESIDENTS_PER_MEMBER".into(), json!(NPC_FOUND_RESIDENTS_PER_MEMBER));
     m.insert("NPC_FOUND_PARTY_MOST".into(), json!(NPC_FOUND_PARTY_MOST));
+    m.insert("NPC_ESCORT_TOWN_RESIDENTS".into(), json!(NPC_ESCORT_TOWN_RESIDENTS));
+    m.insert("NPC_TRADER_ESCORTS".into(), json!(NPC_TRADER_ESCORTS));
+    m.insert("NPC_FOUND_ESCORT_SHARE".into(), json!(NPC_FOUND_ESCORT_SHARE));
     m.insert("NPC_FOUND_SAMPLES".into(), json!(NPC_FOUND_SAMPLES));
     m.insert("NPC_FOUND_REACH".into(), json!(NPC_FOUND_REACH));
     m.insert("NPC_FOUND_FOOD_DAYS".into(), json!(NPC_FOUND_FOOD_DAYS));
@@ -2898,7 +3218,21 @@ pub fn balance_json() -> Value {
     m.insert("TRANSFER_FEE_FACTOR".into(), json!(TRANSFER_FEE_FACTOR));
     m.insert("GOOD_WEIGHT".into(), to_value(GOOD_WEIGHT).expect("serialisable"));
     m.insert("WEAPON_ATTACK".into(), to_value(WEAPON_ATTACK).expect("serialisable"));
+    m.insert("SHOT_REACH".into(), to_value(SHOT_REACH).expect("serialisable"));
+    m.insert("SHOT_TICKS".into(), to_value(SHOT_TICKS).expect("serialisable"));
+    m.insert("SHOT_DAMAGE".into(), to_value(SHOT_DAMAGE).expect("serialisable"));
+    m.insert("SHOT_SKILL_LIMIT".into(), to_value(SHOT_SKILL_LIMIT).expect("serialisable"));
+    m.insert("SHOT_PIERCE".into(), to_value(SHOT_PIERCE).expect("serialisable"));
+    m.insert("WALL_SHOT_REACH_BONUS".into(), json!(WALL_SHOT_REACH_BONUS));
     m.insert("PROTECTION_DEFENCE".into(), to_value(PROTECTION_DEFENCE).expect("serialisable"));
+    m.insert("WEAR_BLOWS".into(), to_value(WEAR_BLOWS).expect("serialisable"));
+    m.insert("TRAINING_WEAR_BLOWS_PER_DAY".into(), json!(TRAINING_WEAR_BLOWS_PER_DAY));
+    m.insert("WORN_FROM".into(), json!(WORN_FROM));
+    m.insert("NEARLY_BROKEN_FROM".into(), json!(NEARLY_BROKEN_FROM));
+    m.insert("MEND_RECIPE_SHARE".into(), json!(MEND_RECIPE_SHARE));
+    m.insert("MEND_WORK_SHARE".into(), json!(MEND_WORK_SHARE));
+    m.insert("WORN_PRICE_SHARE".into(), json!(WORN_PRICE_SHARE));
+    m.insert("NEARLY_BROKEN_PRICE_SHARE".into(), json!(NEARLY_BROKEN_PRICE_SHARE));
     m.insert("CARRY_BASE".into(), json!(CARRY_BASE));
     m.insert("CARRY_PER_STRENGTH".into(), json!(CARRY_PER_STRENGTH));
     m.insert("FOOD_PER_DAY".into(), json!(FOOD_PER_DAY));
@@ -2988,6 +3322,11 @@ pub fn balance_json() -> Value {
     m.insert("DIRECTIVE_BUY_OFF_PRICE".into(), json!(DIRECTIVE_BUY_OFF_PRICE));
     m.insert("BUILD_MATERIALS".into(), to_value(BUILD_MATERIALS).expect("serialisable"));
     m.insert("BUILD_WORK".into(), to_value(BUILD_WORK).expect("serialisable"));
+    m.insert(
+        "STONE_BUILD_MATERIALS".into(),
+        to_value(STONE_BUILD_MATERIALS).expect("serialisable"),
+    );
+    m.insert("STONE_BUILD_WORK".into(), to_value(STONE_BUILD_WORK).expect("serialisable"));
     m.insert("MOUNTAIN_ROAD_WORK_FACTOR".into(), json!(MOUNTAIN_ROAD_WORK_FACTOR));
     m.insert("ROAD_LINE_MAX_TILES".into(), json!(ROAD_LINE_MAX_TILES));
     m.insert("BUILD_STRENGTH_AVERAGE".into(), json!(BUILD_STRENGTH_AVERAGE));
@@ -3012,9 +3351,20 @@ pub fn balance_json() -> Value {
     m.insert("WORK_SKILL_EFFECT".into(), json!(WORK_SKILL_EFFECT));
     m.insert("WORK_SKILL_LIMIT".into(), json!(WORK_SKILL_LIMIT));
     m.insert("WORK_SKILL_MAX".into(), json!(WORK_SKILL_MAX));
+    m.insert("TOOLS_WORK_BONUS".into(), json!(TOOLS_WORK_BONUS));
+    m.insert("TOOLS_WORK_DAYS".into(), json!(TOOLS_WORK_DAYS));
     m.insert("WORK_SKILL_PER_DAY".into(), json!(WORK_SKILL_PER_DAY));
     m.insert("TEARDOWN_WORK_SHARE".into(), json!(TEARDOWN_WORK_SHARE));
     m.insert("TEARDOWN_MATERIALS_RETURNED".into(), json!(TEARDOWN_MATERIALS_RETURNED));
+    m.insert("DECAY_DAYS".into(), to_value(DECAY_DAYS).expect("serialisable"));
+    m.insert("DECAY_WORN".into(), json!(DECAY_WORN));
+    m.insert("DECAY_NEARLY_RUIN".into(), json!(DECAY_NEARLY_RUIN));
+    m.insert("REPAIR_MATERIALS_SHARE".into(), json!(REPAIR_MATERIALS_SHARE));
+    m.insert("REPAIR_WORK_SHARE".into(), json!(REPAIR_WORK_SHARE));
+    m.insert("RUIN_COLLAPSE_DAYS".into(), json!(RUIN_COLLAPSE_DAYS));
+    m.insert("REBUILD_MATERIALS_SHARE".into(), json!(REBUILD_MATERIALS_SHARE));
+    m.insert("REBUILD_WORK_SHARE".into(), json!(REBUILD_WORK_SHARE));
+    m.insert("COLLAPSE_MATERIALS_LEFT".into(), json!(COLLAPSE_MATERIALS_LEFT));
     m.insert("ALLIANCE_LEAVE_DELAY".into(), json!(ALLIANCE_LEAVE_DELAY));
     m.insert("ALLIANCE_RECALL_DELAY".into(), json!(ALLIANCE_RECALL_DELAY));
     m.insert("NPC_ALLIANCE_JOIN_STANDING".into(), json!(NPC_ALLIANCE_JOIN_STANDING));
@@ -3033,7 +3383,21 @@ pub fn balance_json() -> Value {
     m.insert("MIN_BLOW_DAMAGE".into(), json!(MIN_BLOW_DAMAGE));
     m.insert("WALL_DEFENCE".into(), json!(WALL_DEFENCE));
     m.insert("WALL_STRENGTH".into(), to_value(WALL_STRENGTH).expect("serialisable"));
+    m.insert("STONE_WALL_STRENGTH".into(), to_value(STONE_WALL_STRENGTH).expect("serialisable"));
     m.insert("BROKEN_MATERIALS_RETURNED".into(), json!(BROKEN_MATERIALS_RETURNED));
+    m.insert("TOWER_ROOM".into(), json!(TOWER_ROOM));
+    m.insert("TOWER_SIGHT_RANGE".into(), json!(TOWER_SIGHT_RANGE));
+    m.insert("TOWER_SHOT_REACH_BONUS".into(), json!(TOWER_SHOT_REACH_BONUS));
+    m.insert("RAM_CREW".into(), json!(RAM_CREW));
+    m.insert("SIEGE_PUSH_SHARE".into(), json!(SIEGE_PUSH_SHARE));
+    m.insert("RAM_STRENGTH".into(), json!(RAM_STRENGTH));
+    m.insert("RAM_STRIKE_TICKS".into(), json!(RAM_STRIKE_TICKS));
+    m.insert("RAM_BLOW".into(), json!(RAM_BLOW));
+    m.insert("CATAPULT_CREW".into(), json!(CATAPULT_CREW));
+    m.insert("CATAPULT_STRENGTH".into(), json!(CATAPULT_STRENGTH));
+    m.insert("CATAPULT_REACH".into(), json!(CATAPULT_REACH));
+    m.insert("CATAPULT_SHOT_TICKS".into(), json!(CATAPULT_SHOT_TICKS));
+    m.insert("CATAPULT_BLOW".into(), json!(CATAPULT_BLOW));
     m.insert("CLIMB_TICKS".into(), json!(CLIMB_TICKS));
     m.insert("WALL_WALK_TICKS".into(), json!(WALL_WALK_TICKS));
     m.insert("FALL_DAMAGE".into(), json!(FALL_DAMAGE));
@@ -3059,7 +3423,6 @@ pub fn balance_json() -> Value {
     m.insert("SCRIPT_TILE_QUERY_COST".into(), json!(SCRIPT_TILE_QUERY_COST));
     m.insert("SCRIPT_HELPER_COST".into(), json!(SCRIPT_HELPER_COST));
     m.insert("SCRIPT_ACTION_COST".into(), json!(SCRIPT_ACTION_COST));
-    m.insert("SCRIPT_REALM_STEP_BUDGET".into(), json!(SCRIPT_REALM_STEP_BUDGET));
     m.insert("SCRIPT_MEMORY_MAX".into(), json!(SCRIPT_MEMORY_MAX));
     m.insert("SCRIPT_ACTION_VALUE_MAX".into(), json!(SCRIPT_ACTION_VALUE_MAX));
     m.insert("DOING_MAX_LENGTH".into(), json!(DOING_MAX_LENGTH));

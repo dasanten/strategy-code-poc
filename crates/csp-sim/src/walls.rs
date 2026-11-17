@@ -5,15 +5,19 @@
 
 use std::collections::HashMap;
 
-use csp_shared::balance::{BROKEN_MATERIALS_RETURNED, WALL_ENCLOSES_MAX, WALL_STRENGTH};
+use csp_shared::balance::{
+    BROKEN_MATERIALS_RETURNED, STONE_WALL_STRENGTH, WALL_ENCLOSES_MAX, WALL_STRENGTH,
+};
+use csp_shared::footprint::footprint_tiles;
 use csp_shared::terrain::{is_passable_terrain, tile_index, wrap, wrap_delta, TerrainMap};
 use csp_shared::world::{Building, BuildingKind, Resident, Stock, UpSide, WorldState};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 
 use crate::queries::alliance::allied_realms;
-use crate::queries::building::build_materials;
+use crate::queries::building::{is_stone, materials_of};
 use crate::queries::city::npc_city_refuses;
+use crate::queries::names::placed;
 use crate::queries::standing::TRADE_ORG;
 
 /// Whether a wall tile is a wall or a gate.
@@ -40,6 +44,10 @@ pub struct WallTile {
     /// The sides an NPC city keeps its gate shut to even while open (`npcCityRefuses`). Empty for
     /// a wall.
     pub shut_to: Vec<String>,
+    /// The tower this tile is part of, if it is one's (`CONTEXT.md`: Tower): its room is shared by all of
+    /// its tiles.
+    #[serde(default)]
+    pub tower: Option<String>,
 }
 
 impl WallTile {
@@ -51,6 +59,7 @@ impl WallTile {
             realms: Vec::new(),
             closed: false,
             shut_to: Vec::new(),
+            tower: None,
         }
     }
 
@@ -215,7 +224,7 @@ pub fn wall_side(r: &Resident) -> Option<&str> {
 
 /// Whether a building is a finished wall or gate (`isWallOrGate`).
 pub fn is_wall_or_gate(b: &Building) -> bool {
-    matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate) && b.site.is_none()
+    crate::queries::walls::is_wall_or_gate(b)
 }
 
 /// Whether a gate is closed (`isClosed`); a gate is open until its city's realm closes it.
@@ -342,12 +351,23 @@ pub fn wall_map(world: &WorldState, terrain: &TerrainMap) -> WallMap {
                 .unwrap_or_default(),
             _ => Vec::new(),
         };
-        let t = tile_index(size, b.x as i32, b.y as i32);
-        if !tiles.contains_key(&t) {
-            order.push(t);
-        }
+        // A tower is wall on every tile of its footprint (`CONTEXT.md`: Tower).
         let kind = if b.kind == BuildingKind::Gate { WallKind::Gate } else { WallKind::Wall };
-        tiles.insert(t, WallTile { kind, realm_id, realms, closed: is_closed(b), shut_to });
+        for (x, y) in footprint_tiles(placed(b), size) {
+            let t = tile_index(size, x, y);
+            if !tiles.contains_key(&t) {
+                order.push(t);
+            }
+            let tile = WallTile {
+                kind,
+                realm_id: realm_id.clone(),
+                realms: realms.clone(),
+                closed: is_closed(b),
+                shut_to: shut_to.clone(),
+                tower: (b.kind == BuildingKind::Tower).then(|| b.id.clone()),
+            };
+            tiles.insert(t, tile);
+        }
     }
     let passable = |t: usize| is_passable_terrain(terrain.tiles[t]);
     let mut inside: FxHashSet<usize> = FxHashSet::default();
@@ -391,10 +411,9 @@ pub fn wall_map(world: &WorldState, terrain: &TerrainMap) -> WallMap {
 
 /// Whether a resident stands on a wall of their own side or an ally's (`onOwnWall`).
 pub fn on_own_wall(world: &WorldState, r: &Resident) -> bool {
-    let wall = world
-        .buildings
-        .iter()
-        .find(|b| b.x == r.x && b.y == r.y && b.kind == BuildingKind::Wall && b.site.is_none());
+    let wall = world.buildings.iter().find(|b| {
+        b.x == r.x && b.y == r.y && b.kind == BuildingKind::Wall && crate::ruins::standing(b)
+    });
     wall.is_some_and(|w| of_wall_side(world, w, r))
 }
 
@@ -409,10 +428,11 @@ pub fn of_wall_side(world: &WorldState, wall: &Building, r: &Resident) -> bool {
 
 /// Damage a finished wall or gate takes before it falls (`wallStrength`).
 pub fn wall_strength(b: &Building) -> f64 {
-    if b.kind == BuildingKind::Gate {
-        WALL_STRENGTH.gate
-    } else {
-        WALL_STRENGTH.wall
+    let of = if is_stone(b.kind, b.material) { STONE_WALL_STRENGTH } else { WALL_STRENGTH };
+    match b.kind {
+        BuildingKind::Gate => of.gate,
+        BuildingKind::Tower => of.tower,
+        _ => of.wall,
     }
 }
 
@@ -424,7 +444,7 @@ pub fn wall_strength_left(b: &Building) -> f64 {
 /// Goods left on the tile of a broken wall or gate (`brokenReturns`).
 pub fn broken_returns(b: &Building) -> Stock {
     let mut out = Stock::new();
-    for (good, units) in build_materials(b.kind) {
+    for (good, units) in materials_of(b) {
         let back = (units * BROKEN_MATERIALS_RETURNED).floor();
         if back > 0.0 {
             out.insert(good, back);
@@ -441,7 +461,9 @@ pub fn foreign_wall<'w>(
     wall_id: Option<&str>,
 ) -> Result<&'w Building, String> {
     let b = world.buildings.iter().find(|x| Some(x.id.as_str()) == wall_id);
-    let Some(b) = b.filter(|b| matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate)) else {
+    let Some(b) = b.filter(|b| {
+        matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate | BuildingKind::Tower)
+    }) else {
         return Err("no such wall or gate".into());
     };
     if b.site.is_some() {

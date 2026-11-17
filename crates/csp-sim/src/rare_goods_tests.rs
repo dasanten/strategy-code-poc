@@ -166,8 +166,16 @@ fn a_carriage_load_sold_at_the_heartlands_trading_post_is_worth_more_than_a_days
     for good in [Good::Food, Good::Wood, Good::Stone, Good::Iron] {
         let load: Stock = [(good, CARRIAGE_CAPACITY)].into_iter().collect();
         let holder = TradeHolder { stock: &load, room: CARRIAGE_CAPACITY };
-        let q =
-            quote_trade(&world, warehouse, holder, TradeSide::Sell, good, CARRIAGE_CAPACITY, 0.0);
+        let q = quote_trade(
+            &world,
+            warehouse,
+            holder,
+            TradeSide::Sell,
+            good,
+            CARRIAGE_CAPACITY,
+            0.0,
+            &[],
+        );
         assert!(q.coins > day, "{good:?}: {} Coins for {} units, a day is {day}", q.coins, q.units);
     }
 }

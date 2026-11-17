@@ -185,7 +185,17 @@ pub fn near_a_starting_site(starting: &[(f64, f64)], size: i32, at: (f64, f64)) 
 /// first horses, a caravan for each post and the wandering traders. Returns what breaks the rules
 /// it keeps (`check_on_the_land`); a broken carriage way is for the caller to fail on.
 pub fn place_on_the_land(world: &mut WorldState, terrain: &TerrainMap) -> Vec<LandProblem> {
-    let land = LandSites::of(world, terrain);
+    place_on_the_land_in(world, terrain, Regions::of(world.seed, terrain))
+}
+
+/// `place_on_the_land` on the world's regions, worked out already (`Regions::of`), once its
+/// starting sites are placed.
+pub fn place_on_the_land_in(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    regions: Regions,
+) -> Vec<LandProblem> {
+    let land = LandSites::new(regions, starting_site_middles(world));
     place_trade_org_hq_on(world, terrain, &land);
     place_trading_posts_on(world, terrain, &land);
     place_npc_cities_on(world, terrain, &land);

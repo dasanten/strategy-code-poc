@@ -70,7 +70,7 @@ fn project(v: &Village) -> Option<CityProject> {
 
 fn build_at(p: &Option<CityProject>, kind: BuildingKind) -> (f64, f64) {
     match p {
-        Some(CityProject::Build { building, x, y }) if *building == kind => (*x, *y),
+        Some(CityProject::Build { building, x, y, .. }) if *building == kind => (*x, *y),
         other => panic!("not a {kind:?} to build: {other:?}"),
     }
 }
@@ -192,7 +192,8 @@ fn keeps_a_resident_carrying_a_child_out_of_work_at_a_house_the_partner_works() 
 fn builds_a_house_inside_its_wall_when_it_has_a_food_surplus_and_no_free_housing() {
     let mut v = village(None);
     fill_houses(&mut v.world, &v.city, &v.home);
-    set_stock(&mut v, &[(Good::Food, 400.0), (Good::Wood, 100.0)]);
+    // Its founding party's materials too, else it builds for them (`CONTEXT.md`: Full city).
+    set_stock(&mut v, &[(Good::Food, 400.0), (Good::Wood, 400.0), (Good::Stone, 200.0)]);
     let (x, y) = build_at(&project(&v), BuildingKind::House);
     assert!(((x - v.home.x).abs().max((y - v.home.y).abs())) < f64::from(WALL - 1));
     // With room in its houses it builds none.
@@ -263,6 +264,7 @@ fn with_no_room_left_inside_builds_on_its_edge_then_puts_up_a_new_wall_from_its_
             building: BuildingKind::Gate,
             x: v.home.x,
             y: v.home.y + f64::from(WALL) + NPC_WALL_STEP,
+            material: None,
         })
     );
 }
@@ -278,6 +280,7 @@ fn builds_a_lumber_camp_on_the_nearest_forest_when_it_needs_wood_and_makes_none(
             building: BuildingKind::LumberCamp,
             x: f64::from(FOREST.0),
             y: f64::from(FOREST.1),
+            material: None,
         })
     );
 }
@@ -294,7 +297,7 @@ fn builds_a_farm_beyond_its_next_wall_when_the_farmers_it_wants_do_not_fit() {
         .clone();
     let mut m = Mulberry32::new(5.0);
     let most = max_workers(BuildingKind::Farm).expect("farm workers");
-    while farmers_wanted(&v.world, v.city()) <= most {
+    while crate::npc_plan::farmers_to_feed(&v.world, v.city()) <= most {
         let id = new_id("r", &mut v.world.next_id);
         let fields = NewResident {
             id: &id,
@@ -468,4 +471,221 @@ fn a_village_grows_in_residents_and_area_over_game_weeks() {
     assert!(world.buildings.iter().any(|b| b.kind == BuildingKind::LumberCamp && b.site.is_none()));
     assert!(ring(world, city, home, size, WALL).is_empty());
     assert!(ring(world, city, home, size, WALL + NPC_WALL_STEP as i32).len() > 120);
+}
+
+/// A begun site of the city's own, of `kind` at `at`, and a node of `node` under it if any.
+fn own_site(v: &mut Village, id: &str, kind: &str, at: (f64, f64), node: Option<&str>) {
+    let site: Building = serde_json::from_value(json!({
+        "id": id, "kind": kind, "cityId": null, "x": at.0, "y": at.1,
+        "site": { "delivered": {}, "work": TICKS_PER_GAME_DAY },
+    }))
+    .unwrap();
+    v.world.buildings.push(site);
+    if let Some(node) = node {
+        v.world.nodes.push(
+            serde_json::from_value(json!({
+                "id": format!("{node}-{id}"), "kind": node, "x": at.0, "y": at.1,
+            }))
+            .unwrap(),
+        );
+    }
+    let i = v.world.cities.iter().position(|c| c.id == v.city).unwrap();
+    v.world.cities[i].workplace_ids.get_or_insert_with(Vec::new).push(id.into());
+}
+
+#[test]
+fn finishes_the_begun_quarry_a_begun_mine_waits_on_for_its_stone() {
+    // T100.8: the mine came first and waited for ever on Stone from a quarry that was a site.
+    let mut v = village(None);
+    fill_houses(&mut v.world, &v.city, &v.home);
+    set_stock(&mut v, &[(Good::Food, 400.0), (Good::Wood, 400.0)]);
+    let (hx, hy) = (v.home.x, v.home.y);
+    own_site(&mut v, "mine", "mine", (hx + 40.0, hy + 40.0), Some("ironOre"));
+    own_site(&mut v, "quarry", "quarry", (hx - 40.0, hy + 40.0), Some("stone"));
+    assert_eq!(build_at(&project(&v), BuildingKind::Quarry), (hx - 40.0, hy + 40.0));
+}
+
+#[test]
+fn finishes_the_begun_mine_whose_ore_a_begun_smithys_iron_waits_on() {
+    // T100.8: a smithy needs Iron, which its finished smelter makes only from the begun mine's ore.
+    let mut v = village(None);
+    fill_houses(&mut v.world, &v.city, &v.home);
+    let goods = [(Good::Food, 400.0), (Good::Wood, 400.0), (Good::Stone, 400.0)];
+    set_stock(&mut v, &goods);
+    let (hx, hy) = (v.home.x, v.home.y);
+    own_site(&mut v, "smithy", "smithy", (hx + 6.0, hy + 6.0), None);
+    let mut smelter = placed(BuildingKind::Smelter, (hx - 6.0, hy + 6.0));
+    smelter.id = "smelter".into();
+    smelter.city_id = Some(v.city.clone());
+    v.world.buildings.push(smelter);
+    own_site(&mut v, "mine", "mine", (hx + 40.0, hy - 40.0), Some("ironOre"));
+    assert_eq!(build_at(&project(&v), BuildingKind::Mine), (hx + 40.0, hy - 40.0));
+}
+
+#[test]
+fn food_short_of_its_reserve_with_every_farm_full_builds_a_farm_before_a_begun_mine() {
+    // #1379: Larkspur's begun mine waited on Stone from a quarry it never built, and with Food
+    // below its reserve but above the line where it runs short its farms fell behind as it grew.
+    let mut v = village(None);
+    fill_houses(&mut v.world, &v.city, &v.home);
+    let city = v.city().clone();
+    let food = crate::queries::city::city_food_use(&v.world, &city, 10.0).ceil();
+    let reserve = crate::queries::npc_trade::npc_reserve(&v.world, &city);
+    assert!(food < reserve[&Good::Food]);
+    assert!(!crate::npc_plan::food_short(&v.world, &city));
+    set_stock(&mut v, &[(Good::Food, food), (Good::Wood, 400.0)]);
+    let (hx, hy) = (v.home.x, v.home.y);
+    own_site(&mut v, "mine", "mine", (hx + 40.0, hy + 40.0), Some("ironOre"));
+    let farms: Vec<String> = v
+        .world
+        .buildings
+        .iter()
+        .filter(|b| b.kind == BuildingKind::Farm && b.city_id.as_deref() == Some(v.city.as_str()))
+        .map(|b| b.id.clone())
+        .collect();
+    let most = max_workers(BuildingKind::Farm).expect("farm workers") as usize;
+    plan(&mut v);
+    let plan = v.world.city_plans.get_mut(&v.city).expect("a plan");
+    for farm in &farms {
+        for n in 0..most {
+            plan.jobs.insert(
+                format!("{farm}-farmer{n}"),
+                serde_json::from_value(json!({ "kind": "farm", "buildingId": farm })).unwrap(),
+            );
+        }
+    }
+    build_at(&project(&v), BuildingKind::Farm);
+    // Its Food back at its reserve, the mine comes first again.
+    set_stock(&mut v, &[(Good::Food, reserve[&Good::Food] + 1.0), (Good::Wood, 400.0)]);
+    assert!(!matches!(project(&v), Some(CityProject::Build { building: BuildingKind::Farm, .. })));
+}
+
+#[test]
+fn with_nothing_else_short_builds_a_farm_until_it_holds_the_food_founding_wants_first() {
+    // #1379: Ashford sat at its reserve on two farms for a season, so its founding party's
+    // materials never counted as short (`holds_food_first`).
+    let mut v = village(None);
+    fill_houses(&mut v.world, &v.city, &v.home);
+    let city = v.city().clone();
+    let mut goods: Vec<(Good, f64)> = crate::queries::npc_trade::npc_reserve(&v.world, &city)
+        .into_iter()
+        .map(|(g, n)| (g, n + 1.0))
+        .collect();
+    set_stock(&mut v, &goods);
+    let size = v.terrain.size;
+    assert_eq!(
+        crate::npc_founding::short_for_founding(&v.world, &city, Some(&v.home), size),
+        Vec::<Good>::new()
+    );
+    assert!(!crate::npc_founding::holds_food_first(&v.world, &city));
+    let farms: Vec<String> = v
+        .world
+        .buildings
+        .iter()
+        .filter(|b| b.kind == BuildingKind::Farm && b.city_id.as_deref() == Some(v.city.as_str()))
+        .map(|b| b.id.clone())
+        .collect();
+    let most = max_workers(BuildingKind::Farm).expect("farm workers") as usize;
+    plan(&mut v);
+    set_stock(&mut v, &goods);
+    let plan = v.world.city_plans.get_mut(&v.city).expect("a plan");
+    for farm in &farms {
+        for n in 0..most {
+            plan.jobs.insert(
+                format!("{farm}-farmer{n}"),
+                serde_json::from_value(json!({ "kind": "farm", "buildingId": farm })).unwrap(),
+            );
+        }
+    }
+    build_at(&project(&v), BuildingKind::Farm);
+    // Holding it, it builds no farm for it.
+    let cap = csp_shared::balance::NPC_SURPLUS_CAP.get("food").unwrap_or(0.0);
+    for g in &mut goods {
+        if g.0 == Good::Food {
+            g.1 += csp_shared::balance::NPC_FOUND_FOOD_SURPLUS_SHARE * cap;
+        }
+    }
+    set_stock(&mut v, &goods);
+    assert!(crate::npc_founding::holds_food_first(&v.world, &city));
+    assert!(!matches!(project(&v), Some(CityProject::Build { building: BuildingKind::Farm, .. })));
+}
+
+#[test]
+fn below_its_reserve_keeps_the_farmers_who_win_back_what_its_food_lacks() {
+    // #1379: on those who feed everyone and one more, its Food sank to where it runs short.
+    use csp_shared::balance::{NPC_FOOD_REFILL_DAYS, WORK_OUTPUT_PER_DAY};
+    let mut v = village(None);
+    fill_houses(&mut v.world, &v.city, &v.home);
+    let city = v.city().clone();
+    let reserve = crate::queries::npc_trade::npc_reserve(&v.world, &city)[&Good::Food];
+    set_stock(&mut v, &[(Good::Food, reserve)]);
+    let fed = farmers_wanted(&v.world, &city);
+    let per = WORK_OUTPUT_PER_DAY.get("food").unwrap() * NPC_FOOD_REFILL_DAYS;
+    set_stock(&mut v, &[(Good::Food, reserve - 2.0 * per)]);
+    assert!(!crate::npc_plan::food_short(&v.world, &city));
+    assert_eq!(farmers_wanted(&v.world, &city), fed + 2.0);
+    // One more while it has no food surplus, if that is more.
+    set_stock(&mut v, &[(Good::Food, reserve - 1.0)]);
+    assert_eq!(farmers_wanted(&v.world, &city), fed + 1.0);
+}
+
+#[test]
+fn a_builder_of_a_site_beyond_the_node_reach_sets_out_with_food_for_the_walk_there_and_back() {
+    // #1379: Larkspur's builders set out for a quarry 360 tiles away on the Build default's few
+    // units of Food, and went Down on the way back for more.
+    use csp_shared::balance::{road_crew_food, set_out_food, NPC_NODE_REACH, WALK_TICKS_PER_TILE};
+    let mut v = village(None);
+    let storage = v.storage();
+    let (sx, sy) = (v.world.buildings[storage].x, v.world.buildings[storage].y);
+    let memory = |v: &mut Village, x: f64| {
+        let r = &mut v.world.residents[0];
+        (r.order, r.script) = (None, None);
+        // Their Food already on them (`a_builder_of_a_far_site_takes_their_food_..._first`).
+        r.carried = stock(&[(Good::Food, 40.0)]);
+        let project =
+            CityProject::Build { building: BuildingKind::Quarry, x, y: sy, material: None };
+        assert!(super::take_part(&mut v.world, 0, &project, Some(storage), false, None));
+        v.world.residents[0].script.as_ref().expect("the Build default").memory.clone()
+    };
+    let near = memory(&mut v, sx + 40.0);
+    assert_eq!((near.get("foodAt"), near.get("foodTake")), (None, None));
+    let far = sx + NPC_NODE_REACH + 200.0;
+    let walk = (far - sx) * WALK_TICKS_PER_TILE;
+    let m = memory(&mut v, far);
+    assert_eq!(m["foodAt"], csp_lang::plain::number_json(road_crew_food(walk)));
+    assert_eq!(
+        m["foodTake"],
+        csp_lang::plain::number_json(set_out_food(walk) + road_crew_food(walk))
+    );
+    assert!(m["foodTake"].as_f64().unwrap() > 3.0);
+    // Kept as a script keeps numbers (#1402: `running-scripts-sound`).
+    assert_eq!(crate::script_runner::running_scripts_sound(&v.world), []);
+}
+
+#[test]
+fn a_builder_of_a_far_site_takes_their_food_from_the_storage_before_setting_out() {
+    // #1379: the Build default walks to the site before it looks at the Food its builder carries.
+    use csp_shared::balance::NPC_NODE_REACH;
+    let mut v = village(None);
+    set_stock(&mut v, &[(Good::Food, 400.0)]);
+    let storage = v.storage();
+    let (sx, sy) = (v.world.buildings[storage].x, v.world.buildings[storage].y);
+    let r = &mut v.world.residents[0];
+    (r.order, r.script, r.x, r.y) = (None, None, sx, sy);
+    r.carried = stock(&[(Good::Food, 1.0)]);
+    let far = CityProject::Build {
+        building: BuildingKind::Quarry,
+        x: sx + NPC_NODE_REACH + 200.0,
+        y: sy,
+        material: None,
+    };
+    assert!(super::take_part(&mut v.world, 0, &far, Some(storage), false, None));
+    let r = &v.world.residents[0];
+    // With the Build default started, which waits until they have it.
+    assert!(r.script.is_some());
+    assert!(
+        matches!(&r.order, Some(ResidentOrder::PickUp(o)) if o.goods[&Good::Food] >= 4.0),
+        "{:?}",
+        r.order
+    );
 }

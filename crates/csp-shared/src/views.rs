@@ -152,6 +152,8 @@ pub enum Weapon {
     Spear,
     Sword,
     SteelSword,
+    Bow,
+    Crossbow,
 }
 
 ts_type!(

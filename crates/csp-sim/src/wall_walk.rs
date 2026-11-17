@@ -2,7 +2,8 @@
 //! up, walking along and getting down are steps of a path (`walking`, `pathfinding`); here is what
 //! keeps being up true to the walls each tick, and the invariants of it (ADR 0004).
 
-use csp_shared::balance::FALL_DAMAGE;
+use csp_shared::balance::{FALL_DAMAGE, MAP_SIZE, TOWER_ROOM};
+use csp_shared::footprint::{covers, footprint_tiles};
 use csp_shared::terrain::{is_passable_terrain, tile_index, wrap_distance, TerrainMap};
 use csp_shared::world::{
     Building, BuildingKind, DeathCause, Realm, Resident, ResidentOrder, UpSide, WorldState,
@@ -11,19 +12,24 @@ use rustc_hash::FxHashMap;
 
 use crate::invariants::{violation, InvariantViolation};
 use crate::queries::city::town_hall_of;
-use crate::queries::combat::in_contact;
+use crate::queries::combat::{in_contact, ranged_weapon};
+use crate::queries::names::placed;
 use crate::queries::walls::is_up;
 use crate::survival::die_all;
 use crate::walking::order_path_mut;
 use crate::walls::{is_wall_or_gate, neighbours, of_wall_side, plain_ground, side_of, wall_map};
 
-/// The finished walls and gates by tile.
+/// The finished walls, gates and towers by tile, a tower on every tile of its footprint.
 fn walls_by_tile(world: &WorldState) -> FxHashMap<(i64, i64), &Building> {
     world
         .buildings
         .iter()
         .filter(|b| is_wall_or_gate(b))
-        .map(|b| ((b.x as i64, b.y as i64), b))
+        .flat_map(|b| {
+            footprint_tiles(placed(b), MAP_SIZE)
+                .into_iter()
+                .map(move |(x, y)| ((i64::from(x), i64::from(y)), b))
+        })
         .collect()
 }
 
@@ -44,7 +50,7 @@ pub fn step_wall_walk(world: &mut WorldState) {
         let up = match (wall, r.up) {
             (None, Some(_)) => None,
             (Some(w), Some(_)) if !of_wall_side(world, w, r) => None,
-            (Some(w), None) if w.kind == BuildingKind::Wall && of_wall_side(world, w, r) => {
+            (Some(w), None) if w.kind != BuildingKind::Gate && of_wall_side(world, w, r) => {
                 Some(UpSide::Inside)
             }
             _ => continue,
@@ -67,13 +73,13 @@ pub fn fall_from_broken(
     broken: &[Building],
 ) -> (Vec<String>, Vec<Realm>) {
     let size = terrain.size;
-    let at = |b: &Building| (b.x as i64, b.y as i64);
+    let at = |b: &Building, r: &Resident| covers(placed(b), r.x as i32, r.y as i32, terrain.size);
     let falling: Vec<(usize, &Building)> = world
         .residents
         .iter()
         .enumerate()
         .filter(|(_, r)| r.up.is_some())
-        .filter_map(|(i, r)| Some((i, broken.iter().find(|b| at(b) == (r.x as i64, r.y as i64))?)))
+        .filter_map(|(i, r)| Some((i, broken.iter().find(|b| at(b, r))?)))
         .collect();
     if falling.is_empty() {
         return (Vec::new(), Vec::new());
@@ -85,7 +91,8 @@ pub fn fall_from_broken(
     world.buildings.truncate(standing);
     let mut died = Vec::new();
     for (i, wall) in falling {
-        let (x, y) = (wall.x as i32, wall.y as i32);
+        // From the tile they stood on: a tower is broad, its walk on every tile of it.
+        let (x, y) = (world.residents[i].x as i32, world.residents[i].y as i32);
         let t = tile_index(size, x, y);
         let ground: Vec<usize> = neighbours(size, t)
             .into_iter()
@@ -146,8 +153,30 @@ pub fn up_only_on_walls(world: &WorldState, _terrain: &TerrainMap) -> Vec<Invari
         .collect()
 }
 
+/// Never more residents up on a tower than its room (`CONTEXT.md`: Tower, `TOWER_ROOM`; ADR 0004).
+pub fn tower_room(world: &WorldState, terrain: &TerrainMap) -> Vec<InvariantViolation> {
+    let name = "tower-room";
+    let towers =
+        world.buildings.iter().filter(|b| b.kind == BuildingKind::Tower && b.site.is_none());
+    let mut out = Vec::new();
+    for t in towers {
+        let up: Vec<&str> = world
+            .residents
+            .iter()
+            .filter(|r| r.up.is_some() && covers(placed(t), r.x as i32, r.y as i32, terrain.size))
+            .map(|r| r.id.as_str())
+            .collect();
+        if up.len() as f64 > TOWER_ROOM {
+            let msg = format!("tower {} has {} residents up, more than its room", t.id, up.len());
+            out.push(violation(name, msg, &[&t.id]));
+        }
+    }
+    out
+}
+
 /// Nobody on the ground holds an attack order on someone up on the wall walk they are in contact
-/// with (`CONTEXT.md`: High ground, ADR 0004): no blow reaches up, so such an order ends.
+/// with (`CONTEXT.md`: High ground, ADR 0004): no blow reaches up, so such an order ends. An
+/// archer is left out: they shoot up (`CONTEXT.md`: Ranged combat).
 pub fn none_attack_up_from_below(
     world: &WorldState,
     terrain: &TerrainMap,
@@ -162,7 +191,9 @@ pub fn none_attack_up_from_below(
         .filter_map(|a| {
             let Some(ResidentOrder::Attack(o)) = &a.order else { return None };
             let t = world.residents.iter().find(|t| t.id == o.target_id)?;
-            if t.up.is_none() || !in_contact(size, tile(a), tile(t)) {
+            // An archer may shoot up at them (`CONTEXT.md`: Ranged combat); one just out of Arrows
+            // gives the order up on the next tick.
+            if t.up.is_none() || !in_contact(size, tile(a), tile(t)) || ranged_weapon(a).is_some() {
                 return None;
             }
             let msg = format!("{} on the ground attacks {}, up on the wall walk", a.id, t.id);
@@ -195,3 +226,9 @@ mod tests;
 
 #[cfg(test)]
 mod sent_up_tests;
+
+#[cfg(test)]
+mod tower_tests;
+
+#[cfg(test)]
+mod tower_sight_tests;

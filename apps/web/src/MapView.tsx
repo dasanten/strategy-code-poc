@@ -5,6 +5,7 @@ import { TERRAIN_SPEED } from '@csp/balance'
 import { structuresOf } from './map/structures.js'
 import type { Building, KnownNode, SeenResident, ResourceKind } from '@csp/shared-types'
 import { FOOTPRINT } from './shared/footprint.js'
+import { isRuin } from './shared/decay.js'
 import {
   CLOSE_SCALE,
   zoomTier,
@@ -24,6 +25,7 @@ import {
 import { ChunkStore, chunkByChunk, exploredChunkBatches, type ChunkSource } from './map/chunks.js'
 import { cachedSource, countsAt, openTerrainCache } from './map/terrain-cache.js'
 import { selectedWay, wayInView, wayLine } from './map/way.js'
+import { shots, type Shot } from './map/shots.js'
 import { TerrainLayer } from './map/terrain-layer.js'
 import { CoarseLayer, type LevelChunk } from './map/coarse-layer.js'
 import {
@@ -70,6 +72,7 @@ import {
   LEADER_COLOR,
   CITY_AREA_COLOR,
   ROAD_COLOR,
+  RUIN_TINT,
   TERRAIN_COLORS,
   TERRAIN_NAMES,
   LOADING_COLOR,
@@ -108,7 +111,14 @@ import { overviewPixels, overviewSide, overviewTerrainAt } from './map/overview.
 import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
 import { FAR_ROAD_WIDTH, farRoadRuns, roadJoins, roadWidth, type RoadRun } from './map/roads.js'
-import { drawWallTiles, wallSides, type WallTile } from './map/wall-tile.js'
+import {
+  drawStoneFrames,
+  drawStoneMarks,
+  drawWallTiles,
+  wallSides,
+  type WallTile,
+} from './map/wall-tile.js'
+import { isStone } from './shared/building.js'
 import { drawPlans, plannedBuilding } from './map/plans.js'
 import { drawPlaces, pickedPlaces } from './map/places.js'
 import { drawMarks, drawPickPreview, type MapMark } from './map/preview-draw.js'
@@ -858,6 +868,7 @@ export function MapView({
         buildings: [...w.buildings, ...(w.lastSeen?.buildings ?? [])],
         carriages: w.carriages,
         horses: w.horses,
+        machines: w.machines ?? [],
       })
     }
 
@@ -982,6 +993,8 @@ export function MapView({
         rings = true
       }
       if (rings) g.stroke({ width: 2.5, color: LEADER_COLOR })
+      // Archers shooting, a thin line to whom they shoot at (`CONTEXT.md`: Ranged combat).
+      drawShots(g, shots(world.residents, mapSize), spots)
       // What their params and orders point at (`CONTEXT.md`: Places of the picked).
       drawPlaces(g, cam, view, mapSize, pickedPlaces(world, ids), spots)
       for (const id of ids) {
@@ -1214,10 +1227,12 @@ export function MapView({
     /** The Player's residents where they show on screen, to click or box. */
     function ownOnScreen() {
       const view = size()
-      const { home, residents } = worldRef.current
+      const { home, residents, machines } = worldRef.current
       const place = (x: number, y: number) => tileToScreen(cam, view, mapSize, x, y)
       const close = zoomTier(cam.scale) === 'close'
-      return pickables(residents, home.realmId, drawnSpots, place, cam.scale, close)
+      // A siege machine's crew is inside it, as passengers in a cart: a click there is the machine's.
+      const crew = new Set((machines ?? []).flatMap((m) => m.crewIds))
+      return pickables(residents, home.realmId, drawnSpots, place, cam.scale, close, crew)
     }
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
@@ -1566,6 +1581,29 @@ function drawPath(
   else g.circle(...end, 5).fill(LEADER_COLOR)
 }
 
+/** The colour of a shot's line: pale, as an arrow in flight. */
+const SHOT_COLOR = 0xf2e6c9
+
+/**
+ * Each shot as a thin line from the archer to whom they shoot at, both where they stand on screen
+ * (`spots`); a shot with either out of view is skipped.
+ */
+function drawShots(
+  g: Graphics,
+  list: readonly Shot[],
+  spots: ReadonlyMap<string, { x: number; y: number }>,
+) {
+  let any = false
+  for (const s of list) {
+    const from = spots.get(s.from)
+    const to = spots.get(s.to)
+    if (!from || !to) continue
+    g.moveTo(from.x, from.y).lineTo(to.x, to.y)
+    any = true
+  }
+  if (any) g.stroke({ width: 1.5, color: SHOT_COLOR, alpha: 0.8, cap: 'round' })
+}
+
 /** The end of a way far out: a dot in the way's colour with a white ring, in screen pixels. */
 const FAR_WAY_END_RADIUS = 4
 
@@ -1723,8 +1761,10 @@ function drawStructures(
     if (any) under.fill({ color: CITY_AREA_COLOR, alpha: 0.18 * fade })
   }
   // Roads under the buildings, as a wide light band through the middle of the tile joined to the
-  // roads next to it (`CONTEXT.md`: Road, ADR 0008); a road site, and the step onto it, are faint.
+  // roads next to it (`CONTEXT.md`: Road, ADR 0008); a road site or ruin, and the step onto it,
+  // are faint.
   const roads = structures.roads
+  const faintRoad = (r: Building) => !!r.site || isRuin(r)
   const roadAt = (x: number, y: number) => roads.get(`${(x + size) % size},${(y + size) % size}`)
   const w = roadWidth(tile)
   const inSight = ([sx, sy]: readonly number[]) =>
@@ -1734,7 +1774,7 @@ function drawStructures(
     let dots = false
     for (const r of roads.values()) {
       const c = centre(cam, view, size, r)
-      if (!!r.site === site && inSight(c)) {
+      if (faintRoad(r) === site && inSight(c)) {
         under.circle(c[0], c[1], w / 2)
         dots = true
       }
@@ -1747,7 +1787,7 @@ function drawStructures(
       if (!inSight([sx, sy])) continue
       for (const [dx, dy] of roadJoins(r.x, r.y, (x, y) => !!roadAt(x, y))) {
         const next = roadAt(r.x + dx, r.y + dy)
-        if (next && !!(r.site || next.site) === site) {
+        if (next && (faintRoad(r) || faintRoad(next)) === site) {
           under.moveTo(sx, sy).lineTo(sx + dx * tile, sy + dy * tile)
           joins = true
         }
@@ -1772,19 +1812,25 @@ function drawStructures(
     if (b.kind !== 'wall' && b.kind !== 'gate') continue
     const [sx, sy] = tileToScreen(cam, view, size, b.x, b.y)
     if (!near(sx + tile / 2, sy + tile / 2)) continue
-    const key = `${relationshipColor(relOf(b))},${(b.site ? 0.35 : 1) * fade}`
+    // 1: a stone wall, 2: a stone gate, whose token covers the middle of its tile.
+    const stone = isStone(b.kind, b.material) ? (b.kind === 'gate' ? 2 : 1) : 0
+    // A ruined wall or gate is a gap (`CONTEXT.md`: Ruin): only its trace shows.
+    const key = `${relationshipColor(relOf(b))},${(b.site ? 0.35 : isRuin(b) ? 0.15 : 1) * fade},${stone}`
     const list = wallTiles.get(key) ?? []
     wallTiles.set(key, list)
     list.push({ sx, sy, ...wallSides(b.x, b.y, wallAt) })
   }
   for (const [key, list] of wallTiles) {
-    const [color, alpha] = key.split(',').map(Number) as [number, number]
+    const [color, alpha, stone] = key.split(',').map(Number) as [number, number, number]
     drawWallTiles(under, list, tile, color, alpha)
+    if (stone === 1) drawStoneMarks(under, list, tile, alpha)
+    if (stone === 2) drawStoneFrames(under, list, tile, alpha)
   }
 
   // Buildings as icon tokens over their footprint (`CONTEXT.md`: Footprint): a plate in the
   // owner's colour under a bigger token in its middle; a gate sits on its wall, smaller, its
-  // glyph in the owner's colour while closed. A construction site shows faintly.
+  // glyph in the owner's colour while closed. A construction site shows faintly, a ruin faded and
+  // greyed (`CONTEXT.md`: Ruin).
   const r = tokenRadius(tile)
   for (const b of buildings) {
     if (b.kind === 'road' || b.kind === 'wall') continue
@@ -1793,6 +1839,7 @@ function drawStructures(
     const [cx, cy] = [sx + (side * tile) / 2, sy + (side * tile) / 2]
     if (!near(cx - (side - 1) * tile, cy - (side - 1) * tile) && !near(cx, cy)) continue
     const rel = relOf(b)
+    const ruin = isRuin(b)
     const painted = paintedBuildingArt(b.kind, Boolean(b.site))
     if (painted !== undefined) {
       // Painted art (`docs/art.md`): the building, or its site, filling its whole footprint over
@@ -1801,10 +1848,10 @@ function drawStructures(
         .rect(sx, sy, side * tile, side * tile)
         .fill({ color: relationshipColor(rel), alpha: 0.18 * fade })
         .stroke({ width: 1.5, color: relationshipColor(rel), alpha: 0.8 * fade })
-      tokens.place(painted, cx, cy, side * tile, 0xffffff, fade)
+      tokens.place(painted, cx, cy, side * tile, ruin ? RUIN_TINT : 0xffffff, (ruin ? 0.6 : 1) * fade)
       continue
     }
-    const alpha = (b.site ? 0.45 : 1) * fade
+    const alpha = (b.site ? 0.45 : ruin ? 0.3 : 1) * fade
     if (side > 1) {
       const inset = tile * 0.08
       under

@@ -246,9 +246,12 @@ export interface Balance {
     [key: string]: number
   }
   readonly NPC_FOOD_SHORT_DAYS: number
+  readonly NPC_FOOD_REFILL_DAYS: number
   readonly WORK_FOOD_KEPT: number
   readonly NPC_SOLDIER_SHARE: number
   readonly NPC_STEEL_KIT: string[]
+  readonly NPC_ARCHER_SHARE: number
+  readonly NPC_ARCHER_ARROWS: number
   readonly NPC_SOLDIERS_ON_HALL: number
   readonly NPC_SOLDIERS_AT_GATE: number
   readonly NPC_POST_AROUND_HALL: number
@@ -260,6 +263,7 @@ export interface Balance {
   readonly NPC_PATROL_WALL_STOPS: number
   readonly NPC_PATROL_ROAD_STOPS: number
   readonly NPC_WAR_CHEST_PER_RESIDENT: number
+  readonly NPC_TOOLS_SPARE: number
   readonly NPC_GATE_WATCH_RANGE: number
   readonly NPC_ADULTS_PER_PAIR: number
   readonly CARRYING_DAYS: number
@@ -303,8 +307,10 @@ export interface Balance {
     goldOre: number
     coins: number
     spear: number
+    tools: number
     [key: string]: number
   }
+  readonly NPC_SURPLUS_PAST_CAP: number
   readonly NPC_WALL_STEP: number
   readonly NPC_INNER_WALL_REACH: number
   readonly CITY_GRID_BLOCK: number
@@ -312,6 +318,7 @@ export interface Balance {
   readonly CITY_SIDE_LANE_GAP: number
   readonly CITY_QUARTER_ROWS: number
   readonly NPC_WALL_TILES_PER_TRIP: number
+  readonly NPC_STONE_WALL_RESIDENTS: number
   readonly NPC_NODE_REACH: number
   readonly NPC_RESIDENTS_PER_SCOUT: number
   readonly NPC_SCOUT_LIMIT: number
@@ -326,8 +333,12 @@ export interface Balance {
   readonly NPC_FULL_RESIDENTS_PER_DAY: number
   readonly NPC_FULL_DAYS_LEAST: number
   readonly NPC_FULL_DIP_DAYS: number
+  readonly NPC_FOUND_FOOD_SURPLUS_SHARE: number
   readonly NPC_FOUND_RESIDENTS_PER_MEMBER: number
   readonly NPC_FOUND_PARTY_MOST: number
+  readonly NPC_ESCORT_TOWN_RESIDENTS: number
+  readonly NPC_TRADER_ESCORTS: number
+  readonly NPC_FOUND_ESCORT_SHARE: number
   readonly NPC_FOUND_SAMPLES: number
   readonly NPC_FOUND_REACH: number
   readonly NPC_FOUND_FOOD_DAYS: number
@@ -387,6 +398,7 @@ export interface Balance {
       sword: number
       shield: number
       armour: number
+      tools: number
       [key: string]: number
     }
     [key: string]: number | {
@@ -402,6 +414,7 @@ export interface Balance {
       sword: number
       shield: number
       armour: number
+      tools: number
       [key: string]: number
     }
   }
@@ -422,6 +435,10 @@ export interface Balance {
     steelSword: number
     steelShield: number
     steelArmour: number
+    tools: number
+    bow: number
+    crossbow: number
+    arrows: number
     [key: string]: number
   }
   readonly HQ_FLOOR_FACTOR: number
@@ -442,6 +459,10 @@ export interface Balance {
     steelSword: number
     steelShield: number
     steelArmour: number
+    tools: number
+    bow: number
+    crossbow: number
+    arrows: number
     [key: string]: number
   }
   readonly PRICE_REFERENCE_FLOORS: number
@@ -490,14 +511,46 @@ export interface Balance {
     steelSword: number
     steelShield: number
     steelArmour: number
+    tools: number
+    bow: number
+    crossbow: number
+    arrows: number
     [key: string]: number
   }
   readonly WEAPON_ATTACK: {
     spear: number
     sword: number
     steelSword: number
+    bow: number
+    crossbow: number
     [key: string]: number
   }
+  readonly SHOT_REACH: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
+  readonly SHOT_TICKS: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
+  readonly SHOT_DAMAGE: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
+  readonly SHOT_SKILL_LIMIT: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
+  readonly SHOT_PIERCE: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
+  readonly WALL_SHOT_REACH_BONUS: number
   readonly PROTECTION_DEFENCE: {
     shield: number
     armour: number
@@ -505,6 +558,23 @@ export interface Balance {
     steelArmour: number
     [key: string]: number
   }
+  readonly WEAR_BLOWS: {
+    spear: number
+    sword: number
+    steelSword: number
+    shield: number
+    steelShield: number
+    armour: number
+    steelArmour: number
+    [key: string]: number
+  }
+  readonly TRAINING_WEAR_BLOWS_PER_DAY: number
+  readonly WORN_FROM: number
+  readonly NEARLY_BROKEN_FROM: number
+  readonly MEND_RECIPE_SHARE: number
+  readonly MEND_WORK_SHARE: number
+  readonly WORN_PRICE_SHARE: number
+  readonly NEARLY_BROKEN_PRICE_SHARE: number
   readonly CARRY_BASE: number
   readonly CARRY_PER_STRENGTH: number
   readonly FOOD_PER_DAY: number
@@ -679,6 +749,10 @@ export interface Balance {
       wood: number
       [key: string]: number
     }
+    tower: {
+      wood: number
+      [key: string]: number
+    }
     gate: {
       wood: number
       [key: string]: number
@@ -721,6 +795,17 @@ export interface Balance {
       iron: number
       [key: string]: number
     }
+    ram: {
+      wood: number
+      iron: number
+      [key: string]: number
+    }
+    catapult: {
+      wood: number
+      iron: number
+      stone: number
+      [key: string]: number
+    }
     [key: string]: Record<string, never> | {
       wood: number
       [key: string]: number
@@ -748,6 +833,11 @@ export interface Balance {
       wood: number
       iron: number
       [key: string]: number
+    } | {
+      wood: number
+      iron: number
+      stone: number
+      [key: string]: number
     }
   }
   readonly BUILD_WORK: {
@@ -760,6 +850,7 @@ export interface Balance {
     smithy: number
     townHall: number
     wall: number
+    tower: number
     gate: number
     road: number
     house: number
@@ -770,6 +861,32 @@ export interface Balance {
     carriage: number
     boat: number
     ship: number
+    ram: number
+    catapult: number
+    [key: string]: number
+  }
+  readonly STONE_BUILD_MATERIALS: {
+    wall: {
+      stone: number
+      [key: string]: number
+    }
+    gate: {
+      stone: number
+      [key: string]: number
+    }
+    tower: {
+      stone: number
+      [key: string]: number
+    }
+    [key: string]: {
+      stone: number
+      [key: string]: number
+    }
+  }
+  readonly STONE_BUILD_WORK: {
+    wall: number
+    gate: number
+    tower: number
     [key: string]: number
   }
   readonly MOUNTAIN_ROAD_WORK_FACTOR: number
@@ -989,6 +1106,76 @@ export interface Balance {
         steelArmour: number
         [key: string]: number
       }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        tools: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        tools: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        bow: number
+        [key: string]: number
+      }
+      [key: string]: {
+        wood: number
+        [key: string]: number
+      } | {
+        bow: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        crossbow: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        crossbow: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        arrows: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        arrows: number
+        [key: string]: number
+      }
     })[]
     [key: string]: ({
       input: {
@@ -1166,6 +1353,76 @@ export interface Balance {
         steelArmour: number
         [key: string]: number
       }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        tools: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        tools: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        bow: number
+        [key: string]: number
+      }
+      [key: string]: {
+        wood: number
+        [key: string]: number
+      } | {
+        bow: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        crossbow: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        crossbow: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        arrows: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        arrows: number
+        [key: string]: number
+      }
     })[]
   }
   readonly BATCHES_PER_DAY: {
@@ -1187,9 +1444,39 @@ export interface Balance {
   readonly WORK_SKILL_EFFECT: number
   readonly WORK_SKILL_LIMIT: number
   readonly WORK_SKILL_MAX: number
+  readonly TOOLS_WORK_BONUS: number
+  readonly TOOLS_WORK_DAYS: number
   readonly WORK_SKILL_PER_DAY: number
   readonly TEARDOWN_WORK_SHARE: number
   readonly TEARDOWN_MATERIALS_RETURNED: number
+  readonly DECAY_DAYS: {
+    road: number
+    wall: number
+    gate: number
+    farm: number
+    house: number
+    stable: number
+    lumberCamp: number
+    storage: number
+    trainingGround: number
+    haven: number
+    quarry: number
+    mine: number
+    townHall: number
+    warehouse: number
+    smelter: number
+    mint: number
+    smithy: number
+    [key: string]: number
+  }
+  readonly DECAY_WORN: number
+  readonly DECAY_NEARLY_RUIN: number
+  readonly REPAIR_MATERIALS_SHARE: number
+  readonly REPAIR_WORK_SHARE: number
+  readonly RUIN_COLLAPSE_DAYS: number
+  readonly REBUILD_MATERIALS_SHARE: number
+  readonly REBUILD_WORK_SHARE: number
+  readonly COLLAPSE_MATERIALS_LEFT: number
   readonly ALLIANCE_LEAVE_DELAY: number
   readonly ALLIANCE_RECALL_DELAY: number
   readonly NPC_ALLIANCE_JOIN_STANDING: number
@@ -1210,9 +1497,29 @@ export interface Balance {
   readonly WALL_STRENGTH: {
     wall: number
     gate: number
+    tower: number
+    [key: string]: number
+  }
+  readonly STONE_WALL_STRENGTH: {
+    wall: number
+    gate: number
+    tower: number
     [key: string]: number
   }
   readonly BROKEN_MATERIALS_RETURNED: number
+  readonly TOWER_ROOM: number
+  readonly TOWER_SIGHT_RANGE: number
+  readonly TOWER_SHOT_REACH_BONUS: number
+  readonly RAM_CREW: number
+  readonly SIEGE_PUSH_SHARE: number
+  readonly RAM_STRENGTH: number
+  readonly RAM_STRIKE_TICKS: number
+  readonly RAM_BLOW: number
+  readonly CATAPULT_CREW: number
+  readonly CATAPULT_STRENGTH: number
+  readonly CATAPULT_REACH: number
+  readonly CATAPULT_SHOT_TICKS: number
+  readonly CATAPULT_BLOW: number
   readonly CLIMB_TICKS: number
   readonly WALL_WALK_TICKS: number
   readonly FALL_DAMAGE: number
@@ -1277,7 +1584,6 @@ export interface Balance {
   readonly SCRIPT_TILE_QUERY_COST: number
   readonly SCRIPT_HELPER_COST: number
   readonly SCRIPT_ACTION_COST: number
-  readonly SCRIPT_REALM_STEP_BUDGET: number
   readonly SCRIPT_MEMORY_MAX: number
   readonly SCRIPT_ACTION_VALUE_MAX: number
   readonly DOING_MAX_LENGTH: number
@@ -1343,10 +1649,13 @@ export interface Balance {
   readonly FOOTPRINT: {
     wall: number
     gate: number
+    tower: number
     road: number
     carriage: number
     boat: number
     ship: number
+    ram: number
+    catapult: number
     house: number
     storage: number
     smelter: number

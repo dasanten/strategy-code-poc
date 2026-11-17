@@ -71,6 +71,7 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
         horses: Vec::new(),
         carriages: Vec::new(),
         vessels: Vec::new(),
+        siege_machines: Vec::new(),
         piles: Vec::new(),
         events: Vec::new(),
         alliances: Vec::new(),
@@ -102,6 +103,7 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
         dry_nodes: Vec::new(),
         new_veins: Vec::new(),
         waiting_veins: Vec::new(),
+        wear: Default::default(),
     }
 }
 
@@ -111,8 +113,10 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
 /// caravan for each post and wandering traders going round them (`place_on_the_land`).
 pub fn generate_world(terrain: &TerrainMap, seed: i64) -> WorldState {
     let mut world = create_world(terrain, seed);
-    crate::starting_sites::place_starting_sites(&mut world, terrain);
-    place_on_the_land(&mut world, terrain);
+    // Worked out once for both (T100.8): about a second on the full map.
+    let regions = crate::regions::Regions::of(world.seed, terrain);
+    crate::starting_sites::place_starting_sites_on(&mut world, terrain, &regions);
+    place_on_the_land(&mut world, terrain, regions);
     world
 }
 
@@ -244,11 +248,16 @@ pub fn step_world(
     time(timer, TickPhase::Rest, || {
         step_riders(world);
         step_passengers(world, terrain);
+        // A siege machine's crew is who is with it now that everyone moved (`CONTEXT.md`: Siege
+        // machine).
+        crate::siege::step_siege_machines(world);
         // A fight or an army may have given someone Down an order; it ends with the tick.
         keep_down_still(world);
     });
     // Last, whatever else moved goods this tick (work, trades, offers, loot, a capture).
     crate::equipment::settle_all(world);
+    // Worn pieces stay with the units still kept, wherever goods went (`CONTEXT.md`: Wear).
+    crate::wear::settle_wear(world);
     // The orders the world advanced in place this tick are still the ones scripts wait on.
     scratch.waiting.settle(world);
     StepResult { npc_script_runs, npc_plan_ms, survival, horses_died, ..result }
@@ -274,6 +283,19 @@ fn step_rest(
     let strikes = request_strikes(world, size);
     let strikes_len = strikes.len();
     let mut combat = resolve_strikes(world, &strikes, size, &mut GameAlarms, &mut scratch.made);
+    // Crewed rams strike the walls and gates next to them (`CONTEXT.md`: Ram).
+    let rammed = crate::siege::resolve_ram_strikes(world, size, &mut GameAlarms, &mut scratch.made);
+    if !rammed.is_empty() {
+        crate::cities::update_city_membership(world, size);
+    }
+    combat.broken.extend(rammed);
+    // Crewed catapults throw Stone at the walls and gates in their reach (`CONTEXT.md`: Catapult).
+    let thrown =
+        crate::siege::resolve_catapult_shots(world, size, &mut GameAlarms, &mut scratch.made);
+    if !thrown.is_empty() {
+        crate::cities::update_city_membership(world, size);
+    }
+    combat.broken.extend(thrown);
     // Whoever was up on a tile that broke falls (`CONTEXT.md`: A tile breaks).
     let (fell, ended) = crate::wall_walk::fall_from_broken(world, terrain, &combat.broken);
     combat.died.extend(fell);
@@ -306,6 +328,9 @@ fn step_rest(
     let teardowns_len = teardowns.len();
     let wrecked = resolve_tearing_down(world, &teardowns, Some(terrain), scratch);
     count_wrecked(world, wrecked, scratch);
+    let repairs = crate::repair::request_repairing(world);
+    let repairs_len = repairs.len();
+    crate::repair::resolve_repairing(world, &repairs, Some(terrain));
     let work = request_work(world);
     let work_len = work.len();
     resolve_work(world, &work, scratch);
@@ -321,6 +346,11 @@ fn step_rest(
     let births_len = births.len();
     resolve_births(world, &births);
     world.tick += 1;
+    // Buildings lose their day's share of condition at the turn of the day (`CONTEXT.md`: Decay).
+    crate::repair::step_decay(world);
+    crate::repair::trade_org_repairs(world);
+    // One that lost all of it is a ruin, and a ruin left long enough collapses (`CONTEXT.md`: Ruin).
+    crate::ruins::step_ruins(world, size, scratch);
     let aging = step_aging(world, size);
     answer_demands(world, size, scratch);
     step_alliances(world);
@@ -359,6 +389,7 @@ fn step_rest(
         + carries_len
         + builds_len
         + teardowns_len
+        + repairs_len
         + work_len
         + breeding_len
         + births_len
@@ -388,8 +419,12 @@ fn step_rest(
 
 // T100.5: the Trade Organization and the NPC cities on the land. A post or trader stop the HQ has
 // no carriage way to is a generation error.
-fn place_on_the_land(world: &mut WorldState, terrain: &TerrainMap) {
-    let problems = crate::land_sites::place_on_the_land(world, terrain);
+fn place_on_the_land(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    regions: crate::regions::Regions,
+) {
+    let problems = crate::land_sites::place_on_the_land_in(world, terrain, regions);
     let broken: Vec<&str> = problems
         .iter()
         .filter(|p| p.rule == crate::land_sites::ROUTE_RULE)

@@ -56,7 +56,11 @@ fn text(order: &OrderRequest, key: &str) -> Option<String> {
 }
 
 fn attack_request(order: &OrderRequest) -> AttackRequest {
-    AttackRequest { resident_id: text(order, "residentId"), target_id: text(order, "targetId") }
+    AttackRequest {
+        resident_id: text(order, "residentId"),
+        target_id: text(order, "targetId"),
+        shoot: order.fields.get("shoot").and_then(Value::as_bool).unwrap_or(false),
+    }
 }
 
 fn army_request(order: &OrderRequest) -> ArmyRequest {
@@ -88,6 +92,13 @@ pub fn add_rule_orders(kinds: &mut OrderKinds) {
     kinds.insert("row", crate::rowing::Row);
     kinds.insert("load", crate::loading::Load);
     kinds.insert("sail", crate::sailing::Sail);
+    // T110.1: siege machines.
+    kinds.insert("crew", crate::siege::Crew);
+    kinds.insert("push", crate::siege::Push);
+    // T110.2: the ram strikes.
+    kinds.insert("ram", crate::siege::RamAt);
+    // T110.3: the catapult throws.
+    kinds.insert("throw", crate::siege::ThrowAt);
     kinds.insert("climb", crate::climbing::Climb);
     kinds.insert("setGate", crate::gates::SetGate);
     kinds.insert("claimHorses", crate::horse_grant::ClaimHorses);

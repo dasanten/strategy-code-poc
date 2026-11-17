@@ -1,6 +1,4 @@
 import {
-  BUILD_MATERIALS,
-  BUILD_WORK,
   BATCHES_PER_DAY,
   RECIPES,
   WORK_OUTPUT_PER_DAY,
@@ -32,6 +30,9 @@ import {
   recipeGood,
   teardownReturns,
   teardownWork,
+  isStone,
+  materialsOfKind,
+  workOfKind,
 } from './shared/building.js'
 import {
   CARRIAGE_CAPACITY,
@@ -73,6 +74,7 @@ import type {
   Carriage,
   City,
   BuildingKind,
+  GearCondition,
   Good,
   GoodsSpot,
   KnownNode,
@@ -87,6 +89,7 @@ import type {
   SeenResident,
   SeenHorse,
   ResourceNode,
+  WallMaterial,
   Waypoint,
 } from '@csp/shared-types'
 import {
@@ -132,6 +135,7 @@ import {
   equipmentLine,
   equipmentSlots,
   groupSwapChoices,
+  MEND,
   swapChoices,
   type SlotView,
 } from './equipment-view.js'
@@ -361,6 +365,8 @@ export type Picking =
   | 'row'
   | 'driveOff'
   | 'rowOff'
+  | 'push'
+  | 'throw'
   | 'hitchOff'
   | 'haul'
   | 'roadFrom'
@@ -1317,6 +1323,23 @@ export function orderDoing(
     if (!o.path) return `Finding a way over the water to ${o.target.x}, ${o.target.y}`
     return `Rowing to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
   }
+  if (o?.kind === 'crew') {
+    // `CONTEXT.md`: Siege machine.
+    if (!o.path) return 'Finding a way to the ram to crew it'
+    return `${walking} to the ram to crew it · ${left(o.path)}`
+  }
+  if (o?.kind === 'ram') {
+    // `CONTEXT.md`: Ram: its crew under its roof.
+    return 'Ramming with the crew'
+  }
+  if (o?.kind === 'throw') {
+    // `CONTEXT.md`: Catapult.
+    return 'Throwing Stone with the crew'
+  }
+  if (o?.kind === 'push') {
+    if (!o.path) return `Finding a way for the ram to ${o.target.x}, ${o.target.y}`
+    return `Pushing the ram to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
+  }
   if (o?.kind === 'sail') {
     // `CONTEXT.md`: Sailing.
     if (!o.path) return `Finding a way over the Sea to ${o.target.x}, ${o.target.y}`
@@ -1359,13 +1382,16 @@ export function orderDoing(
   if (o?.kind === 'store') return o.phase === 'refilling' ? 'Taking food along' : 'Storing goods'
   if (o?.kind === 'fetch') return 'Fetching goods'
   if (o?.kind === 'tearDown') return 'Tearing down'
+  if (o?.kind === 'repair') return 'Repairing'
   if (o?.kind === 'breed') return 'Breeding horses'
   if (o?.kind === 'build') {
     const what = BUILDING_NAMES[o.building].toLowerCase()
     return o.siteId === null ? `Laying out a ${what}` : `Building a ${what}`
   }
-  if (o?.kind === 'workAt')
+  if (o?.kind === 'workAt') {
+    if (o.mends) return 'Mending worn gear'
     return o.makes ? `Making ${GOOD_LABELS[o.makes].toLowerCase()}` : 'Working'
+  }
   if (o?.kind === 'teach') return `Teaching ${subjectLabel(o.subject)}`
   if (o?.kind === 'train')
     return o.learning ? `Training ${subjectLabel(o.learning)}` : 'Waiting to train'
@@ -2027,6 +2053,7 @@ export function GroupCard({
                     kind: 'build',
                     building: buildAt.site!.kind,
                     at: { x: buildAt.site!.x, y: buildAt.site!.y },
+                    ...(buildAt.site!.material === 'stone' ? { material: 'stone' as const } : {}),
                   })
                 }
               >
@@ -2040,6 +2067,7 @@ export function GroupCard({
                     kind: 'build',
                     building: buildAt.site!.kind,
                     at: { x: buildAt.site!.x, y: buildAt.site!.y },
+                    ...(buildAt.site!.material === 'stone' ? { material: 'stone' as const } : {}),
                   })
                 }
               />
@@ -2051,11 +2079,12 @@ export function GroupCard({
               node={buildAt.node}
               terrain={buildAt.terrain}
               buildProblem={buildAt.problem}
-              onBuild={(kind) =>
+              onBuild={(kind, material) =>
                 onOrder({
                   kind: 'build',
                   building: kind,
                   at: { x: buildAt.x, y: buildAt.y },
+                  ...(material ? { material } : {}),
                 })
               }
             />
@@ -2198,7 +2227,7 @@ export interface GroupBuildTile {
   /** The explored terrain beneath this tile, if known. */
   terrain: number | undefined
   /** Why a kind can't be laid out on this tile, as far as the Player knows. */
-  problem: (kind: BuildingKind) => string | undefined
+  problem: (kind: BuildingKind, material?: WallMaterial) => string | undefined
 }
 
 /** What picking a tile does for a group, said while the map waits for it. */
@@ -2315,7 +2344,8 @@ export function ResidentCard({
   addStep,
   collapsed = false,
 }: {
-  resident: Resident
+  /** The condition of their gear comes for your own residents only (`CONTEXT.md`: Wear). */
+  resident: Resident & { condition?: GearCondition }
   /** About how many ticks until they arrive where they walk, ride or drive (`arrivalTicks`). */
   arrivesIn?: (r: Resident) => number | undefined
   leaderId: string
@@ -2446,9 +2476,9 @@ export function ResidentCard({
   /** The resource node on the resident's tile, if the Player knows of one. */
   node: KnownNode | undefined
   /** Orders the resident to build on their tile, or to join the site there. */
-  onBuild: (kind: BuildingKind) => void
+  onBuild: (kind: BuildingKind, material?: WallMaterial) => void
   /** Why a kind can't be laid out from the resident's tile, as far as the Player knows. */
-  buildProblem?: (kind: BuildingKind) => string | undefined
+  buildProblem?: (kind: BuildingKind, material?: WallMaterial) => string | undefined
   /** Residents in sight working the building on the resident's tile. */
   workers: number
   /** Realms whose residents in sight work it: who holds it (`CONTEXT.md`: Holding a workplace). */
@@ -2456,7 +2486,7 @@ export function ResidentCard({
   /** The Player's realm. */
   realmId: string
   /** Orders the resident to work the workplace on their tile, making `makes` at a smithy. */
-  onWork: (makes?: Good) => void
+  onWork: (makes?: Good | typeof MEND) => void
   /** Gives the resident the Feed the stable task for the stable they stand in. */
   onFeedStable: (stableId: string) => void
   /** Gives the resident the Train task for the training ground they stand on. */
@@ -2847,12 +2877,13 @@ export function ResidentCard({
               )}
             </div>
             <ul className="equipment-slots">
-              {equipmentSlots(r.equipped).map((s) => {
+              {equipmentSlots(r.equipped, r.condition).map((s) => {
                 const choices = onEquip ? swapChoices(s.slot, r.carried, r.equipped) : []
                 return (
                   <li key={s.slot}>
                     <span className="muted small">{s.label}</span>{' '}
                     <span className={s.item ? undefined : 'muted'}>{s.item ?? 'empty'}</span>
+                    {s.condition && <span className="muted small"> ({s.condition})</span>}
                     {choices.length > 0 && (
                       <select
                         aria-label={`Swap into the ${s.label.toLowerCase()} slot`}
@@ -3213,7 +3244,7 @@ export function ResidentCard({
           <span className="mono">{carryLine(stockWeight(r.carried), carryCapacity(r, tick))}</span>
         </div>,
         <span key="equipped" className="muted">
-          {equipmentLine(r.equipped)}
+          {equipmentLine(r.equipped, r.condition)}
         </span>,
         ...(ridden ? [ridden] : []),
       ]}
@@ -3598,13 +3629,15 @@ function SiteBlock({
   /** The explored terrain beneath the site, if known (`buildingWork`). */
   terrain?: number
   at: OnSite
-  onBuild: (kind: BuildingKind) => void
+  onBuild: (kind: BuildingKind, material?: WallMaterial) => void
 }) {
   const adult = canWork(resident, tick)
   const o = resident.order
   const name = BUILDING_NAMES[site.kind]
-  const work = BUILD_WORK[site.kind] ?? 0
-  const materials = goodsIn(BUILD_MATERIALS[site.kind])
+  const work = workOfKind(site.kind, site.material)
+  const materials = goodsIn(materialsOfKind(site.kind, site.material))
+  const stone = isStone(site.kind, site.material)
+  const help = () => onBuild(site.kind, stone ? 'stone' : undefined)
   const joined = o?.kind === 'build' && o.siteId === site.id
   return (
     <section className="inspector-block" aria-label="Construction site">
@@ -3629,19 +3662,20 @@ function SiteBlock({
         </div>
       ))}
       <div className="order-buttons">
-        <button type="button" disabled={!adult || joined} onClick={() => onBuild(site.kind)}>
+        <button type="button" disabled={!adult || joined} onClick={help}>
           {joined ? 'Building…' : 'Help build'}
         </button>
         <CustomiseButton
           order={taskStart('build')}
           of="Help build"
           disabled={!adult || joined}
-          give={() => onBuild(site.kind)}
+          give={help}
         />
       </div>
       <p className="muted small">
-        It becomes a {name.toLowerCase()} once its materials are delivered and the work is done:
-        about {workSpan(buildingWork(site.kind, terrain))} of one resident’s work in all
+        It becomes a {stone ? 'stone ' : ''}
+        {name.toLowerCase()} once its materials are delivered and the work is done: about{' '}
+        {workSpan(buildingWork(site.kind, terrain, site.material))} of one resident’s work in all
         {workFactor(site.kind, terrain) > 1 &&
           `, on Mountain ${workFactor(site.kind, terrain)} times as much as elsewhere`}
         .
@@ -3672,7 +3706,7 @@ function WorkBlock({
   workers: number
   holders: string[]
   realmId: string
-  onWork: (makes?: Good) => void
+  onWork: (makes?: Good | typeof MEND) => void
 }) {
   const max = building && !building.site ? MAX_WORKERS[building.kind] : undefined
   const skill = building && WORKPLACE_SKILL[building.kind]
@@ -3697,28 +3731,49 @@ function WorkBlock({
       </div>
       <p className="small">{holding(holders, realmId)}</p>
       {recipes.length > 1 ? (
-        // A smithy: each worker says what they make (`CONTEXT.md`: Smithy).
-        recipes.map((r) => {
-          const made = recipeGood(r)
-          const making = working && o.makes === made
-          return (
-            <div key={made} className="goods-row">
-              <span>{GOOD_LABELS[made]}</span>
-              <span className="muted small">{stockText(r.input)}</span>
-              <span className="buttons">
-                <button type="button" disabled={blocked || making} onClick={() => onWork(made)}>
-                  {making ? 'Making…' : working ? 'Make instead' : 'Make'}
-                </button>
-                <CustomiseButton
-                  order={taskStart('work', building.id)}
-                  of={`Make ${GOOD_LABELS[made].toLowerCase()}`}
-                  disabled={blocked || making}
-                  give={() => onWork(made)}
-                />
-              </span>
-            </div>
-          )
-        })
+        // A smithy: each worker says what they make (`CONTEXT.md`: Smithy), or mends (Mending).
+        [
+          ...recipes.map((r) => {
+            const made = recipeGood(r)
+            const making = working && !o.mends && o.makes === made
+            return (
+              <div key={made} className="goods-row">
+                <span>{GOOD_LABELS[made]}</span>
+                <span className="muted small">{stockText(r.input)}</span>
+                <span className="buttons">
+                  <button type="button" disabled={blocked || making} onClick={() => onWork(made)}>
+                    {making ? 'Making…' : working ? 'Make instead' : 'Make'}
+                  </button>
+                  <CustomiseButton
+                    order={taskStart('work', building.id)}
+                    of={`Make ${GOOD_LABELS[made].toLowerCase()}`}
+                    disabled={blocked || making}
+                    give={() => onWork(made)}
+                  />
+                </span>
+              </div>
+            )
+          }),
+          <div key="mend" className="goods-row">
+            <span>Mend</span>
+            <span className="muted small">worn gear here, for a share of its recipe</span>
+            <span className="buttons">
+              <button
+                type="button"
+                disabled={blocked || (working && !!o.mends)}
+                onClick={() => onWork(MEND)}
+              >
+                {working && o.mends ? 'Mending…' : working ? 'Mend instead' : 'Mend'}
+              </button>
+              <CustomiseButton
+                order={taskStart('work', building.id)}
+                of="Mend"
+                disabled={blocked || (working && !!o.mends)}
+                give={() => onWork(MEND)}
+              />
+            </span>
+          </div>,
+        ]
       ) : (
         <div className="order-buttons">
           <button

@@ -193,7 +193,7 @@ pub fn hq_house_tile(
 
 /// A building project (`BuildProject`).
 fn build(building: BuildingKind, x: i32, y: i32) -> CityProject {
-    CityProject::Build { building, x: f64::from(x), y: f64::from(y) }
+    CityProject::Build { building, x: f64::from(x), y: f64::from(y), material: None }
 }
 
 /// What the HQ builds next, if anything (`hqProject`, `CONTEXT.md`: Trade Org HQ): a house or a

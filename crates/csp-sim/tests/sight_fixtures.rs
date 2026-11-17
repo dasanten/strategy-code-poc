@@ -96,6 +96,7 @@ fn as_equipment_shows(want: &Value, seen: &Value) -> (Value, Value) {
             let id = e["id"].as_str().unwrap_or_default().to_string();
             let o = e.as_object_mut().expect("an entity");
             o.remove("equipped");
+            o.remove("condition");
             if blank && hidden.contains(id.as_str()) {
                 o.insert("carried".into(), Value::Object(Default::default()));
             }

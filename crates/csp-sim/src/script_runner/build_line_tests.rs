@@ -203,13 +203,74 @@ fn builds_a_5_tile_road_line_away_from_the_resident_fetching_stone_when_it_runs_
 }
 
 #[test]
+fn a_stone_wall_line_fetches_stone_and_builds_each_tile_of_stone() {
+    let mut s = setup(json!({ "stone": 50 }));
+    s.r_mut("w1").carried = Stock::from([(Good::Food, OWN_FOOD)]);
+    let mut wall = line();
+    wall["building"] = json!("wall");
+    wall["material"] = json!("stone");
+    assert_eq!(s.build_line(wall), "ack");
+    s.run_out();
+    let walls: Vec<&Building> =
+        s.world.buildings.iter().filter(|b| b.kind == BuildingKind::Wall).collect();
+    assert_eq!(walls.len(), 5);
+    assert!(walls
+        .iter()
+        .all(|b| b.site.is_none() && b.material == Some(csp_shared::world::WallMaterial::Stone)));
+    let per_tile = csp_shared::balance::STONE_BUILD_MATERIALS
+        .get("wall")
+        .and_then(|t| t.get("stone"))
+        .unwrap();
+    let store = s.world.buildings.iter().find(|b| b.id == "s1").unwrap();
+    let left = held(store.stock.as_ref().unwrap(), Good::Stone);
+    assert_eq!(50.0 - left - held(&s.r("w1").carried, Good::Stone), 5.0 * per_tile);
+    assert_eq!(s.stopped(), Vec::<String>::new());
+}
+
+#[test]
+fn a_stone_wall_line_upgrades_the_wooden_tiles_on_its_way_and_passes_the_stone_one() {
+    let mut s = setup(json!({ "stone": 50 }));
+    s.r_mut("w1").carried = Stock::from([(Good::Food, OWN_FOOD)]);
+    for x in 10..=14 {
+        let mut w: Building = serde_json::from_value(
+            json!({ "id": format!("w{x}"), "kind": "wall", "cityId": "c1", "x": x, "y": 12 }),
+        )
+        .unwrap();
+        if x == 12 {
+            w.material = Some(csp_shared::world::WallMaterial::Stone);
+        }
+        s.world.buildings.push(w);
+    }
+    let mut wall = line();
+    wall["building"] = json!("wall");
+    wall["material"] = json!("stone");
+    assert_eq!(s.build_line(wall), "ack");
+    s.run_out();
+    assert_eq!(s.stopped(), Vec::<String>::new());
+    let on_line: Vec<&Building> = s.world.buildings.iter().filter(|b| b.y == 12.0).collect();
+    assert_eq!(on_line.len(), 5, "each wooden wall became the stone one, no site left");
+    for b in on_line {
+        assert_eq!(b.site, None);
+        assert_eq!(b.material, Some(csp_shared::world::WallMaterial::Stone), "{}", b.id);
+    }
+    let per_tile = csp_shared::balance::STONE_BUILD_MATERIALS
+        .get("wall")
+        .and_then(|t| t.get("stone"))
+        .unwrap();
+    let store = s.world.buildings.iter().find(|b| b.id == "s1").unwrap();
+    let left = held(store.stock.as_ref().unwrap(), Good::Stone);
+    assert_eq!(50.0 - left - held(&s.r("w1").carried, Good::Stone), 4.0 * per_tile);
+}
+
+#[test]
 fn skips_tiles_that_have_a_road_already_or_cant_take_one() {
     let mut terrain = plains();
     terrain.tiles[(12 * SIZE + 13) as usize] = Terrain::Lake as u8;
     let mut s = setup_on(terrain, json!({ "stone": 50 }));
     let road = json!({ "id": "rd", "kind": "road", "cityId": null, "x": 12, "y": 12 });
     s.world.buildings.push(serde_json::from_value::<Building>(road).unwrap());
-    let l = BuildLine { building: BuildingKind::Road, from: (10, 12), to: (14, 12) };
+    let l =
+        BuildLine { building: BuildingKind::Road, from: (10, 12), to: (14, 12), material: None };
     let xs: Vec<i32> = line_to_build(&s.world, &l, Some(&s.terrain)).iter().map(|t| t.x).collect();
     assert_eq!(xs, [10, 11, 14]);
     assert_eq!(s.build_line(line()), "ack");

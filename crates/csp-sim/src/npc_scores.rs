@@ -77,8 +77,8 @@ pub enum ScoredJob {
     Scout,
     /// Going back to the workplace they were let go from.
     Back,
-    /// Working for surplus; `full` is how full its good's cap is, below 1, below 0 under its
-    /// reserve.
+    /// Working for surplus; `full` is how full its good's cap is: below 1, below 0 under its
+    /// reserve, from 1 once worked past its cap (`NPC_SURPLUS_PAST_CAP`).
     Surplus { full: f64 },
 }
 
@@ -99,6 +99,12 @@ pub fn job_score(job: ScoredJob) -> f64 {
         ScoredJob::Road => s.road,
         ScoredJob::Scout => s.scout,
         ScoredJob::Back => s.back,
+        ScoredJob::Surplus { full } if full >= 1.0 => {
+            // Past its cap (`NPC_SURPLUS_PAST_CAP`) it scores below every job under one, by as much
+            // again at most, and further past always scores less.
+            let past = full - 1.0;
+            s.surplus - s.surplus_range * (past / (1.0 + past))
+        }
         ScoredJob::Surplus { full } => {
             // However far below its cap, it stays inside its range, and further below always
             // scores more.
@@ -172,6 +178,16 @@ mod tests {
         assert!(surplus(0.2) > surplus(0.8));
         assert!(surplus(-3.0) > surplus(-2.0));
         assert!(surplus(-1000.0) < job_score(ScoredJob::Back));
+    }
+
+    #[test]
+    fn weighs_work_past_a_cap_below_any_under_one_and_less_the_further_past() {
+        let surplus = |full| job_score(ScoredJob::Surplus { full });
+        assert!(surplus(0.999) >= surplus(1.0));
+        assert!(surplus(1.5) > surplus(3.0));
+        assert!(surplus(1000.0) > 0.0);
+        // Inside a range of its own, below the one under a cap.
+        assert!(surplus(1.0) - surplus(1000.0) <= NPC_JOB_SCORE.surplus_range);
     }
 
     #[test]

@@ -158,12 +158,16 @@ import {
   FOOD_PER_DAY,
   NPC_BUILDERS,
   NPC_INNER_WALL_REACH,
+  NPC_STONE_WALL_RESIDENTS,
   NPC_ROAD_CREW,
   NPC_ROAD_LONGEST,
   NPC_CITY_MIN_DISTANCE,
   NPC_FOUND_FOOD_DAYS,
   NPC_FOUND_GIVE_UP_DAYS,
   NPC_FOUND_PARTY_MOST,
+  NPC_FOUND_ESCORT_SHARE,
+  NPC_ESCORT_TOWN_RESIDENTS,
+  NPC_TRADER_ESCORTS,
   NPC_FOUND_REACH,
   NPC_FOUND_RESIDENTS_PER_MEMBER,
   NPC_FOUND_STANDING,
@@ -178,6 +182,7 @@ import {
   NPC_WAY_CLEARANCE,
   TRADING_POST_REGION,
   NPC_FULL_DIP_DAYS,
+  NPC_FOUND_FOOD_SURPLUS_SHARE,
   NPC_FULL_RESIDENTS_PER_DAY,
   NPC_GATE_WATCH_RANGE,
   NPC_VILLAGE,
@@ -192,9 +197,13 @@ import {
   NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
   NPC_SURPLUS_CAP,
+  NPC_SURPLUS_PAST_CAP,
+  NPC_ARCHER_ARROWS,
+  NPC_ARCHER_SHARE,
   NPC_SOLDIER_SHARE,
   NPC_STEEL_KIT,
   NPC_WAR_CHEST_PER_RESIDENT,
+  NPC_TOOLS_SPARE,
   NPC_TRADE,
   OWN_FOOD,
   OUTPOST_REFILL_REACH,
@@ -219,7 +228,6 @@ import {
   SCRIPT_LOG_LINES,
   SCRIPT_ACTION_VALUE_MAX,
   SCRIPT_MEMORY_MAX,
-  SCRIPT_REALM_STEP_BUDGET,
   SCRIPT_STEP_BUDGET,
   SCRIPT_TILE_QUERY_COST,
   LAST_SEEN_EVERY_TICKS,
@@ -284,6 +292,16 @@ import {
   STRIKE_TICKS,
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
+  TOOLS_WORK_BONUS,
+  TOOLS_WORK_DAYS,
+  DECAY_WORN,
+  DECAY_NEARLY_RUIN,
+  REPAIR_MATERIALS_SHARE,
+  REPAIR_WORK_SHARE,
+  REBUILD_MATERIALS_SHARE,
+  REBUILD_WORK_SHARE,
+  RUIN_COLLAPSE_DAYS,
+  COLLAPSE_MATERIALS_LEFT,
   TERRAIN_FOOD,
   TERRAIN_SPEED,
   TERRITORY_CITY_BASE,
@@ -307,6 +325,19 @@ import {
   Terrain,
   WALL_DEFENCE,
   WALL_STRENGTH,
+  RAM_CREW,
+  RAM_STRENGTH,
+  RAM_BLOW,
+  RAM_STRIKE_TICKS,
+  CATAPULT_CREW,
+  CATAPULT_REACH,
+  CATAPULT_SHOT_TICKS,
+  CATAPULT_BLOW,
+  CATAPULT_STRENGTH,
+  STONE_WALL_STRENGTH,
+  TOWER_ROOM,
+  TOWER_SIGHT_RANGE,
+  TOWER_SHOT_REACH_BONUS,
   WALL_WALK_TICKS,
   FALL_DAMAGE,
   WALK_TICKS_PER_TILE,
@@ -314,6 +345,20 @@ import {
   WAREHOUSE_BASE_PRICE,
   WAREHOUSE_FLOOR,
   WEAPON_ATTACK,
+  WEAR_BLOWS,
+  TRAINING_WEAR_BLOWS_PER_DAY,
+  WORN_FROM,
+  NEARLY_BROKEN_FROM,
+  MEND_RECIPE_SHARE,
+  MEND_WORK_SHARE,
+  WORN_PRICE_SHARE,
+  NEARLY_BROKEN_PRICE_SHARE,
+  SHOT_REACH,
+  SHOT_TICKS,
+  SHOT_DAMAGE,
+  SHOT_SKILL_LIMIT,
+  SHOT_PIERCE,
+  WALL_SHOT_REACH_BONUS,
   WORK_SKILL_EFFECT,
   WORK_SKILL_MAX,
   WORKPLACE_MAX_WORKERS,
@@ -321,6 +366,7 @@ import {
   RECIPES,
   BATCHES_PER_DAY,
   WORK_OUTPUT_PER_DAY,
+  NPC_FOOD_REFILL_DAYS,
   RICHNESS_FACTOR,
   FRONTIER_RICH_NODES,
   RICHER_NODE_REACH,
@@ -339,6 +385,13 @@ import { PARAM_DESCRIPTIONS, DEFAULT_SCRIPTS, SCRIPT_VIEWS } from '@csp/lang-was
 import { WORKPLACE_PARAM } from './shared/default-scripts.js'
 import { SCRIPT_PARAM_TYPES } from './shared/script-api.js'
 import { NPC_SMITHY_WEAPON } from './shared/npc-trade.js'
+import {
+  DECAY_DAYS,
+  rebuildMaterials,
+  rebuildWork,
+  repairMaterials,
+  repairWork,
+} from './shared/decay.js'
 import { fighterStrength } from './shared/persuasion.js'
 import type {
   BuildingKind,
@@ -361,9 +414,14 @@ import {
   blow,
   breakTicks,
   buildCosts,
+  stoneWallCosts,
   carriageCost,
   boatCost,
   shipCost,
+  ramCost,
+  ramPushTicks,
+  ramBreakTicks,
+  catapultBreak,
   cityControl,
   coinsPerMintWorkerDay,
   crimeForgotten,
@@ -407,6 +465,12 @@ const STEEL = RECIPES.smelter!.find((r) => 'steel' in r.output)!
 /** The smithy's recipe for `good` (`CONTEXT.md`: Smithy). */
 const forged = (good: Good) => RECIPES.smithy!.find((r) => good in r.output)!
 
+/** How many blows a piece of gear lasts (`CONTEXT.md`: Wear), or a dash for gear that never wears. */
+function lasts(good: Good): string {
+  const blows = (WEAR_BLOWS as Record<string, number | undefined>)[good]
+  return blows === undefined ? '—' : num(blows)
+}
+
 /** Each steel weapon or piece of armour beside the iron one it beats (`CONTEXT.md`: Coal). */
 const STEEL_GEAR: [Good, Good][] = [
   ['sword', 'steelSword'],
@@ -446,6 +510,7 @@ export const WIKI_TOPICS = [
   { id: 'standing', title: 'Standing & reactions' },
   { id: 'demands', title: 'Demands' },
   { id: 'combat', title: 'Combat & walls' },
+  { id: 'siege', title: 'Siege machines' },
   { id: 'territory', title: 'Territory' },
   { id: 'language', title: 'Script language' },
   { id: 'api', title: 'Game API' },
@@ -558,6 +623,9 @@ function ApiTable({ is }: { is: ApiName['is'] }) {
 }
 
 const kindName = (kind: BuildingKind) => BUILDING_NAMES[kind]
+/** Each kind that decays, with the game days it takes to lose all its condition. */
+const decayRows = () =>
+  (Object.entries(DECAY_DAYS) as [BuildingKind, number][]).map(([kind, days]) => ({ kind, days }))
 const goodName = (good: Good) => GOOD_LABELS[good]
 const skillName = (kind: BuildingKind) => {
   const skill = WORKPLACE_SKILL[kind] ?? ''
@@ -1187,18 +1255,17 @@ export function Wiki() {
           <strong>Starting city.</strong> A new Leader’s city starts with {num(START_RESIDENTS)}{' '}
           residents, your Leader among them, working the farm. Every grown one, your Leader too,
           carries {num(START_SPEARS)} iron Spear, so they are armed from the first tick and an alarm
-          sends them to defend the city. Children get none, and no spare weapons lie in the
-          storage. NPC villages keep their own start.
+          sends them to defend the city. Children get none, and no spare weapons lie in the storage.
+          NPC villages keep their own start.
         </p>
         <p>
-          One resident of your starting city, never your Leader, is its{' '}
-          <strong>stable hand</strong>. They start on a looped queue, <strong>Farm and feed</strong>:
-          if the stable holds less than {days(STABLE_HAND_FEED_DAYS)} of Food for its{' '}
-          {num(START_HORSES)} horses, Feed the stable once; then work the farm for{' '}
-          {num(STABLE_HAND_WORK_MINUTES)} game minutes; again. So your horses don’t starve while you
-          are away, as long as the storage has Food. Their card shows the queue under its name like
-          any queue, which you can change or clear, and the planner’s Saved… lists it among your
-          saved queues in this browser.
+          One resident of your starting city, never your Leader, is its <strong>stable hand</strong>
+          . They start on a looped queue, <strong>Farm and feed</strong>: if the stable holds less
+          than {days(STABLE_HAND_FEED_DAYS)} of Food for its {num(START_HORSES)} horses, Feed the
+          stable once; then work the farm for {num(STABLE_HAND_WORK_MINUTES)} game minutes; again.
+          So your horses don’t starve while you are away, as long as the storage has Food. Their
+          card shows the queue under its name like any queue, which you can change or clear, and the
+          planner’s Saved… lists it among your saved queues in this browser.
         </p>
         <p>
           The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}
@@ -1589,7 +1656,8 @@ export function Wiki() {
           pile keeps its own Food instead. <code>crewFood</code> 0 brings none. A resident an NPC
           city sends to a workplace sets out with Food for the walk there and back plus{' '}
           {days(SET_OUT_WORK_DAYS)} of work, not a fixed amount, so they last until the carrier's
-          first round trip.
+          first round trip. Its builders of a site more than {num(NPC_NODE_REACH)} tiles from its
+          storage take the same, and go back for more while they still have what the walk home eats.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -1658,6 +1726,19 @@ export function Wiki() {
           stand idle, and their Doing line says what is missing ("Idle: no coal").
         </p>
         <p>
+          A smith can also <strong>mend</strong> (Mend on their card, or <code>workAt("mend")</code>
+          in a script): they put the most worn weapon, piece of armour or set of Tools at the smithy
+          back to good, from what its workers carry, its pile and what anyone of their realm
+          standing on it carries. Mending a piece takes {pct(MEND_RECIPE_SHARE)} of its recipe,
+          rounded, and at least one unit, and {pct(MEND_WORK_SHARE)} of the work of forging it. Only
+          a worn or nearly broken piece is mended; with none there, or without the input, the smith
+          stands idle. A worn piece sells and buys for {pct(WORN_PRICE_SHARE)} of a new one's price,
+          a nearly broken one for {pct(NEARLY_BROKEN_PRICE_SHARE)}; a trade gives up new pieces
+          first, then the least worn. An NPC city counts only gear in good condition towards its
+          reserve: its soldiers take worn gear to its smithy, with what mending it takes, and wait
+          there while one of its smiths, or a hand from elsewhere, mends it.
+        </p>
+        <p>
           Work's params on the card: <code>storage</code> is the main storage, used for the output,
           the inputs and Food alike. <code>output</code> (where the output goes), <code>input</code>{' '}
           (where inputs come from) and <code>food</code> (where Food comes from) each take its place
@@ -1723,6 +1804,22 @@ export function Wiki() {
             )}
           </tbody>
         </table>
+        <h3>Tools</h3>
+        <p>
+          <strong>Tools</strong> are a good a smithy makes: {num(forged('tools').input.iron ?? 0)}{' '}
+          Iron and {num(forged('tools').input.wood ?? 0)} Wood make a set, which weighs{' '}
+          {num(GOOD_WEIGHT.tools ?? 0)} kg. Iron only. A resident carrying a set works{' '}
+          {pct(TOOLS_WORK_BONUS)} faster: at a workplace they make that much more, and at a
+          construction site they build, tear down and repair that much faster. Without Tools they
+          work at the plain pace, so nothing stops for want of them. They aren't equipped: carrying
+          one set is enough, a second adds nothing, and nobody else sees them. A workplace's card
+          counts them in what each of your workers makes.
+        </p>
+        <p>
+          Tools wear with each day's work and break after about {days(TOOLS_WORK_DAYS)} of it; their
+          condition reads like a weapon's (Wear). Warehouses buy and sell them like any good (a
+          floor of {num(WAREHOUSE_FLOOR.tools ?? 0)}).
+        </p>
         <h3>Production chains</h3>
         <ul>
           <li>One farmer feeds {num(residentsPerFarmer())} residents.</li>
@@ -1809,9 +1906,12 @@ export function Wiki() {
             </tr>
           </thead>
           <tbody>
-            {buildCosts().map((b) => (
-              <tr key={b.kind}>
-                <td>{kindName(b.kind)}</td>
+            {[
+              ...buildCosts().map((b) => ({ ...b, name: kindName(b.kind) })),
+              ...stoneWallCosts(),
+            ].map((b) => (
+              <tr key={b.name}>
+                <td>{b.name}</td>
                 <td>
                   {num(b.footprint)}×{num(b.footprint)}
                 </td>
@@ -1823,6 +1923,93 @@ export function Wiki() {
             ))}
           </tbody>
         </table>
+        <h3>Decay and repairing</h3>
+        <p>
+          Every finished building, wall, gate and road slowly loses its <strong>condition</strong>,
+          used or not: an even share at the turn of each game day, faster for roads and the wooden
+          walls and gates, slowest for those mostly of stone. Blows from attackers are apart from
+          this (see <a href="#combat">Combat</a>). Its tile card says how it stands: good, then{' '}
+          <strong>worn</strong> once it has lost {pct(DECAY_WORN)}, then{' '}
+          <strong>nearly a ruin</strong> once it has lost {pct(DECAY_NEARLY_RUIN)}. Everyone who
+          sees a building sees its condition; scripts read it as <code>building.condition</code>. A
+          city left alone for a real month is still there: its buildings may be worn, but none has
+          fallen to ruin from decay alone. That is all the game does for an absent Player: Food and
+          defence while you are away are your own setup, with work scripts that give every resident
+          access to Food and your defence scripts.
+        </p>
+        <p>
+          A worn building can be <strong>repaired</strong>: pick a resident, then the building's
+          tile, and <em>Repair</em> on its tile card. They run your Repair default: it walks them
+          there, and while the repair lacks materials they carry none of, they fetch what it lacks
+          from its <code>source</code> param, or the nearest storage of your realm holding some. A
+          repair takes {pct(REPAIR_MATERIALS_SHARE)} of the building's materials (rounded up) and{' '}
+          {pct(REPAIR_WORK_SHARE)} of its work, and puts it back to good. With none of the materials
+          in any storage, Repair ends and your realm log says why. Anyone's building can be
+          repaired. Scripts repair with <code>repair(buildingId)</code> on the building's tile and
+          ask what it lacks with <code>repairNeeded(building)</code>.
+        </p>
+        <p>
+          Some repair <strong>on their own</strong>. A resident running your Build default with no
+          construction site to join (none picked, none on their tile) repairs the worn buildings in
+          their city's area instead, worst first, then nearest, one after another, fetching the
+          materials as above; with none left the script ends. Buildings further off take a Repair
+          order. Scripts find what needs repairing with <code>wornBuildings(cityId)</code>. An NPC
+          city's builders repair its buildings and its road crew its roads, worst first, from what
+          its storage holds above its reserve. The Trade Organization repairs its own from its stock
+          at the turn of each day, so the HQ and its trading posts never fall to ruin while it
+          stands.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Building</th>
+              <th>Worn after</th>
+              <th>All gone after</th>
+              <th>Repair materials</th>
+              <th>Repair, one builder</th>
+              <th>Rebuild materials</th>
+              <th>Rebuild, one builder</th>
+            </tr>
+          </thead>
+          <tbody>
+            {decayRows().map((b) => (
+              <tr key={b.kind}>
+                <td>{kindName(b.kind)}</td>
+                <td>
+                  {num(Math.ceil(b.days * DECAY_WORN))} game days (
+                  {realTimeOf(Math.ceil(b.days * DECAY_WORN) * TICKS_PER_GAME_DAY)})
+                </td>
+                <td>
+                  {num(b.days)} game days ({realTimeOf(b.days * TICKS_PER_GAME_DAY)})
+                </td>
+                <td>{goods(repairMaterials(b.kind))}</td>
+                <td>{duration(repairWork(b.kind))}</td>
+                <td>{goods(rebuildMaterials(b.kind))}</td>
+                <td>{duration(rebuildWork(b.kind))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h3>Ruins and collapse</h3>
+        <p>
+          A building nobody repaired, once it has lost all its condition, becomes a{' '}
+          <strong>ruin</strong>. It still stands where it stood and takes up its tiles, but does
+          nothing: a ruined wall or gate tile is a gap anyone walks through, a house houses nobody,
+          a workplace makes nothing, a stable or training ground is no use, a ruined road is no
+          road, and a storage takes nothing in. Goods in a ruined storage stay in it, but anyone at
+          it can take them out, guarded or not: taking another organization's is theft. On the map a
+          ruin shows faded and grey, and its tile card says it is one.
+        </p>
+        <p>
+          A ruin is <strong>rebuilt</strong> like a repair, with <em>Rebuild</em> on its tile card
+          or <code>repair(buildingId)</code>, for {pct(REBUILD_MATERIALS_SHARE)} of its materials
+          and {pct(REBUILD_WORK_SHARE)} of its work: less than a new one. Left{' '}
+          {num(RUIN_COLLAPSE_DAYS)} game days ({realTimeOf(RUIN_COLLAPSE_DAYS * TICKS_PER_GAME_DAY)}
+          ) more it <strong>collapses</strong>: it is gone, and {pct(COLLAPSE_MATERIALS_LEFT)} of
+          its materials (rounded down), with any goods still in it, lie on its tiles as a pile. A
+          town hall that collapses ends its city, as when it is torn down. Scripts read a ruin's{' '}
+          <code>building.condition</code> as <code>"ruin"</code>.
+        </p>
         <p>
           A city building (town hall, house, storage, wall, gate) belongs to a city when it stands
           within {num(CITY_BUILDING_REACH)} tiles of its town hall or of another of its buildings;
@@ -2023,9 +2210,30 @@ export function Wiki() {
           work column above). Roads are built along a line with <strong>Build line</strong> (see{' '}
           <a href="#building">Building</a>): at most {num(ROAD_LINE_MAX_TILES)} tiles, straight or
           diagonal. A wall is built along a line the same way, past tiles with a wall or gate
-          already; a diagonal wall line closes the way like a straight one. The tiles your
-          residents' road and wall lines still have to build, running or waiting in their queues,
-          show faintly on your map, the picked residents' stronger; only you see them.
+          already; a diagonal wall line closes the way like a straight one.
+        </p>
+        <p>
+          A wall or gate is of <strong>wood</strong> or <strong>stone</strong>: pick which in the
+          Build menu, or on the banner while picking a wall line's ends (wood unless you pick
+          stone). Stone takes Stone instead of Wood and more work (the stone rows above), and it
+          holds out several times longer against blows (see <a href="#combat">Combat</a>); it is no
+          higher, with the same wall walk and cover. On the map a stone tile shows a grey block in
+          its colour, and its card says what it is of. Scripts pass <code>"stone"</code> to{' '}
+          <code>build</code> and <code>wallLine</code>.
+        </p>
+        <p>
+          <strong>Upgrading to stone.</strong> A stone wall or gate can be laid out on a wooden one
+          of its kind: stand on it, pick Stone in the Build menu and Build. The wooden one stands,
+          with its wall walk, and can be defended until the stone one is finished and takes its
+          place; whoever is up on it stays up, and its Wood goes into the new one. A stone wall line
+          upgrades the wooden walls and gates on its way, a gate to a stone gate, and passes only
+          those already of stone; a wooden line passes both. Breaking the wooden one while the stone
+          site stands leaves the site.
+        </p>
+        <p>
+          {' '}
+          The tiles your residents' road and wall lines still have to build, running or waiting in
+          their queues, show faintly on your map, the picked residents' stronger; only you see them.
         </p>
         <p>
           An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the
@@ -2307,8 +2515,10 @@ export function Wiki() {
           but may always take {num(WAITING_HORSE_FOOD)} Food for the horse. Short of Food, they top
           up from the goods warehouse, which the stock floor fills each day, so buying Food there
           can keep them waiting a little longer. A caravan with a delivery or transfer waiting wants
-          all it keeps on board, as there is no Food on that way. Away from the HQ nothing waits: a
-          carriage takes what a post's storage has and drives on.
+          all it keeps on board, as there is no Food on that way. A caravan away from the HQ takes
+          what a post's storage has and drives on. A wandering trader waits at a post as at the HQ:
+          it leaves only with enough Food to reach its next stop, topping up from the post's goods
+          warehouse, and stands there until that has some.
         </p>
         <p>
           On its way a wandering trader stops at each NPC or Player city whose town hall lies within{' '}
@@ -2800,6 +3010,19 @@ export function Wiki() {
           holds counts.
         </p>
         <p>
+          A city with a smithy of its own, finished or begun, also keeps a set of{' '}
+          <a href="#work">Tools</a> for each of its workers and builders who carries none (its
+          adults beyond the soldiers it keeps) and {num(NPC_TOOLS_SPARE)} spare. It never sells
+          them, but they never count as short either: its spare hands forge them, first of all
+          surplus work while it holds fewer, from Iron and Wood above its reserve, and up to{' '}
+          {num(NPC_SURPLUS_CAP.tools ?? 0)} more a step of its needs; its smithy forges them only
+          once its soldiers are armed. So a city forging a set for every worker still founds, lays
+          roads and trains. One grown, unarmed resident at a time who carries none, idle or at work,
+          fetches a set from its storage, as soldiers fetch their weapons, and one whose set breaks
+          fetches the next. Soldiers carry none. A trading post's and the HQ's workers fetch theirs
+          from their warehouse, only what it holds above its floor of Tools.
+        </p>
+        <p>
           A city's needs grow in steps, one for every {num(NPC_RESIDENTS_PER_NEEDS_STEP)} residents.
           A village or town under {num(2 * NPC_RESIDENTS_PER_NEEDS_STEP)} residents counts as one
           step; from there on it is a big city. Each step keeps another house's and those wall
@@ -2826,24 +3049,27 @@ export function Wiki() {
         <p>
           It shares out its adults in this order: soldiers; farmers, as many as feed everyone (each
           eats {num(FOOD_PER_DAY)} Food a day, a farmer makes {num(WORK_OUTPUT_PER_DAY.food ?? 0)})
-          and one more while it has no food surplus, a new farm when they don't fit; up to{' '}
-          {num(NPC_BUILDERS)} builders a step while it has a project; everyone else is a spare hand.
-          A farm is otherwise built only when Food is short of its reserve (
-          {days(NPC_TRADE.reserveFoodDays)} of Food for everyone) with every farm at its full crew
-          of {num(WORKPLACE_MAX_WORKERS.farm ?? 0)}, never because spare hands filled the farms
-          working for surplus. It needs nobody idle for that: the new farm's farmers come from those
-          working for surplus and from its scouts first, and from other work only after them. A farm
-          already begun is finished before another. Spare hands go to the good the reserve is
-          shortest of, as a share of what it wants of it, filling one workplace's crew before the
-          next. A workplace by a way where the city lost people (Threat) is worth less to it: each
-          person lost there takes {num(NPC_JOB_WEIGHTS.danger)} from the work's score, at most{' '}
-          {num(NPC_JOB_WEIGHTS.most)}. Of several workplaces of a good it picks the safest, and a
-          worker leaves a dangerous camp for a safe one of the same good; a dangerous mine can lose
-          to safe work on another good. Farming while Food is short is never weighed down. Without a
-          workplace for that good, the city builds one: on the nearest fitting
-          resource node it knows of, or a smelter, smithy or mint in its area like a house. With
-          every workplace of another short good at its full crew and someone idle, it opens another
-          of them, however many it has.
+          and one more while it has no food surplus; with its Food below its reserve but not yet
+          running short, as many more as win back what it lacks in {days(NPC_FOOD_REFILL_DAYS)}, if
+          that is more; a new farm when they don't fit; up to {num(NPC_BUILDERS)} builders a step
+          while it has a project; everyone else is a spare hand. A farm is otherwise built only when
+          Food is short of its reserve ({days(NPC_TRADE.reserveFoodDays)} of Food for everyone), or,
+          with nothing else keeping it from being full, short of the Food surplus its founding waits
+          on (below), with every farm at its full crew of {num(WORKPLACE_MAX_WORKERS.farm ?? 0)};
+          never because spare hands filled the farms working for surplus. It needs nobody idle for
+          that: the new farm's farmers come from those working for surplus and from its scouts
+          first, and from other work only after them. A farm already begun is finished before
+          another, and that new farm comes before anything else it has begun. Spare hands go to the
+          good the reserve is shortest of, as a share of what it wants of it, filling one
+          workplace's crew before the next. A workplace by a way where the city lost people (Threat)
+          is worth less to it: each person lost there takes {num(NPC_JOB_WEIGHTS.danger)} from the
+          work's score, at most {num(NPC_JOB_WEIGHTS.most)}. Of several workplaces of a good it
+          picks the safest, and a worker leaves a dangerous camp for a safe one of the same good; a
+          dangerous mine can lose to safe work on another good. Farming while Food is short is never
+          weighed down. Without a workplace for that good, the city builds one: on the nearest
+          fitting resource node it knows of, or a smelter, smithy or mint in its area like a house.
+          With every workplace of another short good at its full crew and someone idle, it opens
+          another of them, however many it has.
         </p>
         <p>
           Those with nothing to do, those carrying a child and its children stand at a house of the
@@ -2891,11 +3117,11 @@ export function Wiki() {
           A spare hand with nothing short to work for doesn't stand idle. A few at a time, one for
           every {num(NPC_RESIDENTS_PER_SCOUT)} residents, go scouting: they explore with as much
           Food as they can carry, and turn back when it only just covers the way home. A new scout
-          sets out only while that Food comes from above the city's reserve. A city knows
-          every node within {num(NPC_NODE_REACH)} tiles; what a scout saw, out to{' '}
-          {num(NPC_SCOUT_LIMIT)} tiles, it knows only once they step back into its area alive. A
-          scout killed on the way brings nothing, and nothing protects them. What is short calls
-          them home, with what they saw. Once a city knows its limit it stops scouting.
+          sets out only while that Food comes from above the city's reserve. A city knows every node
+          within {num(NPC_NODE_REACH)} tiles; what a scout saw, out to {num(NPC_SCOUT_LIMIT)} tiles,
+          it knows only once they step back into its area alive. A scout killed on the way brings
+          nothing, and nothing protects them. What is short calls them home, with what they saw.
+          Once a city knows its limit it stops scouting.
         </p>
         <p>
           What a scout brought home it can build on. Short of a good it knows no nearer node of, it
@@ -2912,9 +3138,11 @@ export function Wiki() {
           ore, Iron and Gold ore, {num(NPC_SURPLUS_CAP.coins ?? 0)} coins and{' '}
           {num(NPC_SURPLUS_CAP[NPC_SMITHY_WEAPON] ?? 0)}{' '}
           {GOOD_LABELS[NPC_SMITHY_WEAPON].toLowerCase()}s above what it keeps. A smelter, smithy or
-          mint is worked for surplus only from input above the reserve. Past the cap they stop and
-          are idle. What is short, its trader and a founding party still take them first, the next
-          time it thinks. So its workplaces stay busy, and its trader has more to sell.
+          mint is worked for surplus only from input above the reserve. Once every good they could
+          work for is at its cap they work on past it, the good least far past first, up to{' '}
+          {num(NPC_SURPLUS_PAST_CAP)} times its cap, farms aside; only past that are they idle. What
+          is short, its trader and a founding party still take them first, the next time it thinks.
+          So its workplaces stay busy, and its trader has more to sell.
         </p>
         <p>
           With nothing short, a big city whose one lumber camp, quarry or mine has its crew full and
@@ -2926,12 +3154,13 @@ export function Wiki() {
           hands a step, apart from its builders, build its streets, then road from its home to each
           of its workplaces outside its area, farms too, the nearest first. They follow the way a
           resident would walk, tile by tile, so a road goes round a lake, and they skip tiles that
-          already have a road. They only use materials above its reserve and what its project still
-          needs; with none to spare, or with something short that they can work for, they go back to
-          other work and bring back what they carry. Once the city would otherwise be full, they
-          also leave a town hall's and a storage's materials untouched, so founding comes before
-          roads. Like any road it belongs to nobody, and anyone can use it or tear it down; a tile
-          torn down is laid again in time.
+          already have a road. One of them out on a way with a tile's materials and Food in hand
+          lays the tiles nearest them before walking home to a street owed meanwhile. They only use
+          materials above its reserve and what its project still needs; with none to spare, or with
+          something short that they can work for, they go back to other work and bring back what
+          they carry. Once its full wait is under way, they also leave a town hall's and a storage's
+          materials untouched, so founding comes before roads. Like any road it belongs to nobody,
+          and anyone can use it or tear it down; a tile torn down is laid again in time.
         </p>
         <p>
           With its workplaces joined the crew goes on: to the nearest Trade Organization warehouse
@@ -2961,6 +3190,17 @@ export function Wiki() {
           stays when the outer wall moves. Before that, with nothing short and materials above its
           reserve, it builds one <a href="#training">training ground</a> in its area, and its
           soldiers train there.
+        </p>
+        <p>
+          Once it is a <strong>town</strong>, {num(NPC_STONE_WALL_RESIDENTS)} residents or more, an
+          NPC city upgrades its wall to <strong>stone</strong> (see{' '}
+          <a href="#transport">Upgrading to stone</a>): its outer gate first, then that wall tile by
+          tile, nearest the gate first, and its inner ring once the outer one is all stone. It does
+          this last of all its projects, from Stone beyond its reserve: a tile at a time once it
+          holds a builder's trip of it above its reserve, while its road crew is in and its wall is
+          not moving out. A town with none builds a quarry for it, and its spare hands work it. A
+          new outer wall it puts up when it grows is of stone once its old one was. Villages,
+          starting cities and the Trade Organization's cities stay wooden.
         </p>
         <h3>Trading posts and the HQ</h3>
         <p>
@@ -3007,9 +3247,13 @@ export function Wiki() {
           to the storage. A city has one trader out for each {num(NPC_RESIDENTS_PER_TRADER)} of its
           residents, and a village keeps one; they spread over the goods with surplus, and only with
           no other good to sell does one take a second load of a good already on the road. None go
-          while Food runs short or armed outsiders stand in its area. Nothing protects them on the
-          way; a trader not back after {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may
-          send another.
+          while Food runs short or armed outsiders stand in its area. A city of{' '}
+          {num(NPC_ESCORT_TOWN_RESIDENTS)} residents or more, a town, sends{' '}
+          {num(NPC_TRADER_ESCORTS)} soldier with each trader as their escort, of the soldiers beyond
+          those on its town hall and at its gates; a village's trader goes alone. The escort keeps
+          pace with the trader, who waits for them on the way, fights whoever goes for them and
+          comes home with them. Nothing else protects them on the way; a trader not back after{' '}
+          {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may send another.
         </p>
         <p>
           The same trader goes to a Player's offer within {num(NPC_OFFER_REACH)} tiles, ahead of any
@@ -3025,21 +3269,33 @@ export function Wiki() {
           A city is full once it has had spare hands, idle, on a road crew, scouting or working for
           surplus, and nothing short of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus
           and its founding party's materials above its reserve; Coins it has no way to earn don't
-          count as short. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less
-          for each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}.
-          A dip below its reserve only restarts that wait if it lasts longer than{' '}
+          count as short, and nor do weapons it can't make, nor the Iron it keeps to forge them (it
+          can make them with a smithy, or with nodes it knows of for all they are made from), though
+          it still buys them. Once it lacks nothing but its founding party's materials, those count
+          as short: its spare hands gather them, it builds a workplace for one it has none of, and
+          they are still spare hands while they do. Food, Coins and weapons come first, Food its
+          surplus too: only once it holds {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus
+          cap past its reserve. Its workplaces come first as well: its spare hands go on a road
+          crew, scout and work at its workplaces for surplus, and only those left over gather for
+          the party. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less for
+          each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}. A
+          dip below its reserve only restarts that wait if it lasts longer than{' '}
           {days(NPC_FULL_DIP_DAYS)}, though nobody sets out during one. A full city founds a
           daughter. Once a game day it looks for a free Plains site {num(NPC_CITY_MIN_DISTANCE)} to{' '}
           {num(NPC_FOUND_REACH)} tiles away, with room for a village and on no realm's territory,
           nearest a node of a material it has none of in reach. A founding party of{' '}
           {num(NPC_VILLAGE.residents)} adults, one more for each{' '}
           {num(NPC_FOUND_RESIDENTS_PER_MEMBER)} residents past {num(NPC_FOUND_VILLAGE_RESIDENTS)} up
-          to {num(NPC_FOUND_PARTY_MOST)}, one of them armed, sets out carrying a town hall's and a
-          storage's materials, a house's for each {num(HOUSING_ROOM.house ?? 1)} members past{' '}
-          {num(NPC_VILLAGE.residents)}, and Food for twice the walk and {days(NPC_FOUND_FOOD_DAYS)}{' '}
-          there, and builds the town hall, which founds the daughter: an NPC city of its own with a
-          name from the game. It then builds its storage, a farm and a house, and once its storage
-          holds the Wood of its reserve, its first wall, a ring{' '}
+          to {num(NPC_FOUND_PARTY_MOST)}, sets out. One in{' '}
+          {num(Math.round(1 / NPC_FOUND_ESCORT_SHARE))} of them, rounded down and at least one, is a
+          soldier of its escort, as far as the city has soldiers beyond those on its town hall and
+          at its gates; they fight for the rest on the way and stay as the daughter's first
+          soldiers. The party carries a town hall's and a storage's materials, a house's for each{' '}
+          {num(HOUSING_ROOM.house ?? 1)} members past {num(NPC_VILLAGE.residents)}, and Food for
+          twice the walk and {days(NPC_FOUND_FOOD_DAYS)} there, with as many more adults as it takes
+          to carry all of it, and builds the town hall, which founds the daughter: an NPC city of
+          its own with a name from the game. It then builds its storage, a farm and a house, and
+          once its storage holds the Wood of its reserve, its first wall, a ring{' '}
           {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its home. Mother and daughter start at
           a standing of {num(NPC_FOUND_STANDING)} toward each other, which fades like any other, and
           share nothing. A party whose town hall doesn't stand after {days(NPC_FOUND_GIVE_UP_DAYS)}{' '}
@@ -3094,16 +3350,22 @@ export function Wiki() {
           those the city has: first {num(NPC_SOLDIERS_ON_HALL)} on the town hall, where one is
           enough to stop anyone occupying it, then {num(NPC_SOLDIERS_AT_GATE)} at each gate, and the
           rest up on the walk of its wall, on the tiles they can get up to; they stay up between
-          fights, and coming down for another post takes the time again. A city with too little
-          wall for them, or
-          none, has them stand on the free ground within {num(NPC_POST_AROUND_HALL)} tiles of its
-          hall as well. They eat where they stand. If those on the hall or at a gate are called away
-          or die, the next soldiers take over at the city's next planning pass, and they come back
-          once the alarm is over. In a big city with a training ground some train in turns (
-          <a href="#training">Training</a>). Trading posts and the HQ don't do this.
+          fights, and coming down for another post takes the time again. A city with too little wall
+          for them, or none, has them stand on the free ground within {num(NPC_POST_AROUND_HALL)}{' '}
+          tiles of its hall as well. They eat where they stand. If those on the hall or at a gate
+          are called away or die, the next soldiers take over at the city's next planning pass, and
+          they come back once the alarm is over. In a big city with a training ground some train in
+          turns (<a href="#training">Training</a>). Trading posts and the HQ don't do this.
         </p>
         <p>
-          For every {num(NPC_SOLDIERS_PER_PATROL)} soldiers on its wall one walks a round, and never
+          The soldiers it keeps by its size ({pct(NPC_SOLDIER_SHARE)} of its adults) are all it
+          keeps in peace. Anyone else armed, such as a smith carrying the smithy’s spears to the
+          storage, stands down: they put their weapons, armour and Arrows into its storage and go
+          back to work, those on a round, escorting, training or on alarm last. Soldiers just
+          standing on a post count as standing idle; those on a round, escorting or training don’t.
+        </p>
+        <p>
+          Of the soldiers on its wall {pct(1 / NPC_SOLDIERS_PER_PATROL)} walk a round, and never
           more than {num(NPC_PATROLS_MAX)} in a city however big: {num(NPC_PATROL_WALL_STOPS)} stops
           along its wall, {num(NPC_PATROL_ROAD_STOPS)} along its roads inside it, and back to where
           they set out. When a round ends the next by id goes, so those on the wall take turns;
@@ -3409,6 +3671,7 @@ export function Wiki() {
               <th>Gear</th>
               <th>Attack</th>
               <th>Defence</th>
+              <th>Lasts (blows)</th>
               <th>kg</th>
             </tr>
           </thead>
@@ -3418,6 +3681,7 @@ export function Wiki() {
                 <td>{goodName(g)}</td>
                 <td>{signed(a)}</td>
                 <td>—</td>
+                <td>{lasts(g)}</td>
                 <td>{num(GOOD_WEIGHT[g])}</td>
               </tr>
             ))}
@@ -3426,6 +3690,7 @@ export function Wiki() {
                 <td>{goodName(g)}</td>
                 <td>—</td>
                 <td>{signed(-d)}</td>
+                <td>{lasts(g)}</td>
                 <td>{num(GOOD_WEIGHT[g])}</td>
               </tr>
             ))}
@@ -3450,6 +3715,97 @@ export function Wiki() {
           part of what they carry. A resident's card shows their three slots.
         </p>
         <p>
+          A <strong>Bow</strong> and a <strong>Crossbow</strong> are weapons for shooting, and each
+          takes both hands: with one equipped the shield slot stays empty (the shield stays carried
+          and goes back on when they put a one-handed weapon in its place), and a shield can't be
+          put on beside one. In a blow they add nothing, so an archer in a brawl fights with their
+          fists. They shoot <strong>Arrows</strong>, a plain good that is carried, stored and traded
+          like any other and goes in no slot. A smithy makes each, the smith saying which as for the
+          other gear:
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Good</th>
+              <th>Made from</th>
+              <th>A batch makes</th>
+              <th>Weight</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(['bow', 'crossbow', 'arrows'] as const).map((g) => (
+              <tr key={g}>
+                <td>{goodName(g)}</td>
+                <td>
+                  {(Object.entries(forged(g).input) as [Good, number][])
+                    .map(([input, n]) => `${num(n)} ${goodName(input)}`)
+                    .join(', ')}
+                </td>
+                <td>{num(forged(g).output[g] ?? 0)}</td>
+                <td>{num(GOOD_WEIGHT[g])} kg each</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h3>Ranged combat</h3>
+        <p>
+          An armed resident with a Bow or Crossbow equipped <strong>shoots</strong> anyone they may
+          strike whom they see within their weapon's <strong>reach</strong>, in tiles, contact
+          included: given an attack order, they walk only until the target is in reach and shoot
+          from there. Each shot uses up one Arrow they carry, whether it lands or not; out of Arrows
+          they fight with their fists and have to walk into contact. Nothing blocks a shot for now.
+          A shot is a strike like a blow: the one hit is under attack and fights back or flees,
+          their city's alarm goes, and it is a crime where a blow would be. Agility dodges a shot as
+          it does a blow, and a shield and armour take damage off it, but a Crossbow's bolt goes
+          through part of them. Strength adds nothing to a shot; Combat skill makes a Bow much
+          better, a Crossbow only a little.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Weapon</th>
+              <th>Reach</th>
+              <th>A shot every</th>
+              <th>Damage</th>
+              <th>At full Combat skill</th>
+              <th>Through armour</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(['bow', 'crossbow'] as const).map((w) => (
+              <tr key={w}>
+                <td>{goodName(w)}</td>
+                <td>{num(SHOT_REACH[w] ?? 0)} tiles</td>
+                <td>{duration(SHOT_TICKS[w] ?? 0)}</td>
+                <td>{num(SHOT_DAMAGE[w] ?? 0)}</td>
+                <td>{num((SHOT_DAMAGE[w] ?? 0) * (1 + (SHOT_SKILL_LIMIT[w] ?? 0)))}</td>
+                <td>{pct(SHOT_PIERCE[w] ?? 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p>
+          <strong>Archers by default.</strong> Struck, an archer's Defend default shoots back from
+          where they stand, walking only until the one who struck them is in reach. On an alarm, the
+          Alarm default sends an archer on the ground up onto the city's wall tile between them and
+          whoever they go after, and they shoot from there; up on the wall they wait for them to
+          come in reach rather than come down. With no wall between them they shoot from where they
+          stand. Out of Arrows an archer does what anyone armed does and closes in. Scripts see a
+          resident's <code>reach</code> (null without a Bow or Crossbow) and the Arrows they carry
+          in <code>carried.arrows</code>; <code>shoot(targetId)</code> shoots someone in reach
+          without a step, and <code>attack</code> walks only until they are in reach.
+        </p>
+        <p>
+          <strong>NPC archers.</strong> An NPC city with a smithy arms {pct(NPC_ARCHER_SHARE)} of
+          its soldiers with a Bow (rounded down) and keeps {num(NPC_ARCHER_ARROWS)} Arrows in its
+          reserve for each of them; its smithy forges them once its soldiers are armed. Each archer
+          carries {num(NPC_ARCHER_ARROWS)} Arrows and fetches more from its storage as they run low.
+          While the city has a wall, its archers stand on it and leave the town hall and the gates
+          to the others. One without a smithy, and the Trade Organization's cities, keep no archers.
+          A resident hired from an NPC city who takes a Bow from its surplus takes Arrows along too,
+          also only from its surplus.
+        </p>
+        <p>
           To <strong>swap</strong> gear, pick another item they carry for a slot on their card (or
           the group card's Equip…, for each of them who carries it), or take a slot's item off;
           scripts do the same with <code>equip(good)</code> and <code>takeOff(slot)</code>, and a
@@ -3465,14 +3821,28 @@ export function Wiki() {
           as a carriage's load does, unless one of theirs stands on the same tile.
         </p>
         <p>
+          Gear <strong>wears</strong>: a weapon with each blow it strikes, dodged or not, a shield
+          and armour with each blow they take, and every equipped piece a little in training,{' '}
+          {num(TRAINING_WEAR_BLOWS_PER_DAY)} blow's worth a game day. The table says how many blows
+          each lasts. Worn out, a piece <strong>breaks</strong> and is gone, and the next best one
+          carried takes its slot; until then it fights as well as new. A resident uses up the most
+          worn piece of a kind first, and worn gear stays as worn in a storage, a carriage or the
+          loot of the fallen. Its <strong>condition</strong> reads good, worn (from {pct(WORN_FROM)}{' '}
+          of its life used) or nearly broken (from {pct(NEARLY_BROKEN_FROM)}), on the card and to
+          scripts (<code>condition</code>), only for the realm carrying it; anyone else sees just
+          its kind and metal.
+        </p>
+        <p>
           Defenders on their own city's wall take {pct(WALL_DEFENCE)} of the damage. A tile of wall
           takes {num(WALL_STRENGTH.wall)} damage to break and a gate {num(WALL_STRENGTH.gate)}: an
           average unarmed resident alone needs {duration(breakTicks('wall'))} for a wall and{' '}
-          {duration(breakTicks('gate'))} for a gate. A broken one leaves{' '}
-          {pct(BROKEN_MATERIALS_RETURNED)} of its materials. Climbing over takes{' '}
-          {duration(CLIMB_TICKS)}, unable to dodge or strike back, and raises the alarm as breaking
-          the wall does. So a starting city's armed residents, at home when the attack starts, get
-          up onto their wall in time to beat breakers and climbers twice their number.
+          {duration(breakTicks('gate'))} for a gate. Of stone, a tile of wall takes{' '}
+          {num(STONE_WALL_STRENGTH.wall)} and a gate {num(STONE_WALL_STRENGTH.gate)}:{' '}
+          {duration(breakTicks('wall', true))} and {duration(breakTicks('gate', true))} for that
+          resident. A broken one leaves {pct(BROKEN_MATERIALS_RETURNED)} of its materials. Climbing
+          over takes {duration(CLIMB_TICKS)}, unable to dodge or strike back, and raises the alarm
+          as breaking the wall does. So a starting city's armed residents, at home when the attack
+          starts, get up onto their wall in time to beat breakers and climbers twice their number.
         </p>
         <p>
           <strong>The wall walk.</strong> Every wall and gate tile has a walk on top, unbroken round
@@ -3489,13 +3859,55 @@ export function Wiki() {
           the HQ's soldiers do the same.
         </p>
         <p>
+          <strong>Towers.</strong> A tower is a {num(FOOTPRINT.tower)} × {num(FOOTPRINT.tower)}{' '}
+          building of wood or stone (Build menu, under Defence), standing in a wall's line or alone,
+          off resource nodes and not on Mountain. It isn't built over wall tiles: tear those down
+          first. Like a wall it closes the way, and its top is part of the wall walk wherever a wall
+          tile touches it: residents walk onto it from the walk, or get up onto it from the ground
+          beside it as onto a wall. It holds {num(TOWER_ROOM)} residents up at once; one more waits
+          beside it until someone leaves. It is broken like a wall but holds out longer: wooden,{' '}
+          {num(WALL_STRENGTH.tower)} damage ({duration(breakTicks('tower'))} for that resident), of
+          stone {num(STONE_WALL_STRENGTH.tower)} ({duration(breakTicks('tower', true))}), and it is
+          struck from beside any of its tiles. Whoever is up on it when it breaks falls, as from a
+          wall tile. A tower is broken, not climbed.
+        </p>
+        <p>
+          <strong>Up on a tower.</strong> A resident up on a tower sees {num(TOWER_SIGHT_RANGE)}{' '}
+          tiles around instead of {num(SIGHT_RANGE)}, and what they see is your realm's Sight: it
+          shows on the map, is explored and kept in Last seen like anything else seen. An outsider
+          coming into the city's area that such a lookout sees raises the alarm across the whole of
+          its area, so a tower warns of an army early. An archer up on a tower shoots{' '}
+          {num(TOWER_SHOT_REACH_BONUS)} tiles further than on the ground, beyond an archer on the
+          wall ({num(WALL_SHOT_REACH_BONUS)} further), and up there takes the wall's cover as on the
+          wall.
+        </p>
+        <p>
+          <strong>NPC towers.</strong> A tower is part of a city like its wall, and grows its area
+          the same way. An NPC town whose outer wall is all of stone builds stone towers, each just
+          inside its wall and touching it: first one by each gate, leaving the way in free, then one
+          in each corner. It builds each from Stone it holds beyond its reserve, last of its
+          projects, and quarries for it if it has to. While it waits to found a daughter it starts
+          no new tower, so founding comes first. Its soldiers on wall posts fill its towers first,{' '}
+          {num(TOWER_ROOM)} to a tower, its archers before the others. When the town moves its wall
+          out, it builds towers on the new wall, and tears the old ones down with the old wall.
+        </p>
+        <p>
           <strong>The high ground.</strong> Whoever is up strikes down at anyone on the ground next
           to the wall, but nobody on the ground can strike anyone up: from below there is only the
-          wall or gate itself to break, or climbing it, both while being struck from above. Order a
-          resident below to attack someone up and they won't (“they are up on the wall”). A climber
-          is on the ground until over; one who made it and stands on the wall fights those up as
-          anywhere, and so do those up on two walls that touch. Up on their own city's wall,
-          defenders still take only {pct(WALL_DEFENCE)} of each blow.
+          wall or gate itself to break, or climbing it, both while being struck from above, or
+          shooting up at them with a Bow or Crossbow. Order a resident below without Arrows to shoot
+          to attack someone up and they won't (“they are up on the wall”). A climber is on the
+          ground until over; one who made it and stands on the wall fights those up as anywhere, and
+          so do those up on two walls that touch. Up on their own city's wall, defenders still take
+          only {pct(WALL_DEFENCE)} of each blow and each shot.
+        </p>
+        <p>
+          <strong>Archers on the wall.</strong> An archer up on a wall walk shoots{' '}
+          {num(WALL_SHOT_REACH_BONUS)} tiles further than on the ground: a Bow{' '}
+          {num((SHOT_REACH.bow ?? 0) + WALL_SHOT_REACH_BONUS)} tiles, a Crossbow{' '}
+          {num((SHOT_REACH.crossbow ?? 0) + WALL_SHOT_REACH_BONUS)}. So archers on a wall shoot
+          attackers before those can shoot back, and take only {pct(WALL_DEFENCE)} of what does come
+          back up.
         </p>
         <p>
           <strong>A tile breaks.</strong> When a wall or gate tile breaks, whoever is up on it falls
@@ -3510,14 +3922,14 @@ export function Wiki() {
           <strong>Defend</strong> (one of your default scripts): armed, they fight back at whoever
           struck them until that one is dead, gone or out of sight; unarmed, or struck from up on a
           wall where they can't strike back, they walk home to their city's town hall, away from the
-          wall, and stop once there or once no blow has landed for{' '}
-          {duration(DEFEND_CALM_TICKS)}. Their card says “Defending: fighting back at Bo” or
-          “Defending: fleeing home”, with what they were doing on the line under it. What they were
-          doing waits meanwhile: once Defend ends they go back to it, a script with its memory, a
-          queue at its step, or a plain order. Struck again while defending, they keep defending.
-          Scripts see the last blow as <code>me.struckBy</code> and <code>me.struckAt</code>.
-          Residents of NPC cities, and in an army, fight back or flee home the same way. Armed
-          neighbours at home who see the blow come to help (see Alarms below).
+          wall, and stop once there or once no blow has landed for {duration(DEFEND_CALM_TICKS)}.
+          Their card says “Defending: fighting back at Bo” or “Defending: fleeing home”, with what
+          they were doing on the line under it. What they were doing waits meanwhile: once Defend
+          ends they go back to it, a script with its memory, a queue at its step, or a plain order.
+          Struck again while defending, they keep defending. Scripts see the last blow as{' '}
+          <code>me.struckBy</code> and <code>me.struckAt</code>. Residents of NPC cities, and in an
+          army, fight back or flee home the same way. Armed neighbours at home who see the blow come
+          to help (see Alarms below).
         </p>
         <p>
           <strong>On a carriage:</strong> the carriage is the way out. An unarmed driver drives on
@@ -3567,24 +3979,24 @@ export function Wiki() {
           of a carriage or horse, reaches those standing there who see it; what lies in a pile is
           anyone's to take, so that raises none. An attack, someone striking or climbing a wall or
           gate of the city or striking a resident of yours standing in its area, reaches those
-          standing there who see it,
-          so the armed residents beside them react rather than only the one struck, who runs their
-          defence script. It is raised once per attacker, the first time someone at home sees them
-          at it, and again only after {duration(DEFEND_CALM_TICKS)} with no blow from them. Those
-          already fighting aren't interrupted, and someone fighting back raises none. Army members,
-          those hired out and those driving a carriage get no alarm. It runs their{' '}
-          <strong>Alarm script</strong>, which by default is <strong>Alarm</strong> (one of your
-          default scripts) for an armed resident and nothing for an unarmed one.
+          standing there who see it, so the armed residents beside them react rather than only the
+          one struck, who runs their defence script. It is raised once per attacker, the first time
+          someone at home sees them at it, and again only after {duration(DEFEND_CALM_TICKS)} with
+          no blow from them. Those already fighting aren't interrupted, and someone fighting back
+          raises none. Army members, those hired out and those driving a carriage get no alarm. It
+          runs their <strong>Alarm script</strong>, which by default is <strong>Alarm</strong> (one
+          of your default scripts) for an armed resident and nothing for an unarmed one.
         </p>
         <p>
           Alarm goes after the occupier while they stand in the city's area, any other armed one of
           theirs there after them, and ends once they are gone. It goes after a thief or an attacker
           until they are dead or have left the area or sight; then, while others are still at the
           city's wall or its residents, it goes after the nearest of them in sight, and ends only
-          once none is left. Their card says “On alarm: going after Bo”. For an armed outsider it walks to the town hall and stands there until no armed
-          outsider is left in the area, then goes back to what it was doing; someone armed of yours
-          on the hall blocks an occupation before it starts, at no cost in standing. An unarmed
-          outsider it only writes in the script log.
+          once none is left. Their card says “On alarm: going after Bo”. For an armed outsider it
+          walks to the town hall and stands there until no armed outsider is left in the area, then
+          goes back to what it was doing; someone armed of yours on the hall blocks an occupation
+          before it starts, at no cost in standing. An unarmed outsider it only writes in the script
+          log.
         </p>
         <p>
           <strong>Force at home:</strong> in your own city's area, striking someone occupying its
@@ -3665,6 +4077,77 @@ export function Wiki() {
           its stables join, and the rest stay with their realm. Either way a horse a joining
           resident rides and a carriage one drives join with them, and a carriage's hitched horse
           with it. Another NPC city's or realm's that happen to stand there don't.
+        </p>
+      </Section>
+
+      <Section id="siege">
+        <p>
+          A <b>siege machine</b> is a machine of a realm, built in the field where it is needed, so
+          a siege needs a supply line like an army. There are two: a <b>ram</b>, a roofed frame on
+          wheels round a heavy beam, and a <b>catapult</b>, which throws Stone at walls from far
+          off. NPC cities and the Trade Organization don't build them, for now.
+        </p>
+        <p>
+          <b>Building a ram.</b> A resident lays out a <b>ram site</b> with Build (in the Build menu
+          under Siege) on any tile a carriage could stand on, off resource nodes and buildings, one
+          to a tile. It is a construction site like any other: it takes {goods(ramCost().materials)}{' '}
+          and {duration(ramCost().buildTicks)} of one average resident's work, carried there and put
+          in by anyone. Once finished the site is gone and a ram of the realm of whoever finished it
+          stands on its tile.
+        </p>
+        <p>
+          <b>Crew.</b> Residents of its realm join its <b>crew</b> with Crew the ram on its card:
+          they walk onto its tile, following it if it moves, and are its crew while they stand
+          there. Children don't crew it. With at least {num(RAM_CREW)} of its crew on it, one of
+          them <b>pushes</b> it (Push the ram to…) to a tile a carriage could go to, along a way a
+          carriage could take: a tile of Plains takes about {duration(ramPushTicks()[0]!.ticks)}, of
+          Forest or Hills {duration(ramPushTicks()[1]!.ticks)} and of road{' '}
+          {duration(ramPushTicks()[2]!.ticks)}. The crew go along on its tile. One who walks off is
+          no longer of its crew, and below {num(RAM_CREW)} it stops where it is.
+        </p>
+        <p>
+          <b>Ramming.</b> Pushed next to a wall or gate of another realm's city, or of nobody's, one
+          of its crew swings it with the whole crew (Ram the gate on its card, or{' '}
+          <code>ram(machine, wall)</code> in a script). It strikes every{' '}
+          {duration(RAM_STRIKE_TICKS)} for {num(RAM_BLOW)} damage, far harder than any blow: a tile
+          of wooden wall falls in {duration(ramBreakTicks('wall'))}, a stone gate in{' '}
+          {duration(ramBreakTicks('gate', true))}. Each strike raises the alarm as a blow at the
+          wall does, and breaking another realm's wall is a crime of tearing down, as by hand. Below
+          its crew size it stops. Its crew is under its roof: nobody up on a wall strikes them, and
+          no shot reaches them, so defenders have to come down and out to fight them or to strike
+          the ram, which is struck only from the ground.
+        </p>
+        <p>
+          <b>Breaking and tearing down.</b> Anyone may attack a ram of another realm, as a wall:
+          every blow lands, and after {num(RAM_STRENGTH)} damage it breaks, leaving{' '}
+          {goods(ramCost().broken)} on its tile. Breaking another realm's ram is a crime of tearing
+          down. Its own realm tears it down from its tile in {duration(ramCost().teardownTicks)} of
+          one average resident's work, which leaves {goods(ramCost().tornDown)}.
+        </p>
+        <p>
+          <b>The catapult.</b> It is built, crewed, pushed, broken and torn down as a ram is: its
+          site (Build, under Siege) takes {goods(ramCost('catapult').materials)} and{' '}
+          {duration(ramCost('catapult').buildTicks)} of one average resident's work, it needs{' '}
+          {num(CATAPULT_CREW)} of its crew on it, and it breaks after {num(CATAPULT_STRENGTH)}{' '}
+          damage. One of its crew aims it with the whole crew (Throw Stone at… on its card, then the
+          wall on the map, or <code>throw(machine, wall)</code> or <code>throw(machine, x, y)</code>{' '}
+          in a script) at a wall, gate or tower of another realm's city, or of nobody's, within{' '}
+          {num(CATAPULT_REACH)} tiles: well beyond a Bow's{' '}
+          {num((SHOT_REACH.bow ?? 0) + WALL_SHOT_REACH_BONUS)} from up on a wall. Every{' '}
+          {duration(CATAPULT_SHOT_TICKS)} it throws one Stone for {num(CATAPULT_BLOW)} damage: a
+          tile of wooden wall falls to {num(catapultBreak('wall').shots)} Stone in{' '}
+          {duration(catapultBreak('wall').ticks)}, a stone gate to{' '}
+          {num(catapultBreak('gate', true).shots)} in {duration(catapultBreak('gate', true).ticks)}.
+          The Stone is what its crew carry, then what lies on its tile; out of Stone it stops. It
+          hits the building only, never anyone on it or by it. Each shot raises the alarm and
+          breaking another realm's wall is a crime, as with a ram. Its crew stands in the open:
+          archers in reach shoot them and anyone can strike them.
+        </p>
+        <p>
+          A ram shows on the map to whoever sees its tile, with whose it is and its crew, but Last
+          seen doesn't keep it, as it moves. A ram of a realm that ends belongs to nobody. Scripts
+          see the machines in sight with <code>machines()</code>, join a crew with{' '}
+          <code>crew(machine)</code> and push one with <code>push(machine, x, y)</code>.
         </p>
       </Section>
 
@@ -3998,7 +4481,6 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         </p>
         <ul>
           <li>Each resident's or army's script: {num(SCRIPT_STEP_BUDGET)} steps a tick.</li>
-          <li>All of a realm's scripts together: {num(SCRIPT_REALM_STEP_BUDGET)} steps a tick.</li>
           <li>Function calls nest at most {num(SCRIPT_MAX_CALL_DEPTH)} deep.</li>
           <li>A script's memory holds at most {num(SCRIPT_MEMORY_MAX)} characters of JSON.</li>
           <li>
