@@ -210,16 +210,20 @@ fn distance_to_way(size: i32, from: (f64, f64), to: (f64, f64), p: (f64, f64)) -
 /// `DANGER_PLACE_WAY_REACH` of the way, rounded up, at most `DANGER_ESCORTS_MAX`. `size` is the
 /// map's.
 pub fn danger_escorts(world: &WorldState, city: &City, to: (i32, i32), size: i32) -> usize {
-    let Some(places) = city.danger_places.as_deref() else { return 0 };
     let Some(hall) = town_hall_of(world, city) else { return 0 };
-    let from = (hall.x, hall.y);
     let to = (f64::from(to.0), f64::from(to.1));
-    let weight: f64 = places
+    danger_by_way(city, (hall.x, hall.y), to, size).ceil().min(DANGER_ESCORTS_MAX) as usize
+}
+
+/// The weight of the danger places `city` remembers within `DANGER_PLACE_WAY_REACH` of the way from
+/// `from` to `to` (`dangerByWay`); `size` is the map's.
+pub fn danger_by_way(city: &City, from: (f64, f64), to: (f64, f64), size: i32) -> f64 {
+    let Some(places) = city.danger_places.as_deref() else { return 0.0 };
+    places
         .iter()
         .filter(|p| distance_to_way(size, from, to, (p.x, p.y)) <= DANGER_PLACE_WAY_REACH)
         .map(|p| p.weight)
-        .sum();
-    weight.ceil().min(DANGER_ESCORTS_MAX) as usize
+        .sum()
 }
 
 /// Invariant (`threatSound`, `CONTEXT.md`: Threat): only an NPC city holds threats and danger
