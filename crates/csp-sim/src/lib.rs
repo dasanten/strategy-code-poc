@@ -57,6 +57,7 @@ mod movement_test_world;
 pub mod names;
 pub mod new_veins;
 pub mod node_gen;
+pub mod npc_acting_first;
 pub mod npc_behaviour;
 pub mod npc_chain;
 pub mod npc_cities;

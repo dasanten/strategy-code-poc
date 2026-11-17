@@ -334,6 +334,12 @@
     "expandScouts": 2.0,
     "temperamentTilt": 1.5
   },
+  "NPC_ACTING_FIRST": {
+    "allyThreat": 30.0,
+    "hireThreat": 30.0,
+    "hireSoldiers": 4.0,
+    "hireDays": 7.0
+  },
   "TRADE_ORG_HQ": {
     "innerRadius": 16.0,
     "outerRadius": 40.0,

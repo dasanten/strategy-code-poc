@@ -2422,8 +2422,9 @@ pub fn alliances_sound(world: &WorldState, _: &TerrainMap) -> Out {
         if !a.members.iter().any(|m| m.realm_id == a.leader_id) {
             problems.push(format!("has leader {}, who is not a member", a.leader_id));
         }
-        if !realms.contains(a.leader_id.as_str()) {
-            problems.push(format!("has leader {}, which is no realm", a.leader_id));
+        // An NPC city that founded it may lead it (`CONTEXT.md`: Acting first).
+        if !realms.contains(a.leader_id.as_str()) && !alliance_city(&a.leader_id) {
+            problems.push(format!("has leader {}, which is no realm or NPC city", a.leader_id));
         }
         for (i, m) in a.members.iter().enumerate() {
             if !realms.contains(m.realm_id.as_str()) && !alliance_city(&m.realm_id) {

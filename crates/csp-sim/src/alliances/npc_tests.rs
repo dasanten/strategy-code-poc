@@ -232,7 +232,7 @@ fn leaves_at_once_when_it_joins_a_realm() {
 }
 
 #[test]
-fn never_leads_the_role_passes_to_a_realm_and_an_alliance_with_no_realm_left_ends() {
+fn the_role_passes_to_a_realm_first_and_with_no_realm_left_to_the_npc_city() {
     let mut s = well_regarded();
     s.invite_npc();
     // Dunmere joined after Tobin; make it the longest-standing member.
@@ -246,7 +246,10 @@ fn never_leads_the_role_passes_to_a_realm_and_an_alliance_with_no_realm_left_end
     assert_eq!(s.world.alliances[0].leader_id, "r2");
     s.order(&tobin(), json!({ "kind": "leaveAlliance" }));
     s.pass(ALLIANCE_LEAVE_DELAY);
-    assert!(s.world.alliances.is_empty());
+    // With no realm left, the NPC city leads what is left (T98.5: NPC cities found and lead
+    // alliances of their own).
+    assert_eq!(s.world.alliances[0].leader_id, "npc");
+    assert_eq!(s.world.alliances[0].members.len(), 1);
 }
 
 #[test]
@@ -274,7 +277,7 @@ fn shares_sight_members_see_through_its_residents() {
 }
 
 #[test]
-fn reports_a_trade_org_city_member_and_an_npc_city_leader() {
+fn reports_a_trade_org_city_member_and_leader_but_not_an_npc_city_leader() {
     let mut s = well_regarded();
     let tick = s.world.tick as f64;
     let alliance = &mut s.world.alliances[0];
@@ -282,14 +285,21 @@ fn reports_a_trade_org_city_member_and_an_npc_city_leader() {
         let m = json!({ "realmId": id, "joinedAt": tick, "leaving": null });
         alliance.members.push(serde_json::from_value(m).unwrap());
     }
+    // An NPC city may lead one it founded (T98.5); a Trade Org city never.
     alliance.leader_id = "npc".into();
     let id = s.alliance.clone();
-    let messages: Vec<String> =
-        alliances_sound(&s.world, &s.terrain).into_iter().map(|v| v.message).collect();
+    let messages = |s: &Setup| -> Vec<String> {
+        alliances_sound(&s.world, &s.terrain).into_iter().map(|v| v.message).collect()
+    };
     assert_eq!(
-        messages,
+        messages(&s),
+        [format!("alliance {id} has member post, which is no realm or NPC city")]
+    );
+    s.world.alliances[0].leader_id = "post".into();
+    assert_eq!(
+        messages(&s),
         [
-            format!("alliance {id} has leader npc, which is no realm"),
+            format!("alliance {id} has leader post, which is no realm or NPC city"),
             format!("alliance {id} has member post, which is no realm or NPC city"),
         ]
     );

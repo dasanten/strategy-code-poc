@@ -173,6 +173,7 @@ import {
   NPC_FOUND_STANDING,
   NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT,
   NPC_STANCE,
+  NPC_ACTING_FIRST,
   NPC_FOUND_VILLAGE_RESIDENTS,
   NPC_FULL_DAYS,
   NPC_FULL_DAYS_LEAST,
@@ -3384,7 +3385,11 @@ export function Wiki() {
           hall nor count as your fighters toward it. Struck by one of its own, they still defend
           themselves. The Trade Organization hires out soldiers at{' '}
           {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A contract runs at most{' '}
-          {days(CONTRACT_MAX_DAYS)}.
+          {days(CONTRACT_MAX_DAYS)}. An NPC city hires too, on its own: once it feels a threat of{' '}
+          {num(NPC_ACTING_FIRST.hireThreat)} from one Organization, it asks the Trade Organization
+          for up to {num(NPC_ACTING_FIRST.hireSoldiers)} soldiers for{' '}
+          {days(NPC_ACTING_FIRST.hireDays)}, if its storages hold the whole price, and pays each week
+          from them. They stand at its town hall and fight attackers in its City area.
         </p>
         <p>
           An NPC city shuts its gates while anyone armed who isn't of the city or its alliance
@@ -3518,6 +3523,13 @@ export function Wiki() {
             An NPC city joins an alliance when it holds every member at{' '}
             {signed(NPC_ALLIANCE_JOIN_STANDING)} or better, and leaves when any falls below{' '}
             {signed(NPC_ALLIANCE_LEAVE_STANDING)}.
+          </li>
+          <li>
+            An NPC city also seeks allies on its own: once it feels a threat of{' '}
+            {num(NPC_ACTING_FIRST.allyThreat)} from one Organization, it invites into an alliance it
+            leads, founding one if it has none, the realms in no alliance it holds at{' '}
+            {signed(NPC_ALLIANCE_JOIN_STANDING)} or better (never the one it fears), and the NPC cities
+            that feel threatened by the same Organization and hold it that well too.
           </li>
           <li>
             Below {signed(TRADE_ORG_REFUSES_TRADE_BELOW)} the Trade Organization won't trade with

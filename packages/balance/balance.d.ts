@@ -371,6 +371,13 @@ export interface Balance {
     temperamentTilt: number
     [key: string]: number
   }
+  readonly NPC_ACTING_FIRST: {
+    allyThreat: number
+    hireThreat: number
+    hireSoldiers: number
+    hireDays: number
+    [key: string]: number
+  }
   readonly TRADE_ORG_HQ: {
     innerRadius: number
     outerRadius: number
