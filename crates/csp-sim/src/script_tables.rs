@@ -4029,7 +4029,9 @@ fn goodsText(load, goods) {
 // me I get Food up to params.foodTake at params.food, else params.source,
 // else the nearest storage of my realm with Food, and come back; fetching
 // materials tops my food up to foodTake too. foodAt 0 turns getting food
-// off. At the site we stand spread over its footprint.
+// off. memory.foodAt and memory.foodTake, set with the task, stand in for
+// those two params (an NPC city sets them for a site far from its storage).
+// At the site we stand spread over its footprint.
 param site: building // the construction site to join; none: the one I stand on
 param source: storage // where materials come from; a carriage too; none: the nearest storage holding some
 param food: storage // where Food comes from; a carriage too; none: my source, else the nearest storage with Food
@@ -4227,8 +4229,8 @@ fn goodsOf(missing) {
 fn getFoodIfLow(from, near) {
   let food = me.carried.food
   if (food == null) { food = 0 }
-  if (food >= params.foodAt) { return false }
-  let units = floor(params.foodTake - food) // fetch takes whole units
+  if (food >= (memory.foodAt || params.foodAt)) { return false }
+  let units = floor((memory.foodTake || params.foodTake) - food) // fetch takes whole units
   if (units < 1) { return false }
   let at = from
   if (at == null || !holdsFood(at)) {
@@ -4253,7 +4255,7 @@ fn holdsFood(at) {
 fn foodToTake() {
   let food = me.carried.food
   if (food == null) { food = 0 }
-  let units = floor(params.foodTake - food)
+  let units = floor((memory.foodTake || params.foodTake) - food)
   if (units < 1) { return 0 }
   return units
 }

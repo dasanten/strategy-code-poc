@@ -258,13 +258,16 @@ pub fn pair_adults(world: &mut WorldState, city: &City, adults: &[usize]) {
 /// Gives a resident their part in a project, if there is one for them (`takePart`): walking to the
 /// tile and tearing down there; or building it by the game's Build default. For a tile of wall they
 /// first take enough for a few tiles from the storage. False when they can't help, or the building
-/// to tear down is gone. With `deliver`, only bringing materials they carry.
+/// to tear down is gone. With `deliver`, only bringing materials they carry. A site further from
+/// the storage than `NPC_NODE_REACH` they set out for with the Food for the walk there and back,
+/// and fetch more before they lack what the walk home eats (`far_site_food`, #1379).
 pub fn take_part(
     world: &mut WorldState,
     i: usize,
     project: &CityProject,
     storage: Option<usize>,
     deliver: bool,
+    terrain: Option<&TerrainMap>,
 ) -> bool {
     let r = &world.residents[i];
     if deliver {
@@ -299,9 +302,15 @@ pub fn take_part(
         }
         CityProject::Build { building, x, y } => (*building, *x, *y),
     };
+    let far_food =
+        storage.and_then(|s| far_site_food(world, i, &world.buildings[s], (x, y), terrain));
     let start_build = |world: &mut WorldState| {
         world.residents[i].order = None;
-        let memory = json!({ "building": kind_name(building), "at": { "x": x, "y": y } });
+        let mut memory = json!({ "building": kind_name(building), "at": { "x": x, "y": y } });
+        if let Some((at, take)) = far_food {
+            memory["foodAt"] = json!(at);
+            memory["foodTake"] = json!(take);
+        }
         world.residents[i].script = Some(default_script(Task::Build, memory));
         true
     };
@@ -332,6 +341,35 @@ pub fn take_part(
         return true;
     }
     can_do_more(world, i, site, store) && start_build(world)
+}
+
+/// For a builder of a site at `at` further from the storage than `NPC_NODE_REACH`, the Build
+/// default's `foodAt` and `foodTake` (#1379: Larkspur's builders set out for a quarry 360 tiles
+/// away with a few units and went Down on the way back): Food below what the walk home eats, over
+/// what it fetches below anyway (`road_crew_food`), and enough for the walk there and back and a
+/// few days of work on top (`set_out_food`). `None` for a site nearer.
+pub fn far_site_food(
+    world: &WorldState,
+    i: usize,
+    storage: &Building,
+    at: (f64, f64),
+    terrain: Option<&TerrainMap>,
+) -> Option<(f64, f64)> {
+    use csp_shared::balance::{road_crew_food, set_out_food, NPC_NODE_REACH, WALK_TICKS_PER_TILE};
+    let from = (storage.x as i32, storage.y as i32);
+    let to = (at.0 as i32, at.1 as i32);
+    let size = terrain.map_or(MAP_SIZE, |t| t.size);
+    if wrap_distance(size, from, to) <= NPC_NODE_REACH {
+        return None;
+    }
+    let walk = match terrain {
+        Some(t) => {
+            crate::walk_time::walk_time(world, t, &|_, _| true, &world.residents[i], from, to)
+        }
+        None => wrap_distance(size, from, to) * WALK_TICKS_PER_TILE,
+    };
+    let food_at = road_crew_food(walk);
+    Some((food_at, set_out_food(walk) + food_at))
 }
 
 /// Whether a resident carries materials for walls or gates, for a project of `building`

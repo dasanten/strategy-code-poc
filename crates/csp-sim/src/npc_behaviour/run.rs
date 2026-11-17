@@ -400,7 +400,7 @@ fn run_city(
             && carries_materials(&world.residents[i], &city)
         {
             if let Some(p) = project(world, &mut plan_ms) {
-                if take_part(world, i, &p, store, true) {
+                if take_part(world, i, &p, store, true, terrain) {
                     free -= 1.0;
                     continue;
                 }
@@ -461,7 +461,7 @@ fn run_city(
             }
             if job.as_ref().is_some_and(|j| j.kind == CityJobKind::Build) && free > 0.0 {
                 if let Some(p) = project(world, &mut plan_ms) {
-                    if take_part(world, i, &p, store, false) {
+                    if take_part(world, i, &p, store, false, terrain) {
                         free -= 1.0;
                         continue;
                     }

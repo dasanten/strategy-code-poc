@@ -422,3 +422,31 @@ fn tear_down_with_food_at_0_without_leaving_however_little_food_they_carry() {
     assert_matches(&order_json(w1(&world)), json!({ "kind": "tearDown", "buildingId": "camp" }));
     assert!(!truthy(memory(&world, "food")));
 }
+
+#[test]
+fn build_takes_food_at_and_food_take_from_its_memory_over_the_params() {
+    // #1379: an NPC city sets them for a builder of a far site.
+    let (mut world, t, _) = camp_world();
+    storage(&mut world, "s1", HOUSE_AT.0 as f64 + 6.0, HOUSE_AT.1 as f64, food(50.0));
+    add_builder(&mut world, 3.0, json!({ "source": "s1" }), house_materials());
+    let memory = &mut world.residents[0].script.as_mut().unwrap().memory;
+    let mut m = serde_json::to_value(&*memory).unwrap();
+    m["foodAt"] = json!(4);
+    m["foodTake"] = json!(12);
+    *memory = from(m);
+    let mut fetched = false;
+    let left = run(
+        &mut world,
+        &t,
+        |w| {
+            fetched |= carried(w, Good::Food) >= 12.0;
+            fetched && building_at_site(w)
+        },
+        400,
+        Task::Build,
+    );
+    assert!(left);
+    assert_eq!(carried(&world, Good::Food), 12.0);
+    assert_eq!(stock_of(&world, "s1", Good::Food), Some(50.0 - 9.0));
+    assert_sound(&world, &t);
+}

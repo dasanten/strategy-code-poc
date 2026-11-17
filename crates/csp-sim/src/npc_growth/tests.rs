@@ -624,3 +624,28 @@ fn below_its_reserve_keeps_the_farmers_who_win_back_what_its_food_lacks() {
     set_stock(&mut v, &[(Good::Food, reserve - 1.0)]);
     assert_eq!(farmers_wanted(&v.world, &city), fed + 1.0);
 }
+
+#[test]
+fn a_builder_of_a_site_beyond_the_node_reach_sets_out_with_food_for_the_walk_there_and_back() {
+    // #1379: Larkspur's builders set out for a quarry 360 tiles away on the Build default's few
+    // units of Food, and went Down on the way back for more.
+    use csp_shared::balance::{road_crew_food, set_out_food, NPC_NODE_REACH, WALK_TICKS_PER_TILE};
+    let mut v = village(None);
+    let storage = v.storage();
+    let (sx, sy) = (v.world.buildings[storage].x, v.world.buildings[storage].y);
+    let memory = |v: &mut Village, x: f64| {
+        let r = &mut v.world.residents[0];
+        (r.order, r.script) = (None, None);
+        let project = CityProject::Build { building: BuildingKind::Quarry, x, y: sy };
+        assert!(super::take_part(&mut v.world, 0, &project, Some(storage), false, None));
+        v.world.residents[0].script.as_ref().expect("the Build default").memory.clone()
+    };
+    let near = memory(&mut v, sx + 40.0);
+    assert_eq!((near.get("foodAt"), near.get("foodTake")), (None, None));
+    let far = sx + NPC_NODE_REACH + 200.0;
+    let walk = (far - sx) * WALK_TICKS_PER_TILE;
+    let m = memory(&mut v, far);
+    assert_eq!(m["foodAt"], json!(road_crew_food(walk)));
+    assert_eq!(m["foodTake"], json!(set_out_food(walk) + road_crew_food(walk)));
+    assert!(m["foodTake"].as_f64().unwrap() > 3.0);
+}
