@@ -128,6 +128,7 @@ impl Place {
                 name: None,
                 demands_sent_at: None,
                 heir_id: None,
+                founded_at: None,
             });
         }
         let against = CrimeAgainst {

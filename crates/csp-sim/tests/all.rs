@@ -94,6 +94,8 @@ mod mending;
 mod new_veins;
 #[path = "npc_chain.rs"]
 mod npc_chain;
+#[path = "npc_demand_paid.rs"]
+mod npc_demand_paid;
 #[path = "npc_founded.rs"]
 mod npc_founded;
 #[path = "npc_patrols.rs"]

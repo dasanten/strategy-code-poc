@@ -189,6 +189,7 @@ fn world_for(user_id: i64, realm: bool) -> (WorldState, TerrainMap) {
             name: Some("Ironvale".into()),
             demands_sent_at: None,
             heir_id: None,
+            founded_at: None,
         });
     }
     (world, terrain)

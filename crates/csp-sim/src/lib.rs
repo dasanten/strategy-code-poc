@@ -62,6 +62,7 @@ pub mod npc_chain;
 pub mod npc_cities;
 pub mod npc_coins;
 pub mod npc_defence;
+pub mod npc_demands;
 pub mod npc_escort;
 pub mod npc_founding;
 pub mod npc_growth;

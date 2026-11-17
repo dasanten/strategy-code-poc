@@ -467,6 +467,7 @@ fn found_at(
         name: None,
         demands_sent_at: None,
         heir_id: None,
+        founded_at: Some(world.tick as f64),
     };
     if let (Some(names), Some(leader_name)) = (names, &leader_name) {
         realm.name = Some(crate::queries::people::js_trim(&names.realm_name).to_string());

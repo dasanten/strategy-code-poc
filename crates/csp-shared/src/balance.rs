@@ -804,6 +804,40 @@ pub const NPC_HUNT_REACH: f64 = 160.0;
 /// and gate posts (`CONTEXT.md`: Acting first).
 pub const NPC_HUNTERS_PER_THIEF: f64 = 2.0;
 
+/// How many times an Organization's strength (all its armed residents, as respect weighs them) an
+/// NPC city's own side must be before it sends that Organization a demand (`CONTEXT.md`: NPC
+/// demand): "far outweighs", as a realm must far outweigh a city for it to yield to one
+/// (`DEMAND_YIELD_RESPECT_TIMES`).
+pub const NPC_DEMAND_OUTWEIGH_TIMES: f64 = 4.0;
+
+/// The least strength an NPC city's own side must have to send a demand (`CONTEXT.md`: NPC
+/// demand): as much as a city must see to yield to one (`DEMAND_YIELD_RESPECT_MIN`), so a village
+/// without soldiers asks nobody for anything.
+pub const NPC_DEMAND_MIN_STRENGTH: f64 = 25.0;
+
+/// The Coins an NPC city demands (`CONTEXT.md`: NPC demand): about what a few days of a small
+/// realm's trade bring in, enough to sting, not to ruin.
+pub const NPC_DEMAND_COINS: f64 = 50.0;
+
+/// An NPC city's demand's deadline, in game days (`CONTEXT.md`: NPC demand): one real day, as the
+/// Trade Organization gives for a debt (`TRADE_ORG_DEBT_DEMAND_DAYS`), so a Player who comes by
+/// once a day can still pay.
+pub const NPC_DEMAND_DAYS: f64 = 60.0;
+
+/// Game days before an NPC city sends the same Organization its next demand, from the last
+/// (`CONTEXT.md`: NPC demand): two real days, so one is answered or lapsed a real day before the
+/// next comes.
+pub const NPC_DEMAND_AGAIN_DAYS: f64 = 120.0;
+
+/// Where an NPC city's standing toward an Organization falls to, at most, when it refuses or lets
+/// lapse that city's demand (`CONTEXT.md`: NPC demand): hostile, below where it refuses them
+/// (`NPC_CITY_REFUSES_STANDING`).
+pub const NPC_DEMAND_REFUSED_STANDING: f64 = -40.0;
+
+/// How long a new realm is sheltered from NPC cities, in game days (`CONTEXT.md`: New realm's
+/// shelter): two game weeks, nearly six real hours, to build a first army.
+pub const NEW_REALM_SHELTER_DAYS: f64 = 14.0;
+
 /// How many stops a round has along an NPC city's wall, spread evenly round it. Each costs one path
 /// search; a town's wall of 180 tiles gives legs of about 22 tiles, some 3 game hours each.
 pub const NPC_PATROL_WALL_STOPS: f64 = 8.0;
@@ -3171,6 +3205,13 @@ pub fn balance_json() -> Value {
     m.insert("NPC_SOLDIERS_PER_PATROL".into(), json!(NPC_SOLDIERS_PER_PATROL));
     m.insert("NPC_HUNT_REACH".into(), json!(NPC_HUNT_REACH));
     m.insert("NPC_HUNTERS_PER_THIEF".into(), json!(NPC_HUNTERS_PER_THIEF));
+    m.insert("NPC_DEMAND_OUTWEIGH_TIMES".into(), json!(NPC_DEMAND_OUTWEIGH_TIMES));
+    m.insert("NPC_DEMAND_MIN_STRENGTH".into(), json!(NPC_DEMAND_MIN_STRENGTH));
+    m.insert("NPC_DEMAND_COINS".into(), json!(NPC_DEMAND_COINS));
+    m.insert("NPC_DEMAND_DAYS".into(), json!(NPC_DEMAND_DAYS));
+    m.insert("NPC_DEMAND_AGAIN_DAYS".into(), json!(NPC_DEMAND_AGAIN_DAYS));
+    m.insert("NPC_DEMAND_REFUSED_STANDING".into(), json!(NPC_DEMAND_REFUSED_STANDING));
+    m.insert("NEW_REALM_SHELTER_DAYS".into(), json!(NEW_REALM_SHELTER_DAYS));
     m.insert("NPC_PATROL_WALL_STOPS".into(), json!(NPC_PATROL_WALL_STOPS));
     m.insert("NPC_PATROL_ROAD_STOPS".into(), json!(NPC_PATROL_ROAD_STOPS));
     m.insert("NPC_WAR_CHEST_PER_RESIDENT".into(), json!(NPC_WAR_CHEST_PER_RESIDENT));
