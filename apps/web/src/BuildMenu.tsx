@@ -42,7 +42,7 @@ export function KindDetail({
   const ref = useRef<HTMLDivElement>(null)
   // A wall or gate is of wood or stone (`CONTEXT.md`: Wood or stone): wood unless picked.
   const [material, setMaterial] = useState<WallMaterial>('wood')
-  const ofMaterial = kind === 'wall' || kind === 'gate'
+  const ofMaterial = kind === 'wall' || kind === 'gate' || kind === 'tower'
   const picked = ofMaterial ? material : undefined
   const problem = picked === 'stone' && problemOf ? problemOf(kind, 'stone') : item.problem
   const label = picked === 'stone' ? `stone ${name.toLowerCase()}` : name.toLowerCase()

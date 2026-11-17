@@ -207,6 +207,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "children-dont-work", check: checks::children_dont_work },
         Invariant { name: "children-carry-only-food", check: checks::children_carry_only_food },
         Invariant { name: "carriages-in-place", check: checks::carriages_in_place },
+        Invariant { name: "siege-machines-in-place", check: checks::siege_machines_in_place },
         Invariant { name: "vessels-in-place", check: checks::vessels_in_place },
         Invariant { name: "riders-on-horses", check: checks::riders_on_horses },
         Invariant { name: "passengers-aboard", check: checks::passengers_aboard },
@@ -230,6 +231,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "shots-within-reach", check: checks::shots_within_reach },
         Invariant { name: "up-only-on-walls", check: crate::wall_walk::up_only_on_walls },
         Invariant { name: "up-only-on-own-walls", check: crate::wall_walk::up_only_on_own_walls },
+        Invariant { name: "tower-room", check: crate::wall_walk::tower_room },
         Invariant {
             name: "none-attack-up-from-below",
             check: crate::wall_walk::none_attack_up_from_below,

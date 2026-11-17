@@ -5,7 +5,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use csp_shared::balance::{NPC_POST_AROUND_HALL, NPC_SOLDIERS_AT_GATE, NPC_SOLDIERS_ON_HALL};
+use csp_shared::balance::{
+    NPC_POST_AROUND_HALL, NPC_SOLDIERS_AT_GATE, NPC_SOLDIERS_ON_HALL, TOWER_ROOM,
+};
 use csp_shared::footprint::{covers, footprint_tiles, FOOTPRINT};
 use csp_shared::terrain::{
     is_passable_terrain, terrain_at, tile_index, wrap, wrap_delta, TerrainMap,
@@ -151,7 +153,7 @@ pub fn soldier_posts(
     }
     let mut taken = on_hall_n;
     let at_gate = NPC_SOLDIERS_AT_GATE as usize;
-    for gate in gates {
+    for gate in &gates {
         let at = (gate.x as i32, gate.y as i32);
         let tiles = ids(&[at]);
         for id in ranked.iter().skip(taken).take(at_gate) {
@@ -160,7 +162,28 @@ pub fn soldier_posts(
         taken += at_gate;
     }
     ranked = ranked.into_iter().skip(taken).chain(to_wall).collect();
-    let rest = ranked;
+    // Its towers fill first, `TOWER_ROOM` each, its archers before the others (`CONTEXT.md`:
+    // Tower, Soldier posts).
+    let towers = reachable_towers(world, city, &gates, &walls, size);
+    let mut rest: Vec<&String> = Vec::new();
+    if towers.is_empty() {
+        rest = ranked;
+    } else {
+        let (first, then): (Vec<&String>, Vec<&String>) =
+            ranked.into_iter().partition(|id| archers.contains(id));
+        let mut queue = first.into_iter().chain(then);
+        for tower in &towers {
+            let tiles = footprint_tiles(placed(tower), size);
+            let on_it = ids(&tiles);
+            for slot in 0..TOWER_ROOM as usize {
+                let Some(id) = queue.next() else { break };
+                let at = tiles[slot % tiles.len()];
+                posts.insert(id.to_string(), SoldierPost { at, tiles: on_it.clone() });
+            }
+        }
+        rest.extend(queue);
+        rest.sort();
+    }
     if rest.is_empty() {
         return posts;
     }
@@ -224,6 +247,35 @@ pub fn reachable_walls<'w>(
     // A set order, whichever way the search went: their ids must give them the same tile each pass.
     reached.sort_by(|a, b| a.id.cmp(&b.id));
     (gates, reached)
+}
+
+/// A city's finished towers a soldier can get up onto (`CONTEXT.md`: Tower): those touching, side
+/// to side, one of its gates or the walls joined to one (`reachable_walls`), in order of id.
+fn reachable_towers<'w>(
+    world: &'w WorldState,
+    city: &City,
+    gates: &[&Building],
+    walls: &[&Building],
+    size: i32,
+) -> Vec<&'w Building> {
+    let along: HashSet<(i32, i32)> =
+        gates.iter().chain(walls).map(|b| (b.x as i32, b.y as i32)).collect();
+    let mut towers: Vec<&Building> = world
+        .buildings
+        .iter()
+        .filter(|b| {
+            b.kind == BuildingKind::Tower
+                && b.site.is_none()
+                && b.city_id.as_ref() == Some(&city.id)
+                && footprint_tiles(placed(b), size).iter().any(|&(x, y)| {
+                    [(1, 0), (-1, 0), (0, 1), (0, -1)]
+                        .iter()
+                        .any(|(dx, dy)| along.contains(&(wrap(x + dx, size), wrap(y + dy, size))))
+                })
+        })
+        .collect();
+    towers.sort_by(|a, b| a.id.cmp(&b.id));
+    towers
 }
 
 /// The tiles within `NPC_POST_AROUND_HALL` of a town hall one can stand on (`aroundHall`): not on

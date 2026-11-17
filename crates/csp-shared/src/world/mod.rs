@@ -1042,6 +1042,47 @@ pub struct RowOrder {
     pub progress: f64,
 }
 
+/// Walking to a siege machine to join its crew (`CONTEXT.md`: Siege machine): once on its tile the
+/// resident is one of its crew and the order is done.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CrewOrder {
+    pub machine_id: String,
+    pub path: Option<TilePath>,
+    pub progress: f64,
+}
+
+/// Pushing a siege machine to a tile (`CONTEXT.md`: Siege machine): the pusher is one of its crew,
+/// and the machine goes a Step at a time along a way a carriage could take, its crew with it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PushOrder {
+    pub machine_id: String,
+    pub target: Tile,
+    pub path: Option<TilePath>,
+    pub progress: f64,
+}
+
+/// Ramming a wall or gate (`CONTEXT.md`: Ram): one of a ram's crew swings it, with its whole crew,
+/// at the wall or gate next to it; `progress` builds up to its next strike.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RamOrder {
+    pub machine_id: String,
+    pub target_id: String,
+    pub progress: f64,
+}
+
+/// Throwing Stone at a wall, gate or tower (`CONTEXT.md`: Catapult): one of a catapult's crew aims
+/// it, with its whole crew, at a building in its reach; `progress` builds up to its next shot.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ThrowOrder {
+    pub machine_id: String,
+    pub target_id: String,
+    pub progress: f64,
+}
+
 /// A haul route's stop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -1342,6 +1383,15 @@ pub enum ResidentOrder {
     Sail(RowOrder),
     /// Swapping or taking off gear (`CONTEXT.md`: Equipment).
     Equip(EquipOrder),
+    /// Walking to a siege machine of the realm to join its crew (`CONTEXT.md`: Siege machine).
+    Crew(CrewOrder),
+    /// Pushing a siege machine to a tile, as one of its crew (`CONTEXT.md`: Siege machine).
+    Push(PushOrder),
+    /// Swinging a ram at the wall or gate next to it, as one of its crew (`CONTEXT.md`: Ram).
+    Ram(RamOrder),
+    /// Throwing Stone with a catapult at a wall, gate or tower in its reach, as one of its crew
+    /// (`CONTEXT.md`: Catapult).
+    Throw(ThrowOrder),
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).
@@ -1366,6 +1416,10 @@ pub struct WorldState {
     /// are none, so a world from before format 113 reads as having none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub vessels: Vec<Vessel>,
+    /// Siege machines in the field (`CONTEXT.md`: Siege machine). Left out of a save while there
+    /// are none, so a world from before format 134 reads as having none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub siege_machines: Vec<SiegeMachine>,
     pub piles: Vec<Pile>,
     pub events: Vec<RealmEvent>,
     pub alliances: Vec<Alliance>,
@@ -3456,6 +3510,8 @@ pub enum BuildingKind {
     Warehouse,
     Wall,
     Gate,
+    /// A 2×2 tower of wood or stone, part of the wall walk (`CONTEXT.md`: Tower).
+    Tower,
     Farm,
     Stable,
     Mine,
@@ -3472,6 +3528,11 @@ pub enum BuildingKind {
     Boat,
     /// A ship site (`CONTEXT.md`: Building a ship): finished, it is gone and a ship floats on Sea.
     Ship,
+    /// A ram site (`CONTEXT.md`: Siege machine, Ram): finished, it is gone and a ram stands there.
+    Ram,
+    /// A catapult site (`CONTEXT.md`: Siege machine, Catapult): finished, it is gone and a catapult
+    /// stands there.
+    Catapult,
 }
 
 /// A building or construction site (`Building`).
@@ -3521,8 +3582,8 @@ pub struct Building {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub ruined_at: Option<f64>,
-    /// What a wall or gate, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or
-    /// stone). Only walls and gates have one.
+    /// What a wall, gate or tower, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate,
+    /// Wood or stone, Tower). Only walls, gates and towers have one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub material: Option<WallMaterial>,
@@ -3614,6 +3675,38 @@ pub struct Vessel {
     /// Those aboard a ship as its crew rather than as passengers (`CONTEXT.md`: Crew): of its
     /// realm, aboard it, and not counted against what it holds. A boat has none. Left out of a
     /// save while empty (format 117).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub crew_ids: Vec<String>,
+}
+
+/// The kinds of siege machine (`CONTEXT.md`: Siege machine): a ram and a catapult.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum SiegeMachineKind {
+    Ram,
+    Catapult,
+}
+
+/// A siege machine (`CONTEXT.md`: Siege machine, ADR 0037): a machine of a realm, built in the
+/// field from a site of its kind, standing on a tile a carriage could. Its crew are residents of
+/// its realm on its tile; with enough of them one pushes it (`ResidentOrder::Push`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SiegeMachine {
+    pub id: String,
+    pub kind: SiegeMachineKind,
+    pub realm_id: Option<String>,
+    pub x: f64,
+    pub y: f64,
+    /// Damage taken from blows; at its strength it breaks (`CONTEXT.md`: Siege machine).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub damage: Option<f64>,
+    /// Work put into tearing it down so far (`CONTEXT.md`: Tearing down).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub teardown: Option<f64>,
+    /// Its crew, in the order they joined: residents of its realm on its tile.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub crew_ids: Vec<String>,
 }

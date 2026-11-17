@@ -510,7 +510,8 @@ The shared language of the game. Domain terms only — no implementation details
   realm whose residents finished it. Tearing it down dissolves the city: its buildings and
   residents stay where they are, and its residents are homeless (a Player can Relocate
   theirs).
-- **City building:** a town hall, house, storage, wall or gate (and later ones of their kind);
+- **City building:** a town hall, house, storage, wall, gate or tower (and later ones of their kind;
+  a tower since T109.3, decided overnight, Daniel to confirm);
   not farms, workplaces or stables. It is part of a city when it lies within a short distance of
   the city's town hall or of another building already part of that city, so a city grows outward
   in a chain. A building belongs to at most one city: the one whose town hall is nearer (the
@@ -536,7 +537,8 @@ The shared language of the game. Domain terms only — no implementation details
   further still; it gives the wall's cover and holds a few residents up at once (balance numbers).
   It is broken like a wall and holds out longer; those up on it fall when it does. An NPC city
   with a stone wall builds one by each gate, then at its corners; its wall posts fill its towers
-  first.
+  first. While it waits to found a daughter (Full city) it starts no new one, so founding
+  comes first (decided overnight, Daniel to confirm).
 - **House:** a building in a city's area where a fixed number of residents live (the number is in `balance.ts` and the Wiki). A city's **free housing** is
   its houses' room minus its residents. Houses are the only housing for now; later buildings
   (a palace, a castle) may add room the same way.
@@ -933,7 +935,9 @@ The shared language of the game. Domain terms only — no implementation details
     down and out can attack the ram, or its crew in contact.
   - **Catapult:** of Wood, Iron and Stone. It throws one Stone a shot at a wall, gate or tower
     within a long reach, beyond a bow's from a wall. It hits buildings only, not people. Its crew
-    stands in the open.
+    stands in the open. The Stone it throws is what its crew on its tile carry, then what lies in
+    the pile on its tile (the machine itself holds no goods); out of Stone it stops. It is aimed
+    at a building or at a tile of one. *(Decided overnight, Daniel to confirm.)*
 - **Loot:** when a resident dies, everything they carried drops on the ground for anyone to take.
 - **Capturing a city:** only by occupying its town hall for a set number of game days without a
   break (Occupying a town hall; ADR 0017). When the time is up, the city and its residents join

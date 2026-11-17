@@ -37,6 +37,8 @@ export function pickables(
   place: (x: number, y: number) => readonly [number, number],
   scale: number,
   close: boolean,
+  /** Residents inside something, as a siege machine's crew: boxed only, like passengers. */
+  inside: ReadonlySet<string> = new Set(),
 ): Pickable[] {
   const list: Pickable[] = []
   for (const r of residents) {
@@ -45,7 +47,8 @@ export function pickables(
     if (close && !spot) continue
     const [x, y] = spot ? [spot.x, spot.y] : place(r.x + 0.5, r.y + 0.5)
     const reach = spot ? Math.max(8, spot.r * 1.4) : Math.max(10, scale * 0.6)
-    const p: Pickable = { id: r.id, x, y, reach: r.aboard === undefined ? reach : 0 }
+    const boxedOnly = r.aboard !== undefined || inside.has(r.id)
+    const p: Pickable = { id: r.id, x, y, reach: boxedOnly ? 0 : reach }
     if (spot?.stack) p.stack = spot.stack
     list.push(p)
   }
@@ -92,6 +95,8 @@ export interface PickWorld {
   buildings: readonly PickBuilding[]
   carriages: readonly Pick<SeenCarriage, 'id' | 'realmId' | 'x' | 'y' | 'horseId'>[]
   horses: readonly Pick<SeenHorse, 'id' | 'realmId' | 'x' | 'y'>[]
+  /** Siege machines (`CONTEXT.md`: Siege machine): a click on one's tile opens its card. */
+  machines?: readonly { x: number; y: number }[]
 }
 
 /**
@@ -134,7 +139,8 @@ export function mapPickAt(
   const theirs =
     world.carriages.some((k) => k.realmId !== realmId && onThisTile(k)) ||
     world.horses.some((h) => h.realmId !== realmId && !busyHorses(world).has(h.id) && onThisTile(h))
-  if (theirs) return tilePick(x, y, world)
+  // The crew stand on their siege machine, as passengers in a cart: the tile card lists them.
+  if (theirs || world.machines?.some(onThisTile)) return tilePick(x, y, world)
   if (ours.length === 1 && here.length === 1) return { kind: 'resident', id: ours[0]!.id }
   if (ours.length > 1 && ours.length === here.length)
     return { kind: 'group', ids: ours.map((r) => r.id) }

@@ -365,6 +365,8 @@ export type Picking =
   | 'row'
   | 'driveOff'
   | 'rowOff'
+  | 'push'
+  | 'throw'
   | 'hitchOff'
   | 'haul'
   | 'roadFrom'
@@ -1320,6 +1322,23 @@ export function orderDoing(
     // `CONTEXT.md`: Rowing.
     if (!o.path) return `Finding a way over the water to ${o.target.x}, ${o.target.y}`
     return `Rowing to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
+  }
+  if (o?.kind === 'crew') {
+    // `CONTEXT.md`: Siege machine.
+    if (!o.path) return 'Finding a way to the ram to crew it'
+    return `${walking} to the ram to crew it · ${left(o.path)}`
+  }
+  if (o?.kind === 'ram') {
+    // `CONTEXT.md`: Ram: its crew under its roof.
+    return 'Ramming with the crew'
+  }
+  if (o?.kind === 'throw') {
+    // `CONTEXT.md`: Catapult.
+    return 'Throwing Stone with the crew'
+  }
+  if (o?.kind === 'push') {
+    if (!o.path) return `Finding a way for the ram to ${o.target.x}, ${o.target.y}`
+    return `Pushing the ram to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
   }
   if (o?.kind === 'sail') {
     // `CONTEXT.md`: Sailing.

@@ -48,6 +48,10 @@ impl OrderKind for Climb {
             Ok(w) => w,
             Err(e) => return Some(e),
         };
+        // A wall or gate is climbed; a tower is broken (`CONTEXT.md`: Walls in combat, Tower).
+        if wall.kind == csp_shared::world::BuildingKind::Tower {
+            return Some("a tower is broken, not climbed".into());
+        }
         if let Some(no) = crate::lent::refusal(world, r, &wall.id) {
             return Some(no.into());
         }

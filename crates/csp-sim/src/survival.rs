@@ -295,6 +295,10 @@ pub fn order_kind(o: &ResidentOrder) -> &'static str {
         ResidentOrder::Equip(_) => "equip",
         ResidentOrder::Row(_) => "row",
         ResidentOrder::Sail(_) => "sail",
+        ResidentOrder::Crew(_) => "crew",
+        ResidentOrder::Push(_) => "push",
+        ResidentOrder::Ram(_) => "ram",
+        ResidentOrder::Throw(_) => "throw",
     }
 }
 
@@ -512,6 +516,8 @@ pub fn end_realm(world: &mut WorldState, realm_id: &str, size: i32) {
         world.carriages[i].realm_id = None;
         world.carriages[i].city_id = nearest_city(world, &cities, at, size);
     }
+    // NPC cities build no siege machines (`CONTEXT.md`: Siege machine): the realm's belong to nobody.
+    crate::siege::end_realm_machines(world, realm_id);
     // NPC cities don't use the water (`CONTEXT.md`: Haven), so the realm's boats belong to nobody.
     for v in &mut world.vessels {
         if v.realm_id.as_deref() == Some(realm_id) {

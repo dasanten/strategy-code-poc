@@ -13,11 +13,13 @@ use std::cell::OnceCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
+use crate::queries::walls::sight_range_of;
 use csp_shared::balance::SIGHT_RANGE;
 use csp_shared::footprint::{footprint_tiles, Placed, FOOTPRINT};
 use csp_shared::protocol::{
     BuildLine, ScriptIdOnly, SeenArmy, SeenBuilding, SeenCaravan, SeenCarriage, SeenCity,
-    SeenEntity, SeenHorse, SeenInterrupted, SeenResident, SeenScript, SeenTrader, SeenVessel,
+    SeenEntity, SeenHorse, SeenInterrupted, SeenMachine, SeenResident, SeenScript, SeenTrader,
+    SeenVessel,
 };
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::horse_market::NpcHorseOffer;
@@ -98,6 +100,9 @@ pub fn buildings_by_square(world: &WorldState, size: i32) -> HashMap<i32, Vec<us
     out
 }
 
+/// Each observer's tile and how far they see, by square of the map.
+type SeenFrom = HashMap<i32, Vec<((i32, i32), f64)>>;
+
 /// The observers' eyes (`eyesOf`): whether any of them is within sight range of a spot, plus a
 /// reach. The observers are sorted into squares, so a spot is checked only against those in its
 /// square and the ones next to it.
@@ -106,25 +111,35 @@ pub struct Eyes {
     size: i32,
     squares: Squares,
     steps: Vec<i32>,
-    grid: HashMap<i32, Vec<(i32, i32)>>,
+    /// Each observer's tile and how far they see, by square.
+    grid: SeenFrom,
     /// The squares anything in sight can stand in.
     watched: HashSet<i32>,
 }
 
 impl Eyes {
-    /// The eyes of observers on a map `size` tiles across.
+    /// The eyes of observers on a map `size` tiles across, each seeing `SIGHT_RANGE`.
     pub fn of(size: i32, observers: &[Spot]) -> Self {
+        let ranged: Vec<(Spot, f64)> = observers.iter().map(|&o| (o, SIGHT_RANGE)).collect();
+        Eyes::of_ranged(size, &ranged)
+    }
+
+    /// The eyes of observers each seeing as far as given (`CONTEXT.md`: Sight, Tower): at most twice
+    /// `SIGHT_RANGE`, which the squares are cut for.
+    pub fn of_ranged(size: i32, observers: &[(Spot, f64)]) -> Self {
         let squares = Squares::of(size);
         let across = squares.across;
         // The squares next to one, across the joins; on a map only a few squares across, every
         // one.
         let steps: Vec<i32> = if across < 3 { (0..across).collect() } else { vec![-1, 0, 1] };
-        let mut grid: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
+        let mut grid: SeenFrom = HashMap::new();
         let mut watched = HashSet::new();
         let mut eyes = Eyes { size, squares, steps, grid: HashMap::new(), watched: HashSet::new() };
-        for o in observers {
+        for &(o, range) in observers {
             let (sx, sy) = (squares.square(o.x), squares.square(o.y));
-            grid.entry(sy * across + sx).or_default().push(o.tile());
+            grid.entry(sy * across + sx)
+                .or_default()
+                .push((o.tile(), range.min(2.0 * SIGHT_RANGE)));
             for &dy in &eyes.steps {
                 for &dx in &eyes.steps {
                     watched.insert(eyes.around(sy, dy) * across + eyes.around(sx, dx));
@@ -170,7 +185,8 @@ impl Eyes {
                 else {
                     continue;
                 };
-                if near.iter().any(|&o| wrap_distance(self.size, o, tile) <= SIGHT_RANGE + reach) {
+                if near.iter().any(|&(o, range)| wrap_distance(self.size, o, tile) <= range + reach)
+                {
                     return true;
                 }
             }
@@ -237,6 +253,24 @@ pub fn observers_of(world: &WorldState, index: &WorldIndex, side: &str) -> Vec<S
                     .is_some_and(|b| members.contains(b))
         })
         .map(|r| Spot { x: r.x, y: r.y })
+        .collect()
+}
+
+/// The residents a side sees through and how far each sees (`CONTEXT.md`: Sight, Tower): one up
+/// on a tower `TOWER_SIGHT_RANGE`, anyone else `SIGHT_RANGE`.
+pub fn ranged_observers_of(world: &WorldState, index: &WorldIndex, side: &str) -> Vec<(Spot, f64)> {
+    let members: HashSet<String> = sharing_sight(world, side).into_iter().collect();
+    world
+        .residents
+        .iter()
+        .filter(|r| {
+            let org = r.owner.as_deref().or(r.city_id.as_deref());
+            org.is_some_and(|o| members.contains(o))
+                || index
+                    .commander_ref(world, &r.id, r.owner.as_deref())
+                    .is_some_and(|b| members.contains(b))
+        })
+        .map(|r| (Spot { x: r.x, y: r.y }, sight_range_of(world, r)))
         .collect()
 }
 
@@ -590,6 +624,23 @@ fn everything_seen(
             }));
         }
     }
+    // A siege machine shows to whoever has its tile in sight, with its kind, realm and crew
+    // (`CONTEXT.md`: Siege machine).
+    for m in &world.siege_machines {
+        if in_sight(m.x, m.y) {
+            out.push(SeenEntity::Machine(SeenMachine {
+                id: m.id.clone(),
+                kind: m.kind,
+                realm_id: m.realm_id.clone(),
+                x: m.x,
+                y: m.y,
+                damage: m.damage,
+                teardown: m.teardown,
+                crew_ids: m.crew_ids.clone(),
+                pusher_id: crate::siege::pusher_of(world, m).map(|r| r.id.clone()),
+            }));
+        }
+    }
     for p in &world.piles {
         if in_sight(p.x, p.y) {
             out.push(SeenEntity::Pile(p.clone()));
@@ -790,8 +841,9 @@ pub struct SideSight {
 impl SideSight {
     /// What `side` sees of the world now.
     pub fn new(world: &WorldState, index: &WorldIndex, side: &str) -> Self {
-        let observers = observers_of(world, index, side);
-        let eyes = Arc::new(Eyes::of(index.size(), &observers));
+        let ranged = ranged_observers_of(world, index, side);
+        let observers: Vec<Spot> = ranged.iter().map(|&(o, _)| o).collect();
+        let eyes = Arc::new(Eyes::of_ranged(index.size(), &ranged));
         SideSight {
             side: side.to_string(),
             observers,
@@ -1054,6 +1106,7 @@ fn spot_of(e: &SeenEntity) -> Option<Spot> {
         SeenEntity::Horse(h) => Some(Spot { x: h.x, y: h.y }),
         SeenEntity::Carriage(k) => Some(Spot { x: k.x, y: k.y }),
         SeenEntity::Vessel(v) => Some(Spot { x: v.x, y: v.y }),
+        SeenEntity::Machine(m) => Some(Spot { x: m.x, y: m.y }),
         SeenEntity::Pile(p) => Some(Spot { x: p.x, y: p.y }),
         SeenEntity::Building(b) => Some(Spot { x: b.building.x, y: b.building.y }),
         _ => None,
@@ -1070,7 +1123,7 @@ pub fn sent_out_of_sight(
     realm_id: &str,
     sent: &[SeenEntity],
 ) -> Vec<InvariantViolation> {
-    let eyes = Eyes::of(index.size(), &observers_of(world, index, realm_id));
+    let eyes = Eyes::of_ranged(index.size(), &ranged_observers_of(world, index, realm_id));
     sent.iter()
         .filter(|e| match e {
             SeenEntity::City(c) => !world.buildings.iter().any(|b| {
@@ -1225,7 +1278,7 @@ impl SightTracker {
         }
         let mut grown: BTreeMap<u64, BTreeSet<usize>> = BTreeMap::new();
         let mut looking: HashSet<(u64, String)> = HashSet::new();
-        let radius = SIGHT_RANGE as i32;
+
         for r in &world.residents {
             let by = index.commander_of(world, &r.id, r.owner.as_deref());
             let org = r.owner.as_deref().or(r.city_id.as_deref());
@@ -1246,6 +1299,8 @@ impl SightTracker {
                     continue;
                 }
                 self.last_seen_from.insert(key, here);
+                // Further from up on a tower (`CONTEXT.md`: Tower).
+                let radius = sight_range_of(world, r) as i32;
                 let chunks = explored.explore(user, here.0, here.1, radius);
                 if chunks.is_empty() {
                     continue;

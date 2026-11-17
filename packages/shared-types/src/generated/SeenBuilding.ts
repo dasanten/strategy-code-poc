@@ -30,7 +30,7 @@ repair?: ConstructionSite,
  */
 ruinedAt?: number, 
 /**
- * What a wall or gate, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or
- * stone). Only walls and gates have one.
+ * What a wall, gate or tower, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate,
+ * Wood or stone, Tower). Only walls, gates and towers have one.
  */
 material?: WallMaterial, };

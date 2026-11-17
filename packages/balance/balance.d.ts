@@ -739,6 +739,10 @@ export interface Balance {
       wood: number
       [key: string]: number
     }
+    tower: {
+      wood: number
+      [key: string]: number
+    }
     gate: {
       wood: number
       [key: string]: number
@@ -781,6 +785,17 @@ export interface Balance {
       iron: number
       [key: string]: number
     }
+    ram: {
+      wood: number
+      iron: number
+      [key: string]: number
+    }
+    catapult: {
+      wood: number
+      iron: number
+      stone: number
+      [key: string]: number
+    }
     [key: string]: Record<string, never> | {
       wood: number
       [key: string]: number
@@ -808,6 +823,11 @@ export interface Balance {
       wood: number
       iron: number
       [key: string]: number
+    } | {
+      wood: number
+      iron: number
+      stone: number
+      [key: string]: number
     }
   }
   readonly BUILD_WORK: {
@@ -820,6 +840,7 @@ export interface Balance {
     smithy: number
     townHall: number
     wall: number
+    tower: number
     gate: number
     road: number
     house: number
@@ -830,6 +851,8 @@ export interface Balance {
     carriage: number
     boat: number
     ship: number
+    ram: number
+    catapult: number
     [key: string]: number
   }
   readonly STONE_BUILD_MATERIALS: {
@@ -841,6 +864,10 @@ export interface Balance {
       stone: number
       [key: string]: number
     }
+    tower: {
+      stone: number
+      [key: string]: number
+    }
     [key: string]: {
       stone: number
       [key: string]: number
@@ -849,6 +876,7 @@ export interface Balance {
   readonly STONE_BUILD_WORK: {
     wall: number
     gate: number
+    tower: number
     [key: string]: number
   }
   readonly MOUNTAIN_ROAD_WORK_FACTOR: number
@@ -1459,14 +1487,29 @@ export interface Balance {
   readonly WALL_STRENGTH: {
     wall: number
     gate: number
+    tower: number
     [key: string]: number
   }
   readonly STONE_WALL_STRENGTH: {
     wall: number
     gate: number
+    tower: number
     [key: string]: number
   }
   readonly BROKEN_MATERIALS_RETURNED: number
+  readonly TOWER_ROOM: number
+  readonly TOWER_SIGHT_RANGE: number
+  readonly TOWER_SHOT_REACH_BONUS: number
+  readonly RAM_CREW: number
+  readonly SIEGE_PUSH_SHARE: number
+  readonly RAM_STRENGTH: number
+  readonly RAM_STRIKE_TICKS: number
+  readonly RAM_BLOW: number
+  readonly CATAPULT_CREW: number
+  readonly CATAPULT_STRENGTH: number
+  readonly CATAPULT_REACH: number
+  readonly CATAPULT_SHOT_TICKS: number
+  readonly CATAPULT_BLOW: number
   readonly CLIMB_TICKS: number
   readonly WALL_WALK_TICKS: number
   readonly FALL_DAMAGE: number
@@ -1587,10 +1630,13 @@ export interface Balance {
   readonly FOOTPRINT: {
     wall: number
     gate: number
+    tower: number
     road: number
     carriage: number
     boat: number
     ship: number
+    ram: number
+    catapult: number
     house: number
     storage: number
     smelter: number

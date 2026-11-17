@@ -29,6 +29,8 @@ export const BUILDING_PURPOSE: Record<BuildingKind, string> = {
     'A warehouse keeps the Trade Organization’s goods; a resident or carriage on it can sell goods for its coins or buy with them.',
   wall: 'A stretch of wall; walls grow the city they stand by, like houses.',
   gate: 'A gate in a wall, which its city’s realm opens and closes; it grows the city like a wall does.',
+  tower:
+    'A tower is a square building of wood or stone, two tiles a side, in a wall’s line or alone; it closes the way like a wall, its top is part of the wall walk where a wall touches it, and it holds a few residents up at once. It is broken like a wall but holds out longer.',
   farm: 'A farm is fields that make Food; on Plains only.',
   stable: 'A stable keeps horses and their Food, and breeds them; on Plains only.',
   mine: 'A mine digs what the iron ore, gold ore or coal node it stands on yields.',
@@ -47,6 +49,9 @@ export const BUILDING_PURPOSE: Record<BuildingKind, string> = {
     'A haven is where boats and ships are built, with a storage anyone at it loads and unloads; on the shore, touching Lake or Sea, and not on Mountain. Like a stable, nobody owns it.',
   boat: 'A boat is rowed over Lake and Sea with a few residents and a little cargo aboard; built on a tile of a finished haven that touches the water, it floats on the nearest free water tile next to it and belongs to the realm of whoever finishes it.',
   ship: 'A ship is sailed over the Sea by a crew, carrying far more than a carriage; built on a tile of a finished haven that touches the Sea, it floats on the nearest free Sea tile next to it and belongs to the realm of whoever finishes it.',
+  ram: 'A ram is a siege machine built in the field, anywhere a carriage could stand; finished, it belongs to the realm of whoever finishes it, and a crew of its residents pushes it slowly where a carriage could go. Blows break it, and its realm can tear it down.',
+  catapult:
+    "A catapult is a siege machine built in the field like a ram; its crew throws Stone they or its tile hold at a wall, gate or tower far out of any archer's reach. It hits buildings only, and its crew stands in the open.",
 }
 
 /**
@@ -58,8 +63,9 @@ export const BUILD_GROUPS: readonly { name: string; kinds: readonly BuildingKind
   { name: 'Food and animals', kinds: ['farm', 'stable'] },
   { name: 'Industry', kinds: ['smelter', 'mint', 'smithy'] },
   { name: 'City', kinds: ['townHall', 'house', 'storage', 'trainingGround'] },
-  { name: 'Defence', kinds: ['wall', 'gate'] },
+  { name: 'Defence', kinds: ['wall', 'gate', 'tower'] },
   { name: 'Transport', kinds: ['road', 'carriage', 'haven', 'boat', 'ship'] },
+  { name: 'Siege', kinds: ['ram', 'catapult'] },
 ]
 
 /** Everything the ⓘ on a building's card says about its kind, numbers from the balance. */

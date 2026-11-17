@@ -40,6 +40,7 @@ import {
   thiefOf,
   unhitcherOf,
   boaterOf,
+  pusherOf,
   type CardAction,
   type CarriageView,
   type CardList,
@@ -536,6 +537,11 @@ export function TileCard({
   onDriveOff,
   onHitchOff,
   onStealHorse,
+  onCrew,
+  onPush,
+  onTearDownMachine,
+  onRam,
+  onThrow,
   tile,
   waypoints,
   workSettings,
@@ -588,6 +594,19 @@ export function TileCard({
   onHitchOff: (residentId: string) => void
   /** Orders a resident on the tile to steal the horse there by mounting it. */
   onStealHorse: (horseId: string, residentId: string) => void
+  /**
+   * Orders a resident to join the crew of a siege machine of the realm, walking onto it
+   * (`CONTEXT.md`: Siege machine).
+   */
+  onCrew?: (machineId: string, residentId: string) => void
+  /** Has one of a siege machine's crew start pushing it, by picking where to. */
+  onPush?: (machineId: string, residentId: string) => void
+  /** Orders a resident on a siege machine's tile to tear it down. */
+  onTearDownMachine?: (machineId: string, residentId: string) => void
+  /** Has one of a ram's crew swing it at the wall or gate next to it (`CONTEXT.md`: Ram). */
+  onRam?: (machineId: string, residentId: string, targetId: string) => void
+  /** Has one of a catapult's crew aim it, by picking the wall to throw Stone at (`CONTEXT.md`: Catapult). */
+  onThrow?: (machineId: string, residentId: string) => void
   /** The tile the card is for. */
   tile: { x: number; y: number }
   /** The Player's waypoints, for a new one's name and the cap (`CONTEXT.md`: Waypoint). */
@@ -736,6 +755,14 @@ export function TileCard({
             const rider = thiefAmong(card.stealHorse?.residents, actor)
             if (a.id === 'stealHorse' && rider && card.stealHorse)
               onStealHorse(card.stealHorse.horseId, rider.id)
+            const machine = card.machine
+            if (a.id === 'crew' && machine && actor) onCrew?.(machine.id, actor.id)
+            const pusher = pusherOf(card, actor)
+            if (a.id === 'push' && machine && pusher) onPush?.(machine.id, pusher)
+            if (a.id === 'tearDown' && machine && actor) onTearDownMachine?.(machine.id, actor.id)
+            if (a.id === 'ram' && machine?.ramAt && pusher)
+              onRam?.(machine.id, pusher, machine.ramAt.id)
+            if (a.id === 'throw' && machine?.throws && pusher) onThrow?.(machine.id, pusher)
           }}
           beside={(a) =>
             a.id === 'build' &&

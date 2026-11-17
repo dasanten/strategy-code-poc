@@ -24,9 +24,15 @@ use super::names::{good_name, good_of, held, kind_name, placed};
 use super::residents::{can_work, good_weight, stock_weight};
 
 /// Kinds that may share a tile with a building (`SHARES_A_TILE`): roads, carriage sites, boat
-/// sites and ship sites.
-pub const SHARES_A_TILE: [BuildingKind; 4] =
-    [BuildingKind::Road, BuildingKind::Carriage, BuildingKind::Boat, BuildingKind::Ship];
+/// sites, ship sites, ram sites and catapult sites.
+pub const SHARES_A_TILE: [BuildingKind; 6] = [
+    BuildingKind::Road,
+    BuildingKind::Carriage,
+    BuildingKind::Boat,
+    BuildingKind::Ship,
+    BuildingKind::Ram,
+    BuildingKind::Catapult,
+];
 
 /// Kinds that keep goods (`KEEPS_GOODS`): storages, warehouses, stables and havens.
 pub const KEEPS_GOODS: [BuildingKind; 4] =
@@ -150,7 +156,7 @@ pub const CARRYING_A_CHILD: &str = "carrying a child";
 pub const VEIN_RAN_DRY: &str = "the vein ran dry";
 
 /// Kinds of building that can be built so far (`BUILDABLE`).
-pub const BUILDABLE: [BuildingKind; 19] = [
+pub const BUILDABLE: [BuildingKind; 22] = [
     BuildingKind::LumberCamp,
     BuildingKind::Quarry,
     BuildingKind::Mine,
@@ -165,11 +171,14 @@ pub const BUILDABLE: [BuildingKind; 19] = [
     BuildingKind::TrainingGround,
     BuildingKind::Wall,
     BuildingKind::Gate,
+    BuildingKind::Tower,
     BuildingKind::Road,
     BuildingKind::Carriage,
     BuildingKind::Haven,
     BuildingKind::Boat,
     BuildingKind::Ship,
+    BuildingKind::Ram,
+    BuildingKind::Catapult,
 ];
 
 /// Workplaces that turn goods into other goods (`PROCESSING`, the keys of `RECIPES`).
@@ -177,7 +186,7 @@ pub const PROCESSING: [BuildingKind; 3] =
     [BuildingKind::Smelter, BuildingKind::Mint, BuildingKind::Smithy];
 
 /// Kinds that go on passable land but Mountain, off any resource node (`OFF_NODES`).
-pub const OFF_NODES: [BuildingKind; 10] = [
+pub const OFF_NODES: [BuildingKind; 11] = [
     BuildingKind::Smelter,
     BuildingKind::Mint,
     BuildingKind::Smithy,
@@ -186,6 +195,7 @@ pub const OFF_NODES: [BuildingKind; 10] = [
     BuildingKind::Storage,
     BuildingKind::Wall,
     BuildingKind::Gate,
+    BuildingKind::Tower,
     BuildingKind::TrainingGround,
     BuildingKind::Haven,
 ];
@@ -201,12 +211,13 @@ pub const ON_PLAINS: [BuildingKind; 2] = [BuildingKind::Stable, BuildingKind::Fa
 pub const IN_CITY_AREA: [BuildingKind; 1] = [BuildingKind::House];
 
 /// What a build menu offers off any resource node, in its order (`OFF_NODE_BUILDS`).
-pub const OFF_NODE_BUILDS: [BuildingKind; 12] = [
+pub const OFF_NODE_BUILDS: [BuildingKind; 13] = [
     BuildingKind::TownHall,
     BuildingKind::House,
     BuildingKind::Storage,
     BuildingKind::Wall,
     BuildingKind::Gate,
+    BuildingKind::Tower,
     BuildingKind::TrainingGround,
     BuildingKind::Haven,
     BuildingKind::Stable,
@@ -318,9 +329,11 @@ pub fn construction_index_at(
 ) -> Option<usize> {
     match kind {
         BuildingKind::Road => road_index_at(world, x, y),
-        BuildingKind::Carriage | BuildingKind::Boat | BuildingKind::Ship => {
-            first_of_kind_at(world, x, y, kind)
-        }
+        BuildingKind::Carriage
+        | BuildingKind::Boat
+        | BuildingKind::Ship
+        | BuildingKind::Ram
+        | BuildingKind::Catapult => first_of_kind_at(world, x, y, kind),
         // A wall or gate site first: one may stand over the wooden wall it upgrades.
         BuildingKind::Wall | BuildingKind::Gate => {
             wall_site_index_at(world, x, y).or_else(|| building_index_at(world, x, y, MAP_SIZE))
@@ -383,7 +396,8 @@ pub fn build_work_of(kind: BuildingKind) -> f64 {
 /// Whether a building of `kind` of `material` is of stone (`CONTEXT.md`: Wall / Gate, Wood or
 /// stone): only a wall or gate can be.
 pub fn is_stone(kind: BuildingKind, material: Option<WallMaterial>) -> bool {
-    material == Some(WallMaterial::Stone) && matches!(kind, BuildingKind::Wall | BuildingKind::Gate)
+    material == Some(WallMaterial::Stone)
+        && matches!(kind, BuildingKind::Wall | BuildingKind::Gate | BuildingKind::Tower)
 }
 
 /// The materials a building of `kind` of `material` takes: a stone wall's or gate's from
@@ -531,6 +545,25 @@ pub fn build_problem_for(
         }
         if carriage_site_at(world, x, y).is_some() {
             return Some("there is already a carriage site on this tile".into());
+        }
+        return None;
+    }
+    if matches!(kind, BuildingKind::Ram | BuildingKind::Catapult) {
+        // `CONTEXT.md`: Siege machine: laid out in the field, anywhere a carriage could stand.
+        let name = kind_name(kind);
+        if at(x, y).is_some_and(|t| !carriage_can_enter(t)) {
+            return Some(format!("a {name} is built where a carriage could stand"));
+        }
+        if world.nodes.iter().any(|n| n.x as i32 == x && n.y as i32 == y) {
+            return Some(format!("a {name} goes off any resource node"));
+        }
+        if building_at(world, x, y, size).is_some() {
+            return Some("there is already a building there".into());
+        }
+        if first_of_kind_at(world, x, y, BuildingKind::Ram).is_some()
+            || first_of_kind_at(world, x, y, BuildingKind::Catapult).is_some()
+        {
+            return Some("there is already a siege machine site on this tile".into());
         }
         return None;
     }

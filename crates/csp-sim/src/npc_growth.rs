@@ -343,13 +343,16 @@ pub fn take_part(
     }
     let start_build = |world: &mut WorldState| {
         world.residents[i].order = set_out.clone();
-        let mut memory = json!({ "building": kind_name(building), "at": { "x": x, "y": y } });
+        // Numbers as a script keeps them: a whole one reads back as one (`running-scripts-sound`).
+        let num = csp_lang::plain::number_json;
+        let mut memory =
+            json!({ "building": kind_name(building), "at": { "x": num(x), "y": num(y) } });
         if is_stone(building, material) {
             memory["material"] = json!("stone");
         }
         if let Some((at, take)) = far_food {
-            memory["foodAt"] = json!(at);
-            memory["foodTake"] = json!(take);
+            memory["foodAt"] = num(at);
+            memory["foodTake"] = num(take);
         }
         // Until the Build default walks out, nobody takes them for stuck (`no_way_out`).
         if set_out.is_some() {
@@ -474,6 +477,10 @@ pub fn next_project(
     let rings = wall_rings(world, city, home, terrain.size);
     if let Some(r) = &rings {
         if let Some(old) = old_wall_to_tear_down(world, city, home, terrain, r) {
+            // Its old towers go with it, first (`CONTEXT.md`: Tower).
+            let size = terrain.size;
+            let old = crate::npc_towers::old_tower(world, city, home, r.inner, r.outer, size)
+                .unwrap_or(old);
             return Some(CityProject::TearDown { building_id: old });
         }
     }
@@ -769,6 +776,11 @@ fn wanted(
     if let Some(p) = stone_upgrade_project(world, city, home, size, true) {
         return Some(p);
     }
+    // So does a tower begun (`CONTEXT.md`: Tower).
+    if let Some(p) = crate::npc_towers::tower_project(world, city, home, Some(terrain), size, true)
+    {
+        return Some(p);
+    }
     if city.trade_org.is_none() {
         // A daughter starts with its town hall alone.
         let has = |kind: BuildingKind| {
@@ -878,7 +890,17 @@ fn wanted(
     if let Some(p) = stone_upgrade_project(world, city, home, size, expanding) {
         return Some(p);
     }
-    if wants_stone_for_walls(world, city) && !makes(world, city, Good::Stone) {
+    // With its outer wall all of stone, a tower by each gate, then at its corners, as it can
+    // spare the Stone (`CONTEXT.md`: Tower).
+    let towers =
+        crate::npc_towers::tower_project(world, city, home, Some(terrain), size, expanding);
+    if let Some(p) = towers {
+        return Some(p);
+    }
+    let wants_tower_stone = || crate::npc_towers::wants_stone_for_towers(world, city, home, size);
+    if (wants_stone_for_walls(world, city) || wants_tower_stone())
+        && !makes(world, city, Good::Stone)
+    {
         return chain_project(world, city, home, terrain, rings, Good::Stone, &mut HashSet::new());
     }
     None

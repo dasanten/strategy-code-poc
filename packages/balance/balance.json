@@ -650,6 +650,9 @@
     "wall": {
       "wood": 3.0
     },
+    "tower": {
+      "wood": 20.0
+    },
     "gate": {
       "wood": 4.0
     },
@@ -682,6 +685,15 @@
     "ship": {
       "wood": 120.0,
       "iron": 15.0
+    },
+    "ram": {
+      "wood": 40.0,
+      "iron": 5.0
+    },
+    "catapult": {
+      "wood": 30.0,
+      "iron": 5.0,
+      "stone": 10.0
     }
   },
   "BUILD_WORK": {
@@ -694,6 +706,7 @@
     "smithy": 7200.0,
     "townHall": 8640.0,
     "wall": 90.0,
+    "tower": 720.0,
     "gate": 180.0,
     "road": 90.0,
     "house": 1440.0,
@@ -703,7 +716,9 @@
     "haven": 5760.0,
     "carriage": 2880.0,
     "boat": 1440.0,
-    "ship": 14400.0
+    "ship": 14400.0,
+    "ram": 2880.0,
+    "catapult": 2880.0
   },
   "STONE_BUILD_MATERIALS": {
     "wall": {
@@ -711,11 +726,15 @@
     },
     "gate": {
       "stone": 6.0
+    },
+    "tower": {
+      "stone": 28.0
     }
   },
   "STONE_BUILD_WORK": {
     "wall": 270.0,
-    "gate": 540.0
+    "gate": 540.0,
+    "tower": 2160.0
   },
   "MOUNTAIN_ROAD_WORK_FACTOR": 4.0,
   "ROAD_LINE_MAX_TILES": 128.0,
@@ -951,13 +970,28 @@
   "WALL_DEFENCE": 0.25,
   "WALL_STRENGTH": {
     "wall": 3000.0,
-    "gate": 4500.0
+    "gate": 4500.0,
+    "tower": 9000.0
   },
   "STONE_WALL_STRENGTH": {
     "wall": 12000.0,
-    "gate": 18000.0
+    "gate": 18000.0,
+    "tower": 36000.0
   },
   "BROKEN_MATERIALS_RETURNED": 0.34,
+  "TOWER_ROOM": 4.0,
+  "TOWER_SIGHT_RANGE": 72.0,
+  "TOWER_SHOT_REACH_BONUS": 7.0,
+  "RAM_CREW": 4.0,
+  "SIEGE_PUSH_SHARE": 0.25,
+  "RAM_STRENGTH": 6000.0,
+  "RAM_STRIKE_TICKS": 10.0,
+  "RAM_BLOW": 150.0,
+  "CATAPULT_CREW": 3.0,
+  "CATAPULT_STRENGTH": 3000.0,
+  "CATAPULT_REACH": 20.0,
+  "CATAPULT_SHOT_TICKS": 60.0,
+  "CATAPULT_BLOW": 600.0,
   "CLIMB_TICKS": 360.0,
   "WALL_WALK_TICKS": 20.0,
   "FALL_DAMAGE": 30.0,
@@ -1073,10 +1107,13 @@
   "FOOTPRINT": {
     "wall": 1,
     "gate": 1,
+    "tower": 2,
     "road": 1,
     "carriage": 1,
     "boat": 1,
     "ship": 1,
+    "ram": 1,
+    "catapult": 1,
     "house": 2,
     "storage": 2,
     "smelter": 2,

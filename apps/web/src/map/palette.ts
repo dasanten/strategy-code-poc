@@ -74,6 +74,7 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   townHall: 0xd8c08a,
   wall: WALL_COLOR,
   gate: 0xb88a55,
+  tower: WALL_COLOR,
   house: 0xc7b391,
   storage: 0x8c6a44,
   warehouse: 0x6e5236,
@@ -90,6 +91,8 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   carriage: 0xa0703f,
   boat: 0x8a6a45,
   ship: 0x6b5236,
+  ram: 0x7a5a3a,
+  catapult: 0x6e5a44,
   haven: 0x5f8fa8,
 }
 
@@ -97,6 +100,7 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   townHall: 'Town hall',
   wall: 'Wall',
   gate: 'Gate',
+  tower: 'Tower',
   house: 'House',
   storage: 'Storage',
   warehouse: 'Warehouse',
@@ -113,6 +117,8 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   carriage: 'Carriage',
   boat: 'Boat',
   ship: 'Ship',
+  ram: 'Ram',
+  catapult: 'Catapult',
   haven: 'Haven',
 }
 /** A Trade Org caravan's carriage and crew (`CONTEXT.md`: Caravan). */

@@ -156,6 +156,7 @@ fn takes_a_diagonal_step_only_between_two_steppable_tiles_using_up_root_2_of_pro
             carriage_id: None,
             horse_id: None,
             vessel_id: None,
+            machine_id: None,
         };
         walking.resolve(world, &mut scratch, &[action])
     };
