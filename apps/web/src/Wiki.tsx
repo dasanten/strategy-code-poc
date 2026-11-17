@@ -386,6 +386,10 @@ import {
   NPC_DEMAND_AGAIN_DAYS,
   NPC_DEMAND_REFUSED_STANDING,
   NEW_REALM_SHELTER_DAYS,
+  NPC_NODE_GUARD_RANGE,
+  NPC_TAKE_OUTWEIGH_TIMES,
+  NPC_TAKE_PARTY_MIN,
+  NPC_SITE_ESCORTS,
   carryCapacity,
   walkSpeed,
   workFactor,
@@ -3348,6 +3352,20 @@ export function Wiki() {
             and sends {num(NPC_STANCE.expandScouts)} times the scouts.
           </li>
         </ul>
+        <p>
+          <b>Taking a node.</b> An NPC city short of a good it has no workplace for builds on the
+          nearest free node of it that it knows. In Expand, when that node lies out of its City
+          area, {num(NPC_SITE_ESCORTS)} of its soldiers beyond its hall and gate posts go along and
+          stand at the site until the workplace is built. A militarist city in Expand that knows no
+          free node of the good goes for the nearest workplace on one that a realm holds, in no
+          city: the realm's residents within {num(NPC_NODE_GUARD_RANGE)} tiles of it hold it. It
+          goes only when the soldiers it can spare are at least {num(NPC_TAKE_OUTWEIGH_TIMES)}{' '}
+          times as strong as the armed ones there, and never fewer than{' '}
+          {num(NPC_TAKE_PARTY_MIN)}. They strike everyone of that realm there, an attack like any
+          other and a crime against it, until none is left up; then the workplace is the city's and
+          its own workers move in (Holding a workplace). It never goes for the node of a realm in
+          its shelter (Demands).
+        </p>
         <p>
           Whoever sees an NPC city reads its stance on its card as a mood line: growing, arming,
           busy trading or looking to expand. Scripts see it as the city's stance.

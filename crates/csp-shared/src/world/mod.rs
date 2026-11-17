@@ -1686,6 +1686,26 @@ pub struct CityPlan {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub demanded: Option<IndexMap<String, f64>>,
+    /// Its soldiers out to take a node another Organization holds (`CONTEXT.md`: Taking a node).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub taking: Option<NodeTaking>,
+    /// The soldiers it sent along with the crew building on a node out of its City area
+    /// (`CONTEXT.md`: Taking a node), by resident id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub site_escort: Option<Vec<String>>,
+}
+
+/// An NPC city's soldiers out to take a workplace on a node another Organization holds
+/// (`CONTEXT.md`: Taking a node): they drive its workers and guards off, then it is the city's.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NodeTaking {
+    pub building_id: String,
+    /// The Organization that held it.
+    pub holder: String,
+    pub soldier_ids: Vec<String>,
 }
 
 /// A soldier of an NPC city out after a thief it knows of, to take back what was taken

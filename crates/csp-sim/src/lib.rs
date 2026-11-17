@@ -84,6 +84,7 @@ mod npc_slow;
 pub mod npc_stable;
 pub mod npc_stance;
 pub mod npc_stone_walls;
+pub mod npc_take_node;
 #[cfg(test)]
 mod npc_test_world;
 pub mod npc_threat;
