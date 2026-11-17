@@ -383,6 +383,7 @@ fn step_rest(
     crate::npc_threat::step_threat(world, size);
     // And pick their stance at the first of them each game day (`CONTEXT.md`: Stance).
     crate::npc_stance::step_stances(world, size);
+    crate::npc_demands::step_npc_demands(world);
     // Who is up on a wall walk, now that walls broke, changed hands and residents moved this tick.
     crate::wall_walk::step_wall_walk(world);
     let actions = steps

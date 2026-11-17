@@ -71,7 +71,7 @@ pub fn pick_stance(world: &WorldState, city: &City, size: i32) -> Stance {
 }
 
 /// Whether this tick is `city_id`'s first planning pass of a game day.
-fn first_pass_of_day(world: &WorldState, city_id: &str) -> bool {
+pub(crate) fn first_pass_of_day(world: &WorldState, city_id: &str) -> bool {
     let tick = world.tick as f64;
     plan_due(world, city_id)
         && (tick / TICKS_PER_GAME_DAY).floor()

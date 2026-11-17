@@ -18,11 +18,12 @@ use crate::events::record_event;
 use crate::goods_deps::{end_offer, new_id, realm_name, OrderSender};
 use crate::holders::{move_between, Holder};
 use crate::order_sender::commands;
+use crate::queries::city::for_sale;
 use crate::queries::goods::{free_stock, units_that_fit, units_that_fit_carriage};
 use crate::queries::names::{good_of, held, placed};
 use crate::queries::offers::offer_storage;
 use crate::queries::residents::{good_weight, is_down};
-use crate::queries::standing::TRADE_ORG;
+use crate::queries::standing::{organization_label, TRADE_ORG};
 use crate::queries::trade_org::trade_org_hq;
 use crate::queries::transfer::{
     fee_at_pick_up, hand_in_problem, nearest_warehouse, pick_up_transfer_problem, quote_transfer,
@@ -56,7 +57,7 @@ pub fn order_pick_up(
     let to = world.cities.iter().find(|c| c.id == to_city_id).cloned();
     let storage = delivery_storage(world, from_city_id).map(xy);
     let (Some(from), Some(to), Some(storage)) = (from, to, storage) else { return };
-    let Some(to_realm) = to.realm_id.clone() else { return };
+    let Some(to_realm) = receiving_org(&to) else { return };
     let Some(warehouse) = nearest_warehouse(world, storage, size).map(|w| w.id.clone()) else {
         return;
     };
@@ -83,7 +84,7 @@ pub fn order_pick_up(
         fee: 0.0,
         from_city: Some(from.name.clone()),
         name: None,
-        to_realm: realm_name(world, &to_realm),
+        to_realm: organization_label(world, &to_realm),
         to_realm_id: to_realm,
         city_id: to.id.clone(),
         city: to.name.clone(),
@@ -285,7 +286,7 @@ pub fn hand_in(
         fee: if units > 0.0 { fee } else { 0.0 },
         from_city: None,
         name: Some(world.residents[ri].name.clone()),
-        to_realm: realm_name(world, &to_realm),
+        to_realm: organization_label(world, &to_realm),
         to_realm_id: to_realm,
         city_id: to.id.clone(),
         city: to.name.clone(),
@@ -396,11 +397,18 @@ fn pick_up_at(
     world.buildings.iter().position(|b| b.id == id)
 }
 
-/// Whether the city is still the realm's, with a storage (`holds`).
+/// Whether the city is still the realm's, with a storage (`holds`). An NPC city paid a demand by
+/// Transfer is its own Organization (`CONTEXT.md`: NPC demand).
 fn holds(world: &WorldState, realm_id: &str, city_id: Option<&str>) -> bool {
     world.cities.iter().find(|c| Some(c.id.as_str()) == city_id).is_some_and(|c| {
-        c.realm_id.as_deref() == Some(realm_id) && delivery_storage(world, &c.id).is_some()
+        receiving_org(c).as_deref() == Some(realm_id) && delivery_storage(world, &c.id).is_some()
     })
+}
+
+/// Whom goods sent to a city go to: its realm, or an NPC city itself, which is paid its demands by
+/// Transfer (`CONTEXT.md`: NPC demand). None for a Trade Org city.
+fn receiving_org(city: &csp_shared::world::City) -> Option<String> {
+    city.realm_id.clone().or_else(|| for_sale(city).then(|| city.id.clone()))
 }
 
 /// Whether the sender still holds where its transfer is picked up (`senderHolds`).
@@ -905,7 +913,7 @@ fn log_arrived(world: &mut WorldState, t: &Transfer, units: f64, at: (f64, f64))
         from_realm_id: t.realm_id.clone(),
         from_realm: realm_name(world, &t.realm_id),
         to_realm_id: t.to_realm_id.clone(),
-        to_realm: realm_name(world, &t.to_realm_id),
+        to_realm: organization_label(world, &t.to_realm_id),
         back: t.back,
         city_id: t.to_city_id.clone(),
         city: city_name(world, &t.to_city_id),

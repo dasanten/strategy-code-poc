@@ -124,6 +124,7 @@ fn is_forgotten_by_a_city_that_joins_a_realm() {
         name: None,
         demands_sent_at: None,
         heir_id: None,
+        founded_at: None,
     });
     world.cities[ci].realm_id = Some("other".into());
     step_standing(&mut world);
@@ -161,6 +162,7 @@ fn is_checked_by_an_invariant() {
         name: None,
         demands_sent_at: None,
         heir_id: None,
+        founded_at: None,
     });
     assert!(matches!(check(&world).as_slice(), [m] if m.contains("has a realm again")));
     world.realms.pop();

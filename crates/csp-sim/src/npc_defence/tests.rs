@@ -143,6 +143,7 @@ fn outsider(world: &mut WorldState, id: &str, x: f64, y: f64) -> String {
             name: None,
             demands_sent_at: None,
             heir_id: None,
+            founded_at: None,
         });
     }
     id.into()
@@ -761,6 +762,7 @@ fn fight_nobody_while_two_realms_share_the_hall_as_nobody_occupies_it() {
         name: None,
         demands_sent_at: None,
         heir_id: None,
+        founded_at: None,
     });
     p.defend();
     assert_eq!(p.occupier(), None);

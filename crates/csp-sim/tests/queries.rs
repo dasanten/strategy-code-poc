@@ -70,6 +70,7 @@ fn realm(id: &str, user_id: u64, leader: &str) -> Realm {
         name: None,
         demands_sent_at: None,
         heir_id: None,
+        founded_at: None,
     }
 }
 

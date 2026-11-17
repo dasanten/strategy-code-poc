@@ -22,7 +22,7 @@ use super::offers::{free_stock, offer_storage};
 use super::persuasion::{city_strength, respect_seen_by, ticks_until_yield};
 use super::residents::good_weight;
 use super::standing::TRADE_ORG;
-use super::trade_org::{trade_org_hq, NO_CARAVANS};
+use super::trade_org::{trade_org_hq, trade_org_refuses, NO_CARAVANS};
 use super::transfer::{pick_up_transfer_problem, transfer_fee, transfer_load, transfer_warehouses};
 use super::warehouse_trade::delivery_storage;
 
@@ -295,6 +295,9 @@ pub fn demand_hand_over(
     let field = |k: &str| how.and_then(|h| h.get(k));
     let text = |k: &str| field(k).and_then(Value::as_str);
     let to_trade_org = demand.from_id == TRADE_ORG;
+    if answered_by_game(world, &demand.from_id) == Some(AnsweredBy::City) {
+        return npc_demand_hand_over(world, realm_id, demand, text("way"), text("fromCityId"));
+    }
     if to_trade_org {
         if trade_org_hq(world).is_none() {
             return Err(NO_CARAVANS.into());
@@ -357,6 +360,45 @@ pub fn demand_hand_over(
         }
         _ => Err("set the goods aside at a storage, or send them by a Transfer".into()),
     }
+}
+
+/// How `realm_id` hands over what an NPC city demanded (`CONTEXT.md`: NPC demand): by a Transfer
+/// from a city of its own to that city, which sends nobody to fetch goods set aside. The Player
+/// knows where the city that threatened them is, in sight or not.
+fn npc_demand_hand_over(
+    world: &WorldState,
+    realm_id: &str,
+    demand: &Demand,
+    way: Option<&str>,
+    from_city_id: Option<&str>,
+) -> Result<DemandHandOver, String> {
+    if way != Some("transfer") {
+        return Err("an NPC city fetches nothing: send it by a Transfer".into());
+    }
+    if trade_org_hq(world).is_none() {
+        return Err(NO_CARAVANS.into());
+    }
+    if transfer_warehouses(world).is_empty() {
+        return Err("no Trade Org warehouse to send a caravan".into());
+    }
+    if trade_org_refuses(world, realm_id) {
+        return Err("the Trade Organization won’t carry for you".into());
+    }
+    let from = from_city_id.and_then(|id| world.cities.iter().find(|c| c.id == id));
+    let Some(from) = from.filter(|c| c.realm_id.as_deref() == Some(realm_id)) else {
+        return Err("not one of your cities".into());
+    };
+    if delivery_storage(world, &from.id).is_none() {
+        return Err("your city has no storage".into());
+    }
+    let to = world.cities.iter().find(|c| c.id == demand.from_id && for_sale(c));
+    if to.is_none_or(|c| delivery_storage(world, &c.id).is_none()) {
+        return Err("their city has no storage".into());
+    }
+    Ok(DemandHandOver::Transfer {
+        from_city_id: from.id.clone(),
+        to_city_id: demand.from_id.clone(),
+    })
 }
 
 /// Why `realm_id` can't hand over a demand's goods this way, or `None` when it can
