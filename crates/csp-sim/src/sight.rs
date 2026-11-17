@@ -756,6 +756,13 @@ fn places(
         // So is how dangerous it thinks others are and where it lost people (`CONTEXT.md`: Threat).
         shown.threats = None;
         shown.danger_places = None;
+        // Whoever sees an NPC city reads its temperament (`CONTEXT.md`: Temperament); a city a
+        // Player holds now is theirs to run, whatever it was like before.
+        shown.temperament = if shown.realm_id.is_some() {
+            None
+        } else {
+            crate::temperament::temperament_of(world.seed, c)
+        };
         out.push(SeenEntity::City(Box::new(SeenCity {
             city: shown,
             price,

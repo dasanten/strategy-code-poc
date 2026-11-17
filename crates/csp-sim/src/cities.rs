@@ -79,6 +79,8 @@ pub fn found_city(world: &mut WorldState, hall: usize, realm_id: Option<&str>) -
     let drawn = CITY_NAMES[hash_str(&format!("{}:{id}", world.seed)) as usize % CITY_NAMES.len()];
     let name = given_city_name(world, drawn);
     let layout = realm_id.is_none().then(|| pick_layout(world.seed, &id));
+    let temperament =
+        realm_id.is_none().then(|| crate::temperament::pick_temperament(world.seed, &id));
     world.cities.push(City {
         id: id.clone(),
         name,
@@ -96,6 +98,7 @@ pub fn found_city(world: &mut WorldState, hall: usize, realm_id: Option<&str>) -
         threats: None,
         danger_places: None,
         layout,
+        temperament,
     });
     world.buildings[hall].city_id = Some(id);
     world.cities.len() - 1

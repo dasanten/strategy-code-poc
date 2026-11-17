@@ -380,6 +380,10 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, _t| crate::city_layout::city_layouts_sound(w),
         },
         Invariant {
+            name: "trading-posts-have-no-temperament",
+            check: |w, _t| crate::temperament::trading_posts_have_no_temperament(w),
+        },
+        Invariant {
             name: "city-streets-sound",
             check: |w, _t| crate::city_layout::city_streets_sound(w),
         },

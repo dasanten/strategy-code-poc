@@ -363,6 +363,7 @@ fn found_at(
         outweighed: None,
         threats: None,
         danger_places: None,
+        temperament: None,
         layout: None,
     };
     let building = |world: &mut WorldState, kind: BuildingKind, (bx, by): (i32, i32)| Building {

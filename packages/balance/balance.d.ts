@@ -324,6 +324,7 @@ export interface Balance {
   readonly NPC_FOUND_FOOD_DAYS: number
   readonly NPC_FOUND_GIVE_UP_DAYS: number
   readonly NPC_FOUND_STANDING: number
+  readonly NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT: number
   readonly TRADE_ORG_HQ: {
     innerRadius: number
     outerRadius: number

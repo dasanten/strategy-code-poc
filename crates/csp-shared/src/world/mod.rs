@@ -3337,6 +3337,11 @@ pub struct City {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub danger_places: Option<Vec<DangerPlace>>,
+    /// For an NPC city, what it is like (`CONTEXT.md`: Temperament), fixed when it comes into
+    /// being. Left out for a trading post and a city founded by a Player.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub temperament: Option<Temperament>,
 }
 
 /// A place where an NPC city lost people (`City.danger_places`, `CONTEXT.md`: Threat). How much it
@@ -3348,6 +3353,15 @@ pub struct DangerPlace {
     pub y: f64,
     /// About one for each person lost there, fading.
     pub weight: f64,
+}
+
+/// What an NPC city is like (`City.temperament`, `CONTEXT.md`: Temperament).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum Temperament {
+    Merchant,
+    Militarist,
+    Settler,
 }
 
 /// Since when a realm's fighters near an NPC city have outweighed it without a break
