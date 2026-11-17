@@ -154,7 +154,8 @@ pub fn steer_feeder(
     let stable = world.buildings.iter().find(|b| Some(&b.id) == job.stable_id.as_ref());
     let food = stable.and_then(|s| stable_need(world, city, s)).map_or(0.0, |n| n.food);
     if let Some(script) = &mut world.residents[i].script {
-        script.memory.insert("spareFood".into(), json!(food));
+        // As a script keeps it: a whole number reads back as one (`running-scripts-sound`, #1402).
+        script.memory.insert("spareFood".into(), csp_lang::plain::number_json(food));
     }
     None
 }
@@ -170,7 +171,8 @@ pub fn start_feeding(world: &mut WorldState, city: &City, i: usize, job: &CityJo
         return false;
     }
     let spare_food = stable_need(world, city, stable).map_or(0.0, |n| n.food);
-    let memory = json!({ "stableId": stable.id, "spareFood": spare_food });
+    let memory =
+        json!({ "stableId": stable.id, "spareFood": csp_lang::plain::number_json(spare_food) });
     world.residents[i].script = Some(default_script(Task::FeedStable, memory));
     true
 }

@@ -410,3 +410,16 @@ fn the_invariant_catches_two_feeders_and_a_trade_org_citys() {
     s.world.cities.iter_mut().find(|c| c.id == city).unwrap().trade_org = Some(TradeOrgCity::Post);
     assert_eq!(npc_one_feeder(&s.world).len(), 1);
 }
+
+#[test]
+fn a_feeders_script_keeps_plain_memory() {
+    // #1402: the spare Food went into the Feed the stable default's memory as 10.0, which a script
+    // keeps as 10, so `running-scripts-sound` broke on every feeder.
+    let mut s = setup(0.0, 1000.0);
+    let mut fed = false;
+    s.run(DAY / 4.0, |world| {
+        fed |= !feeders(world).is_empty();
+        assert_eq!(crate::script_runner::running_scripts_sound(world), []);
+    });
+    assert!(fed);
+}
