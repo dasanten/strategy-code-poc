@@ -178,10 +178,10 @@ fn at_order<'w>(world: &'w WorldState, id: &str) -> Option<&'w ResidentOrder> {
 fn holds_out_longer_than_a_wall_and_stone_longer_still() {
     let mut t = tower();
     assert_eq!(wall_strength(&t), WALL_STRENGTH.tower);
-    assert!(WALL_STRENGTH.tower > WALL_STRENGTH.gate);
+    const { assert!(WALL_STRENGTH.tower > WALL_STRENGTH.gate) };
     t.material = Some(WallMaterial::Stone);
     assert_eq!(wall_strength(&t), STONE_WALL_STRENGTH.tower);
-    assert!(STONE_WALL_STRENGTH.tower > WALL_STRENGTH.tower);
+    const { assert!(STONE_WALL_STRENGTH.tower > WALL_STRENGTH.tower) };
 }
 
 #[test]

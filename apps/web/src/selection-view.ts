@@ -1740,8 +1740,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (stable) lines.push(...pausedBreedingLines(stable, t.residents ?? [], t.horses, t.tick))
-      // What a wall or gate, or its site, is of (`CONTEXT.md`: Wood or stone).
-      if (building.kind === 'wall' || building.kind === 'gate')
+      // What a wall, gate or tower, or its site, is of (`CONTEXT.md`: Wood or stone, Tower).
+      if (building.kind === 'wall' || building.kind === 'gate' || building.kind === 'tower')
         lines.push(isStone(building.kind, building.material) ? 'Of stone' : 'Of wood')
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
       if (building.kind === 'townHall' && live && city)

@@ -862,6 +862,16 @@ const things = (more: Partial<TileThings> = {}): TileThings => ({
 })
 const tile = (more: Partial<TileThings> = {}) => describeTile(things(more), GOOD_LABELS)
 
+describe('the card for a tower (CONTEXT.md: Tower)', () => {
+  it('shows on every tile of it, saying what it is of', () => {
+    const tower = { id: 't1', kind: 'tower' as const, cityId: 'c-me', x: 4, y: 4 }
+    expect(tile({ buildings: [tower] }).lines).toContain('Of wood')
+    const stone = tile({ buildings: [{ ...tower, material: 'stone' as const }] })
+    expect(stone.lines).toContain('Of stone')
+    expect(stone.what).toBe('building')
+  })
+})
+
 describe('the card for a tile', () => {
   it('shows a boat on the water with its owner and load, what it holds only to its own realm', () => {
     const boat = {

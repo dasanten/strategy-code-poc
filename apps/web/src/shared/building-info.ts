@@ -30,7 +30,7 @@ export const BUILDING_PURPOSE: Record<BuildingKind, string> = {
   wall: 'A stretch of wall; walls grow the city they stand by, like houses.',
   gate: 'A gate in a wall, which its city’s realm opens and closes; it grows the city like a wall does.',
   tower:
-    'A tower is a 2×2 building of wood or stone in a wall’s line or alone; it closes the way like a wall, its top is part of the wall walk where a wall touches it, and it holds a few residents up at once. It is broken like a wall but holds out longer.',
+    'A tower is a square building of wood or stone, two tiles a side, in a wall’s line or alone; it closes the way like a wall, its top is part of the wall walk where a wall touches it, and it holds a few residents up at once. It is broken like a wall but holds out longer.',
   farm: 'A farm is fields that make Food; on Plains only.',
   stable: 'A stable keeps horses and their Food, and breeds them; on Plains only.',
   mine: 'A mine digs what the iron ore, gold ore or coal node it stands on yields.',
