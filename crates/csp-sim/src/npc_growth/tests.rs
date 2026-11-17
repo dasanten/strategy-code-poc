@@ -636,6 +636,8 @@ fn a_builder_of_a_site_beyond_the_node_reach_sets_out_with_food_for_the_walk_the
     let memory = |v: &mut Village, x: f64| {
         let r = &mut v.world.residents[0];
         (r.order, r.script) = (None, None);
+        // Their Food already on them (`a_builder_of_a_far_site_takes_their_food_..._first`).
+        r.carried = stock(&[(Good::Food, 40.0)]);
         let project = CityProject::Build { building: BuildingKind::Quarry, x, y: sy };
         assert!(super::take_part(&mut v.world, 0, &project, Some(storage), false, None));
         v.world.residents[0].script.as_ref().expect("the Build default").memory.clone()
@@ -648,4 +650,30 @@ fn a_builder_of_a_site_beyond_the_node_reach_sets_out_with_food_for_the_walk_the
     assert_eq!(m["foodAt"], json!(road_crew_food(walk)));
     assert_eq!(m["foodTake"], json!(set_out_food(walk) + road_crew_food(walk)));
     assert!(m["foodTake"].as_f64().unwrap() > 3.0);
+}
+
+#[test]
+fn a_builder_of_a_far_site_takes_their_food_from_the_storage_before_setting_out() {
+    // #1379: the Build default walks to the site before it looks at the Food its builder carries.
+    use csp_shared::balance::NPC_NODE_REACH;
+    let mut v = village(None);
+    set_stock(&mut v, &[(Good::Food, 400.0)]);
+    let storage = v.storage();
+    let (sx, sy) = (v.world.buildings[storage].x, v.world.buildings[storage].y);
+    let r = &mut v.world.residents[0];
+    (r.order, r.script, r.x, r.y) = (None, None, sx, sy);
+    r.carried = stock(&[(Good::Food, 1.0)]);
+    let far = CityProject::Build {
+        building: BuildingKind::Quarry,
+        x: sx + NPC_NODE_REACH + 200.0,
+        y: sy,
+    };
+    assert!(super::take_part(&mut v.world, 0, &far, Some(storage), false, None));
+    let r = &v.world.residents[0];
+    assert!(r.script.is_none());
+    assert!(
+        matches!(&r.order, Some(ResidentOrder::PickUp(o)) if o.goods[&Good::Food] >= 4.0),
+        "{:?}",
+        r.order
+    );
 }

@@ -304,6 +304,26 @@ pub fn take_part(
     };
     let far_food =
         storage.and_then(|s| far_site_food(world, i, &world.buildings[s], (x, y), terrain));
+    // For a far site they take their Food from the storage first: the Build default walks to the
+    // site before it looks at what they carry.
+    if let (Some((_, take)), Some(s)) = (far_food, storage) {
+        let store = &world.buildings[s];
+        let has = held_in(store.stock.as_ref(), Good::Food).floor();
+        let short = (take - held(&world.residents[i].carried, Good::Food)).floor();
+        let fits = crate::queries::goods::units_that_fit(r, Good::Food, world.tick as f64).floor();
+        let units = short.min(has).min(fits);
+        if units >= 1.0 {
+            let (sid, at) = (store.id.clone(), (store.x, store.y));
+            if is_at((r.x as i32, r.y as i32), placed(store), MAP_SIZE) {
+                let from = GoodsSpot::Storage { storage_id: sid };
+                let goods = Stock::from([(Good::Food, units)]);
+                world.residents[i].order = Some(ResidentOrder::PickUp(PickUpOrder { from, goods }));
+            } else {
+                walk_to(&mut world.residents[i], at);
+            }
+            return true;
+        }
+    }
     let start_build = |world: &mut WorldState| {
         world.residents[i].order = None;
         let mut memory = json!({ "building": kind_name(building), "at": { "x": x, "y": y } });
