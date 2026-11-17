@@ -1,6 +1,4 @@
 import {
-  BUILD_MATERIALS,
-  BUILD_WORK,
   BATCHES_PER_DAY,
   RECIPES,
   WORK_OUTPUT_PER_DAY,
@@ -32,6 +30,9 @@ import {
   recipeGood,
   teardownReturns,
   teardownWork,
+  isStone,
+  materialsOfKind,
+  workOfKind,
 } from './shared/building.js'
 import {
   CARRIAGE_CAPACITY,
@@ -87,6 +88,7 @@ import type {
   SeenResident,
   SeenHorse,
   ResourceNode,
+  WallMaterial,
   Waypoint,
 } from '@csp/shared-types'
 import {
@@ -2027,6 +2029,7 @@ export function GroupCard({
                     kind: 'build',
                     building: buildAt.site!.kind,
                     at: { x: buildAt.site!.x, y: buildAt.site!.y },
+                    ...(buildAt.site!.material === 'stone' ? { material: 'stone' as const } : {}),
                   })
                 }
               >
@@ -2040,6 +2043,7 @@ export function GroupCard({
                     kind: 'build',
                     building: buildAt.site!.kind,
                     at: { x: buildAt.site!.x, y: buildAt.site!.y },
+                    ...(buildAt.site!.material === 'stone' ? { material: 'stone' as const } : {}),
                   })
                 }
               />
@@ -2051,11 +2055,12 @@ export function GroupCard({
               node={buildAt.node}
               terrain={buildAt.terrain}
               buildProblem={buildAt.problem}
-              onBuild={(kind) =>
+              onBuild={(kind, material) =>
                 onOrder({
                   kind: 'build',
                   building: kind,
                   at: { x: buildAt.x, y: buildAt.y },
+                  ...(material ? { material } : {}),
                 })
               }
             />
@@ -2198,7 +2203,7 @@ export interface GroupBuildTile {
   /** The explored terrain beneath this tile, if known. */
   terrain: number | undefined
   /** Why a kind can't be laid out on this tile, as far as the Player knows. */
-  problem: (kind: BuildingKind) => string | undefined
+  problem: (kind: BuildingKind, material?: WallMaterial) => string | undefined
 }
 
 /** What picking a tile does for a group, said while the map waits for it. */
@@ -2446,9 +2451,9 @@ export function ResidentCard({
   /** The resource node on the resident's tile, if the Player knows of one. */
   node: KnownNode | undefined
   /** Orders the resident to build on their tile, or to join the site there. */
-  onBuild: (kind: BuildingKind) => void
+  onBuild: (kind: BuildingKind, material?: WallMaterial) => void
   /** Why a kind can't be laid out from the resident's tile, as far as the Player knows. */
-  buildProblem?: (kind: BuildingKind) => string | undefined
+  buildProblem?: (kind: BuildingKind, material?: WallMaterial) => string | undefined
   /** Residents in sight working the building on the resident's tile. */
   workers: number
   /** Realms whose residents in sight work it: who holds it (`CONTEXT.md`: Holding a workplace). */
@@ -3598,13 +3603,15 @@ function SiteBlock({
   /** The explored terrain beneath the site, if known (`buildingWork`). */
   terrain?: number
   at: OnSite
-  onBuild: (kind: BuildingKind) => void
+  onBuild: (kind: BuildingKind, material?: WallMaterial) => void
 }) {
   const adult = canWork(resident, tick)
   const o = resident.order
   const name = BUILDING_NAMES[site.kind]
-  const work = BUILD_WORK[site.kind] ?? 0
-  const materials = goodsIn(BUILD_MATERIALS[site.kind])
+  const work = workOfKind(site.kind, site.material)
+  const materials = goodsIn(materialsOfKind(site.kind, site.material))
+  const stone = isStone(site.kind, site.material)
+  const help = () => onBuild(site.kind, stone ? 'stone' : undefined)
   const joined = o?.kind === 'build' && o.siteId === site.id
   return (
     <section className="inspector-block" aria-label="Construction site">
@@ -3629,19 +3636,20 @@ function SiteBlock({
         </div>
       ))}
       <div className="order-buttons">
-        <button type="button" disabled={!adult || joined} onClick={() => onBuild(site.kind)}>
+        <button type="button" disabled={!adult || joined} onClick={help}>
           {joined ? 'Building…' : 'Help build'}
         </button>
         <CustomiseButton
           order={taskStart('build')}
           of="Help build"
           disabled={!adult || joined}
-          give={() => onBuild(site.kind)}
+          give={help}
         />
       </div>
       <p className="muted small">
-        It becomes a {name.toLowerCase()} once its materials are delivered and the work is done:
-        about {workSpan(buildingWork(site.kind, terrain))} of one resident’s work in all
+        It becomes a {stone ? 'stone ' : ''}
+        {name.toLowerCase()} once its materials are delivered and the work is done: about{' '}
+        {workSpan(buildingWork(site.kind, terrain, site.material))} of one resident’s work in all
         {workFactor(site.kind, terrain) > 1 &&
           `, on Mountain ${workFactor(site.kind, terrain)} times as much as elsewhere`}
         .

@@ -8,6 +8,7 @@ import { relocateRoom, type RelocateWorld } from './shared/relocate.js'
 import type {
   Building,
   BuildingKind,
+  WallMaterial,
   Carriage,
   City,
   Condition,
@@ -573,7 +574,7 @@ export function pickInto(w: PlanWorld, plan: Plan, at: { x: number; y: number })
 /** What the card's ask answered: goods with units, a kind to build, two horses, and so on. */
 export type PlanAnswer =
   | { ask: 'goods'; goods: Stock }
-  | { ask: 'buildingKind'; building: BuildingKind }
+  | { ask: 'buildingKind'; building: BuildingKind; material?: WallMaterial }
   | { ask: 'makes'; makes: Good }
   | { ask: 'horses'; horseIds: [string, string] }
   | { ask: 'horse'; horseId: string }
@@ -644,7 +645,8 @@ export function planOrder(
     }
     case 'build': {
       const building = a?.ask === 'buildingKind' ? a.building : p.building
-      return { order: { kind: 'task', task: 'build', building, at } }
+      const material = a?.ask === 'buildingKind' && a.material ? { material: a.material } : {}
+      return { order: { kind: 'task', task: 'build', building, at, ...material } }
     }
     case 'tearDown':
       return { order: { kind: 'task', task: 'tearDown', buildingId: p.id }, at }

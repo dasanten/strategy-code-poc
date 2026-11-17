@@ -15,6 +15,7 @@ import {
   SHARES_A_TILE,
   takesWorkSettings,
   roadTiles,
+  stoneOverAt,
 } from './shared/building.js'
 import { firstDayShown } from './shared/first-day.js'
 import type {
@@ -34,6 +35,7 @@ import type {
   Stock,
   TrainingSubject,
   SeenResident,
+  WallMaterial,
 } from '@csp/shared-types'
 import {
   carriagePulledBy,
@@ -199,6 +201,7 @@ import { arrivalOf } from './doing-view.js'
 import { CardSheet, PickBanner, TileCard, closeOpenPanel, panelOpen } from './SelectionCard.js'
 import {
   pickHint,
+  picksWallLine,
   pickPrompt,
   pickTap,
   pickTarget,
@@ -436,6 +439,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [groupLineFrom, setGroupLineFrom] = useState<{ x: number; y: number }>()
   // The start picked for the picked resident's Build line, while they pick its end.
   const [lineFrom, setLineFrom] = useState<{ x: number; y: number }>()
+  /** What a wall line is built of, picked on the banner while its ends are picked (`CONTEXT.md`: Wood or stone). */
+  const [wallMaterial, setWallMaterial] = useState<WallMaterial>('wood')
   // Where a pick is previewed: the tile under the pointer, or the one tapped on a touch screen.
   const [pickAt, setPickAt] = useState<{ x: number; y: number; tapped?: boolean }>()
   const [groupBuildAt, setGroupBuildAt] = useState<{ x: number; y: number }>()
@@ -976,7 +981,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if ((mode === 'roadTo' || mode === 'wallTo') && lineFrom) {
       // The Build line task: they run the Player's Build line (default) script (`CONTEXT.md`: Build line).
       const building = mode === 'roadTo' ? 'road' : 'wall'
-      const order = { kind: 'task', task: 'buildLine', residentId: selected.id, building }
+      const order = {
+        kind: 'task',
+        task: 'buildLine',
+        residentId: selected.id,
+        building,
+        ...(building === 'wall' && wallMaterial === 'stone' ? { material: wallMaterial } : {}),
+      }
       setLineFrom(undefined)
       setOrderError(await giveOrder({ ...order, from: lineFrom, to: { x, y } }))
       return
@@ -1052,18 +1063,24 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const request = { ...order, residentId: selected.id }
     setOrderError(await sendOrder(appendRequest(selected, request, at) ?? request))
   }
-  /** Why a kind can't be laid out on a tile, as far as the Player knows (`buildHereProblem`). */
+  /**
+   * Why a kind can't be laid out on a tile, as far as the Player knows (`buildHereProblem`); a
+   * stone wall or gate may go on the wooden one of its kind (`CONTEXT.md`: Wood or stone).
+   */
   const buildProblemAt =
-    (w: NonNullable<typeof world>, x: number, y: number) => (kind: BuildingKind) =>
-      buildHereProblem(
-        kind,
-        x,
-        y,
-        w,
-        (nx, ny) => nodeAt?.(nx, ny),
-        // Terrain not loaded counts as unexplored: nothing is laid out there.
-        { size: w.map.size, at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED },
-      )
+    (w: NonNullable<typeof world>, x: number, y: number) =>
+    (kind: BuildingKind, material?: WallMaterial) =>
+      material === 'stone' && stoneOverAt(w, x, y, kind)
+        ? undefined
+        : buildHereProblem(
+            kind,
+            x,
+            y,
+            w,
+            (nx, ny) => nodeAt?.(nx, ny),
+            // Terrain not loaded counts as unexplored: nothing is laid out there.
+            { size: w.map.size, at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED },
+          )
   /** The queue planner's Add step, on the resident card and the group card. */
   function addStep(w: NonNullable<typeof world>) {
     const seen = { cities: knownCities, buildings: knownBuildings, residents: w.residents }
@@ -1180,6 +1197,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           building: mode === 'roadTo' ? 'road' : 'wall',
           from: groupLineFrom,
           to: { x, y },
+          ...(mode === 'wallTo' && wallMaterial === 'stone' ? { material: wallMaterial } : {}),
         })
       case 'tearDown': {
         // A building before a road sharing its tile.
@@ -1278,9 +1296,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * there: they run the Player's Build (default) script, which fetches missing materials from
    * the realm's storages (`CONTEXT.md`: Fetching materials).
    */
-  async function build(building: BuildingKind) {
+  async function build(building: BuildingKind, material?: WallMaterial) {
     if (!selected) return
-    const order = { kind: 'task', task: 'build', residentId: selected.id, building }
+    const order = {
+      kind: 'task',
+      task: 'build',
+      residentId: selected.id,
+      building,
+      ...(material === 'stone' ? { material } : {}),
+    }
     setOrderError(await giveOrder(order))
   }
   /**
@@ -2093,6 +2117,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               key={kind}
               prompt={pickPrompt(pick, touch)}
               hint={pickHint(pick)}
+              material={
+                picksWallLine(pick) ? { value: wallMaterial, onChange: setWallMaterial } : undefined
+              }
               under={pick.kind === 'plan' && pick.error ? undefined : preview?.label}
               onConfirm={pickAt?.tapped ? () => pickTile(pickAt.x, pickAt.y) : undefined}
               onWaypoints={

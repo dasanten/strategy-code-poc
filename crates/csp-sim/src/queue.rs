@@ -107,7 +107,9 @@ pub fn step_line(order: &OrderRequest) -> Option<BuildLine> {
     };
     let from = whole_tile(order.fields.get("from"))?;
     let to = whole_tile(order.fields.get("to"))?;
-    Some(BuildLine { building, from, to })
+    let material = crate::building::material_field(order)
+        .filter(|m| building == BuildingKind::Wall && *m == csp_shared::world::WallMaterial::Stone);
+    Some(BuildLine { building, from, to, material })
 }
 
 /// A queue item as a request gives it: a repeat block of more, an If block, or a step. Told apart
@@ -569,7 +571,8 @@ mod tests {
             Some(BuildLine {
                 building: BuildingKind::Road,
                 from: Tile { x: 1.0, y: 2.0 },
-                to: Tile { x: 3.0, y: 2.0 }
+                to: Tile { x: 3.0, y: 2.0 },
+                material: None
             })
         );
         assert!(never_ends(&order(json!({ "kind": "task", "task": "train" }))));

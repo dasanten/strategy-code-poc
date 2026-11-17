@@ -381,7 +381,7 @@ fn as_order(o: &OrderRequest, task: Task) -> OrderRequest {
         ),
         Task::TearDown => ("tearDown", pick(&[("buildingId", "buildingId")])),
         Task::Breed => ("breed", pick(&[("stableId", "stableId"), ("horseIds", "horseIds")])),
-        Task::Build => ("build", pick(&[("building", "building")])),
+        Task::Build => ("build", pick(&[("building", "building"), ("material", "material")])),
         Task::Train => ("train", pick(&[("buildingId", "groundId")])),
         _ => ("workAt", pick(&[("makes", "makes")])),
     };
@@ -434,13 +434,17 @@ fn task_memory(
         }
         Task::Build => {
             m.insert("building".into(), f.get("building").cloned().unwrap_or(Json::Null));
+            if let Some(material) = f.get("material").filter(|v| !v.is_null()) {
+                m.insert("material".into(), material.clone());
+            }
             m.insert("at".into(), tile(f.get("at")).unwrap_or_else(|| json!({ "x": x, "y": y })));
         }
         Task::BuildLine => {
-            m.insert(
-                "line".into(),
-                json!({ "building": f.get("building"), "from": tile(f.get("from")), "to": tile(f.get("to")) }),
-            );
+            let mut line = json!({ "building": f.get("building"), "from": tile(f.get("from")), "to": tile(f.get("to")) });
+            if let Some(material) = f.get("material").filter(|v| !v.is_null()) {
+                line["material"] = material.clone();
+            }
+            m.insert("line".into(), line);
         }
         Task::Haul => {
             m.insert("carriageId".into(), f.get("carriageId").cloned().unwrap_or(Json::Null));
@@ -666,7 +670,9 @@ fn build_line_problem(
             csp_shared::balance::ROAD_LINE_MAX_TILES
         ));
     }
-    let line = crate::queries::building::BuildLine { building, from, to };
+    let material = crate::building::material_field(o)
+        .filter(|m| building == BuildingKind::Wall && *m == csp_shared::world::WallMaterial::Stone);
+    let line = crate::queries::building::BuildLine { building, from, to, material };
     if line_to_build(world, &line, terrain).is_empty() {
         return Some(format!("no {} to build on that line", kind_name(building)));
     }
