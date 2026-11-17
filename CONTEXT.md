@@ -152,7 +152,13 @@ The shared language of the game. Domain terms only — no implementation details
   them they work at the plain pace, so nothing stops for want of Tools. They aren't equipped:
   carrying one set is enough, a second adds nothing, and nobody else sees them. Tools wear with
   each day's work and break (Wear). Iron only. An NPC city keeps a set for each of its workers and
-  builders and a few spare in its reserve, and its workers fetch one from its storage.
+  builders and a few spare in its reserve, and its workers fetch one from its storage. Only a city
+  with a smithy of its own, finished or begun, keeps Tools in its reserve, so one without is never
+  short of them; its smithy forges them once its soldiers are armed. Being short of Tools sends
+  hands to its smithy but doesn't keep it from counting as full (founding, roads, training, its
+  inner wall), nor does it build or buy for them. A trading post's or the HQ's
+  workers fetch theirs from its warehouse, only what it holds above its floor of Tools (both decided
+  overnight, Daniel to confirm).
 - **Spoilage:** Food slowly goes bad. Other goods don't (but see Wear and Decay).
 - **Coins:** money, and just another good. Made from Gold ore at a **Mint**, which anyone can
   build. No special currency rules.

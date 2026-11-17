@@ -24,13 +24,15 @@ use crate::queries::warehouse::{stock_floor, warehouse_keeps};
 
 /// The workplace that processes goods into one the chain wants, by that good (`PROCESSED_BY`):
 /// for a city that goes for Steel (`npc_makes_steel`) also Steel at a smelter and the steel kit
-/// at a smithy.
+/// at a smithy; for an NPC city also Tools at a smithy.
 pub fn processed_by(world: &WorldState, city: &City, good: Good) -> Option<BuildingKind> {
     match good {
         Good::Iron => Some(BuildingKind::Smelter),
         Good::Coins => Some(BuildingKind::Mint),
         g if g == NPC_SMITHY_WEAPON => Some(BuildingKind::Smithy),
-        Good::Tools => Some(BuildingKind::Smithy),
+        // An NPC city forges its Tools (`CONTEXT.md`: Tools); the Trade Organization's warehouses
+        // get them as any good.
+        Good::Tools if city.trade_org.is_none() => Some(BuildingKind::Smithy),
         Good::Steel if npc_makes_steel(world, city) => Some(BuildingKind::Smelter),
         Good::SteelSword | Good::SteelArmour | Good::SteelShield
             if npc_makes_steel(world, city) =>
@@ -193,14 +195,22 @@ pub fn shortages(
     short.into_iter().filter(|s| s.good != Good::Coins).collect()
 }
 
-/// The goods an NPC city is short of, the shortest first (`shortGoods`).
+/// The goods an NPC city is short of, the shortest first (`shortGoods`): what keeps it from
+/// counting as full (founding, roads, training, its inner wall, growing) and what it builds and
+/// buys for. Tools aside (`CONTEXT.md`: Tools, decided overnight, Daniel to confirm): being short
+/// of them sends hands to its smithy (`shortages`, its planning pass) but never holds the rest up,
+/// so a big city forging a set for every worker still founds and builds.
 pub fn short_goods(
     world: &WorldState,
     city: &City,
     size: i32,
     project: Option<&CityProject>,
 ) -> Vec<Good> {
-    shortages(world, city, size, project).into_iter().map(|s| s.good).collect()
+    shortages(world, city, size, project)
+        .into_iter()
+        .map(|s| s.good)
+        .filter(|g| *g != Good::Tools)
+        .collect()
 }
 
 /// How an NPC city weighs its workplaces for surplus work (`surplusWork`, `CONTEXT.md`: Spare

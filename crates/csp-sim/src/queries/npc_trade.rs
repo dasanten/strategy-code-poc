@@ -277,8 +277,9 @@ pub fn npc_reserve(world: &WorldState, city: &City) -> Stock {
     }
     // Tools for its workers and builders, and the Iron and Wood to forge what its storages lack:
     // only for a city with a smithy of its own, finished or begun, to forge them (decided
-    // overnight, Daniel to confirm), so one without stays full and founds as before.
-    if !adults.is_empty() && has_smithy(world, city) {
+    // overnight, Daniel to confirm), so one without stays full and founds as before. The Trade
+    // Organization's cities keep theirs by their warehouses' floors.
+    if !adults.is_empty() && city.trade_org.is_none() && has_smithy(world, city) {
         let tools = npc_tools_wanted(world, city);
         reserve.insert(Good::Tools, tools);
         let forge = tools - held(&npc_city_stock(world, city), Good::Tools);

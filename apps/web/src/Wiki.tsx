@@ -197,6 +197,7 @@ import {
   NPC_SOLDIER_SHARE,
   NPC_STEEL_KIT,
   NPC_WAR_CHEST_PER_RESIDENT,
+  NPC_TOOLS_SPARE,
   NPC_TRADE,
   OWN_FOOD,
   OUTPOST_REFILL_REACH,
@@ -2912,6 +2913,18 @@ export function Wiki() {
           once it has a horse, or with none once nothing else is short, and what the stable lacks of{' '}
           {days(STABLE_FEED_DAYS)} of Food for its horses is in the reserve too; what the stable
           holds counts.
+        </p>
+        <p>
+          A city with a smithy of its own, finished or begun, also keeps a set of{' '}
+          <a href="#work">Tools</a> for each of its workers and builders who carries none (its
+          adults beyond the soldiers it keeps) and {num(NPC_TOOLS_SPARE)} spare, with the Iron and
+          Wood to forge them; its smithy forges Tools once its soldiers are armed. Being short of
+          Tools sends hands to its smithy, but never keeps the city from counting as full (it still
+          founds, lays roads and trains), nor does it build or buy for them. One grown, unarmed
+          resident at a time who carries none, idle or at work, fetches a set from its storage, as
+          soldiers fetch their weapons, and one whose set breaks fetches the next. Soldiers carry
+          none. A trading post's and the HQ's workers fetch theirs from their warehouse, only what
+          it holds above its floor of Tools.
         </p>
         <p>
           A city's needs grow in steps, one for every {num(NPC_RESIDENTS_PER_NEEDS_STEP)} residents.

@@ -32,7 +32,7 @@ use crate::queries::residents::best_weapon;
 use crate::queries::residents::{can_work, carry_capacity, is_armed, stock_weight};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::walls::wall_side;
-use crate::queries::warehouse::warehouse_keeps;
+use crate::queries::warehouse::{stock_floor, warehouse_keeps};
 use crate::sight::InvariantViolation;
 use crate::work::start_work;
 
@@ -121,13 +121,15 @@ pub fn step_npc_defence(world: &mut WorldState, size: i32) {
 /// reserve): while `store` holds a set, one grown, unarmed resident at a time who carries none,
 /// idle or at work, fetches one from it, as soldiers fetch their weapons (`fetch`); a set that
 /// breaks is replaced the same way. Not its traders nor a founding party's members, who are on
-/// their way. Trading posts and the HQ fetch from their warehouse. Only orders a Player could give
-/// (ADR 0002).
+/// their way. Trading posts and the HQ fetch from their warehouse, only what it holds above its
+/// floor (`stock_floor`), so their market of Tools stays (decided overnight, Daniel to confirm).
+/// Only orders a Player could give (ADR 0002).
 fn keep_tools(world: &mut WorldState, city: &City, people: &[usize], store: Option<usize>) {
     let Some(st) = store else { return };
-    if world.buildings[st].site.is_some()
-        || held_in(world.buildings[st].stock.as_ref(), Good::Tools) < 1.0
-    {
+    let b = &world.buildings[st];
+    let floor =
+        if city.trade_org.is_some() { held(&stock_floor(world, b), Good::Tools) } else { 0.0 };
+    if b.site.is_some() || held_in(b.stock.as_ref(), Good::Tools) - floor < 1.0 {
         return;
     }
     let tick = world.tick as f64;
