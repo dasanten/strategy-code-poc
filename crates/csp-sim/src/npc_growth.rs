@@ -28,7 +28,7 @@ use crate::npc_chain::{
     short_goods, SurplusWork,
 };
 use crate::npc_inner_wall::{inner_wall_project, outer_walls, Rings as InnerRings};
-use crate::npc_plan::{farmers_wanted, food_short};
+use crate::npc_plan::farmers_wanted;
 use crate::npc_scouts::knows_node;
 use crate::npc_training::wants_training_ground;
 use crate::placing::Ground;
@@ -589,6 +589,31 @@ fn nearest_node(
     best.map(|(k, at, _)| (k, at))
 }
 
+/// Whether an NPC city's storages hold less Food than its reserve (`CONTEXT.md`: NPC reserve, NPC
+/// city): with every farm full it then builds another. One with no storage yet never is.
+pub fn food_below_reserve(world: &WorldState, city: &City) -> bool {
+    if city.trade_org.is_some() || no_storage_yet(world, city) {
+        return false;
+    }
+    held(&npc_city_stock(world, city), Good::Food) < held(&npc_reserve(world, city), Good::Food)
+}
+
+/// Whether an NPC city wants more Food than it holds (`CONTEXT.md`: NPC city, Full city): it is
+/// short of its reserve, or nothing else keeps it from being full and it doesn't yet hold the Food
+/// surplus that comes before its founding party's materials (`holds_food_first`). With every farm
+/// full it then builds another.
+pub fn wants_food(world: &WorldState, city: &City, home: &Building, size: i32) -> bool {
+    use crate::npc_founding::{founding_party, holds_food_first, short_for_founding};
+    if food_below_reserve(world, city) {
+        return true;
+    }
+    city.trade_org.is_none()
+        && !no_storage_yet(world, city)
+        && founding_party(world.city_plans.get(&city.id)).is_empty()
+        && !holds_food_first(world, city)
+        && short_for_founding(world, city, Some(home), size).is_empty()
+}
+
 /// What the city wants built most, where (`wanted`).
 fn wanted(
     world: &WorldState,
@@ -604,7 +629,7 @@ fn wanted(
         _ => first_wall(world, city, home, terrain, rings),
     };
     let in_area = |b: &Building| in_city_area(world, &city.id, b.x as i32, b.y as i32, size);
-    let begun = world.buildings.iter().find(|b| {
+    let is_begun = |b: &Building| {
         b.site.is_some()
             && (((b.kind == BuildingKind::Farm || b.kind == BuildingKind::Stable)
                 && b.city_id.as_ref() == Some(&city.id))
@@ -615,8 +640,26 @@ fn wanted(
                     && city.trade_org.is_none()
                     && is_big_npc_city(world, city)
                     && in_area(b)))
-    });
+    };
+    // A farm already begun is finished before anything else (`CONTEXT.md`: NPC city).
+    let begun =
+        world.buildings.iter().filter(|b| is_begun(b)).min_by_key(|b| b.kind != BuildingKind::Farm);
     let wall_site = ring.iter().find(|t| t.site.is_some());
+    let at = |building: BuildingKind, t: Option<(i32, i32)>| t.map(|t| build(building, t));
+    let first = first_ring();
+    let plan = rings.unwrap_or(&first);
+    if let Some(b) = begun.filter(|b| b.kind == BuildingKind::Farm) {
+        return Some(build(b.kind, (b.x as i32, b.y as i32)));
+    }
+    // Its Food short of its reserve, or of the surplus that comes before its founding party's
+    // materials, with every farm full: another farm, whether or not anyone is idle, and before any
+    // other building it has begun (#1379: a begun mine waiting on far Stone kept Larkspur from the
+    // farm it needed as it grew, and Ashford sat at its reserve on two farms).
+    if farms_full(world, city) && wants_food(world, city, home, size) {
+        if let Some(p) = at(BuildingKind::Farm, farm_tile(world, home, terrain, Some(plan))) {
+            return Some(p);
+        }
+    }
     if let Some(b) = begun {
         return Some(build(b.kind, (b.x as i32, b.y as i32)));
     }
@@ -624,11 +667,8 @@ fn wanted(
         let site = world.buildings.iter().find(|b| Some(&b.id) == t.site.as_ref()).expect("a site");
         return Some(build(site.kind, (site.x as i32, site.y as i32)));
     }
-    let at = |building: BuildingKind, t: Option<(i32, i32)>| t.map(|t| build(building, t));
     if city.trade_org.is_none() {
         // A daughter starts with its town hall alone.
-        let first = first_ring();
-        let plan = rings.unwrap_or(&first);
         let has = |kind: BuildingKind| {
             world
                 .buildings
@@ -653,12 +693,6 @@ fn wanted(
                 BuildingKind::House,
                 house_tile(world, city, home, terrain, Some(plan), BuildingKind::House),
             ) {
-                return Some(p);
-            }
-        }
-        // Its Food runs short with every farm full: another farm, whether or not anyone is idle.
-        if food_short(world, city) && farms_full(world, city) {
-            if let Some(p) = at(BuildingKind::Farm, farm_tile(world, home, terrain, Some(plan))) {
                 return Some(p);
             }
         }

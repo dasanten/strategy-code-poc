@@ -4,8 +4,8 @@
 //! built only for the farmers it wants. The big city is `npc_slow`'s staged one (`bigCity()`).
 
 use csp_shared::balance::{
-    BUILD_MATERIALS, NPC_BUILDERS, NPC_RESIDENTS_PER_NEEDS_STEP, NPC_ROAD_CREW, NPC_SURPLUS_CAP,
-    NPC_TOWN, NPC_TRADE, NPC_VILLAGE,
+    BUILD_MATERIALS, NPC_BUILDERS, NPC_FOUND_FOOD_SURPLUS_SHARE, NPC_RESIDENTS_PER_NEEDS_STEP,
+    NPC_ROAD_CREW, NPC_SURPLUS_CAP, NPC_TOWN, NPC_TRADE, NPC_VILLAGE,
 };
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
@@ -428,6 +428,13 @@ fn stop_growing_past_what_its_farmers_need_however_full_spare_hands_keep_them() 
     for farm in &own {
         t.fill_crew(farm);
     }
+    // Once it holds the Food surplus that comes before its founding party's materials (#1379:
+    // short of that and of nothing else, it builds another).
+    let reserve = held(&t.reserve(), Good::Food);
+    let cap = NPC_SURPLUS_CAP.get("food").unwrap_or(0.0)
+        * crate::queries::npc_trade::npc_needs_scale(&t.world, t.c());
+    t.stock().insert(Good::Food, reserve + NPC_FOUND_FOOD_SURPLUS_SHARE * cap);
+    assert!(crate::npc_founding::holds_food_first(&t.world, t.c()));
     assert_ne!(t.planned(), Some(BuildingKind::Farm));
 }
 

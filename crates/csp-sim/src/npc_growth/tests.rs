@@ -518,3 +518,91 @@ fn finishes_the_begun_mine_whose_ore_a_begun_smithys_iron_waits_on() {
     own_site(&mut v, "mine", "mine", (hx + 40.0, hy - 40.0), Some("ironOre"));
     assert_eq!(build_at(&project(&v), BuildingKind::Mine), (hx + 40.0, hy - 40.0));
 }
+
+#[test]
+fn food_short_of_its_reserve_with_every_farm_full_builds_a_farm_before_a_begun_mine() {
+    // #1379: Larkspur's begun mine waited on Stone from a quarry it never built, and with Food
+    // below its reserve but above the line where it runs short its farms fell behind as it grew.
+    let mut v = village(None);
+    fill_houses(&mut v.world, &v.city, &v.home);
+    let city = v.city().clone();
+    let food = crate::queries::city::city_food_use(&v.world, &city, 10.0).ceil();
+    let reserve = crate::queries::npc_trade::npc_reserve(&v.world, &city);
+    assert!(food < reserve[&Good::Food]);
+    assert!(!crate::npc_plan::food_short(&v.world, &city));
+    set_stock(&mut v, &[(Good::Food, food), (Good::Wood, 400.0)]);
+    let (hx, hy) = (v.home.x, v.home.y);
+    own_site(&mut v, "mine", "mine", (hx + 40.0, hy + 40.0), Some("ironOre"));
+    let farms: Vec<String> = v
+        .world
+        .buildings
+        .iter()
+        .filter(|b| b.kind == BuildingKind::Farm && b.city_id.as_deref() == Some(v.city.as_str()))
+        .map(|b| b.id.clone())
+        .collect();
+    let most = max_workers(BuildingKind::Farm).expect("farm workers") as usize;
+    plan(&mut v);
+    let plan = v.world.city_plans.get_mut(&v.city).expect("a plan");
+    for farm in &farms {
+        for n in 0..most {
+            plan.jobs.insert(
+                format!("{farm}-farmer{n}"),
+                serde_json::from_value(json!({ "kind": "farm", "buildingId": farm })).unwrap(),
+            );
+        }
+    }
+    build_at(&project(&v), BuildingKind::Farm);
+    // Its Food back at its reserve, the mine comes first again.
+    set_stock(&mut v, &[(Good::Food, reserve[&Good::Food] + 1.0), (Good::Wood, 400.0)]);
+    assert!(!matches!(project(&v), Some(CityProject::Build { building: BuildingKind::Farm, .. })));
+}
+
+#[test]
+fn with_nothing_else_short_builds_a_farm_until_it_holds_the_food_founding_wants_first() {
+    // #1379: Ashford sat at its reserve on two farms for a season, so its founding party's
+    // materials never counted as short (`holds_food_first`).
+    let mut v = village(None);
+    fill_houses(&mut v.world, &v.city, &v.home);
+    let city = v.city().clone();
+    let mut goods: Vec<(Good, f64)> = crate::queries::npc_trade::npc_reserve(&v.world, &city)
+        .into_iter()
+        .map(|(g, n)| (g, n + 1.0))
+        .collect();
+    set_stock(&mut v, &goods);
+    let size = v.terrain.size;
+    assert_eq!(
+        crate::npc_founding::short_for_founding(&v.world, &city, Some(&v.home), size),
+        Vec::<Good>::new()
+    );
+    assert!(!crate::npc_founding::holds_food_first(&v.world, &city));
+    let farms: Vec<String> = v
+        .world
+        .buildings
+        .iter()
+        .filter(|b| b.kind == BuildingKind::Farm && b.city_id.as_deref() == Some(v.city.as_str()))
+        .map(|b| b.id.clone())
+        .collect();
+    let most = max_workers(BuildingKind::Farm).expect("farm workers") as usize;
+    plan(&mut v);
+    set_stock(&mut v, &goods);
+    let plan = v.world.city_plans.get_mut(&v.city).expect("a plan");
+    for farm in &farms {
+        for n in 0..most {
+            plan.jobs.insert(
+                format!("{farm}-farmer{n}"),
+                serde_json::from_value(json!({ "kind": "farm", "buildingId": farm })).unwrap(),
+            );
+        }
+    }
+    build_at(&project(&v), BuildingKind::Farm);
+    // Holding it, it builds no farm for it.
+    let cap = csp_shared::balance::NPC_SURPLUS_CAP.get("food").unwrap_or(0.0);
+    for g in &mut goods {
+        if g.0 == Good::Food {
+            g.1 += csp_shared::balance::NPC_FOUND_FOOD_SURPLUS_SHARE * cap;
+        }
+    }
+    set_stock(&mut v, &goods);
+    assert!(crate::npc_founding::holds_food_first(&v.world, &city));
+    assert!(!matches!(project(&v), Some(CityProject::Build { building: BuildingKind::Farm, .. })));
+}
