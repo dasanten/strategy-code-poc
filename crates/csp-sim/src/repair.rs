@@ -89,7 +89,9 @@ pub fn step_decay(world: &mut WorldState) {
         }
         let Some(days) = decay_days(b.kind) else { continue };
         let lost = ((b.decay.unwrap_or(0.0) + 1.0 / days) * 1e9).round() / 1e9;
-        b.decay = Some(lost.min(1.0));
+        // Rounded each day, a share like 1/450 adds up to a hair under all of it after its
+        // days: within a millionth (far less than a day's share) it is all gone.
+        b.decay = Some(if lost >= 1.0 - 1e-6 { 1.0 } else { lost });
     }
 }
 

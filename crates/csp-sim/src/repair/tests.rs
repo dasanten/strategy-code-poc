@@ -43,11 +43,14 @@ fn condition_falls_per_game_day_by_kind_and_reads_in_words() {
     assert_eq!(decay_of(&world, "road"), 0.0);
     world.tick = 0;
 
-    days(&mut world, 15);
-    let road = 15.0 / decay_days(BuildingKind::Road).unwrap();
-    let smithy = 15.0 / decay_days(BuildingKind::Smithy).unwrap();
-    assert!((decay_of(&world, "road") - road).abs() < 1e-8);
-    assert!((decay_of(&world, "smithy") - smithy).abs() < 1e-8);
+    // Until a road reads worn.
+    let worn = (DECAY_WORN * decay_days(BuildingKind::Road).unwrap()).ceil();
+    days(&mut world, worn as u64);
+    let road = worn / decay_days(BuildingKind::Road).unwrap();
+    let smithy = worn / decay_days(BuildingKind::Smithy).unwrap();
+    // Rounded to a billionth each day.
+    assert!((decay_of(&world, "road") - road).abs() < 1e-7);
+    assert!((decay_of(&world, "smithy") - smithy).abs() < 1e-7);
     // Roads go faster than timber, timber faster than stone.
     assert!(decay_of(&world, "road") > decay_of(&world, "house"));
     assert!(decay_of(&world, "house") > decay_of(&world, "smithy"));
@@ -58,7 +61,7 @@ fn condition_falls_per_game_day_by_kind_and_reads_in_words() {
     assert_eq!(condition_of(b(&world, "site")), None);
     assert_eq!(decay_of(&world, "cart"), 0.0);
 
-    days(&mut world, 60);
+    days(&mut world, decay_days(BuildingKind::Road).unwrap() as u64);
     assert_eq!(decay_of(&world, "road"), 1.0, "never below nothing");
     assert_eq!(condition_of(b(&world, "road")), Some(Condition::NearlyRuin));
 }
