@@ -5,7 +5,7 @@ use csp_shared::footprint::Placed;
 use csp_shared::world::{Building, BuildingKind, Good, Stock};
 
 /// Every good, in the order of `GOODS`.
-pub const ALL_GOODS: [Good; 16] = [
+pub const ALL_GOODS: [Good; 17] = [
     Good::Food,
     Good::Wood,
     Good::Stone,
@@ -22,11 +22,12 @@ pub const ALL_GOODS: [Good; 16] = [
     Good::SteelSword,
     Good::SteelShield,
     Good::SteelArmour,
+    Good::Tools,
 ];
 
 /// Goods other than coins, in the order of `GOODS`: what a warehouse puts a price on
 /// (`PRICED_GOODS`).
-pub const PRICED_GOODS: [Good; 15] = [
+pub const PRICED_GOODS: [Good; 16] = [
     Good::Food,
     Good::Wood,
     Good::Stone,
@@ -42,6 +43,7 @@ pub const PRICED_GOODS: [Good; 15] = [
     Good::SteelSword,
     Good::SteelShield,
     Good::SteelArmour,
+    Good::Tools,
 ];
 
 /// The good's TypeScript name.
@@ -63,6 +65,7 @@ pub fn good_name(g: Good) -> &'static str {
         Good::SteelSword => "steelSword",
         Good::SteelShield => "steelShield",
         Good::SteelArmour => "steelArmour",
+        Good::Tools => "tools",
     }
 }
 

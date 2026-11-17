@@ -35,6 +35,15 @@ describe('equipment slots', () => {
     // Another realm's resident comes without a condition: kind and metal only.
     expect(equipmentLine(equipped)).toBe('Sword · no shield · Armour')
   })
+
+  it('adds the condition of the Tools they work with, for the realm carrying them', () => {
+    expect(equipmentLine({ weapon: 'spear' }, { weapon: 'good', tools: 'worn' })).toBe(
+      'Spear (good) · no shield · no armour · Tools (worn)',
+    )
+    expect(equipmentLine(undefined, { tools: 'nearlyBroken' })).toBe(
+      'Nothing equipped · Tools (nearly broken)',
+    )
+  })
 })
 
 describe('swapping gear', () => {

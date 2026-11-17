@@ -5,4 +5,8 @@ import type { PieceCondition } from "./PieceCondition.js";
  * The condition of each piece a resident has equipped, an empty slot left out (`CONTEXT.md`:
  * Wear). Only the realm carrying it sees it.
  */
-export type GearCondition = { weapon?: PieceCondition, shield?: PieceCondition, armour?: PieceCondition, };
+export type GearCondition = { weapon?: PieceCondition, shield?: PieceCondition, armour?: PieceCondition, 
+/**
+ * The set of Tools they work with (`CONTEXT.md`: Tools), if they carry one.
+ */
+tools?: PieceCondition, };

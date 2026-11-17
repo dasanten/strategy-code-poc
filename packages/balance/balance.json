@@ -333,7 +333,8 @@
       "spear": 4.0,
       "sword": 2.0,
       "shield": 4.0,
-      "armour": 2.0
+      "armour": 2.0,
+      "tools": 4.0
     }
   },
   "WAREHOUSE_FLOOR": {
@@ -352,7 +353,8 @@
     "armour": 1.0,
     "steelSword": 1.0,
     "steelShield": 1.0,
-    "steelArmour": 1.0
+    "steelArmour": 1.0,
+    "tools": 2.0
   },
   "HQ_FLOOR_FACTOR": 5.0,
   "HQ_FOOD_FLOOR_FACTOR": 15.0,
@@ -371,7 +373,8 @@
     "armour": 90.0,
     "steelSword": 50.0,
     "steelShield": 30.0,
-    "steelArmour": 160.0
+    "steelArmour": 160.0,
+    "tools": 25.0
   },
   "PRICE_REFERENCE_FLOORS": 4.0,
   "PRICE_ELASTICITY": 0.5,
@@ -417,7 +420,8 @@
     "steel": 1.0,
     "steelSword": 3.0,
     "steelShield": 4.0,
-    "steelArmour": 8.0
+    "steelArmour": 8.0,
+    "tools": 2.0
   },
   "WEAPON_ATTACK": {
     "spear": 4.0,
@@ -785,6 +789,15 @@
         "output": {
           "steelArmour": 1.0
         }
+      },
+      {
+        "input": {
+          "iron": 1.0,
+          "wood": 1.0
+        },
+        "output": {
+          "tools": 1.0
+        }
       }
     ]
   },
@@ -805,6 +818,8 @@
   "WORK_SKILL_EFFECT": 0.01,
   "WORK_SKILL_LIMIT": 1.0,
   "WORK_SKILL_MAX": 100.0,
+  "TOOLS_WORK_BONUS": 0.25,
+  "TOOLS_WORK_DAYS": 60.0,
   "WORK_SKILL_PER_DAY": 0.23809523809523808,
   "TEARDOWN_WORK_SHARE": 0.5,
   "TEARDOWN_MATERIALS_RETURNED": 0.5,

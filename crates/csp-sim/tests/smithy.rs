@@ -103,7 +103,9 @@ mod weapons_and_armour_balance_file {
     fn a_smithy_has_one_recipe_from_iron_or_steel_and_wood_for_each_weapon_and_piece_of_armour() {
         let recipes = RECIPES.get("smithy").expect("smithy recipes");
         let mut made: Vec<&str> = recipes.iter().map(recipe_good).collect();
+        // And one for Tools (`CONTEXT.md`: Tools), of Iron and Wood too.
         let mut want = arms();
+        want.push("tools");
         made.sort_unstable();
         want.sort_unstable();
         assert_eq!(made, want);

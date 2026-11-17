@@ -15,7 +15,9 @@
 //! the units its holder still has, dropping the least worn first, and forgets holders that are
 //! gone.
 
-use csp_shared::balance::{NEARLY_BROKEN_FROM, TRAINING_WEAR_BLOWS_PER_DAY, WEAR_BLOWS, WORN_FROM};
+use csp_shared::balance::{
+    NEARLY_BROKEN_FROM, TOOLS_WORK_DAYS, TRAINING_WEAR_BLOWS_PER_DAY, WEAR_BLOWS, WORN_FROM,
+};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 pub use csp_shared::world::{GearCondition, PieceCondition};
 use csp_shared::world::{Good, Resident, Stock, Wear, WorldState};
@@ -46,8 +48,13 @@ pub fn condition_name(c: PieceCondition) -> &'static str {
     }
 }
 
-/// How many blows a piece of `good` lasts (`WEAR_BLOWS`); `None` for a good that doesn't wear.
+/// How long a piece of `good` lasts: a weapon, shield or armour so many blows (`WEAR_BLOWS`), a set
+/// of Tools so many game days of work (`TOOLS_WORK_DAYS`, `CONTEXT.md`: Tools); `None` for a good
+/// that doesn't wear.
 pub fn lasts(good: Good) -> Option<f64> {
+    if good == Good::Tools {
+        return Some(TOOLS_WORK_DAYS);
+    }
     WEAR_BLOWS.get(good_name(good))
 }
 
@@ -69,10 +76,18 @@ pub fn slot_condition(world: &WorldState, r: &Resident, slot: Slot) -> Option<Pi
 }
 
 /// What a resident's slots hold, in condition: `{ weapon, shield, armour }`, each `good`, `worn`
-/// or `nearlyBroken`, an empty slot left out. Only for the realm carrying it (`CONTEXT.md`: Wear).
+/// or `nearlyBroken`, an empty slot left out, and `tools`, the set of Tools they work with, if
+/// any. Only for the realm carrying it (`CONTEXT.md`: Wear).
 pub fn gear_condition(world: &WorldState, r: &Resident) -> GearCondition {
     let c = |slot| slot_condition(world, r, slot);
-    GearCondition { weapon: c(Slot::Weapon), shield: c(Slot::Shield), armour: c(Slot::Armour) }
+    let tools = (held(&r.carried, Good::Tools) >= 1.0)
+        .then(|| condition_of(in_use(world, &r.id, Good::Tools)));
+    GearCondition {
+        weapon: c(Slot::Weapon),
+        shield: c(Slot::Shield),
+        armour: c(Slot::Armour),
+        tools,
+    }
 }
 
 /// The JSON of [`gear_condition`]: what a script's view of one of its own residents shows.
@@ -125,6 +140,16 @@ pub fn wear_slot(world: &mut WorldState, ri: usize, slot: Slot, blows: f64) -> O
     }
     settle_equipment(r);
     Some(good)
+}
+
+/// A tick of work for resident `ri` at a workplace or a construction site (building, tearing down,
+/// repairing): the set of Tools they work with, if they carry one, wears by a tick of a game day's
+/// work (`CONTEXT.md`: Tools, Wear). Worn out, it breaks and they work on at the plain pace, or with
+/// the next set they carry. Returns whether a set broke.
+pub fn wear_tools(world: &mut WorldState, ri: usize) -> bool {
+    let id = world.residents[ri].id.clone();
+    let r = &mut world.residents[ri];
+    wear_piece(&mut world.wear, &id, &mut r.carried, Good::Tools, 1.0 / TICKS_PER_GAME_DAY)
 }
 
 /// A tick of training for resident `ri` (`CONTEXT.md`: Wear): each piece they have equipped wears

@@ -305,20 +305,20 @@ fn equipment_view(r: &Resident) -> Value {
     }))
 }
 
-/// The condition of a resident's equipped pieces as their `condition` view (`CONTEXT.md`: Wear),
-/// `null` for an empty slot.
+/// The condition of a resident's equipped pieces and their Tools as their `condition` view
+/// (`CONTEXT.md`: Wear, Tools), `null` for an empty slot or no Tools.
 fn condition_view(world: &WorldState, r: &Resident) -> Value {
-    use crate::equipment::Slot;
-    use crate::wear::{condition_name, slot_condition};
+    use crate::wear::{condition_name, gear_condition};
+    let gear = gear_condition(world, r);
     let fields = script_view("condition").map_or(&[][..], |v| v.fields);
     Value::frozen_fields(fields.iter().map(|f| {
-        let slot = match f.name {
-            "weapon" => Some(Slot::Weapon),
-            "shield" => Some(Slot::Shield),
-            "armour" => Some(Slot::Armour),
+        let c = match f.name {
+            "weapon" => gear.weapon,
+            "shield" => gear.shield,
+            "armour" => gear.armour,
+            "tools" => gear.tools,
             _ => None,
         };
-        let c = slot.and_then(|s| slot_condition(world, r, s));
         (f.name, c.map_or(Value::Null, |c| Value::string(condition_name(c))))
     }))
 }

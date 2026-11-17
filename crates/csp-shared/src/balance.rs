@@ -1152,6 +1152,7 @@ pub const TRADING_POST: TradingPost = TradingPost {
         ("sword", 2.0),
         ("shield", 4.0),
         ("armour", 2.0),
+        ("tools", 4.0),
     ]),
 };
 
@@ -1177,6 +1178,7 @@ pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("steelSword", 1.0),
     ("steelShield", 1.0),
     ("steelArmour", 1.0),
+    ("tools", 2.0),
 ]);
 
 /// How many times a trading post's floor (`WAREHOUSE_FLOOR`) the Trade Org HQ's warehouses keep.
@@ -1209,6 +1211,7 @@ pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("steelSword", 50.0),
     ("steelShield", 30.0),
     ("steelArmour", 160.0),
+    ("tools", 25.0),
 ]);
 
 /// Stock, in floors, at which a warehouse sells at its base price; less stock costs more.
@@ -1351,6 +1354,7 @@ pub const GOOD_WEIGHT: Table<f64> = Table(&[
     ("steelSword", 3.0),
     ("steelShield", 4.0),
     ("steelArmour", 8.0),
+    ("tools", 2.0),
 ]);
 
 /// Attack each weapon adds to a resident's blow (`CONTEXT.md`: Weapons and armour, Combat). A
@@ -2121,6 +2125,10 @@ pub const RECIPES: Table<&[Recipe]> = Table(&[
                 input: Table(&[("steel", 7.0), ("wood", 1.0)]),
                 output: Table(&[("steelArmour", 1.0)]),
             },
+            Recipe {
+                input: Table(&[("iron", 1.0), ("wood", 1.0)]),
+                output: Table(&[("tools", 1.0)]),
+            },
         ],
     ),
 ]);
@@ -2154,6 +2162,16 @@ pub const WORK_SKILL_LIMIT: f64 = 1.0;
 
 /// The most of a workplace's skill a resident can have: where it reaches `WORK_SKILL_LIMIT`.
 pub const WORK_SKILL_MAX: f64 = WORK_SKILL_LIMIT / WORK_SKILL_EFFECT;
+
+/// How much faster a resident carrying Tools works (`CONTEXT.md`: Tools), as a share of their
+/// plain pace: a quarter, at a workplace (what they make) and at a construction site (building,
+/// tearing down, repairing). One set counts; a second adds nothing.
+pub const TOOLS_WORK_BONUS: f64 = 0.25;
+
+/// Game days of work a set of Tools lasts before it breaks (`CONTEXT.md`: Tools, Wear): some two
+/// months of daily work, so a set made from an Iron and a Wood (`RECIPES`) pays for itself many
+/// times over before a worker needs the next.
+pub const TOOLS_WORK_DAYS: f64 = 60.0;
 
 /// Skill a worker of average Intellect gains per game day of work at a workplace: the cap takes
 /// about a game year (one real week).
@@ -3019,6 +3037,8 @@ pub fn balance_json() -> Value {
     m.insert("WORK_SKILL_EFFECT".into(), json!(WORK_SKILL_EFFECT));
     m.insert("WORK_SKILL_LIMIT".into(), json!(WORK_SKILL_LIMIT));
     m.insert("WORK_SKILL_MAX".into(), json!(WORK_SKILL_MAX));
+    m.insert("TOOLS_WORK_BONUS".into(), json!(TOOLS_WORK_BONUS));
+    m.insert("TOOLS_WORK_DAYS".into(), json!(TOOLS_WORK_DAYS));
     m.insert("WORK_SKILL_PER_DAY".into(), json!(WORK_SKILL_PER_DAY));
     m.insert("TEARDOWN_WORK_SHARE".into(), json!(TEARDOWN_WORK_SHARE));
     m.insert("TEARDOWN_MATERIALS_RETURNED".into(), json!(TEARDOWN_MATERIALS_RETURNED));

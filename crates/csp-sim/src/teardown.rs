@@ -102,6 +102,7 @@ pub fn resolve_tearing_down(
             let had = skill_of(r, SkillName::Construction);
             world.buildings[bi].teardown = Some(total);
             world.residents[ri].skills.insert(SkillName::Construction, had + learned);
+            crate::wear::wear_tools(world, ri);
         }
         if teardown_left(&world.buildings[bi]) == 0.0 {
             let resident_id = world.residents[ri].id.clone();
