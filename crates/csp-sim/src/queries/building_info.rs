@@ -40,6 +40,7 @@ pub fn building_purpose(kind: BuildingKind) -> String {
         BuildingKind::Boat => "A boat is rowed over Lake and Sea with a few residents and a little cargo aboard; built on a tile of a finished haven that touches the water, it floats on the nearest free water tile next to it and belongs to the realm of whoever finishes it.".into(),
         BuildingKind::Ship => "A ship is sailed over the Sea by a crew, carrying far more than a carriage; built on a tile of a finished haven that touches the Sea, it floats on the nearest free Sea tile next to it and belongs to the realm of whoever finishes it.".into(),
         BuildingKind::Ram => "A ram is a siege machine built in the field, anywhere a carriage could stand; finished, it belongs to the realm of whoever finishes it, and a crew of its residents pushes it slowly where a carriage could go. Blows break it, and its realm can tear it down.".into(),
+        BuildingKind::Catapult => "A catapult is a siege machine built in the field like a ram; its crew throws Stone they or its tile hold at a wall, gate or tower far out of any archer's reach. It hits buildings only, and its crew stands in the open.".into(),
     }
 }
 
@@ -82,7 +83,7 @@ pub const BUILD_GROUPS: [BuildGroup; 7] = [
             BuildingKind::Ship,
         ],
     },
-    BuildGroup { name: "Siege", kinds: &[BuildingKind::Ram] },
+    BuildGroup { name: "Siege", kinds: &[BuildingKind::Ram, BuildingKind::Catapult] },
 ];
 
 /// Everything the ⓘ on a building's card says about its kind (`BuildingInfo`).

@@ -1,19 +1,23 @@
-//! Siege machines (`CONTEXT.md`: Siege machine, ADR 0037): a ram is laid out and built in the field
-//! as a construction site (`building.rs`); finished, it stands as a machine of the finisher's
-//! realm. Residents of its realm join its **crew** by walking onto its tile (the crew order), and
-//! with at least its crew size there one of them **pushes** it, slowly, along a way a carriage
-//! could take, the crew walking with it (the push order; the steps are taken by `walking.rs`). It
-//! is broken by blows like a wall (`combat.rs`) and torn down by its realm (`teardown.rs`).
+//! Siege machines (`CONTEXT.md`: Siege machine, ADR 0037): a ram or a catapult is laid out and
+//! built in the field as a construction site (`building.rs`); finished, it stands as a machine of
+//! the finisher's realm. Residents of its realm join its **crew** by walking onto its tile (the
+//! crew order), and with at least its crew size there one of them **pushes** it, slowly, along a
+//! way a carriage could take, the crew walking with it (the push order; the steps are taken by
+//! `walking.rs`). A ram **rams** the wall next to it; a catapult **throws** Stone at one in its
+//! reach. It is broken by blows like a wall (`combat.rs`) and torn down by its realm
+//! (`teardown.rs`).
 
 use csp_shared::balance::{
-    carriage_can_enter, BROKEN_MATERIALS_RETURNED, CARRIAGE_SPEED, RAM_BLOW, RAM_CREW,
+    carriage_can_enter, BROKEN_MATERIALS_RETURNED, CARRIAGE_SPEED, CATAPULT_BLOW, CATAPULT_CREW,
+    CATAPULT_REACH, CATAPULT_SHOT_TICKS, CATAPULT_STRENGTH, MAP_SIZE, RAM_BLOW, RAM_CREW,
     RAM_STRENGTH, RAM_STRIKE_TICKS, SIEGE_PUSH_SHARE, TEARDOWN_MATERIALS_RETURNED,
     TEARDOWN_WORK_SHARE, WALK_TICKS_PER_TILE,
 };
+use csp_shared::footprint::near_footprint;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
-    Building, BuildingKind, CrewOrder, CrimeKind, OrderRequest, PushOrder, RamOrder, Resident,
-    ResidentOrder, SiegeMachine, SiegeMachineKind, Stock, Tile, WorldState,
+    Building, BuildingKind, CrewOrder, CrimeKind, Good, OrderRequest, PushOrder, RamOrder,
+    Resident, ResidentOrder, SiegeMachine, SiegeMachineKind, Stock, ThrowOrder, Tile, WorldState,
 };
 
 use crate::crimes::{building_organization, commit_crime, CrimeAgainst};
@@ -24,6 +28,7 @@ use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::building::{build_materials_of, build_work_for};
 use crate::queries::combat::in_contact;
 use crate::queries::driving::carriage_can_go_to;
+use crate::queries::names::{held, placed};
 use crate::queries::residents::{can_work, is_down};
 use crate::queries::walls::{broken_returns, foreign_wall, wall_strength, wall_strength_left};
 use crate::survival::drop_goods;
@@ -32,6 +37,7 @@ use crate::survival::drop_goods;
 pub fn site_kind(kind: SiegeMachineKind) -> BuildingKind {
     match kind {
         SiegeMachineKind::Ram => BuildingKind::Ram,
+        SiegeMachineKind::Catapult => BuildingKind::Catapult,
     }
 }
 
@@ -39,6 +45,7 @@ pub fn site_kind(kind: SiegeMachineKind) -> BuildingKind {
 pub fn machine_kind(kind: BuildingKind) -> Option<SiegeMachineKind> {
     match kind {
         BuildingKind::Ram => Some(SiegeMachineKind::Ram),
+        BuildingKind::Catapult => Some(SiegeMachineKind::Catapult),
         _ => None,
     }
 }
@@ -47,6 +54,7 @@ pub fn machine_kind(kind: BuildingKind) -> Option<SiegeMachineKind> {
 pub fn machine_name(kind: SiegeMachineKind) -> &'static str {
     match kind {
         SiegeMachineKind::Ram => "ram",
+        SiegeMachineKind::Catapult => "catapult",
     }
 }
 
@@ -54,6 +62,7 @@ pub fn machine_name(kind: SiegeMachineKind) -> &'static str {
 pub fn crew_needed(kind: SiegeMachineKind) -> usize {
     match kind {
         SiegeMachineKind::Ram => RAM_CREW as usize,
+        SiegeMachineKind::Catapult => CATAPULT_CREW as usize,
     }
 }
 
@@ -61,6 +70,7 @@ pub fn crew_needed(kind: SiegeMachineKind) -> usize {
 pub fn machine_strength(kind: SiegeMachineKind) -> f64 {
     match kind {
         SiegeMachineKind::Ram => RAM_STRENGTH,
+        SiegeMachineKind::Catapult => CATAPULT_STRENGTH,
     }
 }
 
@@ -323,6 +333,10 @@ pub fn step_siege_machines(world: &mut WorldState) {
                 None => true,
                 Some(m) => ram_problem(world, &world.residents[i], m, &o.target_id).is_some(),
             },
+            Some(ResidentOrder::Throw(o)) => match machine_by_id(world, &o.machine_id) {
+                None => true,
+                Some(m) => throw_problem(world, &world.residents[i], m, &o.target_id).is_some(),
+            },
             _ => false,
         };
         if ends {
@@ -457,29 +471,52 @@ pub fn resolve_ram_strikes(
         }
         o.progress = 0.0;
         let attacker_id = world.residents[i].id.clone();
-        alarms.raise_wall_attacked(world, &attacker_id, &target_id, size);
-        let Some(bi) = world.buildings.iter().position(|b| b.id == target_id) else { continue };
-        let b = &mut world.buildings[bi];
-        b.damage = Some(wall_strength(b).min(b.damage.unwrap_or(0.0) + RAM_BLOW));
-        if wall_strength_left(b) > 0.0 {
-            continue;
-        }
-        let against = CrimeAgainst {
-            victim_org: building_organization(world, &world.buildings[bi]),
-            building: Some(world.buildings[bi].kind),
-            ..CrimeAgainst::default()
-        };
-        commit_crime(world, size, CrimeKind::TearDown, &attacker_id, against);
-        let b = world.buildings.remove(bi);
-        let returned = broken_returns(&b);
-        drop_goods(world, b.x, b.y, &returned, size);
-        made.note(&returned);
-        broken.push(b);
+        broken.extend(hit_wall(world, size, alarms, made, &attacker_id, &target_id, RAM_BLOW));
     }
+    end_orders_on(world, &broken);
+    broken
+}
+
+/// One hit of a machine at a wall, gate or tower (`CONTEXT.md`: Ram, Catapult): it raises the
+/// alarm as a blow at the wall does and does `blow` to it. One that has taken its strength falls,
+/// leaving `BROKEN_MATERIALS_RETURNED` of its materials, and breaking another Organization's is a
+/// crime of tearing down by `attacker_id`. Returns it if it fell.
+fn hit_wall(
+    world: &mut WorldState,
+    size: i32,
+    alarms: &mut dyn Alarms,
+    made: &mut GoodsMade,
+    attacker_id: &str,
+    target_id: &str,
+    blow: f64,
+) -> Option<Building> {
+    alarms.raise_wall_attacked(world, attacker_id, target_id, size);
+    let bi = world.buildings.iter().position(|b| b.id == target_id)?;
+    let b = &mut world.buildings[bi];
+    b.damage = Some(wall_strength(b).min(b.damage.unwrap_or(0.0) + blow));
+    if wall_strength_left(b) > 0.0 {
+        return None;
+    }
+    let against = CrimeAgainst {
+        victim_org: building_organization(world, &world.buildings[bi]),
+        building: Some(world.buildings[bi].kind),
+        ..CrimeAgainst::default()
+    };
+    commit_crime(world, size, CrimeKind::TearDown, attacker_id, against);
+    let b = world.buildings.remove(bi);
+    let returned = broken_returns(&b);
+    drop_goods(world, b.x, b.y, &returned, size);
+    made.note(&returned);
+    Some(b)
+}
+
+/// Orders at walls and gates that fell this tick end: ramming, throwing at or attacking them.
+fn end_orders_on(world: &mut WorldState, broken: &[Building]) {
     let gone: Vec<&str> = broken.iter().map(|b| b.id.as_str()).collect();
     for r in &mut world.residents {
         let on_gone = match &r.order {
             Some(ResidentOrder::Ram(o)) => gone.contains(&o.target_id.as_str()),
+            Some(ResidentOrder::Throw(o)) => gone.contains(&o.target_id.as_str()),
             Some(ResidentOrder::Attack(o)) => gone.contains(&o.target_id.as_str()),
             _ => false,
         };
@@ -487,6 +524,185 @@ pub fn resolve_ram_strikes(
             r.order = None;
         }
     }
+}
+
+/// Stone a catapult has at hand to throw (`CONTEXT.md`: Catapult): what its crew on its tile carry
+/// and what lies in the pile on its tile.
+pub fn stone_at_hand(world: &WorldState, m: &SiegeMachine) -> f64 {
+    let carried: f64 =
+        crew_of(world, m).into_iter().map(|i| held(&world.residents[i].carried, Good::Stone)).sum();
+    let piled: f64 = world
+        .piles
+        .iter()
+        .filter(|p| p.x as i32 == m.x as i32 && p.y as i32 == m.y as i32)
+        .map(|p| held(&p.goods, Good::Stone))
+        .sum();
+    carried + piled
+}
+
+/// Takes the one Stone a shot throws: from its crew first, in the order they joined, then from the
+/// pile on its tile. False if there was none.
+fn take_a_stone(world: &mut WorldState, mi: usize) -> bool {
+    let m = world.siege_machines[mi].clone();
+    for i in crew_of(world, &m) {
+        let carried = &mut world.residents[i].carried;
+        if held(carried, Good::Stone) >= 1.0 {
+            *carried.entry(Good::Stone).or_insert(0.0) -= 1.0;
+            carried.retain(|_, n| *n > 0.0);
+            return true;
+        }
+    }
+    let pile = world.piles.iter_mut().find(|p| {
+        p.x as i32 == m.x as i32 && p.y as i32 == m.y as i32 && held(&p.goods, Good::Stone) >= 1.0
+    });
+    let Some(pile) = pile else { return false };
+    *pile.goods.entry(Good::Stone).or_insert(0.0) -= 1.0;
+    pile.goods.retain(|_, n| *n > 0.0);
+    world.piles.retain(|p| p.goods.values().any(|n| *n > 0.0));
+    true
+}
+
+/// Why `r` can't throw with the catapult `m` at the wall, gate or tower `target_id` now
+/// (`CONTEXT.md`: Catapult): they must be one of its crew with its crew size there, it a finished
+/// wall, gate or tower of another realm's city, or of none, within `CATAPULT_REACH` tiles of it,
+/// and a Stone at hand.
+pub fn throw_problem(
+    world: &WorldState,
+    r: &Resident,
+    m: &SiegeMachine,
+    target_id: &str,
+) -> Option<String> {
+    if m.kind != SiegeMachineKind::Catapult {
+        return Some(format!("a {} doesn’t throw", machine_name(m.kind)));
+    }
+    if !is_crew(m, r) {
+        return Some("only one of its crew on its tile aims a catapult".into());
+    }
+    if let n @ 1.. = crew_short(world, m) {
+        return Some(format!("the catapult needs {n} more crew to shoot"));
+    }
+    let wall = match foreign_wall(world, r.owner.as_deref(), target_id) {
+        Ok(w) => w,
+        Err(e) => return Some(e.into()),
+    };
+    if !near_footprint(placed(wall), (m.x as i32, m.y as i32), CATAPULT_REACH as i32, MAP_SIZE) {
+        return Some("that is beyond the catapult’s reach".into());
+    }
+    if stone_at_hand(world, m) < 1.0 {
+        return Some("the catapult has no Stone to throw".into());
+    }
+    None
+}
+
+/// The throw order (`throw`): one of a catapult's crew aims it at the wall, gate or tower `targetId`
+/// in its reach, with its whole crew (`CONTEXT.md`: Catapult). Pushing it stops while it shoots.
+pub struct ThrowAt;
+
+impl ThrowAt {
+    fn check(
+        world: &WorldState,
+        sender: &OrderSender,
+        order: &OrderRequest,
+    ) -> Result<(usize, String, String), String> {
+        let Some(i) = ordered_resident(world, sender, str_field(order, "residentId")) else {
+            return Err("not one of your residents".into());
+        };
+        let Some(m) = str_field(order, "machineId").and_then(|id| machine_by_id(world, id)) else {
+            return Err("no such siege machine".into());
+        };
+        let r = &world.residents[i];
+        if r.owner.is_none() || m.realm_id != r.owner {
+            return Err(format!("not a {} of your realm", machine_name(m.kind)));
+        }
+        // Aimed at a building, or at a tile of one (`CONTEXT.md`: Catapult).
+        let at_tile = match (int_field(order, "x"), int_field(order, "y")) {
+            (Some(x), Some(y)) => {
+                crate::queries::building::building_at(world, x as i32, y as i32, MAP_SIZE)
+            }
+            _ => None,
+        };
+        let target = str_field(order, "targetId").or(at_tile.map(|b| b.id.as_str())).unwrap_or("");
+        if let Some(p) = throw_problem(world, r, m, target) {
+            return Err(p);
+        }
+        Ok((i, m.id.clone(), target.to_string()))
+    }
+}
+
+impl OrderKind for ThrowAt {
+    fn validate(
+        &self,
+        world: &WorldState,
+        sender: &OrderSender,
+        order: &OrderRequest,
+        _terrain: Option<&TerrainMap>,
+    ) -> Option<String> {
+        ThrowAt::check(world, sender, order).err()
+    }
+
+    fn apply(
+        &self,
+        world: &mut WorldState,
+        sender: &OrderSender,
+        order: &OrderRequest,
+        _terrain: Option<&TerrainMap>,
+    ) {
+        let Ok((i, machine_id, target_id)) = ThrowAt::check(world, sender, order) else { return };
+        for r in &mut world.residents {
+            let on_it = match &r.order {
+                Some(ResidentOrder::Push(o)) => o.machine_id == machine_id,
+                Some(ResidentOrder::Throw(o)) => o.machine_id == machine_id,
+                _ => false,
+            };
+            if on_it {
+                r.order = None;
+            }
+        }
+        world.residents[i].order =
+            Some(ResidentOrder::Throw(ThrowOrder { machine_id, target_id, progress: 0.0 }));
+    }
+}
+
+/// Resolves this tick's catapult shots (`CONTEXT.md`: Catapult, ADR 0002): each throw order that
+/// still holds gets `1 / CATAPULT_SHOT_TICKS` closer to its next shot; a shot takes one Stone and
+/// hits the wall, gate or tower for `CATAPULT_BLOW`, as a ram's strike does (`hit_wall`). It hits
+/// buildings only: nobody standing by takes anything. An order that no longer holds (out of Stone,
+/// say) ends. Returns the walls and gates that fell.
+pub fn resolve_catapult_shots(
+    world: &mut WorldState,
+    size: i32,
+    alarms: &mut dyn Alarms,
+    made: &mut GoodsMade,
+) -> Vec<Building> {
+    let mut broken = Vec::new();
+    for i in 0..world.residents.len() {
+        let Some(ResidentOrder::Throw(o)) = &world.residents[i].order else { continue };
+        let (machine_id, target_id) = (o.machine_id.clone(), o.target_id.clone());
+        let mi = machine_index(world, &machine_id).filter(|&mi| {
+            throw_problem(world, &world.residents[i], &world.siege_machines[mi], &target_id)
+                .is_none()
+        });
+        let Some(mi) = mi else {
+            world.residents[i].order = None;
+            continue;
+        };
+        let Some(ResidentOrder::Throw(o)) = &mut world.residents[i].order else { continue };
+        o.progress += 1.0 / CATAPULT_SHOT_TICKS;
+        if o.progress < 1.0 - 1e-9 {
+            continue;
+        }
+        o.progress = 0.0;
+        if !take_a_stone(world, mi) {
+            world.residents[i].order = None;
+            continue;
+        }
+        if stone_at_hand(world, &world.siege_machines[mi]) < 1.0 {
+            world.residents[i].order = None;
+        }
+        let attacker_id = world.residents[i].id.clone();
+        broken.extend(hit_wall(world, size, alarms, made, &attacker_id, &target_id, CATAPULT_BLOW));
+    }
+    end_orders_on(world, &broken);
     broken
 }
 
@@ -510,3 +726,6 @@ mod tests;
 
 #[cfg(test)]
 mod strike_tests;
+
+#[cfg(test)]
+mod catapult_tests;

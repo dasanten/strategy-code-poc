@@ -134,7 +134,7 @@ mod building_one {
         world.buildings.push(s);
         assert_eq!(
             problem(&world, 2, 2).as_deref(),
-            Some("there is already a ram site on this tile")
+            Some("there is already a siege machine site on this tile")
         );
     }
 

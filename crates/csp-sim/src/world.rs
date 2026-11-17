@@ -283,6 +283,13 @@ fn step_rest(
         crate::cities::update_city_membership(world, size);
     }
     combat.broken.extend(rammed);
+    // Crewed catapults throw Stone at the walls and gates in their reach (`CONTEXT.md`: Catapult).
+    let thrown =
+        crate::siege::resolve_catapult_shots(world, size, &mut GameAlarms, &mut scratch.made);
+    if !thrown.is_empty() {
+        crate::cities::update_city_membership(world, size);
+    }
+    combat.broken.extend(thrown);
     // Whoever was up on a tile that broke falls (`CONTEXT.md`: A tile breaks).
     let (fell, ended) = crate::wall_walk::fall_from_broken(world, terrain, &combat.broken);
     combat.died.extend(fell);

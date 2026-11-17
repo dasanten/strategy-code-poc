@@ -217,16 +217,16 @@ pub fn buildings_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
             if b.stock.is_some() {
                 fail(&b.id, "is a road with a stock".into());
             }
-        } else if b.kind == BuildingKind::Ram {
+        } else if matches!(b.kind, BuildingKind::Ram | BuildingKind::Catapult) {
             // `CONTEXT.md`: Siege machine: a site in the field, where a carriage could stand.
             if b.site.is_none() {
-                fail(&b.id, "is a finished ram site".into());
+                fail(&b.id, format!("is a finished {kind} site"));
             }
             if !carriage_can_go_to(world, terrain, b.x as i32, b.y as i32) {
-                fail(&b.id, "is a ram site where no carriage can go".into());
+                fail(&b.id, format!("is a {kind} site where no carriage can go"));
             }
             if !nodes.is_empty() {
-                fail(&b.id, "is a ram site on a resource node".into());
+                fail(&b.id, format!("is a {kind} site on a resource node"));
             }
             if let Some(c) = city {
                 fail(&b.id, format!("is a ram site of city {c}"));
@@ -1223,6 +1223,23 @@ pub fn siege_machines_in_place(world: &WorldState, terrain: &TerrainMap) -> Out 
             format!("resident {} rams {} with {}, but {problem}", r.id, o.target_id, o.machine_id);
         out.push(violation(name, msg, &[&r.id]));
     }
+    // A catapult throws only with its crew and a Stone at hand, at a foreign wall or gate in its
+    // reach (`CONTEXT.md`: Catapult).
+    for r in &world.residents {
+        let Some(ResidentOrder::Throw(o)) = &r.order else { continue };
+        let problem = match crate::siege::machine_by_id(world, &o.machine_id) {
+            None => "which is gone".to_string(),
+            Some(m) => match crate::siege::throw_problem(world, r, m, &o.target_id) {
+                None => continue,
+                Some(p) => p,
+            },
+        };
+        let msg = format!(
+            "resident {} throws at {} with {}, but {problem}",
+            r.id, o.target_id, o.machine_id
+        );
+        out.push(violation(name, msg, &[&r.id]));
+    }
     // Nobody up struck one of a ram's crew under its roof this tick.
     for r in world.residents.iter().filter(|r| crate::siege::under_roof(world, r)) {
         let Some(s) = r.struck.as_ref().filter(|s| s.tick + 1.0 == world.tick as f64) else {
@@ -2123,9 +2140,9 @@ pub fn carrying_doesnt_work(world: &WorldState, _: &TerrainMap) -> Out {
 }
 
 /// Orders only a grown resident can hold (`ADULT_ORDERS`).
-const ADULT_ORDERS: [&str; 13] = [
+const ADULT_ORDERS: [&str; 14] = [
     "build", "roadLine", "wallLine", "tearDown", "workAt", "teach", "train", "breed", "drive",
-    "feed", "crew", "push", "ram",
+    "feed", "crew", "push", "ram", "throw",
 ];
 
 /// Children don't work until they are grown (`childrenDontWork`).

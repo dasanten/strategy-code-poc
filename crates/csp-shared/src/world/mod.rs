@@ -1025,6 +1025,16 @@ pub struct RamOrder {
     pub progress: f64,
 }
 
+/// Throwing Stone at a wall, gate or tower (`CONTEXT.md`: Catapult): one of a catapult's crew aims
+/// it, with its whole crew, at a building in its reach; `progress` builds up to its next shot.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ThrowOrder {
+    pub machine_id: String,
+    pub target_id: String,
+    pub progress: f64,
+}
+
 /// A haul route's stop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -1330,6 +1340,9 @@ pub enum ResidentOrder {
     Push(PushOrder),
     /// Swinging a ram at the wall or gate next to it, as one of its crew (`CONTEXT.md`: Ram).
     Ram(RamOrder),
+    /// Throwing Stone with a catapult at a wall, gate or tower in its reach, as one of its crew
+    /// (`CONTEXT.md`: Catapult).
+    Throw(ThrowOrder),
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).
@@ -3455,6 +3468,9 @@ pub enum BuildingKind {
     Ship,
     /// A ram site (`CONTEXT.md`: Siege machine, Ram): finished, it is gone and a ram stands there.
     Ram,
+    /// A catapult site (`CONTEXT.md`: Siege machine, Catapult): finished, it is gone and a catapult
+    /// stands there.
+    Catapult,
 }
 
 /// A building or construction site (`Building`).
@@ -3584,11 +3600,12 @@ pub struct Vessel {
     pub crew_ids: Vec<String>,
 }
 
-/// The kinds of siege machine (`CONTEXT.md`: Siege machine): a ram, for now.
+/// The kinds of siege machine (`CONTEXT.md`: Siege machine): a ram and a catapult.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum SiegeMachineKind {
     Ram,
+    Catapult,
 }
 
 /// A siege machine (`CONTEXT.md`: Siege machine, ADR 0037): a machine of a realm, built in the

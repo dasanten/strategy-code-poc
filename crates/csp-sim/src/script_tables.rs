@@ -2829,6 +2829,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::String,
     },
     ScriptBinding {
+        name: "throw",
+        is: Is::Action,
+        params: &["machine", "wallOrX", "y?"],
+        cost: 10.0,
+        description: "Shoot a catapult, by it or its id, at a wall, gate or tower within its reach: by it or its id, or by the tile x, y of it. It must be one of another realm's city, or of nobody's. I must be one of its crew on its tile, with at least as many crew as it needs there. Each shot throws one Stone that its crew carry or that lies on its tile; out of Stone it stops. It hits only the building, never anyone. My order is \"throw\" until the wall falls.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
         name: "push",
         is: Is::Action,
         params: &["machine", "x", "y"],
