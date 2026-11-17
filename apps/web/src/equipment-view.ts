@@ -111,3 +111,6 @@ export function groupSwapChoices(
     .map((good) => ({ good, label: GOOD_LABELS[good] }))
     .sort((a, b) => a.label.localeCompare(b.label))
 }
+
+/** What a smithy worker is told to make to mend worn gear instead (`CONTEXT.md`: Mending). */
+export const MEND = 'mend' as const

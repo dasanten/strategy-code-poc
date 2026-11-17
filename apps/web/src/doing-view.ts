@@ -149,7 +149,7 @@ function doingOfOrder(
   if (o && o.kind === own) {
     if (o.kind === 'breed') return breedingLine(o.horseIds, horses)
     if (o.kind === 'haul' || o.kind === 'train') return orderDoing(r, arrives, cities)
-    return o.kind === 'workAt' && o.makes
+    return o.kind === 'workAt' && (o.makes || o.mends)
       ? `${what}: ${lower(orderDoing(r, arrives, cities))}`
       : what
   }

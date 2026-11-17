@@ -17,7 +17,8 @@ use crate::goods_deps::{
     end_breeding_of, hand_in, new_id, raise_standing_both_ways, raise_standing_by_trade, realm_of,
     record_event, OrderSender,
 };
-use crate::holders::{move_between, total, Holder};
+use crate::holders::{holder_id, move_between, total, Holder};
+use crate::mending::leaving_shares;
 use crate::queries::carriages::caravan_food_for;
 use crate::queries::city::npc_city_refuses;
 use crate::queries::command::{commander_of_resident, commands, commands_carriage};
@@ -223,6 +224,13 @@ fn holder_of(world: &WorldState, ri: usize, carriage: Option<usize>) -> (Holder,
     }
 }
 
+/// The price share of each unit of `good` that `from` would give up in a trade (`CONTEXT.md`: Wear:
+/// a worn piece sells and buys for less).
+fn shares_from(world: &WorldState, from: Holder, good: Good) -> Vec<f64> {
+    let units = held(holder_stock(world, from), good);
+    leaving_shares(world, holder_id(world, from), units, good)
+}
+
 fn holder_stock(world: &WorldState, h: Holder) -> &Stock {
     match h {
         Holder::Carriage(k) => &world.carriages[k].load,
@@ -347,8 +355,11 @@ pub fn resolve_trades(world: &mut WorldState, size: i32, ledger: &mut TradeLedge
         }
         let ResidentOrder::Trade(o) = &order else { unreachable!() };
         let owed = owed_by(world, &world.buildings[w].id, o.good);
+        let seller = if o.side == TradeSide::Buy { Holder::Storage(w) } else { holder };
+        let shares = shares_from(world, seller, o.good);
         let hold = TradeHolder { stock: holder_stock(world, holder), room };
-        let q = quote_trade(world, &world.buildings[w], hold, o.side, o.good, o.units, owed);
+        let q =
+            quote_trade(world, &world.buildings[w], hold, o.side, o.good, o.units, owed, &shares);
         let (goods_from, goods_to) = match o.side {
             TradeSide::Buy => (Holder::Storage(w), holder),
             TradeSide::Sell => (holder, Holder::Storage(w)),
@@ -446,6 +457,8 @@ fn trade_with_city(
     ensure_stock(world, s);
     let parties = [holder, Holder::Storage(s)];
     let before = total(world, &parties);
+    let seller = if o.side == TradeSide::Buy { Holder::Storage(s) } else { holder };
+    let shares = shares_from(world, seller, o.good);
     let hold = TradeHolder { stock: holder_stock(world, holder), room };
     let city = &world.cities[ci];
     let q = quote_npc_trade(
@@ -457,6 +470,7 @@ fn trade_with_city(
         o.good,
         o.units,
         trader.as_deref(),
+        &shares,
     );
     let (goods_from, goods_to) = match o.side {
         TradeSide::Buy => (Holder::Storage(s), holder),
@@ -542,9 +556,12 @@ fn trade_with_trader(
     let (holder, room) = holder_of(world, ri, carriage);
     let parties = [holder, Holder::Carriage(wagon)];
     let before = total(world, &parties);
+    let seller = if o.side == TradeSide::Buy { Holder::Carriage(wagon) } else { holder };
+    let shares = shares_from(world, seller, o.good);
     let hold = TradeHolder { stock: holder_stock(world, holder), room };
     let t = &world.traders[ti];
-    let q = quote_with_trader(world, t, &world.carriages[wagon], hold, o.side, o.good, o.units);
+    let wagon_k = &world.carriages[wagon];
+    let q = quote_with_trader(world, t, wagon_k, hold, o.side, o.good, o.units, &shares);
     let (goods_from, goods_to) = match o.side {
         TradeSide::Buy => (Holder::Carriage(wagon), holder),
         TradeSide::Sell => (holder, Holder::Carriage(wagon)),

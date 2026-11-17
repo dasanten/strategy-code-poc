@@ -435,6 +435,7 @@ fn found_at(
             at: Tile { x: fx, y: fy },
             progress: 0.0,
             makes: None,
+            mends: false,
         }));
         // By the Work default, the Player's version from the first tick their scripts run.
         let mut memory = serde_json::Map::new();

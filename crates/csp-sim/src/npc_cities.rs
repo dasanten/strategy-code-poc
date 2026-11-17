@@ -288,6 +288,7 @@ pub fn found_npc_city(
             at: Tile { x: farm.x, y: farm.y },
             progress: 0.0,
             makes: None,
+            mends: false,
         }));
         r.script = Some(default_script(Task::Work, json!({ "workplaceId": farm.id })));
         world.residents.push(r);

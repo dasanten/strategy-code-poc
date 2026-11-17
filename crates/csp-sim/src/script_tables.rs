@@ -644,6 +644,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 null_when: Some("for other orders, and at other workplaces"),
             },
             ScriptField {
+                name: "mends",
+                r#type: ScriptType::Boolean,
+                description: "Whether I mend worn gear at a smithy (`workAt(\"mend\")`) rather than make anything.",
+                null_when: Some("for other orders, and while not mending"),
+            },
+            ScriptField {
                 name: "carriageId",
                 r#type: ScriptType::String,
                 description: "The carriage driven, hauled with or traded from.",
@@ -2607,7 +2613,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &["workplace", "makes?"],
         cost: 1.0,
-        description: "At a smelter, mint or smithy I see, the goods it lacks for a batch of its recipe (the one making `makes`, else its only one) in its pile and its workers’ hands: of each, as many batches’ worth as fit in my hands, as a list like [{good: \"ironOre\", units: 24}]; empty while it has a batch’s, when none fits, and for any other building.",
+        description: "At a smelter, mint or smithy I see, the goods it lacks for a batch of its recipe (the one making `makes`, else its only one; at a smithy with `makes` \"mend\", what mending its most worn piece takes) in its pile and its workers’ hands: of each, as many batches’ worth as fit in my hands, as a list like [{good: \"ironOre\", units: 24}]; empty while it has a batch’s, when none fits, and for any other building.",
         returns: ScriptType::List(&ScriptType::View("material")),
     },
     ScriptBinding {
@@ -2863,7 +2869,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Action,
         params: &["makes?"],
         cost: 10.0,
-        description: "Work the workplace on my tile; at a smithy, say what to make.",
+        description: "Work the workplace on my tile; at a smithy, say what to make, or \"mend\" to mend the most worn weapon, piece of armour or set of Tools there (carried by its workers or on its pile) back to good, for a share of its recipe.",
         returns: ScriptType::String,
     },
     ScriptBinding {

@@ -976,6 +976,10 @@ pub struct WorkOrder {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub makes: Option<Good>,
+    /// At a smithy, mending worn gear instead of making anything (`CONTEXT.md`: Mending).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[ts(optional, as = "Option<bool>")]
+    pub mends: bool,
 }
 
 /// Repairing a worn building (`CONTEXT.md`: Repairing).

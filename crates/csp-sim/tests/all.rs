@@ -88,6 +88,8 @@ mod known_workplace;
 mod last_seen;
 #[path = "lost_post.rs"]
 mod lost_post;
+#[path = "mending.rs"]
+mod mending;
 #[path = "new_veins.rs"]
 mod new_veins;
 #[path = "npc_chain.rs"]

@@ -839,7 +839,11 @@ The shared language of the game. Domain terms only — no implementation details
   less, a nearly broken one for much less.
 - **Mending:** a smithy worker mends a worn weapon, piece of armour or set of Tools back to good, for a share of
   its recipe and in less time than forging it. An NPC city counts only pieces in good condition
-  towards its reserve and mends the rest.
+  towards its reserve and mends the rest. A smith set to mend takes the most worn piece at the smithy: on its pile,
+  carried by its workers, or carried by anyone of their side standing on it, so a soldier brings
+  their worn sword there. An NPC city's soldier with worn gear takes it to the city's smithy with
+  what mending it takes and waits there; one of its smiths mends, or with none, an idle hand, else
+  a worker from another of its workplaces (a farm's last). (Decided overnight, Daniel to confirm.)
 - **Army:** a named group of a realm's residents moving and fighting together under one order or
   script, at the pace of the slowest. A resident leaves it when given an order of their own.
   Needs a supply line or it starves far from home.

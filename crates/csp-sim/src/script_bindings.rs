@@ -1451,10 +1451,14 @@ impl<'a> ScriptBindings<'a> {
                     return Ok(Json::Array(vec![]));
                 }
                 let makes = arg(1).and_then(Value::as_str);
-                let Some(recipe) = recipe_for(b.kind, makes) else {
-                    return Ok(Json::Array(vec![]));
+                let load = if makes == Some(crate::mending::MEND) {
+                    crate::mending::mend_input_to_fetch(world, b)
+                } else {
+                    let Some(recipe) = recipe_for(b.kind, makes) else {
+                        return Ok(Json::Array(vec![]));
+                    };
+                    input_to_fetch(world, b, recipe, r)
                 };
-                let load = input_to_fetch(world, b, recipe, r);
                 Json::Array(
                     load.iter()
                         .map(|(g, u)| json!({ "good": good_name(*g), "units": u }))
