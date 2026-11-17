@@ -99,6 +99,9 @@ pub fn buildings_by_square(world: &WorldState, size: i32) -> HashMap<i32, Vec<us
     out
 }
 
+/// Each observer's tile and how far they see, by square of the map.
+type SeenFrom = HashMap<i32, Vec<((i32, i32), f64)>>;
+
 /// The observers' eyes (`eyesOf`): whether any of them is within sight range of a spot, plus a
 /// reach. The observers are sorted into squares, so a spot is checked only against those in its
 /// square and the ones next to it.
@@ -108,7 +111,7 @@ pub struct Eyes {
     squares: Squares,
     steps: Vec<i32>,
     /// Each observer's tile and how far they see, by square.
-    grid: HashMap<i32, Vec<((i32, i32), f64)>>,
+    grid: SeenFrom,
     /// The squares anything in sight can stand in.
     watched: HashSet<i32>,
 }
@@ -128,7 +131,7 @@ impl Eyes {
         // The squares next to one, across the joins; on a map only a few squares across, every
         // one.
         let steps: Vec<i32> = if across < 3 { (0..across).collect() } else { vec![-1, 0, 1] };
-        let mut grid: HashMap<i32, Vec<((i32, i32), f64)>> = HashMap::new();
+        let mut grid: SeenFrom = HashMap::new();
         let mut watched = HashSet::new();
         let mut eyes = Eyes { size, squares, steps, grid: HashMap::new(), watched: HashSet::new() };
         for &(o, range) in observers {
