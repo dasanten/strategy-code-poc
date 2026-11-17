@@ -76,6 +76,9 @@ fn a_big_city_whose_vein_runs_dry_ends_a_season_working_the_next_node_no_idler_t
     staged.world.nodes.last_mut().expect("the node").fill_stock();
 
     let mut dry_day: Option<f64> = None;
+    // The most of a plan's crew at a mine on the second node once the vein ran dry: a city whose
+    // soldiers are all armed lacks no ore and at times sends that crew to its road (#1379).
+    let mut crew = 0;
     let mut planned_at = None;
     let (mut before, mut after) = (Vec::new(), Vec::new());
     let mut runner =
@@ -97,6 +100,18 @@ fn a_big_city_whose_vein_runs_dry_ends_a_season_working_the_next_node_no_idler_t
                 continue;
             }
             planned_at = Some(plan.planned_at);
+            if dry_day.is_some() {
+                let on_ore2 = |id: &String| {
+                    s.world.buildings.iter().any(|b| {
+                        &b.id == id
+                            && b.kind == BuildingKind::Mine
+                            && b.site.is_none()
+                            && workplace_node(&s.world, b).is_some_and(|n| n.id == ore2)
+                    })
+                };
+                let n = plan.jobs.values().filter(|j| j.building_id.as_ref().is_some_and(on_ore2));
+                crew = crew.max(n.count());
+            }
             let Some(share) = idle_share(s) else { continue };
             match dry_day {
                 None => before.push(share),
@@ -114,15 +129,10 @@ fn a_big_city_whose_vein_runs_dry_ends_a_season_working_the_next_node_no_idler_t
             b.kind == BuildingKind::Mine && workplace_node(world, b).is_some_and(|n| n.id == ore2)
         })
         .cloned();
-    let crew = new_mine.as_ref().map_or(0, |m| {
-        world.city_plans.get(&staged.city).map_or(0, |p| {
-            p.jobs.values().filter(|j| j.building_id.as_deref() == Some(m.id.as_str())).count()
-        })
-    });
     let dead_gone = !world.buildings.iter().any(|b| b.id == mine.id);
     let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len().max(1) as f64;
     eprintln!(
-        "vein ran dry on day {dry_day:?}; new mine {:?}, finished {}, crew {crew}; dead mine torn \
+        "vein ran dry on day {dry_day:?}; new mine {:?}, finished {}, most crew {crew}; dead mine torn \
          down: {dead_gone}; idle before {:.1}% ({} plans), after {:.1}% ({} plans)",
         new_mine.as_ref().map(|m| (m.x, m.y)),
         new_mine.as_ref().is_some_and(|m| m.site.is_none()),
@@ -134,7 +144,7 @@ fn a_big_city_whose_vein_runs_dry_ends_a_season_working_the_next_node_no_idler_t
     assert!(dry_day.is_some(), "the vein never ran dry");
     let new_mine = new_mine.expect("a mine on the second node");
     assert!(new_mine.site.is_none(), "the new mine is still a site");
-    assert!(crew > 0, "nobody works the new mine");
+    assert!(crew > 0, "nobody ever worked the new mine");
     assert!(dead_gone, "the dead mine still stands");
     assert!(!before.is_empty() && !after.is_empty());
     assert!(mean(&after) <= mean(&before) + IDLE_SLACK, "{before:?}\n{after:?}");
