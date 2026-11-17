@@ -217,6 +217,11 @@ pub struct SeenBuilding {
 pub struct SeenCity {
     #[serde(flatten)]
     pub city: City,
+    /// For an NPC city in Retaliate, the name of the Organization it turned on, for its mood line
+    /// (`CONTEXT.md`: Retaliating).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub retaliating_against: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub price: Option<f64>,

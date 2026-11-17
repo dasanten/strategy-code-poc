@@ -84,6 +84,8 @@ pub fn step_captures(
         });
         if occupier == TRADE_ORG {
             take_city(world, &city_id, size, terrain);
+        } else if crate::queries::alliance_rules::is_alliance_city(world, &occupier) {
+            npc_takes_city(world, &city_id, &occupier, size);
         } else {
             capture_city(world, &city_id, &occupier, size);
         }
@@ -127,7 +129,8 @@ fn occupation_logged(world: &mut WorldState, ci: usize, occupier: &str, occupied
     };
     let to_occupier = event(owner.as_deref().map(|o| realm_name(world, o)), true);
     record_event(world, Some(occupier), to_occupier);
-    let to_owner = event(Some(realm_name(world, occupier)), false);
+    let to_owner =
+        event(Some(crate::queries::standing::organization_label(world, occupier)), false);
     record_event(world, owner.as_deref(), to_owner);
 }
 
@@ -426,3 +429,26 @@ mod tests;
 
 #[cfg(test)]
 mod what_joins_tests;
+
+/// An NPC city's soldiers held a realm's town hall to the end (`CONTEXT.md`: Retaliating; decided
+/// overnight, Daniel to confirm): the city leaves its realm with its residents and goes on as an NPC
+/// city of its own, as one does whose realm ended, holding nothing against its taker. Its former
+/// realm's log says so.
+pub fn npc_takes_city(world: &mut WorldState, city_id: &str, captor: &str, size: i32) {
+    let Some(ci) = city_index(world, city_id) else { return };
+    let from = world.cities[ci].realm_id.clone();
+    let residents = change_hands(world, ci, None, size) as f64;
+    let seed = world.seed;
+    let city = &mut world.cities[ci];
+    city.layout = Some(crate::city_layout::pick_layout(seed, &city.id));
+    city.temperament.get_or_insert_with(|| crate::temperament::pick_temperament(seed, city_id));
+    let (id, name) = (city.id.clone(), city.name.clone());
+    let what = RealmEventWhat::CityCaptured {
+        city_id: id,
+        city: name,
+        other: Some(crate::queries::standing::organization_label(world, captor)),
+        captor: false,
+        residents,
+    };
+    record_event(world, from.as_deref(), what);
+}

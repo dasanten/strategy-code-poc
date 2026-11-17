@@ -6,12 +6,16 @@ const MOODS: Record<Stance, string> = {
   fortify: 'arming',
   trade: 'busy trading',
   expand: 'looking to expand',
+  retaliate: 'retaliating',
 }
 
 /**
  * What an NPC city is after for now (`CONTEXT.md`: Stance), as a mood line on its card: whoever
- * sees it reads it. Nothing for a city without one (a realm's, a trading post).
+ * sees it reads it, in Retaliate with whom it turned on (`CONTEXT.md`: Retaliating). Nothing for a
+ * city without one (a realm's, a trading post).
  */
-export function moodLine(s: Stance | undefined): string | undefined {
-  return s && `Mood: ${MOODS[s]}`
+export function moodLine(s: Stance | undefined, against?: string): string | undefined {
+  if (!s) return undefined
+  if (s === 'retaliate' && against) return `Mood: retaliating against ${against}`
+  return `Mood: ${MOODS[s]}`
 }

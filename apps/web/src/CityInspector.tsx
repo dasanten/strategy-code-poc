@@ -300,7 +300,7 @@ export function CityInspector({
             </p>
           )}
           <TemperamentLine temperament={city.temperament} />
-          <MoodLine stance={city.stance} />
+          <MoodLine stance={city.stance} against={city.retaliatingAgainst} />
           <Reaction city={city} />
           <Buying
             buy={describeBuying(city, { residents, buildings }, realmId)}
@@ -715,8 +715,8 @@ function RememberedCity({
 }
 
 /** What an NPC city is after for now (`CONTEXT.md`: Stance), for whoever sees it. */
-function MoodLine({ stance }: { stance: Stance | undefined }) {
-  const line = moodLine(stance)
+function MoodLine({ stance, against }: { stance: Stance | undefined; against?: string }) {
+  const line = moodLine(stance, against)
   if (!line) return null
   return (
     <p className="city-details" aria-label="Mood">

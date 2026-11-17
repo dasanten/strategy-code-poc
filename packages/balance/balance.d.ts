@@ -374,6 +374,14 @@ export interface Balance {
     hireDays: number
     [key: string]: number
   }
+  readonly NPC_RETALIATE: {
+    threat: number
+    endsBelow: number
+    marchThreat: number
+    marchStanding: number
+    marchOutweigh: number
+    [key: string]: number
+  }
   readonly TRADE_ORG_HQ: {
     innerRadius: number
     outerRadius: number

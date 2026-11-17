@@ -222,6 +222,7 @@ pub fn plan_city(
         patrolled_last: None,
         hunts: None,
         demanded: None,
+        march: None,
     });
     plan.planned_at = tick;
     let Some(city) = world.cities.iter().find(|c| c.id == city_id).cloned() else { return };

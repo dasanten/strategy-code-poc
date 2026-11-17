@@ -1686,6 +1686,19 @@ pub struct CityPlan {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub demanded: Option<IndexMap<String, f64>>,
+    /// Its soldiers marching on a city of the Organization it retaliates against
+    /// (`CONTEXT.md`: Retaliating).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub march: Option<CityMarch>,
+}
+
+/// An NPC city's soldiers marching on a city to take it (`CityPlan.march`, `CONTEXT.md`: Retaliating).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CityMarch {
+    pub city_id: String,
+    pub resident_ids: Vec<String>,
 }
 
 /// A soldier of an NPC city out after a thief it knows of, to take back what was taken
@@ -3521,6 +3534,10 @@ pub struct City {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub stance: Option<Stance>,
+    /// For an NPC city in Retaliate, the Organization it turned on (`CONTEXT.md`: Retaliating).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub retaliating: Option<String>,
 }
 
 /// A place where an NPC city lost people (`City.danger_places`, `CONTEXT.md`: Threat). How much it
@@ -3552,6 +3569,7 @@ pub enum Stance {
     Fortify,
     Trade,
     Expand,
+    Retaliate,
 }
 
 /// Since when a realm's fighters near an NPC city have outweighed it without a break

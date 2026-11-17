@@ -7,6 +7,8 @@ describe('an NPC city’s stance', () => {
     expect(moodLine('fortify')).toBe('Mood: arming')
     expect(moodLine('trade')).toBe('Mood: busy trading')
     expect(moodLine('expand')).toBe('Mood: looking to expand')
+    expect(moodLine('retaliate', 'Mara')).toBe('Mood: retaliating against Mara')
+    expect(moodLine('retaliate')).toBe('Mood: retaliating')
     expect(moodLine(undefined)).toBeUndefined()
   })
 })

@@ -149,6 +149,7 @@ pub fn add_city(
         threats: None,
         danger_places: None,
         stance: None,
+        retaliating: None,
         temperament: None,
         layout: (realm_id.is_none() && trade_org.is_none()).then_some(CityLayout::Grid),
     });

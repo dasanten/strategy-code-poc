@@ -823,8 +823,15 @@ fn places(
         };
         // And its stance, as a mood line (`CONTEXT.md`: Stance); Grow too, which it stores as none.
         shown.stance = crate::queries::city::for_sale(c).then(|| crate::npc_stance::stance_of(c));
+        // In Retaliate, against whom, by name (`CONTEXT.md`: Retaliating).
+        let retaliating_against = shown
+            .retaliating
+            .take()
+            .filter(|_| shown.stance.is_some())
+            .map(|org| crate::queries::standing::organization_label(world, &org));
         out.push(SeenEntity::City(Box::new(SeenCity {
             city: shown,
+            retaliating_against,
             price,
             wont_sell,
             refuses: refuses.then_some(true),

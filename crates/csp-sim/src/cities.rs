@@ -99,6 +99,7 @@ pub fn found_city(world: &mut WorldState, hall: usize, realm_id: Option<&str>) -
         danger_places: None,
         layout,
         stance: None,
+        retaliating: None,
         temperament,
     });
     world.buildings[hall].city_id = Some(id);

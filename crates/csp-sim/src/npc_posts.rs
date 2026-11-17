@@ -75,12 +75,15 @@ pub fn soldiers_at_hand(world: &WorldState, city: &City, adults: &[usize]) -> Ve
         .map(|p| &p.resident_id)
         .collect();
     let hunting = crate::npc_hunts::hunters(world, &city.id);
+    let marching: HashSet<String> =
+        crate::npc_retaliate::marchers(world, &city.id).into_iter().collect();
     adults
         .iter()
         .copied()
         .filter(|&i| {
             let r = &world.residents[i];
             !hunting.contains(&r.id)
+                && !marching.contains(&r.id)
                 && is_armed(r)
                 && r.down_until.is_none()
                 && r.script.as_ref().is_none_or(|s| s.task == Some(Task::Train))
