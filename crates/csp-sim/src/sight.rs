@@ -733,7 +733,7 @@ fn places(
         if !eyes.building_seen(placed(b)) {
             continue;
         }
-        out.push(SeenEntity::Building(seen_building(world, insight, b)));
+        out.push(SeenEntity::Building(Box::new(seen_building(world, insight, b))));
         if let Some(city) = b.city_id.as_deref() {
             seen_cities.insert(city);
             if b.kind == BuildingKind::Storage && b.site.is_none() {
@@ -909,7 +909,7 @@ impl SideSight {
             return None;
         }
         let insight = self.insight(world, index);
-        Some(SeenEntity::Building(seen_building(world, insight, b)))
+        Some(SeenEntity::Building(Box::new(seen_building(world, insight, b))))
     }
 
     /// Everything in its sight.

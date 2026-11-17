@@ -442,7 +442,8 @@ pub struct SeenTrader {
 pub enum SeenEntity {
     /// Boxed: a resident carries far more than anything else seen.
     Resident(Box<SeenResident>),
-    Building(SeenBuilding),
+    /// Boxed too: a building with its stock, prices and offers outweighs the rest.
+    Building(Box<SeenBuilding>),
     /// Boxed too: a city carries its prices and what it keeps in mind.
     City(Box<SeenCity>),
     Horse(SeenHorse),
@@ -509,7 +510,7 @@ mod tests {
         .unwrap();
         let mut seen = SeenBuilding { building: b, prices: None, offers: None };
         seen.building.stock = None;
-        let e = SeenEntity::Building(seen);
+        let e = SeenEntity::Building(Box::new(seen));
         assert_eq!(
             serde_json::to_value(&e).unwrap(),
             json!({ "is": "building", "id": "b1", "kind": "storage", "cityId": "c1", "x": 3.0, "y": 4.0 })
