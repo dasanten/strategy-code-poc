@@ -106,6 +106,10 @@ pub fn step_training(world: &mut WorldState, size: i32) {
         if let Some(ResidentOrder::Train(o)) = &mut r.order {
             o.learning = subject;
         }
+        // Training wears their gear a little (`CONTEXT.md`: Wear).
+        if subject.is_some() {
+            crate::wear::wear_in_training(world, i);
+        }
     }
 }
 

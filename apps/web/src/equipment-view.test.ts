@@ -21,6 +21,20 @@ describe('equipment slots', () => {
     expect(equipmentLine(undefined)).toBe('Nothing equipped')
     expect(equipmentLine({ weapon: 'spear', shield: 'shield' })).toBe('Spear · Shield · no armour')
   })
+
+  it('says the condition of each piece where it is known, for the realm carrying it', () => {
+    const equipped = { weapon: 'sword', armour: 'armour' } as const
+    expect(equipmentSlots(equipped, { weapon: 'worn', armour: 'nearlyBroken' })).toEqual([
+      { slot: 'weapon', label: 'Weapon', item: 'Sword', condition: 'worn' },
+      { slot: 'shield', label: 'Shield' },
+      { slot: 'armour', label: 'Armour', item: 'Armour', condition: 'nearly broken' },
+    ])
+    expect(equipmentLine(equipped, { weapon: 'good', armour: 'worn' })).toBe(
+      'Sword (good) · no shield · Armour (worn)',
+    )
+    // Another realm's resident comes without a condition: kind and metal only.
+    expect(equipmentLine(equipped)).toBe('Sword · no shield · Armour')
+  })
 })
 
 describe('swapping gear', () => {

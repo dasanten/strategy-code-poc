@@ -168,6 +168,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "outpost-storage-realms", check: checks::outpost_storage_realms },
         Invariant { name: "carried-within-capacity", check: checks::carried_within_capacity },
         Invariant { name: "equipment-sound", check: checks::equipment_sound },
+        Invariant { name: "wear-sound", check: |w, _| crate::wear::wear_problems(w) },
         Invariant { name: "goods-in-place", check: checks::goods_in_place },
         Invariant { name: "breed-orders-sound", check: checks::breed_orders_sound },
         Invariant { name: "kept-breedings-sound", check: checks::kept_breedings_sound },

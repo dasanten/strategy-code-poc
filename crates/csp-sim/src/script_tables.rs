@@ -152,6 +152,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 null_when: None,
             },
             ScriptField {
+                name: "condition",
+                r#type: ScriptType::View("condition"),
+                description: "The condition of what they have equipped.",
+                null_when: Some("for another realm’s residents"),
+            },
+            ScriptField {
                 name: "order",
                 r#type: ScriptType::View("residentOrder"),
                 description: "What they were ordered to do.",
@@ -329,6 +335,30 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 name: "armour",
                 r#type: ScriptType::String,
                 description: "The armour equipped: \"armour\" or \"steelArmour\".",
+                null_when: Some("when they have none equipped"),
+            },
+        ],
+    },
+    ScriptView {
+        name: "condition",
+        description: "The condition of what a resident has equipped: \"good\", \"worn\" or \"nearlyBroken\". Gear wears with each blow struck or taken and a little in training; worn out, it breaks and is gone. It fights as well as new until then.",
+        fields: &[
+            ScriptField {
+                name: "weapon",
+                r#type: ScriptType::String,
+                description: "The equipped weapon's condition.",
+                null_when: Some("when unarmed"),
+            },
+            ScriptField {
+                name: "shield",
+                r#type: ScriptType::String,
+                description: "The equipped shield's condition.",
+                null_when: Some("when they have none equipped"),
+            },
+            ScriptField {
+                name: "armour",
+                r#type: ScriptType::String,
+                description: "The equipped armour's condition.",
                 null_when: Some("when they have none equipped"),
             },
         ],
