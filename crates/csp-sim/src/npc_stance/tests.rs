@@ -175,3 +175,16 @@ fn mood_lines() {
     assert_eq!(mood(Stance::Fortify), "arming");
     assert_eq!(mood(Stance::Trade), "busy trading");
 }
+
+#[test]
+fn reports_stances_and_threats_for_monitoring() {
+    let mut p = Place::town(Temperament::Merchant, false);
+    p.threatened(12.0);
+    let report = intent_report(&p.world);
+    let count = |name: &str| report.stances.iter().find(|s| s.0 == name).map(|s| s.1);
+    assert_eq!(count("grow"), Some(1));
+    assert_eq!(count("retaliate"), Some(0));
+    assert_eq!((report.threat_max, report.threat_total, report.danger_places), (12.0, 12.0, 0));
+    p.city_mut().stance = Some(Stance::Fortify);
+    assert_eq!(intent_report(&p.world).stances.iter().find(|s| s.0 == "fortify").unwrap().1, 1);
+}

@@ -206,6 +206,20 @@ impl<L: LogSink> TickReporter for ServerReporter<L> {
             metrics::gauge("npc.idle_share", csp_sim::queries::npc_idle::npc_idle_share(world))
                 .attribute("world_seed", seed)
                 .capture();
+            // What NPC cities are after and fear (`CONTEXT.md`: Stance, Threat; T98.9).
+            let intent = csp_sim::npc_stance::intent_report(world);
+            for (stance, n) in &intent.stances {
+                metrics::gauge(format!("npc.stance.{stance}"), *n as f64)
+                    .attribute("world_seed", seed)
+                    .capture();
+            }
+            for (name, v) in [
+                ("npc.threat.max", intent.threat_max),
+                ("npc.threat.total", intent.threat_total),
+                ("npc.danger_places", intent.danger_places as f64),
+            ] {
+                metrics::gauge(name, v).attribute("world_seed", seed).capture();
+            }
         }
         metrics::gauge("tick.actions", health.actions as f64)
             .attribute("world_seed", seed)

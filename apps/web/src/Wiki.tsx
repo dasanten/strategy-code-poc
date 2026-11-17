@@ -3315,6 +3315,16 @@ export function Wiki() {
           share nothing. A party whose town hall doesn't stand after {days(NPC_FOUND_GIVE_UP_DAYS)}{' '}
           gives up and walks home. Trading posts and the Trade Organization's HQ never found cities.
         </p>
+        <h3>What drives an NPC city</h3>
+        <p>
+          An NPC city is more than its needs. It has a <b>temperament</b>, fixed for good, which
+          leans it one way; it feels <b>threat</b> from those it sees armed nearby and from those who
+          killed or robbed its people, and remembers where it lost them; and each game day it takes
+          a <b>stance</b> from both: growing, arming, trading, settling further out, or turning on
+          whoever hurt it. The stance decides what it builds and how many soldiers it keeps, its
+          threat how far it sends its traders and where its workers go, and its temperament which
+          stance it reaches for first. Below, each in turn; Threat is under Standing & reactions.
+        </p>
         <h3>Temperament</h3>
         <p>
           Every NPC city has a temperament, fixed when it comes to be: merchant, militarist or
@@ -3329,7 +3339,7 @@ export function Wiki() {
         <h3>Stance</h3>
         <p>
           What an NPC city is after for now. It picks again at its first planning pass of each game
-          day, from what it needs: <b>Fortify</b> by the threat it feels from everyone together,
+          day, from what it needs: <b>Fortify</b> by the threat it feels from the one it fears most,
           fully at {num(NPC_STANCE.fortifyThreat)}; <b>Trade</b> with a Food surplus and a Trade
           Organization warehouse within its traders' reach; <b>Expand</b> with a Food surplus and
           nothing short. Trade and Expand alone are worth {pct(NPC_STANCE.tradeNeed)} and{' '}

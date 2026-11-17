@@ -32,11 +32,13 @@ fn leans_to(t: Temperament) -> Stance {
 }
 
 /// How much `city` needs each stance but Grow now, before its temperament tilts them, in the
-/// order a tie goes to: Fortify by the threat it feels from all Organizations together; Trade with
+/// order a tie goes to: Fortify by the threat it feels from the Organization it fears most; Trade with
 /// a Food surplus and a Trade Org warehouse in its traders' reach; Expand with a Food surplus and
 /// no good short.
 pub fn stance_needs(world: &WorldState, city: &City, size: i32) -> [(Stance, f64); 3] {
-    let threat: f64 = city.threats.as_ref().map_or(0.0, |t| t.values().sum());
+    // The Organization it fears most, not all together: neighbours it merely sees armed add up
+    // otherwise (T98.9).
+    let threat: f64 = city.threats.iter().flatten().map(|(_, v)| *v).fold(0.0, f64::max);
     let surplus = has_food_surplus(world, city);
     let warehouse = surplus
         && npc_home(world, &city.id).is_some_and(|home| {
@@ -209,3 +211,43 @@ pub fn stances_sound(world: &WorldState) -> Vec<InvariantViolation> {
 
 #[cfg(test)]
 mod tests;
+
+/// What NPC cities are after and fear, for monitoring (`CONTEXT.md`: Stance, Threat; T98.9).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct IntentReport {
+    /// How many NPC cities hold each stance, Grow included, by its name.
+    pub stances: Vec<(&'static str, usize)>,
+    /// The greatest threat any NPC city feels from one Organization.
+    pub threat_max: f64,
+    /// All NPC cities' threats together.
+    pub threat_total: f64,
+    /// The danger places they remember.
+    pub danger_places: usize,
+}
+
+/// What NPC cities are after and fear now (`intentReport`).
+pub fn intent_report(world: &WorldState) -> IntentReport {
+    let names = [
+        (Stance::Grow, "grow"),
+        (Stance::Fortify, "fortify"),
+        (Stance::Trade, "trade"),
+        (Stance::Expand, "expand"),
+        (Stance::Retaliate, "retaliate"),
+    ];
+    let cities: Vec<&City> = world.cities.iter().filter(|c| for_sale(c)).collect();
+    let mut report = IntentReport {
+        stances: names
+            .iter()
+            .map(|(s, name)| (*name, cities.iter().filter(|c| stance_of(c) == *s).count()))
+            .collect(),
+        ..IntentReport::default()
+    };
+    for c in cities {
+        for v in c.threats.iter().flatten().map(|(_, v)| *v) {
+            report.threat_max = report.threat_max.max(v);
+            report.threat_total += v;
+        }
+        report.danger_places += c.danger_places.as_ref().map_or(0, Vec::len);
+    }
+    report
+}

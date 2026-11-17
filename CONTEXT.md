@@ -782,7 +782,8 @@ The shared language of the game. Domain terms only — no implementation details
   order of its jobs can change: a dangerous far mine can lose to a safe near one. Food short
   still comes first. How it picks (decided overnight 2026-11-17, Daniel to confirm): at its first
   planning pass of each game day, each stance has a need: Fortify by the threat it feels from
-  everyone together, Trade with a Food surplus and a Trade Org warehouse in its traders' reach,
+  the one Organization it fears most (not all together: armed neighbours it merely sees would
+  add up, T98.9), Trade with a Food surplus and a Trade Org warehouse in its traders' reach,
   Expand with a Food surplus and nothing short; its temperament's own stance (merchant Trade,
   militarist Fortify, settler Expand) weighs more, and the greatest full need wins, else Grow.
   Under Fortify danger places weigh more on its jobs. Not yet: Fortify putting walls, stone and a
