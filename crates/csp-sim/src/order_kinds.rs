@@ -95,6 +95,8 @@ pub fn add_rule_orders(kinds: &mut OrderKinds) {
     // T110.1: siege machines.
     kinds.insert("crew", crate::siege::Crew);
     kinds.insert("push", crate::siege::Push);
+    // T110.2: the ram strikes.
+    kinds.insert("ram", crate::siege::RamAt);
     kinds.insert("climb", crate::climbing::Climb);
     kinds.insert("setGate", crate::gates::SetGate);
     kinds.insert("claimHorses", crate::horse_grant::ClaimHorses);

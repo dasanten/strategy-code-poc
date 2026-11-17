@@ -2821,6 +2821,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::String,
     },
     ScriptBinding {
+        name: "ram",
+        is: Is::Action,
+        params: &["machine", "wall"],
+        cost: 10.0,
+        description: "Swing a ram, by it or its id, at the wall or gate next to it, by it or its id: one of another realm's city, or of nobody's. I must be one of its crew on its tile, with at least as many crew as it needs there. It strikes far harder than a blow until the wall falls, and nobody up on a wall reaches its crew under its roof. My order is \"ram\" until then.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
         name: "push",
         is: Is::Action,
         params: &["machine", "x", "y"],

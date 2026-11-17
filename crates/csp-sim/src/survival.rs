@@ -296,6 +296,7 @@ pub fn order_kind(o: &ResidentOrder) -> &'static str {
         ResidentOrder::Sail(_) => "sail",
         ResidentOrder::Crew(_) => "crew",
         ResidentOrder::Push(_) => "push",
+        ResidentOrder::Ram(_) => "ram",
     }
 }
 

@@ -1650,6 +1650,7 @@ impl<'a> ScriptBindings<'a> {
             }
             "row" => self.request("row", vec![("vesselId", place(0)?), ("x", p(1)?), ("y", p(2)?)]),
             "crew" => self.request("crew", vec![("machineId", place(0)?)]),
+            "ram" => self.request("ram", vec![("machineId", place(0)?), ("targetId", place(1)?)]),
             "push" => {
                 self.request("push", vec![("machineId", place(0)?), ("x", p(1)?), ("y", p(2)?)])
             }
