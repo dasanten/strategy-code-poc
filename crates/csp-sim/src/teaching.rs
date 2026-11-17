@@ -76,7 +76,7 @@ pub fn step_teaching(world: &mut WorldState, size: i32) {
         let ground = world.buildings.iter().find(|b| b.id == o.building_id);
         let holds = ground.is_some_and(|g| {
             g.kind == BuildingKind::TrainingGround
-                && g.site.is_none()
+                && crate::ruins::standing(g)
                 && is_at((r.x as i32, r.y as i32), placed(g), size)
                 && !taught.contains(&g.id)
         });

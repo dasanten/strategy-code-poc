@@ -101,6 +101,9 @@ fn stabled() -> (Village, String) {
         closed: None,
         damage: None,
         breedings: None,
+        decay: None,
+        ruined_at: None,
+        repair: None,
     };
     stable.stock = Some(stock(&[(Good::Food, 500.0)]));
     v.world.buildings.push(stable);
@@ -545,6 +548,9 @@ mod a_daughter_with_no_horse {
             closed: None,
             damage: None,
             breedings: None,
+            decay: None,
+            ruined_at: None,
+            repair: None,
         };
         b.stock = None;
         v.world.buildings.push(b);

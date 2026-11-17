@@ -194,7 +194,7 @@ fn the_invariant_flags_wear_out_of_range() {
 
 #[test]
 fn a_world_saved_before_wear_has_all_gear_in_good_condition() {
-    // `empty_world` is parsed from JSON without `wear`, as a save from before format 133.
+    // `empty_world` is parsed from JSON without `wear`, as a save from before format 136.
     let world = fight();
     assert!(world.wear.is_empty());
     let json = serde_json::to_value(&world).unwrap();

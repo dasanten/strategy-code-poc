@@ -116,12 +116,16 @@ mod processing;
 mod queries;
 #[path = "relocate_steps.rs"]
 mod relocate_steps;
+#[path = "repairing.rs"]
+mod repairing;
 #[path = "residents_stepped.rs"]
 mod residents_stepped;
 #[path = "road_line.rs"]
 mod road_line;
 #[path = "roads.rs"]
 mod roads;
+#[path = "ruins.rs"]
+mod ruins;
 #[path = "script_waiting.rs"]
 mod script_waiting;
 #[path = "ship_building.rs"]

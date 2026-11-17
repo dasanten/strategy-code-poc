@@ -5,6 +5,9 @@ import { THEME, hex, type Relationship } from '../theme.js'
 /** Roads, wide and light over the terrain (ADR 0008). */
 export const ROAD_COLOR = hex(THEME.terrain.road)
 
+/** A ruin's painted art, greyed (`CONTEXT.md`: Ruin). */
+export const RUIN_TINT = 0x8c8680
+
 /** Terrain colours from the theme (ADR 0008), as 0xRRGGBB. */
 export const TERRAIN_COLORS: Record<number, number> = {
   [Terrain.Plains]: hex(THEME.terrain.plains),

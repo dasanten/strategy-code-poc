@@ -213,6 +213,9 @@ mod an_npc_resident_carrying_a_child {
             closed: None,
             damage: None,
             breedings: None,
+            decay: None,
+            ruined_at: None,
+            repair: None,
         });
         world.cities.iter_mut().find(|c| c.id == city).unwrap().workplace_ids =
             Some(vec!["smithy".into()]);

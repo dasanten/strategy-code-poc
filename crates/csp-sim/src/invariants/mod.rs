@@ -184,6 +184,9 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "tear-down-orders-on-buildings",
             check: checks::tear_down_orders_on_buildings,
         },
+        Invariant { name: "conditions-in-range", check: checks::conditions_in_range },
+        Invariant { name: "repair-orders-on-buildings", check: checks::repair_orders_on_buildings },
+        Invariant { name: "ruins-ruined", check: checks::ruins_ruined },
         Invariant { name: "nodes-on-fitting-terrain", check: checks::nodes_on_fitting_terrain },
         Invariant { name: "realm-logs-in-order", check: checks::realm_logs_in_order },
         Invariant { name: "residents-in-cities", check: checks::residents_in_cities },
@@ -453,6 +456,10 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant {
             name: "npc-traders-sound",
             check: |w, _t| crate::npc_trader::npc_traders_sound(w),
+        },
+        Invariant {
+            name: "npc-escorts-sound",
+            check: |w, _t| crate::npc_escort::npc_escorts_sound(w),
         },
         Invariant { name: "line-orders-sound", check: checks::line_orders_sound },
         Invariant { name: "paths-are-steps", check: checks::paths_are_steps },

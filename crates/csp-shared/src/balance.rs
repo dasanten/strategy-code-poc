@@ -1012,6 +1012,19 @@ pub const NPC_FOUND_RESIDENTS_PER_MEMBER: f64 = 10.0;
 /// (`NPC_SURPLUS_CAP`), or a big city could never found on what it makes.
 pub const NPC_FOUND_PARTY_MOST: f64 = 14.0;
 
+/// Residents from which an NPC city counts as a town and sends soldiers along with its traders
+/// (`CONTEXT.md`: Escort); a village's trader goes alone. Between a village's start (`NPC_VILLAGE`)
+/// and a town's (`NPC_TOWN`).
+pub const NPC_ESCORT_TOWN_RESIDENTS: f64 = 12.0;
+
+/// Soldiers a town's trader takes along on a run (`CONTEXT.md`: Escort), on a way not known to be
+/// dangerous.
+pub const NPC_TRADER_ESCORTS: f64 = 1.0;
+
+/// Soldiers a founding party takes per member (`CONTEXT.md`: Escort), rounded down and at least
+/// one, in place of its one armed member: a village's worth (6) takes one, the largest party two.
+pub const NPC_FOUND_ESCORT_SHARE: f64 = 0.2;
+
 /// Random tiles a full NPC city tries in one search for its daughter's site (`CONTEXT.md`:
 /// Founding), once a game day: enough to find free Plains on most maps, cheap enough to do while
 /// it waits.
@@ -2164,6 +2177,62 @@ pub const TEARDOWN_WORK_SHARE: f64 = 0.5;
 /// to whole units. An unfinished site leaves all its delivered materials.
 pub const TEARDOWN_MATERIALS_RETURNED: f64 = 0.5;
 
+/// Game days a finished building of each kind takes to lose all its condition, unrepaired
+/// (`CONTEXT.md`: Decay): it loses an even share each game day, used or not. Roads and the wooden
+/// walls and gates go fastest, about two game months; timber buildings in four; those mostly of
+/// stone (smelter, mint, smithy) in eight. A kind not listed (a carriage, boat or ship site) never
+/// decays.
+pub const DECAY_DAYS: Table<f64> = Table(&[
+    ("road", 60.0),
+    ("wall", 60.0),
+    ("gate", 60.0),
+    ("farm", 90.0),
+    ("house", 120.0),
+    ("stable", 120.0),
+    ("lumberCamp", 120.0),
+    ("storage", 150.0),
+    ("trainingGround", 150.0),
+    ("haven", 150.0),
+    ("quarry", 150.0),
+    ("mine", 150.0),
+    ("townHall", 180.0),
+    ("warehouse", 240.0),
+    ("smelter", 240.0),
+    ("mint", 240.0),
+    ("smithy", 240.0),
+]);
+
+/// Share of its condition lost from which a building reads worn, rather than good
+/// (`CONTEXT.md`: Decay), and can be repaired: a road after about two game weeks.
+pub const DECAY_WORN: f64 = 0.25;
+
+/// Share of its condition lost from which a building reads nearly a ruin.
+pub const DECAY_NEARLY_RUIN: f64 = 0.75;
+
+/// Share of a building's materials a repair takes (`CONTEXT.md`: Repairing), rounded up to whole
+/// units of each good: a tile of road or wall a unit, a house 5 Wood.
+pub const REPAIR_MATERIALS_SHARE: f64 = 0.25;
+
+/// Share of a building's `BUILD_WORK` a repair takes: less than building it, and less than
+/// tearing it down (`TEARDOWN_WORK_SHARE`).
+pub const REPAIR_WORK_SHARE: f64 = 0.25;
+
+/// Game days a ruin stands before it collapses (`CONTEXT.md`: Ruin): "a long while more", about
+/// two game months, time enough to notice it and rebuild it.
+pub const RUIN_COLLAPSE_DAYS: f64 = 60.0;
+
+/// Share of a building's materials rebuilding its ruin takes (`CONTEXT.md`: Ruin), rounded up to
+/// whole units: more than a repair, less than a new one.
+pub const REBUILD_MATERIALS_SHARE: f64 = 0.5;
+
+/// Share of a building's `BUILD_WORK` rebuilding its ruin takes: more than a repair, less than
+/// building it new.
+pub const REBUILD_WORK_SHARE: f64 = 0.5;
+
+/// Share of a building's materials that lies on its tiles once its ruin collapses, rounded down
+/// to whole units, as when it is torn down (`TEARDOWN_MATERIALS_RETURNED`).
+pub const COLLAPSE_MATERIALS_LEFT: f64 = 0.25;
+
 /// How long after a realm says it leaves an alliance, or the alliance leader removes it, it stops
 /// being a member (`CONTEXT.md`: Alliance): one real hour, time enough for the others to react.
 pub const ALLIANCE_LEAVE_DELAY: f64 = 3600.0;
@@ -2789,6 +2858,9 @@ pub fn balance_json() -> Value {
     m.insert("NPC_FULL_DIP_DAYS".into(), json!(NPC_FULL_DIP_DAYS));
     m.insert("NPC_FOUND_RESIDENTS_PER_MEMBER".into(), json!(NPC_FOUND_RESIDENTS_PER_MEMBER));
     m.insert("NPC_FOUND_PARTY_MOST".into(), json!(NPC_FOUND_PARTY_MOST));
+    m.insert("NPC_ESCORT_TOWN_RESIDENTS".into(), json!(NPC_ESCORT_TOWN_RESIDENTS));
+    m.insert("NPC_TRADER_ESCORTS".into(), json!(NPC_TRADER_ESCORTS));
+    m.insert("NPC_FOUND_ESCORT_SHARE".into(), json!(NPC_FOUND_ESCORT_SHARE));
     m.insert("NPC_FOUND_SAMPLES".into(), json!(NPC_FOUND_SAMPLES));
     m.insert("NPC_FOUND_REACH".into(), json!(NPC_FOUND_REACH));
     m.insert("NPC_FOUND_FOOD_DAYS".into(), json!(NPC_FOUND_FOOD_DAYS));
@@ -2950,6 +3022,15 @@ pub fn balance_json() -> Value {
     m.insert("WORK_SKILL_PER_DAY".into(), json!(WORK_SKILL_PER_DAY));
     m.insert("TEARDOWN_WORK_SHARE".into(), json!(TEARDOWN_WORK_SHARE));
     m.insert("TEARDOWN_MATERIALS_RETURNED".into(), json!(TEARDOWN_MATERIALS_RETURNED));
+    m.insert("DECAY_DAYS".into(), to_value(DECAY_DAYS).expect("serialisable"));
+    m.insert("DECAY_WORN".into(), json!(DECAY_WORN));
+    m.insert("DECAY_NEARLY_RUIN".into(), json!(DECAY_NEARLY_RUIN));
+    m.insert("REPAIR_MATERIALS_SHARE".into(), json!(REPAIR_MATERIALS_SHARE));
+    m.insert("REPAIR_WORK_SHARE".into(), json!(REPAIR_WORK_SHARE));
+    m.insert("RUIN_COLLAPSE_DAYS".into(), json!(RUIN_COLLAPSE_DAYS));
+    m.insert("REBUILD_MATERIALS_SHARE".into(), json!(REBUILD_MATERIALS_SHARE));
+    m.insert("REBUILD_WORK_SHARE".into(), json!(REBUILD_WORK_SHARE));
+    m.insert("COLLAPSE_MATERIALS_LEFT".into(), json!(COLLAPSE_MATERIALS_LEFT));
     m.insert("ALLIANCE_LEAVE_DELAY".into(), json!(ALLIANCE_LEAVE_DELAY));
     m.insert("ALLIANCE_RECALL_DELAY".into(), json!(ALLIANCE_RECALL_DELAY));
     m.insert("NPC_ALLIANCE_JOIN_STANDING".into(), json!(NPC_ALLIANCE_JOIN_STANDING));

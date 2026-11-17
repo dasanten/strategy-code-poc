@@ -69,6 +69,15 @@ pub struct RememberedBuilding {
     pub breedings: Option<Vec<KeptBreeding>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
+    pub decay: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub repair: Option<ConstructionSite>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub ruined_at: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub prices: Option<Vec<ShownWarehousePrice>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]

@@ -164,6 +164,9 @@ import {
   NPC_FOUND_FOOD_DAYS,
   NPC_FOUND_GIVE_UP_DAYS,
   NPC_FOUND_PARTY_MOST,
+  NPC_FOUND_ESCORT_SHARE,
+  NPC_ESCORT_TOWN_RESIDENTS,
+  NPC_TRADER_ESCORTS,
   NPC_FOUND_REACH,
   NPC_FOUND_RESIDENTS_PER_MEMBER,
   NPC_FOUND_STANDING,
@@ -273,6 +276,14 @@ import {
   STRIKE_TICKS,
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
+  DECAY_WORN,
+  DECAY_NEARLY_RUIN,
+  REPAIR_MATERIALS_SHARE,
+  REPAIR_WORK_SHARE,
+  REBUILD_MATERIALS_SHARE,
+  REBUILD_WORK_SHARE,
+  RUIN_COLLAPSE_DAYS,
+  COLLAPSE_MATERIALS_LEFT,
   TERRAIN_FOOD,
   TERRAIN_SPEED,
   TERRITORY_CITY_BASE,
@@ -330,6 +341,13 @@ import { PARAM_DESCRIPTIONS, DEFAULT_SCRIPTS, SCRIPT_VIEWS } from '@csp/lang-was
 import { WORKPLACE_PARAM } from './shared/default-scripts.js'
 import { SCRIPT_PARAM_TYPES } from './shared/script-api.js'
 import { NPC_SMITHY_WEAPON } from './shared/npc-trade.js'
+import {
+  DECAY_DAYS,
+  rebuildMaterials,
+  rebuildWork,
+  repairMaterials,
+  repairWork,
+} from './shared/decay.js'
 import { fighterStrength } from './shared/persuasion.js'
 import type {
   BuildingKind,
@@ -555,6 +573,9 @@ function ApiTable({ is }: { is: ApiName['is'] }) {
 }
 
 const kindName = (kind: BuildingKind) => BUILDING_NAMES[kind]
+/** Each kind that decays, with the game days it takes to lose all its condition. */
+const decayRows = () =>
+  (Object.entries(DECAY_DAYS) as [BuildingKind, number][]).map(([kind, days]) => ({ kind, days }))
 const goodName = (good: Good) => GOOD_LABELS[good]
 const skillName = (kind: BuildingKind) => {
   const skill = WORKPLACE_SKILL[kind] ?? ''
@@ -1820,6 +1841,73 @@ export function Wiki() {
             ))}
           </tbody>
         </table>
+        <h3>Decay and repairing</h3>
+        <p>
+          Every finished building, wall, gate and road slowly loses its <strong>condition</strong>,
+          used or not: an even share at the turn of each game day, faster for roads and the wooden
+          walls and gates, slowest for those mostly of stone. Blows from attackers are apart from
+          this (see <a href="#combat">Combat</a>). Its tile card says how it stands: good, then{' '}
+          <strong>worn</strong> once it has lost {pct(DECAY_WORN)}, then{' '}
+          <strong>nearly a ruin</strong> once it has lost {pct(DECAY_NEARLY_RUIN)}. Everyone who
+          sees a building sees its condition; scripts read it as <code>building.condition</code>.
+        </p>
+        <p>
+          A worn building can be <strong>repaired</strong>: pick a resident, then the building's
+          tile, and <em>Repair</em> on its tile card. They run your Repair default: it walks them
+          there, and while the repair lacks materials they carry none of, they fetch what it lacks
+          from its <code>source</code> param, or the nearest storage of your realm holding some. A
+          repair takes {pct(REPAIR_MATERIALS_SHARE)} of the building's materials (rounded up) and{' '}
+          {pct(REPAIR_WORK_SHARE)} of its work, and puts it back to good. With none of the materials
+          in any storage, Repair ends and your realm log says why. Anyone's building can be
+          repaired. Scripts repair with <code>repair(buildingId)</code> on the building's tile and
+          ask what it lacks with <code>repairNeeded(building)</code>.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Building</th>
+              <th>Worn after</th>
+              <th>All gone after</th>
+              <th>Repair materials</th>
+              <th>Repair, one builder</th>
+              <th>Rebuild materials</th>
+              <th>Rebuild, one builder</th>
+            </tr>
+          </thead>
+          <tbody>
+            {decayRows().map((b) => (
+              <tr key={b.kind}>
+                <td>{kindName(b.kind)}</td>
+                <td>{num(Math.ceil(b.days * DECAY_WORN))} game days</td>
+                <td>{num(b.days)} game days</td>
+                <td>{goods(repairMaterials(b.kind))}</td>
+                <td>{duration(repairWork(b.kind))}</td>
+                <td>{goods(rebuildMaterials(b.kind))}</td>
+                <td>{duration(rebuildWork(b.kind))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h3>Ruins and collapse</h3>
+        <p>
+          A building nobody repaired, once it has lost all its condition, becomes a{' '}
+          <strong>ruin</strong>. It still stands where it stood and takes up its tiles, but does
+          nothing: a ruined wall or gate tile is a gap anyone walks through, a house houses nobody, a
+          workplace makes nothing, a stable or training ground is no use, a ruined road is no road,
+          and a storage takes nothing in. Goods in a ruined storage stay in it, but anyone at it can
+          take them out, guarded or not: taking another organization's is theft. On the map a ruin
+          shows faded and grey, and its tile card says it is one.
+        </p>
+        <p>
+          A ruin is <strong>rebuilt</strong> like a repair, with <em>Rebuild</em> on its tile card or{' '}
+          <code>repair(buildingId)</code>, for {pct(REBUILD_MATERIALS_SHARE)} of its materials and{' '}
+          {pct(REBUILD_WORK_SHARE)} of its work: less than a new one. Left{' '}
+          {num(RUIN_COLLAPSE_DAYS)} game days more it <strong>collapses</strong>: it is gone, and{' '}
+          {pct(COLLAPSE_MATERIALS_LEFT)} of its materials (rounded down), with any goods still in
+          it, lie on its tiles as a pile. A town hall that collapses ends its city, as when it is
+          torn down. Scripts read a ruin's <code>building.condition</code> as{' '}
+          <code>"ruin"</code>.
+        </p>
         <p>
           A city building (town hall, house, storage, wall, gate) belongs to a city when it stands
           within {num(CITY_BUILDING_REACH)} tiles of its town hall or of another of its buildings;
@@ -2999,7 +3087,12 @@ export function Wiki() {
           to the storage. A city has one trader out for each {num(NPC_RESIDENTS_PER_TRADER)} of its
           residents, and a village keeps one; they spread over the goods with surplus, and only with
           no other good to sell does one take a second load of a good already on the road. None go
-          while Food runs short or armed outsiders stand in its area. Nothing protects them on the
+          while Food runs short or armed outsiders stand in its area. A city of{' '}
+          {num(NPC_ESCORT_TOWN_RESIDENTS)} residents or more, a town, sends{' '}
+          {num(NPC_TRADER_ESCORTS)} soldier with each trader as their escort, of the soldiers beyond
+          those on its town hall and at its gates; a village's trader goes alone. The escort keeps
+          pace with the trader, who waits for them on the way, fights whoever goes for them and comes
+          home with them. Nothing else protects them on the
           way; a trader not back after {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may
           send another.
         </p>
@@ -3026,7 +3119,11 @@ export function Wiki() {
           nearest a node of a material it has none of in reach. A founding party of{' '}
           {num(NPC_VILLAGE.residents)} adults, one more for each{' '}
           {num(NPC_FOUND_RESIDENTS_PER_MEMBER)} residents past {num(NPC_FOUND_VILLAGE_RESIDENTS)} up
-          to {num(NPC_FOUND_PARTY_MOST)}, one of them armed, sets out carrying a town hall's and a
+          to {num(NPC_FOUND_PARTY_MOST)}, sets out. One in{' '}
+          {num(Math.round(1 / NPC_FOUND_ESCORT_SHARE))} of them, rounded down and at least one, is a
+          soldier of its escort, as far as the city has soldiers beyond those on its town hall and at
+          its gates; they fight for the rest on the way and stay as the daughter's first soldiers.
+          The party carries a town hall's and a
           storage's materials, a house's for each {num(HOUSING_ROOM.house ?? 1)} members past{' '}
           {num(NPC_VILLAGE.residents)}, and Food for twice the walk and {days(NPC_FOUND_FOOD_DAYS)}{' '}
           there, and builds the town hall, which founds the daughter: an NPC city of its own with a
