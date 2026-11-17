@@ -56,6 +56,18 @@ pub fn npc_city_stock(world: &WorldState, city: &City) -> Stock {
     sum
 }
 
+/// What an NPC city's storages hold together in good condition (`CONTEXT.md`: Mending): a worn or
+/// nearly broken weapon, piece of armour or set of Tools doesn't count towards its reserve.
+pub fn npc_city_good_stock(world: &WorldState, city: &City) -> Stock {
+    let mut sum = Stock::new();
+    for b in npc_storages(world, city) {
+        for (good, n) in b.stock.iter().flatten() {
+            *sum.entry(*good).or_insert(0.0) += crate::mending::good_units(world, &b.id, *n, *good);
+        }
+    }
+    sum
+}
+
 /// What an NPC city's smithy makes for its soldiers (`NPC_SMITHY_WEAPON`): the cheapest weapon.
 pub const NPC_SMITHY_WEAPON: Good = Good::Spear;
 

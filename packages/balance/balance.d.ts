@@ -516,6 +516,10 @@ export interface Balance {
   readonly TRAINING_WEAR_BLOWS_PER_DAY: number
   readonly WORN_FROM: number
   readonly NEARLY_BROKEN_FROM: number
+  readonly MEND_RECIPE_SHARE: number
+  readonly MEND_WORK_SHARE: number
+  readonly WORN_PRICE_SHARE: number
+  readonly NEARLY_BROKEN_PRICE_SHARE: number
   readonly CARRY_BASE: number
   readonly CARRY_PER_STRENGTH: number
   readonly FOOD_PER_DAY: number

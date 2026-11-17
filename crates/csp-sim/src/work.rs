@@ -4,12 +4,14 @@
 
 use std::collections::HashMap;
 
-use csp_shared::balance::{Recipe, MAP_SIZE, RECIPES};
+use csp_shared::balance::{MAP_SIZE, RECIPES};
 use csp_shared::footprint::is_at;
 use csp_shared::world::{
-    Building, Good, OrderRequest, Resident, ResidentOrder, Stock, Tile, WorkOrder, WorldState,
+    Building, BuildingKind, Good, OrderRequest, Resident, ResidentOrder, Stock, Tile, WorkOrder,
+    WorldState,
 };
 
+use crate::mending::{has_mend_input, mend_input, mend_pace, mend_piece, piece_to_mend, MEND};
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::balance::{batch_work, skill_of, work_learned, work_output, workplace_skill};
 use crate::queries::building::{building_at, work_problem, CARRYING_A_CHILD};
@@ -43,6 +45,9 @@ pub fn validate_work_at(
     if r.carrying.is_some() {
         return Some(CARRYING_A_CHILD.into());
     }
+    if str_field(order, "makes") == Some(MEND) {
+        return mend_problem(world, r);
+    }
     let makes = match order.fields.get("makes") {
         None => None,
         Some(v) => match v.as_str().and_then(good_of) {
@@ -53,14 +58,40 @@ pub fn validate_work_at(
     work_problem(world, r, makes)
 }
 
-/// Sets the resident to work the workplace on their tile (`workAt.apply`).
+/// Why a resident can't be set to mend at the building on their tile (`CONTEXT.md`: Mending).
+fn mend_problem(world: &WorldState, r: &Resident) -> Option<String> {
+    let here = building_at(world, r.x as i32, r.y as i32, MAP_SIZE);
+    let Some(here) = here.filter(|b| b.kind == BuildingKind::Smithy) else {
+        return Some("only a smithy mends".into());
+    };
+    if here.site.is_some() {
+        return Some("it is still a construction site".into());
+    }
+    if let Some(ResidentOrder::WorkAt(o)) = &r.order {
+        if o.building_id == here.id {
+            return o.mends.then(|| "already mending here".into());
+        }
+    }
+    let max = max_workers(here.kind).unwrap_or(0.0);
+    if worker_indices(world, here).len() as f64 >= max {
+        return Some(format!("it already has {max} workers"));
+    }
+    None
+}
+
+/// Sets the resident to work the workplace on their tile (`workAt.apply`), at a smithy mending
+/// for `makes: "mend"`.
 pub fn apply_work_at(world: &mut WorldState, order: &OrderRequest) {
+    let mends = str_field(order, "makes") == Some(MEND);
     let makes = str_field(order, "makes").and_then(good_of);
     let id = str_field(order, "residentId");
     let Some(ri) = world.residents.iter().position(|x| Some(x.id.as_str()) == id) else { return };
     let (x, y) = (world.residents[ri].x as i32, world.residents[ri].y as i32);
     if let Some(here) = building_at(world, x, y, MAP_SIZE).cloned() {
         start_work(&mut world.residents[ri], &here, makes);
+        if let Some(ResidentOrder::WorkAt(o)) = world.residents[ri].order.as_mut() {
+            o.mends = mends;
+        }
     }
 }
 
@@ -78,6 +109,7 @@ pub fn start_work(r: &mut Resident, workplace: &Building, makes: Option<Good>) {
         at: Tile { x: r.x, y: r.y },
         progress: 0.0,
         makes,
+        mends: false,
     }));
 }
 
@@ -117,6 +149,22 @@ pub fn resolve_work(world: &mut WorldState, actions: &[WorkAction], scratch: &mu
         let (building_id, makes, at) = (o.building_id.clone(), o.makes, o.at);
         let place = building_index(world, &building_id);
         let count = workers.get(&building_id).copied().unwrap_or(0.0);
+        if o.mends {
+            let fits = place.filter(|&pi| {
+                let p = &world.buildings[pi];
+                let max = max_workers(p.kind).unwrap_or(0.0);
+                let on_it =
+                    p.site.is_none() && is_at((r.x as i32, r.y as i32), placed(p), MAP_SIZE);
+                p.kind == BuildingKind::Smithy && on_it && r.x == at.x && r.y == at.y && count < max
+            });
+            let Some(pi) = fits else {
+                world.residents[ri].order = None;
+                continue;
+            };
+            workers.insert(building_id, count + 1.0);
+            mend_work(world, ri, pi, tick);
+            continue;
+        }
         let fits = place.and_then(|pi| {
             let p = &world.buildings[pi];
             let max = max_workers(p.kind).unwrap_or(0.0);
@@ -163,7 +211,7 @@ pub fn resolve_work(world: &mut WorldState, actions: &[WorkAction], scratch: &mu
             let place = world.buildings[pi].clone();
             match recipe {
                 Some(recipe) => {
-                    use_up(world, &place, recipe);
+                    use_up(world, &place, &recipe_input(recipe));
                     for (made, units) in recipe_output(recipe) {
                         for _ in 0..units as u32 {
                             produce(world, &place, made, scratch);
@@ -185,10 +233,36 @@ pub fn resolve_work(world: &mut WorldState, actions: &[WorkAction], scratch: &mu
     }
 }
 
+/// A tick of mending (`CONTEXT.md`: Mending) by resident `ri` at the smithy at `pi`: their work
+/// goes into mending the most worn piece there (`piece_to_mend`) at `mend_pace` times a batch's
+/// pace, only while the smithy holds the input for it; mended, the piece is good again and the
+/// input used up. With nothing to mend, or no input, they stand idle: no work, nothing learned.
+fn mend_work(world: &mut WorldState, ri: usize, pi: usize, tick: f64) {
+    let place = world.buildings[pi].clone();
+    let Some(piece) = piece_to_mend(world, &place) else { return };
+    if !has_mend_input(world, &place, &piece) {
+        return;
+    }
+    let r = &world.residents[ri];
+    let Some(skill) = workplace_skill(place.kind) else { return };
+    let gain = batch_work(r, place.kind, tick) * mend_pace();
+    let learned = work_learned(r, skill, tick);
+    let had = skill_of(r, skill);
+    world.residents[ri].skills.insert(skill, had + learned);
+    let o = work_order(world, ri);
+    o.progress += gain;
+    if o.progress < 1.0 {
+        return;
+    }
+    o.progress -= 1.0;
+    use_up(world, &place, &mend_input(piece.good).unwrap_or_default());
+    mend_piece(world, &piece);
+}
+
 /// Takes a batch's input from what a processing workplace's workers carry, the most laden first,
 /// and then from its pile (`useUp`). The caller has checked it is all there.
-fn use_up(world: &mut WorldState, place: &Building, recipe: &Recipe) {
-    for (good, units) in recipe_input(recipe) {
+fn use_up(world: &mut WorldState, place: &Building, input: &[(Good, f64)]) {
+    for &(good, units) in input {
         let mut left = units;
         let mut carriers = worker_indices(world, place);
         // `sort` is stable, as JavaScript's is.

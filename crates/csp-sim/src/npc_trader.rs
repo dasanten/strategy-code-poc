@@ -421,7 +421,8 @@ fn visit_deal(
         let arms = surplus.min((room / good_weight(good) + 1e-9).floor());
         let in_hand = Stock::from([(good, arms)]);
         let holder = TradeHolder { stock: &in_hand, room: f64::INFINITY };
-        let q = quote_with_trader(world, visitor, carriage, holder, TradeSide::Sell, good, arms);
+        let q =
+            quote_with_trader(world, visitor, carriage, holder, TradeSide::Sell, good, arms, &[]);
         if q.units < 1.0 || q.coins <= 0.0 || (fresh == best_fresh && q.coins <= best_coins) {
             continue;
         }

@@ -492,7 +492,10 @@ fn share_out(
     };
     // Workers of a workplace whose good the city isn't short of become spare hands, the farms aside.
     for &i in adults {
-        if held_score(world, jobs, i) <= only_back && jobs.contains_key(&world.residents[i].id) {
+        if held_score(world, jobs, i) <= only_back
+            && jobs.contains_key(&world.residents[i].id)
+            && !crate::npc_mending::mends(&world.residents[i])
+        {
             release(world, jobs, held, &mut kept, &mut spare, i);
         }
     }

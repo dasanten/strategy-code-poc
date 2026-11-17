@@ -51,6 +51,7 @@ pub mod last_seen;
 pub mod leader;
 pub mod lent;
 pub mod loading;
+pub mod mending;
 #[cfg(test)]
 mod movement_test_world;
 pub mod names;
@@ -66,6 +67,7 @@ pub mod npc_founding;
 pub mod npc_growth;
 pub mod npc_hire;
 pub mod npc_inner_wall;
+pub mod npc_mending;
 pub mod npc_patrols;
 pub mod npc_plan;
 pub mod npc_posts;
