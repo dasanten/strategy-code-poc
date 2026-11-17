@@ -28,6 +28,11 @@ and a stance and temperament that should change what it does first. A fixed band
   test keeps the old planner's choices on staged cities (`npc_scores/neutral.json`) and checks them.
 - **The weights are the city's** (`job_weights(city)`): the same for all for now; T98.4's stance and
   temperament tilt them.
+- **Only danger weighs for now.** Distance and crew are weighed with a weight of nothing: with any
+  weight of their own (tried: 0.05 a tile, 0.25 a worker) the slow NPC runs broke. Distance pulled
+  spare hands from far surplus work across goods, so a big city never worked the new mine past its
+  dry one, and the crew weight shook its farmer count past what the runs allow. A stance may give
+  them weight where that is the point (Expand going further, say).
 
 ## Alternatives
 
@@ -41,8 +46,6 @@ and a stance and temperament that should change what it does first. A fixed band
 
 ## Consequences
 
-- Cities spread work across equal workplaces (the crew weight) and favour near ones: a little less
-  walking, and a node far out is left until the near ones are full.
 - A city that lost people by a way stops sending its workers along it while it remembers the place.
 - One more pass over the city's danger places per workplace weighed in a planning pass: a handful
   of places, once a game hour.

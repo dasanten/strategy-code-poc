@@ -884,14 +884,14 @@ impl NpcJobWeights {
         NpcJobWeights { distance: 0.0, danger: 0.0, crew: 0.0, most: 0.0 };
 }
 
-/// What weighs on an NPC city's jobs at a place (`NpcJobWeights`). A node costs a point per twenty
-/// tiles, so one at the edge of `NPC_NODE_REACH` loses to a near one by a little more than
-/// `NPC_JOB_MARGIN`; one person lost by the way costs more than the margin, so workers move to a
-/// safer workplace of the same good; a crew of four costs a point, so equal places share the work.
-/// At most `most`, under the gap from `NPC_JOB_SCORE.short` to `road`, so work on a good that is
-/// short stays ahead of the road crew however far or dangerous.
+/// What weighs on an NPC city's jobs at a place (`NpcJobWeights`). One person lost by the way
+/// costs more than `NPC_JOB_MARGIN`, so workers move to a safer workplace of the same good. Distance
+/// and crew weigh nothing yet: weighed on their own they pull spare hands from far surplus work
+/// (a new mine past a dry one) and shake the farmers of a big city (the slow NPC tests); a stance
+/// tilts them (T98.4). At most `most`, under the gap from `NPC_JOB_SCORE.short` to `road`, so work
+/// on a good that is short stays ahead of the road crew however dangerous.
 pub const NPC_JOB_WEIGHTS: NpcJobWeights =
-    NpcJobWeights { distance: 0.05, danger: 7.0, crew: 0.25, most: 15.0 };
+    NpcJobWeights { distance: 0.0, danger: 7.0, crew: 0.0, most: 15.0 };
 
 /// How much more another job must score for an NPC city's worker to leave theirs (`CONTEXT.md`: NPC
 /// city; ADR 0029), so nobody goes back and forth: more than the whole of `NPC_JOB_SCORE.shortRange`

@@ -731,9 +731,10 @@ The shared language of the game. Domain terms only — no implementation details
   - **Retaliate:** turned on one Organization that hurt it (Retaliating).
   Whoever has traded with a city or sees it reads its temperament on its card; whoever sees it
   reads its stance as a mood line ("arming", "busy trading"). Scripts see the same. Its stance and
-  temperament weigh into every job's score, as do the way from its storage to a workplace, the
-  danger places it remembers by that way and the crew already there, so the order of its jobs can
-  change: a dangerous far mine can lose to a safe near one. Food short still comes first.
+  temperament weigh into every job's score, as do the danger places it remembers by the way to a
+  workplace (decided overnight, Daniel to confirm: distance and crew weigh nothing yet), so the
+  order of its jobs can change: a dangerous far mine can lose to a safe near one. Food short
+  still comes first.
 - **Threat** (Epic 98): how dangerous an NPC city thinks an Organization is, apart from how it
   regards it (Standing): from that Organization's armed residents it saw near itself or its people,
   by their gear, and from its people that Organization killed or robbed (traders, scouts, escorts).

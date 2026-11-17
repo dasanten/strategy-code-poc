@@ -2833,13 +2833,12 @@ export function Wiki() {
           working for surplus and from its scouts first, and from other work only after them. A farm
           already begun is finished before another. Spare hands go to the good the reserve is
           shortest of, as a share of what it wants of it, filling one workplace's crew before the
-          next. Of several workplaces of a good it picks the one that costs least: each tile from its
-          storage costs {num(NPC_JOB_WEIGHTS.distance)}, each person it lost by the way there
-          (Threat) {num(NPC_JOB_WEIGHTS.danger)} and each worker already there{' '}
-          {num(NPC_JOB_WEIGHTS.crew)}, at most {num(NPC_JOB_WEIGHTS.most)} in all. That cost also
-          weighs the work against other work, so a far, dangerous mine can lose to a near, safe one,
-          and a worker leaves a dangerous camp for a safe one of the same good. Farming while Food
-          is short is never weighed down. Without a workplace for that good, the city builds one: on the nearest fitting
+          next. A workplace by a way where the city lost people (Threat) is worth less to it: each
+          person lost there takes {num(NPC_JOB_WEIGHTS.danger)} from the work's score, at most{' '}
+          {num(NPC_JOB_WEIGHTS.most)}. Of several workplaces of a good it picks the safest, and a
+          worker leaves a dangerous camp for a safe one of the same good; a dangerous mine can lose
+          to safe work on another good. Farming while Food is short is never weighed down. Without a
+          workplace for that good, the city builds one: on the nearest fitting
           resource node it knows of, or a smelter, smithy or mint in its area like a house. With
           every workplace of another short good at its full crew and someone idle, it opens another
           of them, however many it has.
