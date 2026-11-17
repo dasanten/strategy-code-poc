@@ -215,7 +215,7 @@ pub fn wall_side(r: &Resident) -> Option<&str> {
 
 /// Whether a building is a finished wall or gate (`isWallOrGate`).
 pub fn is_wall_or_gate(b: &Building) -> bool {
-    matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate) && b.site.is_none()
+    matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate) && crate::ruins::standing(b)
 }
 
 /// Whether a gate is closed (`isClosed`); a gate is open until its city's realm closes it.
@@ -391,10 +391,9 @@ pub fn wall_map(world: &WorldState, terrain: &TerrainMap) -> WallMap {
 
 /// Whether a resident stands on a wall of their own side or an ally's (`onOwnWall`).
 pub fn on_own_wall(world: &WorldState, r: &Resident) -> bool {
-    let wall = world
-        .buildings
-        .iter()
-        .find(|b| b.x == r.x && b.y == r.y && b.kind == BuildingKind::Wall && b.site.is_none());
+    let wall = world.buildings.iter().find(|b| {
+        b.x == r.x && b.y == r.y && b.kind == BuildingKind::Wall && crate::ruins::standing(b)
+    });
     wall.is_some_and(|w| of_wall_side(world, w, r))
 }
 

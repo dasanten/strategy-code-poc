@@ -18,6 +18,7 @@ use crate::crimes::{
     CrimeAgainst,
 };
 use crate::defence::{defends_by_script, end_hold_if_over, start_defence, Alarms};
+use crate::equipment::Slot;
 use crate::events::record_event;
 use crate::goods_made::GoodsMade;
 use crate::order_sender::commands;
@@ -40,6 +41,7 @@ use crate::queries::walls::{
 };
 use crate::random::{hash_str, Mulberry32};
 use crate::survival::{die_all, drop_goods};
+use crate::wear::wear_slot;
 
 /// A blow a resident with an attack order requests once in contact with their target and ready
 /// (`StrikeAction`). The world checks and resolves it at the end of the tick.
@@ -407,6 +409,7 @@ pub fn resolve_strikes(
                 if let Some(b) = break_wall(world, ai, &wall_id, size, made) {
                     broken.push(b);
                 }
+                wear_slot(world, ai, Slot::Weapon, 1.0);
                 continue;
             }
             Target::Resident(ti) => ti,
@@ -466,10 +469,16 @@ pub fn resolve_strikes(
         let t = &world.residents[ti];
         let climbing = matches!(t.order, Some(ResidentOrder::Climb(_)));
         if !down && !climbing && roll < dodge_chance(t, tf) {
+            // The blow was struck, if not taken (`CONTEXT.md`: Wear).
+            wear_slot(world, ai, Slot::Weapon, 1.0);
             continue;
         }
         let cover = if on_own_wall(world, t) { WALL_DEFENCE } else { 1.0 };
         let damage = blow_damage(&world.residents[ai], t, tf) * cover;
+        // The gear fights as well as new up to the blow that breaks it (`CONTEXT.md`: Wear).
+        wear_slot(world, ai, Slot::Weapon, 1.0);
+        wear_slot(world, ti, Slot::Shield, 1.0);
+        wear_slot(world, ti, Slot::Armour, 1.0);
         let t = &mut world.residents[ti];
         t.health = 0f64.max(t.health - damage);
         if t.health <= 0.0 {

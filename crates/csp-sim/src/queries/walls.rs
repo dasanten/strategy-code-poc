@@ -16,7 +16,7 @@ pub fn wall_side(r: &Resident) -> Option<&str> {
 
 /// Whether a building is a finished wall or gate (`isWallOrGate`).
 pub fn is_wall_or_gate(b: &Building) -> bool {
-    matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate) && b.site.is_none()
+    matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate) && crate::ruins::standing(b)
 }
 
 /// Whether a resident is up (`CONTEXT.md`: Wall walk, High ground): on the wall walk, or a climber
@@ -24,10 +24,9 @@ pub fn is_wall_or_gate(b: &Building) -> bool {
 /// on a gate tile and not on its walk passes under it, on the ground.
 pub fn is_up(world: &WorldState, r: &Resident) -> bool {
     r.up.is_some()
-        || world
-            .buildings
-            .iter()
-            .any(|b| b.x == r.x && b.y == r.y && b.kind == BuildingKind::Wall && b.site.is_none())
+        || world.buildings.iter().any(|b| {
+            b.x == r.x && b.y == r.y && b.kind == BuildingKind::Wall && crate::ruins::standing(b)
+        })
 }
 
 /// Whether a blow from `a` can reach `b` for height (`CONTEXT.md`: High ground): nobody on the
@@ -38,10 +37,9 @@ pub fn reaches_for_height(world: &WorldState, a: &Resident, b: &Resident) -> boo
 
 /// Whether a resident stands on a wall of their own side or an ally's (`onOwnWall`).
 pub fn on_own_wall(world: &WorldState, r: &Resident) -> bool {
-    let wall = world
-        .buildings
-        .iter()
-        .find(|b| b.x == r.x && b.y == r.y && b.kind == BuildingKind::Wall && b.site.is_none());
+    let wall = world.buildings.iter().find(|b| {
+        b.x == r.x && b.y == r.y && b.kind == BuildingKind::Wall && crate::ruins::standing(b)
+    });
     let city = wall.and_then(|w| world.cities.iter().find(|c| Some(&c.id) == w.city_id.as_ref()));
     let (Some(city), Some(side)) = (city, wall_side(r)) else { return false };
     allied(world, city.realm_id.as_deref().unwrap_or(&city.id), side)

@@ -44,16 +44,34 @@ pub fn stock_of(world: &WorldState, h: Holder) -> Stock {
 }
 
 /// Moves units of a good between two holders (`move`): nothing for `units <= 0`, nor between a
-/// holder and itself, where the TypeScript's move takes out and puts back the same units.
+/// holder and itself, where the TypeScript's move takes out and puts back the same units. Worn
+/// gear takes its wear along (`crate::wear::move_wear`).
 pub fn move_between(world: &mut WorldState, from: Holder, to: Holder, good: Good, units: f64) {
     if units <= 0.0 || from == to {
         return;
     }
     let mut source = std::mem::take(stock_mut(world, from));
     let mut target = std::mem::take(stock_mut(world, to));
+    let from_units = crate::queries::names::held(&source, good);
     move_goods(&mut source, &mut target, good, units);
     *stock_mut(world, from) = source;
     *stock_mut(world, to) = target;
+    if !world.wear.is_empty() {
+        let (from_id, to_id) =
+            (holder_id(world, from).to_string(), holder_id(world, to).to_string());
+        crate::wear::move_wear(world, &from_id, &to_id, good, units, from_units);
+    }
+}
+
+/// The id of the resident, building, carriage, vessel or pile a holder is (`WorldState::wear`).
+pub fn holder_id(world: &WorldState, h: Holder) -> &str {
+    match h {
+        Holder::Pile(i) => &world.piles[i].id,
+        Holder::Storage(i) | Holder::Site(i) => &world.buildings[i].id,
+        Holder::Carriage(i) => &world.carriages[i].id,
+        Holder::Resident(i) => &world.residents[i].id,
+        Holder::Vessel(i) => &world.vessels[i].id,
+    }
 }
 
 /// The goods of several holders added up, each holder once (`total([...new Set(parties)])`).

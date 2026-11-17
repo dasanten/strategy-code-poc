@@ -23,6 +23,7 @@ use crate::land_sites::{near_a_starting_site, starting_site_middles, FootReach};
 use crate::npc_behaviour::{default_script, stop_work, Jobs};
 use crate::npc_chain::short_goods;
 use crate::npc_cities::{hall_tile, npc_site_fits, taken_ground, FARM_RING};
+use crate::npc_escort::{founding_escorts_wanted, spare_soldiers};
 use crate::npc_scouts::knows_node;
 use crate::placing::Ground;
 use crate::queries::building::{build_materials, building_at, node_good};
@@ -200,7 +201,9 @@ pub fn plan_founding(
     let near = |i: usize| {
         !far_out((world.residents[i].x as i32, world.residents[i].y as i32), home_at, terrain.size)
     };
-    let Some(chosen) = pick_party(world, city, people.adults, people.unneeded, &near, jobs, walk)
+    let site_at = (site.x as i32, site.y as i32);
+    let Some(chosen) =
+        pick_party(world, city, people.adults, people.unneeded, &near, jobs, (walk, site_at))
     else {
         return;
     };
@@ -235,10 +238,11 @@ pub fn far_out(r: (i32, i32), home: (i32, i32), size: i32) -> bool {
     wrap_distance(size, r, home) > NPC_NODE_REACH
 }
 
-/// The founding party (`pickParty`, `CONTEXT.md`: Founding): `npc_founding_party_size` adults, one
-/// of them armed while the city has an armed adult, the rest of its spare hands and its workers off
-/// the farms, those with the most room on them first. None while there aren't enough, or while
-/// their arms can't hold the Food for the walk and all the materials.
+/// The founding party (`pickParty`, `CONTEXT.md`: Founding, Escort): `npc_founding_party_size`
+/// adults, its escort of soldiers (`founding_escorts_wanted`) as far as the city has them beyond
+/// its hall and gates, the rest of its spare hands and its workers off the farms, those with the
+/// most room on them first. None while there aren't enough, or while their arms can't hold the
+/// Food for the walk and all the materials. `(walk_ticks, site)` is the way to the site.
 fn pick_party(
     world: &WorldState,
     city: &City,
@@ -246,7 +250,7 @@ fn pick_party(
     unneeded: &[usize],
     near: &dyn Fn(usize) -> bool,
     jobs: &Jobs,
-    walk_ticks: f64,
+    (walk_ticks, site): (f64, (i32, i32)),
 ) -> Option<Vec<usize>> {
     let tick = world.tick as f64;
     let free = |i: usize| {
@@ -264,8 +268,9 @@ fn pick_party(
         carry_capacity(r, tick) - stock_weight(&r.carried) + carried_food(r) * food_weight
     };
     let armed_now = |i: usize| is_armed(&world.residents[i]);
+    // Its escort: soldiers beyond those on its hall and at its gates (`CONTEXT.md`: Escort).
     let mut armed: Vec<usize> =
-        adults.iter().copied().filter(|&i| armed_now(i) && free(i)).collect();
+        spare_soldiers(world, city, adults).into_iter().filter(|&i| free(i)).collect();
     armed.sort_by(|&a, &b| room(b).total_cmp(&room(a)));
     let mut rest: Vec<usize> = Vec::new();
     let mut seen = HashSet::new();
@@ -282,7 +287,8 @@ fn pick_party(
     }
     rest.sort_by(|&a, &b| room(b).total_cmp(&room(a)));
     let members = npc_founding_party_size(city_residents(world, &city.id).len() as f64) as usize;
-    let party: Vec<usize> = armed.first().copied().into_iter().chain(rest).take(members).collect();
+    let escort = founding_escorts_wanted(world, city, members, site);
+    let party: Vec<usize> = armed.into_iter().take(escort).chain(rest).take(members).collect();
     if party.len() < members {
         return None;
     }

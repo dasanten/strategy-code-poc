@@ -319,6 +319,9 @@ export interface Balance {
   readonly NPC_FULL_DIP_DAYS: number
   readonly NPC_FOUND_RESIDENTS_PER_MEMBER: number
   readonly NPC_FOUND_PARTY_MOST: number
+  readonly NPC_ESCORT_TOWN_RESIDENTS: number
+  readonly NPC_TRADER_ESCORTS: number
+  readonly NPC_FOUND_ESCORT_SHARE: number
   readonly NPC_FOUND_SAMPLES: number
   readonly NPC_FOUND_REACH: number
   readonly NPC_FOUND_FOOD_DAYS: number
@@ -500,6 +503,19 @@ export interface Balance {
     steelArmour: number
     [key: string]: number
   }
+  readonly WEAR_BLOWS: {
+    spear: number
+    sword: number
+    steelSword: number
+    shield: number
+    steelShield: number
+    armour: number
+    steelArmour: number
+    [key: string]: number
+  }
+  readonly TRAINING_WEAR_BLOWS_PER_DAY: number
+  readonly WORN_FROM: number
+  readonly NEARLY_BROKEN_FROM: number
   readonly CARRY_BASE: number
   readonly CARRY_PER_STRENGTH: number
   readonly FOOD_PER_DAY: number
@@ -1247,6 +1263,10 @@ export interface Balance {
   readonly DECAY_NEARLY_RUIN: number
   readonly REPAIR_MATERIALS_SHARE: number
   readonly REPAIR_WORK_SHARE: number
+  readonly RUIN_COLLAPSE_DAYS: number
+  readonly REBUILD_MATERIALS_SHARE: number
+  readonly REBUILD_WORK_SHARE: number
+  readonly COLLAPSE_MATERIALS_LEFT: number
   readonly ALLIANCE_LEAVE_DELAY: number
   readonly ALLIANCE_RECALL_DELAY: number
   readonly NPC_ALLIANCE_JOIN_STANDING: number

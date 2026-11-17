@@ -122,7 +122,8 @@ pub fn resolve_work(world: &mut WorldState, actions: &[WorkAction], scratch: &mu
             let max = max_workers(p.kind).unwrap_or(0.0);
             let good = workplace_good(world, p, makes)?;
             let skill = workplace_skill(p.kind)?;
-            let on_it = p.site.is_none() && is_at((r.x as i32, r.y as i32), placed(p), MAP_SIZE);
+            let on_it =
+                crate::ruins::standing(p) && is_at((r.x as i32, r.y as i32), placed(p), MAP_SIZE);
             (on_it && r.x == at.x && r.y == at.y && count < max).then_some((pi, good, skill))
         });
         let Some((pi, good, skill)) = fits else {

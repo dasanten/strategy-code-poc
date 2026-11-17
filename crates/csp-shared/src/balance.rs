@@ -1012,6 +1012,19 @@ pub const NPC_FOUND_RESIDENTS_PER_MEMBER: f64 = 10.0;
 /// (`NPC_SURPLUS_CAP`), or a big city could never found on what it makes.
 pub const NPC_FOUND_PARTY_MOST: f64 = 14.0;
 
+/// Residents from which an NPC city counts as a town and sends soldiers along with its traders
+/// (`CONTEXT.md`: Escort); a village's trader goes alone. Between a village's start (`NPC_VILLAGE`)
+/// and a town's (`NPC_TOWN`).
+pub const NPC_ESCORT_TOWN_RESIDENTS: f64 = 12.0;
+
+/// Soldiers a town's trader takes along on a run (`CONTEXT.md`: Escort), on a way not known to be
+/// dangerous.
+pub const NPC_TRADER_ESCORTS: f64 = 1.0;
+
+/// Soldiers a founding party takes per member (`CONTEXT.md`: Escort), rounded down and at least
+/// one, in place of its one armed member: a village's worth (6) takes one, the largest party two.
+pub const NPC_FOUND_ESCORT_SHARE: f64 = 0.2;
+
 /// Random tiles a full NPC city tries in one search for its daughter's site (`CONTEXT.md`:
 /// Founding), once a game day: enough to find free Plains on most maps, cheap enough to do while
 /// it waits.
@@ -1354,6 +1367,30 @@ pub const WEAPON_ATTACK: Table<f64> = Table(&[("spear", 4.0), ("sword", 6.0), ("
 /// at the same weight. Only the best shield and the best armour carried count (`PROTECTION_KINDS`).
 pub const PROTECTION_DEFENCE: Table<f64> =
     Table(&[("shield", 3.0), ("armour", 5.0), ("steelShield", 5.0), ("steelArmour", 8.0)]);
+
+/// How many blows each piece of gear lasts before it breaks (`CONTEXT.md`: Wear): a weapon's
+/// blows struck, a shield's or armour's blows taken. A fight to the death is some 15 to 30 blows,
+/// so an iron sword sees about twenty fights; steel lasts half again as long as iron.
+pub const WEAR_BLOWS: Table<f64> = Table(&[
+    ("spear", 400.0),
+    ("sword", 600.0),
+    ("steelSword", 900.0),
+    ("shield", 300.0),
+    ("steelShield", 450.0),
+    ("armour", 400.0),
+    ("steelArmour", 600.0),
+]);
+
+/// How many blows' wear a game day of training puts on each piece a trainee has equipped
+/// (`CONTEXT.md`: Wear): a little, so a soldier training every day wears out an iron sword in
+/// well over a game year.
+pub const TRAINING_WEAR_BLOWS_PER_DAY: f64 = 1.0;
+
+/// Share of its life worn away from which a piece's condition reads "worn" (`CONTEXT.md`: Wear).
+pub const WORN_FROM: f64 = 0.5;
+
+/// Share of its life worn away from which a piece's condition reads "nearly broken".
+pub const NEARLY_BROKEN_FROM: f64 = 0.85;
 
 /// Carry capacity of a resident with no Strength at all, in kg.
 pub const CARRY_BASE: f64 = 10.0;
@@ -2198,6 +2235,22 @@ pub const REPAIR_MATERIALS_SHARE: f64 = 0.25;
 /// tearing it down (`TEARDOWN_WORK_SHARE`).
 pub const REPAIR_WORK_SHARE: f64 = 0.25;
 
+/// Game days a ruin stands before it collapses (`CONTEXT.md`: Ruin): "a long while more", about
+/// two game months, time enough to notice it and rebuild it.
+pub const RUIN_COLLAPSE_DAYS: f64 = 60.0;
+
+/// Share of a building's materials rebuilding its ruin takes (`CONTEXT.md`: Ruin), rounded up to
+/// whole units: more than a repair, less than a new one.
+pub const REBUILD_MATERIALS_SHARE: f64 = 0.5;
+
+/// Share of a building's `BUILD_WORK` rebuilding its ruin takes: more than a repair, less than
+/// building it new.
+pub const REBUILD_WORK_SHARE: f64 = 0.5;
+
+/// Share of a building's materials that lies on its tiles once its ruin collapses, rounded down
+/// to whole units, as when it is torn down (`TEARDOWN_MATERIALS_RETURNED`).
+pub const COLLAPSE_MATERIALS_LEFT: f64 = 0.25;
+
 /// How long after a realm says it leaves an alliance, or the alliance leader removes it, it stops
 /// being a member (`CONTEXT.md`: Alliance): one real hour, time enough for the others to react.
 pub const ALLIANCE_LEAVE_DELAY: f64 = 3600.0;
@@ -2823,6 +2876,9 @@ pub fn balance_json() -> Value {
     m.insert("NPC_FULL_DIP_DAYS".into(), json!(NPC_FULL_DIP_DAYS));
     m.insert("NPC_FOUND_RESIDENTS_PER_MEMBER".into(), json!(NPC_FOUND_RESIDENTS_PER_MEMBER));
     m.insert("NPC_FOUND_PARTY_MOST".into(), json!(NPC_FOUND_PARTY_MOST));
+    m.insert("NPC_ESCORT_TOWN_RESIDENTS".into(), json!(NPC_ESCORT_TOWN_RESIDENTS));
+    m.insert("NPC_TRADER_ESCORTS".into(), json!(NPC_TRADER_ESCORTS));
+    m.insert("NPC_FOUND_ESCORT_SHARE".into(), json!(NPC_FOUND_ESCORT_SHARE));
     m.insert("NPC_FOUND_SAMPLES".into(), json!(NPC_FOUND_SAMPLES));
     m.insert("NPC_FOUND_REACH".into(), json!(NPC_FOUND_REACH));
     m.insert("NPC_FOUND_FOOD_DAYS".into(), json!(NPC_FOUND_FOOD_DAYS));
@@ -2864,6 +2920,10 @@ pub fn balance_json() -> Value {
     m.insert("GOOD_WEIGHT".into(), to_value(GOOD_WEIGHT).expect("serialisable"));
     m.insert("WEAPON_ATTACK".into(), to_value(WEAPON_ATTACK).expect("serialisable"));
     m.insert("PROTECTION_DEFENCE".into(), to_value(PROTECTION_DEFENCE).expect("serialisable"));
+    m.insert("WEAR_BLOWS".into(), to_value(WEAR_BLOWS).expect("serialisable"));
+    m.insert("TRAINING_WEAR_BLOWS_PER_DAY".into(), json!(TRAINING_WEAR_BLOWS_PER_DAY));
+    m.insert("WORN_FROM".into(), json!(WORN_FROM));
+    m.insert("NEARLY_BROKEN_FROM".into(), json!(NEARLY_BROKEN_FROM));
     m.insert("CARRY_BASE".into(), json!(CARRY_BASE));
     m.insert("CARRY_PER_STRENGTH".into(), json!(CARRY_PER_STRENGTH));
     m.insert("FOOD_PER_DAY".into(), json!(FOOD_PER_DAY));
@@ -2987,6 +3047,10 @@ pub fn balance_json() -> Value {
     m.insert("DECAY_NEARLY_RUIN".into(), json!(DECAY_NEARLY_RUIN));
     m.insert("REPAIR_MATERIALS_SHARE".into(), json!(REPAIR_MATERIALS_SHARE));
     m.insert("REPAIR_WORK_SHARE".into(), json!(REPAIR_WORK_SHARE));
+    m.insert("RUIN_COLLAPSE_DAYS".into(), json!(RUIN_COLLAPSE_DAYS));
+    m.insert("REBUILD_MATERIALS_SHARE".into(), json!(REBUILD_MATERIALS_SHARE));
+    m.insert("REBUILD_WORK_SHARE".into(), json!(REBUILD_WORK_SHARE));
+    m.insert("COLLAPSE_MATERIALS_LEFT".into(), json!(COLLAPSE_MATERIALS_LEFT));
     m.insert("ALLIANCE_LEAVE_DELAY".into(), json!(ALLIANCE_LEAVE_DELAY));
     m.insert("ALLIANCE_RECALL_DELAY".into(), json!(ALLIANCE_RECALL_DELAY));
     m.insert("NPC_ALLIANCE_JOIN_STANDING".into(), json!(NPC_ALLIANCE_JOIN_STANDING));

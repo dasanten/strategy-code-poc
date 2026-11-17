@@ -186,6 +186,7 @@ fn building(id: String, kind: BuildingKind, city_id: &str, x: i32, y: i32) -> Bu
         damage: None,
         breedings: None,
         decay: None,
+        ruined_at: None,
         repair: None,
     }
 }
