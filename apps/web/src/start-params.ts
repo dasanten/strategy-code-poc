@@ -69,11 +69,14 @@ export function workScriptOf(
 /**
  * The params the form shows for an order starting `script`: its `param` lines, but for a task
  * not the script's target param (`targetParam`; `CONTEXT.md`: Started directly), which the task
- * fills itself; for Work, `workplace`, whatever the work script.
+ * fills itself; for Work, `workplace`, whatever the work script. Nor a param the step itself
+ * gives, as Feed the stable once gives `once` (`CONTEXT.md`: Feeding the stable, Once).
  */
 export function startFormParams(order: OrderRequest, script: ScriptSummary): ScriptParam[] {
   const target = isWorkTask(order) ? WORKPLACE_PARAM : targetParam(script)
-  return order.kind === 'task' ? script.params.filter((p) => p.name !== target) : script.params
+  const given = (order.params ?? {}) as Record<string, unknown>
+  const shown = script.params.filter((p) => !(p.name in given))
+  return order.kind === 'task' ? shown.filter((p) => p.name !== target) : shown
 }
 
 /**

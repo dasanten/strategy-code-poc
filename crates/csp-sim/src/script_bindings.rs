@@ -218,6 +218,9 @@ fn as_view(world: &WorldState, mut r: Map<String, Json>) -> Map<String, Json> {
     let down = r.get("downUntil").is_some_and(|v| !v.is_null())
         || r.get("down") == Some(&Json::Bool(true));
     r.insert("down".into(), Json::Bool(down));
+    // Up on the wall walk, whichever side they came from (`CONTEXT.md`: Wall walk).
+    let up = r.get("up").is_some_and(|v| !v.is_null() && *v != Json::Bool(false));
+    r.insert("up".into(), Json::Bool(up));
     if let Some(q) = r.get("queue").filter(|v| !v.is_null()).cloned() {
         if let Ok(q) = serde_json::from_value(q) {
             r.insert("queue".into(), serde_json::to_value(queue_view(&q)).unwrap_or(Json::Null));
@@ -282,6 +285,23 @@ fn numbers_view<K: Copy>(
     Value::frozen_fields(fields.iter().map(|f| {
         let n = entries.iter().find(|(k, _)| name_of(**k) == f.name);
         (f.name, n.map_or(Value::Null, |(_, n)| number(*n)))
+    }))
+}
+
+/// A resident's slots as their `equipment` view: the good in each as the rules count it
+/// (`CONTEXT.md`: Equipment), `null` for an empty slot.
+fn equipment_view(r: &Resident) -> Value {
+    use crate::equipment::{equipped, Slot};
+    let fields = script_view("equipment").map_or(&[][..], |v| v.fields);
+    Value::frozen_fields(fields.iter().map(|f| {
+        let slot = match f.name {
+            "weapon" => Some(Slot::Weapon),
+            "shield" => Some(Slot::Shield),
+            "armour" => Some(Slot::Armour),
+            _ => None,
+        };
+        let good = slot.and_then(|s| equipped(r, s));
+        (f.name, good.map_or(Value::Null, |g| Value::string(good_name(g))))
     }))
 }
 
@@ -374,6 +394,7 @@ fn resident_view(
             "stats" => stats_view(&r.stats),
             "skills" => numbers_view("skills", &r.skills, skill_name),
             "carried" => numbers_view("goods", &r.carried, good_name),
+            "equipped" => equipment_view(r),
             "order" => order_value(r.order.as_ref(), f.r#type, land),
             "orderEnded" => field_value(&r.order_ended, f.r#type),
             "queue" => match &r.queue {
@@ -384,6 +405,7 @@ fn resident_view(
             "carrying" => field_value(&r.carrying, f.r#type),
             "riding" => text(r.riding.as_ref()),
             "aboard" => text(r.aboard.as_ref()),
+            "up" => Value::Bool(r.up.is_some()),
             // `knownThief` is for others, and `script` is left out of `me`.
             _ => Value::Null,
         };
@@ -417,6 +439,8 @@ fn resident_data(
         }
     }
     m.insert("age".into(), json!(age_in_years(r.born_at, world.tick as f64)));
+    // The slots as the rules count them, an empty one too (`CONTEXT.md`: Equipment).
+    m.insert("equipped".into(), crate::equipment::equipment_json(r));
     m
 }
 
@@ -762,6 +786,10 @@ impl<'a> ScriptBindings<'a> {
         });
         let mut m = self.own_memory(id).unwrap_or_default();
         m.insert("knownThief".into(), Json::Bool(thieves.contains(id)));
+        // The slots as the rules count them, an empty one too (`CONTEXT.md`: Equipment).
+        if let Some(r) = self.ctx.index.resident_by_id(self.world(), id) {
+            m.insert("equipped".into(), crate::equipment::equipment_json(r));
+        }
         m
     }
 
@@ -1117,6 +1145,7 @@ impl<'a> ScriptBindings<'a> {
                         })
                         .map(|r| {
                             let mut m = to_json(r);
+                            m.insert("equipped".into(), crate::equipment::equipment_json(r));
                             let s = r.script.as_ref().expect("filtered");
                             m.insert(
                                 "script".into(),
@@ -1648,6 +1677,8 @@ impl<'a> ScriptBindings<'a> {
             "pair" => self.request("pair", vec![("partnerId", p(0)?)]),
             "attack" => self.request("attack", vec![("targetId", p(0)?)]),
             "feed" => self.request("feed", vec![("targetId", p(0)?), ("units", p(1)?)]),
+            "equip" => self.request("equip", vec![("good", p(0)?)]),
+            "takeOff" => self.request("takeOff", vec![("slot", p(0)?)]),
             "climb" => self.request("climb", vec![("wallId", p(0)?)]),
             "pay" => self.request("pay", vec![("contractId", p(0)?), ("weeks", p(1)?)]),
             "buyCity" => self.request("buyCity", vec![("cityId", p(0)?)]),

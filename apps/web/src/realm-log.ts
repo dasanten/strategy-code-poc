@@ -101,6 +101,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         starved: 'starved to death',
         oldAge: 'died of old age',
         killed: e.by ? `was killed by ${e.by}` : 'was killed',
+        fell: 'died in a fall from a broken wall',
       }[e.cause]
       if (e.leader && e.heir) {
         return { text: `Your Leader ${e.name} ${how}. Your heir ${e.heir} takes over.`, tone: 'bad' }

@@ -6,12 +6,12 @@ use csp_shared::balance::{
     DODGE_LIMIT, DODGE_PER_AGILITY, INTELLECT_AVERAGE, MIN_BLOW_DAMAGE, PROTECTION_DEFENCE,
     WEAPON_ATTACK,
 };
-use csp_shared::goods::PROTECTION_KINDS;
 use csp_shared::terrain::wrap_delta;
 use csp_shared::world::{Resident, SkillName, StatName};
 
-use super::names::{good_name, good_of, held};
-use super::residents::{best_weapon, stat_value};
+use super::names::good_name;
+use super::residents::stat_value;
+use crate::equipment::{equipped, Slot};
 
 /// Whether two spots are in contact (`inContact`): on the same tile or one of the eight around
 /// it, the short way round the map of `size` tiles.
@@ -19,30 +19,26 @@ pub fn in_contact(size: i32, a: (i32, i32), b: (i32, i32)) -> bool {
     wrap_delta(a.0, b.0, size).abs() <= 1 && wrap_delta(a.1, b.1, size).abs() <= 1
 }
 
-/// Damage a resident's protection takes off each blow (`protection`): a shield and armour, if
-/// they carry them, the best of each kind counting (`PROTECTION_KINDS`), so steel over iron.
+/// Damage a resident's protection takes off each blow (`protection`): the shield and armour they
+/// have equipped (`CONTEXT.md`: Equipment); spares in the pack add nothing.
 pub fn protection(r: &Resident) -> f64 {
-    PROTECTION_KINDS
-        .iter()
-        .map(|kind| {
-            kind.iter()
-                .filter(|p| good_of(p).is_some_and(|g| held(&r.carried, g) > 0.0))
-                .filter_map(|p| PROTECTION_DEFENCE.get(p))
-                .fold(0.0, f64::max)
-        })
+    [Slot::Shield, Slot::Armour]
+        .into_iter()
+        .filter_map(|s| equipped(r, s))
+        .filter_map(|g| PROTECTION_DEFENCE.get(good_name(g)))
         .sum()
 }
 
-/// How hard a resident strikes at `tick` (`attackPower`): from Strength and the best weapon they
-/// carry, harder with Combat skill.
+/// How hard a resident strikes at `tick` (`attackPower`): from Strength and the weapon they have
+/// equipped, harder with Combat skill.
 pub fn attack_power(r: &Resident, tick: f64) -> f64 {
     let raw = BLOW_BASE + BLOW_PER_STRENGTH * stat_value(r, StatName::Strength, tick);
     (raw + weapon_attack(r)) * combat_skill_factor(r)
 }
 
-/// What the best weapon a resident carries adds to each blow (`weaponAttack`): nothing unarmed.
+/// What the weapon a resident has equipped adds to each blow (`weaponAttack`): nothing unarmed.
 pub fn weapon_attack(r: &Resident) -> f64 {
-    best_weapon(&r.carried).and_then(|w| WEAPON_ATTACK.get(good_name(w))).unwrap_or(0.0)
+    equipped(r, Slot::Weapon).and_then(|w| WEAPON_ATTACK.get(good_name(w))).unwrap_or(0.0)
 }
 
 /// What a resident's Combat skill multiplies each blow by (`combatSkillFactor`): 1 unskilled, up

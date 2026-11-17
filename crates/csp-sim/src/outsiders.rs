@@ -181,11 +181,7 @@ pub fn step_outsiders(world: &mut WorldState, size: i32) {
         let city_id = world.cities[ci].id.clone();
         for armed in [true, false] {
             for id in &came {
-                let is = world
-                    .residents
-                    .iter()
-                    .find(|r| &r.id == id)
-                    .is_some_and(|r| is_armed(&r.carried));
+                let is = world.residents.iter().find(|r| &r.id == id).is_some_and(is_armed);
                 if is == armed {
                     raise_outsider(world, &city_id, id, size);
                 }

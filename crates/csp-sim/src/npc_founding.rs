@@ -358,7 +358,7 @@ fn pick_party(
         let r = &world.residents[i];
         carry_capacity(r, tick) - stock_weight(&r.carried) + carried_food(r) * food_weight
     };
-    let armed_now = |i: usize| is_armed(&world.residents[i].carried);
+    let armed_now = |i: usize| is_armed(&world.residents[i]);
     let mut armed: Vec<usize> =
         adults.iter().copied().filter(|&i| armed_now(i) && free(i)).collect();
     armed.sort_by(|&a, &b| room(b).total_cmp(&room(a)));

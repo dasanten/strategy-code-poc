@@ -15,6 +15,7 @@ use crate::walking::Walking;
 mod big_city;
 pub(crate) mod big_city_fixture;
 mod dry_mine;
+mod early_siege;
 mod far_nodes;
 mod game_year;
 mod inner_wall;

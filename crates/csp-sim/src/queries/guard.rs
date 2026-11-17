@@ -22,7 +22,7 @@ pub fn guarded_by<'r>(
 ) -> bool {
     let mut guarded = false;
     for r in residents {
-        if r.health <= 0.0 || is_down(r.down_until) || !is_armed(&r.carried) || !here(r) {
+        if r.health <= 0.0 || is_down(r.down_until) || !is_armed(r) || !here(r) {
             continue;
         }
         if breaks(r) {

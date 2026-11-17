@@ -208,6 +208,21 @@ describe('the form before a script starts', () => {
     expect(startFormParams({ kind: 'task', task: 'work' }, summary(1, null))).toEqual(PARAMS)
   })
 
+  it('leaves out a param the step gives itself, as Feed the stable once gives once', () => {
+    const feed = {
+      ...summary(3, 'feedStable'),
+      params: [
+        { name: 'stable', type: 'storage' as const },
+        { name: 'source', type: 'storage' as const },
+        { name: 'once', type: 'number' as const, default: 0 },
+      ],
+    }
+    const once = { kind: 'task', task: 'feedStable', stableId: 'b1', params: { once: 1 } }
+    expect(startFormParams(once, feed).map((p) => p.name)).toEqual(['source'])
+    const fullTime = { kind: 'task', task: 'feedStable', stableId: 'b1' }
+    expect(startFormParams(fullTime, feed).map((p) => p.name)).toEqual(['source', 'once'])
+  })
+
   it('can start only with whole numbers of zero or more', () => {
     expect(startValuesValid(PARAMS, { rounds: 3, take: undefined })).toBe(true)
     expect(startValuesValid(PARAMS, { rounds: -1 })).toBe(false)

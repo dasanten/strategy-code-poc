@@ -72,7 +72,7 @@ export function learnedSkills(r: Pick<Resident, 'skills'>): { skill: SkillName; 
 }
 
 /** The weapon a resident fights with and the protection they carry: "Sword, Shield"; empty with none. */
-export function gearLine(r: Pick<Resident, 'carried'>): string {
+export function gearLine(r: Pick<Resident, 'equipped'>): string {
   const weapon = bestWeapon(r)
   const worn = wornProtection(r)
   return [...(weapon ? [weapon] : []), ...worn].map((g) => GOOD_LABELS[g]).join(', ')

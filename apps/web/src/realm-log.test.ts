@@ -427,6 +427,9 @@ describe('realm log', () => {
     expect(describeEvent({ ...died, cause: 'killed', leader: false, by: 'Tobin' }).text).toBe(
       'Mara was killed by Tobin.',
     )
+    expect(describeEvent({ ...died, cause: 'fell', leader: false }).text).toBe(
+      'Mara died in a fall from a broken wall.',
+    )
   })
 
   it('describes a horse sold to an NPC city, or why it wasn’t', () => {

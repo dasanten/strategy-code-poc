@@ -10,15 +10,17 @@ import { fighterStrength } from './persuasion.js'
 
 describe('fighterStrength (Respect, ADR 0033)', () => {
   it('is nothing for the unarmed, however armoured', () => {
-    expect(fighterStrength({ carried: { armour: 1, shield: 1 }, skills: {} })).toBe(0)
+    expect(fighterStrength({ equipped: { armour: 'armour', shield: 'shield' }, skills: {} })).toBe(
+      0,
+    )
   })
 
-  it('weighs the best weapon, Combat skill, shield and armour as combat does', () => {
-    const spear = fighterStrength({ carried: { spear: 1 }, skills: {} })
+  it('weighs the weapon equipped, Combat skill, shield and armour as combat does', () => {
+    const spear = fighterStrength({ equipped: { weapon: 'spear' }, skills: {} })
     expect(spear).toBe(BLOW_BASE + WEAPON_ATTACK.spear)
     const full = COMBAT_SKILL_LIMIT / COMBAT_SKILL_EFFECT
     const trained = fighterStrength({
-      carried: { spear: 1, sword: 1, shield: 1, armour: 1 },
+      equipped: { weapon: 'sword', shield: 'shield', armour: 'armour' },
       skills: { combat: full * 2 },
     })
     expect(trained).toBe(
@@ -28,9 +30,9 @@ describe('fighterStrength (Respect, ADR 0033)', () => {
     )
   })
 
-  it('weighs steel over iron, the best shield and the best armour only', () => {
+  it('weighs steel gear equipped as steel (CONTEXT.md: Equipment)', () => {
     const steel = fighterStrength({
-      carried: { sword: 1, steelSword: 1, shield: 1, steelShield: 1, armour: 1 },
+      equipped: { weapon: 'steelSword', shield: 'steelShield', armour: 'armour' },
       skills: {},
     })
     expect(steel).toBe(

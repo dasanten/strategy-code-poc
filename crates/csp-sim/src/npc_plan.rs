@@ -280,7 +280,7 @@ pub fn plan_city(
         let feed = feed_job_kept(world, &city, r);
         if traders.contains(&id) {
             jobs.insert(id, job_at(CityJobKind::Trade, None));
-        } else if is_armed(&r.carried) {
+        } else if is_armed(r) {
             jobs.insert(id, job_at(CityJobKind::Soldier, None));
         } else if r.carrying.is_some() {
             jobs.insert(id, job_at(CityJobKind::Idle, None));

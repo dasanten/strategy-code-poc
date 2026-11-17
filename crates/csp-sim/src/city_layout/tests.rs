@@ -132,7 +132,7 @@ fn can_walk_out(
             if seen.contains(&i) || !is_passable_terrain(terrain_at(terrain, x, y)) {
                 continue;
             }
-            if !may_step(&walls, Some(city), tile_index(size, tx, ty), i, false, false) {
+            if !may_step(&walls, Some(city), i) {
                 continue;
             }
             seen.insert(i);

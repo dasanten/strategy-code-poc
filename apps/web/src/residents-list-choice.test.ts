@@ -76,15 +76,15 @@ describe('searching the full list', () => {
 describe('filtering the full list', () => {
   it('by weapons: has any, has none, or fights with this one', () => {
     const people = [
-      resident('Spear', { carried: { spear: 1 } }),
-      resident('Both', { carried: { spear: 1, sword: 1 } }),
-      resident('Shield', { carried: { shield: 1 } }),
+      resident('Spear', { carried: { spear: 1 }, equipped: { weapon: 'spear' } }),
+      resident('Both', { carried: { spear: 1, sword: 1 }, equipped: { weapon: 'sword' } }),
+      resident('Shield', { carried: { shield: 1, sword: 1 }, equipped: { shield: 'shield' } }),
       resident('Bare'),
     ]
     expect(filtered(people, { weapons: 'armed' })).toEqual(['Spear', 'Both'])
     expect(filtered(people, { weapons: 'unarmed' })).toEqual(['Shield', 'Bare'])
     expect(filtered(people, { weapons: 'sword' })).toEqual(['Both'])
-    // Armed with the weapon they fight with, as the Gear column says: the best one.
+    // Armed with the weapon equipped, as the Gear column says; a spare one carried counts for nothing.
     expect(filtered(people, { weapons: 'spear' })).toEqual(['Spear'])
   })
 
@@ -137,12 +137,12 @@ describe('filtering the full list', () => {
 
   it('takes filters together and leaves the order alone', () => {
     const people = [
-      resident('Zed', { carried: { sword: 1 } }),
+      resident('Zed', { equipped: { weapon: 'sword' } }),
       resident('Anna', {
-        carried: { sword: 1 },
+        equipped: { weapon: 'sword' },
         order: { kind: 'feed', targetId: 'h1', units: 1 },
       }),
-      resident('Ava', { carried: { sword: 1 } }),
+      resident('Ava', { equipped: { weapon: 'sword' } }),
       resident('Abe'),
     ]
     expect(filtered(people, { weapons: 'armed', doing: 'idle' })).toEqual(['Zed', 'Ava'])
@@ -252,8 +252,8 @@ describe('sorting the full list', () => {
     })
 
     it('puts those without gear last either way, the rest by what it says', () => {
-      const sword = resident('Sword', { carried: { sword: 1 } })
-      const shield = resident('Shield', { carried: { shield: 1 } })
+      const sword = resident('Sword', { equipped: { weapon: 'sword' } })
+      const shield = resident('Shield', { equipped: { shield: 'shield' } })
       expect(sorted([none, sword, shield], 'gear', false)).toEqual(['Shield', 'Sword', 'None'])
       expect(sorted([none, sword, shield], 'gear', true)).toEqual(['Sword', 'Shield', 'None'])
     })
@@ -324,10 +324,10 @@ describe('sorting the full list', () => {
 })
 
 describe('who Pick these picks', () => {
-  const ada = resident('Ada', { carried: { sword: 1 } })
+  const ada = resident('Ada', { equipped: { weapon: 'sword' } })
   const bo = resident('Bo')
-  const cy = resident('Cy', { carried: { spear: 1 } })
-  const dee = resident('Dee', { carried: { spear: 1 } })
+  const cy = resident('Cy', { equipped: { weapon: 'spear' } })
+  const dee = resident('Dee', { equipped: { weapon: 'spear' } })
   const all = list(ada, bo, cy, dee)
   const armed = filterResidents(all, { ...DEFAULT_CHOICE, weapons: 'armed' }, NOW)
 

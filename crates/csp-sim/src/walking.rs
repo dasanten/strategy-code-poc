@@ -6,15 +6,15 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use csp_shared::balance::carriage_can_enter;
+use csp_shared::balance::{carriage_can_enter, WALL_WALK_TICKS};
 use csp_shared::terrain::{
     beside_step, ground_at, is_passable_terrain, step_length, terrain_at, tile_index, wrap,
     TerrainMap,
 };
 use csp_shared::world::{
-    FetchOrder, FetchPhase, GoodsPlace, HaulPhase, HaulStop, LinePhase, OrderRequest,
-    ResidentOrder, SkillName, StoreOrder, StorePhase, Tile, TilePath, VesselKind, WalkOrder,
-    WorldState,
+    FetchOrder, FetchPhase, GoodsPlace, HaulPhase, HaulStop, LinePhase, OrderRequest, Resident,
+    ResidentOrder, SkillName, StoreOrder, StorePhase, Tile, TilePath, UpSide, VesselKind,
+    WalkOrder, WorldState,
 };
 
 use crate::passengers::get_off_vessel;
@@ -44,7 +44,9 @@ use crate::storing::{end_order, place_tile};
 use crate::tick::{Scratch, Walk};
 use crate::trade_org_punishment::waiting_on_the_road;
 use crate::walls::wall_side;
-use crate::walls::{may_step, stranded_on_wall, wall_map, walls_fingerprint, WallMap};
+use crate::walls::{
+    may_move, may_step, stranded_on_wall, up_after, wall_map, walls_fingerprint, WallMap,
+};
 
 /// Time the pathfinder may use per tick (`PATH_BUDGET_MS`, ADR 0004).
 pub const PATH_BUDGET_MS: f64 = 50.0;
@@ -612,14 +614,16 @@ impl Walking {
     }
 
     /// Tells the pathfinder the finished roads and the walls, when they changed (`setGround`).
-    fn set_ground(&mut self, world: &WorldState, roads: Rc<HashSet<usize>>) {
+    /// Returns the walls it set.
+    fn set_ground(&mut self, world: &WorldState, roads: Rc<HashSet<usize>>) -> Arc<WallMap> {
         // The same index as last time holds the same roads: no need to compare them tile by tile.
         if self.roads.as_ref().is_none_or(|r| !Rc::ptr_eq(r, &roads) && **r != *roads) {
             self.finder.set_roads(roads.iter().copied());
         }
         self.roads = Some(roads);
         let walls = self.walls_of(world);
-        self.finder.set_walls(Some(walls));
+        self.finder.set_walls(Some(walls.clone()));
+        walls
     }
 
     fn advance(&mut self, budget_ms: f64) {
@@ -644,8 +648,13 @@ impl Walking {
         if let Some(result) = self.finder.result(&id) {
             return result;
         }
-        let options =
-            PathOptions { realm_id: side.map(str::to_string), on_walls: false, near: false, area };
+        let options = PathOptions {
+            realm_id: side.map(str::to_string),
+            on_walls: false,
+            near: false,
+            area,
+            up: None,
+        };
         self.finder.request(&id, from, to, &WALKING_COSTS, options);
         PathResult::Searching
     }
@@ -660,7 +669,7 @@ impl Walking {
         let size = self.terrain.size;
         land_moving_passengers(world, &self.terrain);
         let roads = scratch.index(world, size).roads(world);
-        self.set_ground(world, roads.clone());
+        let walls = self.set_ground(world, roads.clone());
         let mut holding: HashSet<String> = HashSet::new();
         for i in 0..world.residents.len() {
             let r = &world.residents[i];
@@ -827,6 +836,10 @@ impl Walking {
             } else {
                 gain = walk_speed(r, ground, tick);
             }
+            // Getting up onto a wall walk or down from it takes its ticks, however fast they walk
+            // (`CONTEXT.md`: Wall walk).
+            let climbs = foot && riding.is_none() && gets_up_or_down(&walls, size, r, path);
+            let gain = if climbs { 1.0 } else { gain };
             let horse_id = riding.map(|h| h.id.clone());
             let carriage_id = match o {
                 ResidentOrder::Drive(o) => Some(o.carriage_id.clone()),
@@ -845,6 +858,7 @@ impl Walking {
             // A diagonal step is further, so it waits for that much more progress (`CONTEXT.md`: Step).
             let length = match step_length(size, rx as i32, ry as i32, next.0 as i32, next.1 as i32)
             {
+                _ if climbs => WALL_WALK_TICKS,
                 0.0 => 1.0,
                 l => l,
             };
@@ -905,6 +919,8 @@ impl Walking {
                     on_walls: walking,
                     near,
                     area: None,
+                    // From up on a wall walk, if they are (`CONTEXT.md`: Wall walk).
+                    up: r.up.filter(|_| walking),
                 };
                 let from = (r.x as i32, r.y as i32);
                 let to = (target.0 as i32, target.1 as i32);
@@ -987,22 +1003,37 @@ impl Walking {
             let to = tile_index(size, tx, ty);
             let side = wall_side(r);
             let on_walls = step.carriage_id.is_none() && step.horse_id.is_none();
-            let stranded = stranded_on_wall(&walls, side, from);
-            let enterable = |t: usize| {
-                let g = ground_at(&terrain, &roads, t as i32 % size, t as i32 / size);
-                if on_walls {
-                    is_passable_terrain(g)
-                } else {
-                    carriage_can_enter(g)
-                }
+            // Up on a wall walk, or getting up or down: straight steps on foot only, along their
+            // side's walk, down to the side they came up from (`CONTEXT.md`: Wall walk).
+            let up = r.up.filter(|_| on_walls);
+            let to_up = match move_path(r.order.as_ref()) {
+                Some(p) if on_walls && p.first() == Some(&step.to) => up_next(&walls, size, r, p),
+                _ if on_walls => up_after(&walls, from, up, std::iter::once(to)),
+                _ => None,
             };
-            let corners = beside_step(size, rx, ry, tx, ty)
-                .into_iter()
-                .all(|t| enterable(t) && may_step(&walls, side, from, t, on_walls, stranded));
-            if !corners || !may_step(&walls, side, from, to, on_walls, stranded) {
+            let walked = if up.is_some() || to_up.is_some() {
+                let stranded = up.is_some_and(|s| stranded_on_wall(&walls, side, from, s));
+                length == 1.0 && may_move(&walls, side, from, up, to, to_up, stranded)
+            } else {
+                let enterable = |t: usize| {
+                    let g = ground_at(&terrain, &roads, t as i32 % size, t as i32 / size);
+                    if on_walls {
+                        is_passable_terrain(g)
+                    } else {
+                        carriage_can_enter(g)
+                    }
+                };
+                let corners = beside_step(size, rx, ry, tx, ty)
+                    .into_iter()
+                    .all(|t| enterable(t) && may_step(&walls, side, t));
+                corners && may_step(&walls, side, to)
+            };
+            if !walked {
                 reset_path(world, i);
                 continue;
             }
+            // Getting up or down uses up its ticks of progress (`request_steps`).
+            let length = if up.is_some() != to_up.is_some() { WALL_WALK_TICKS } else { length };
             if let Some(cid) = &step.carriage_id {
                 let k = world.carriages.iter().position(|k| k.id == *cid);
                 let horse = k.and_then(|k| horse_for(world, &world.carriages[k]));
@@ -1069,6 +1100,7 @@ impl Walking {
             }
             let r = &mut world.residents[i];
             (r.x, r.y) = step.to;
+            r.up = to_up;
             taken += 1;
             let Some((path, progress)) = move_path_mut(r.order.as_mut()) else { continue };
             let Some(p) = path else { continue };
@@ -1082,6 +1114,19 @@ impl Walking {
         }
         taken
     }
+}
+
+/// Where a walker is once they take the next step of `path`, on the ground or up on a wall walk
+/// (`up_after`).
+fn up_next(walls: &WallMap, size: i32, r: &Resident, path: &TilePath) -> Option<UpSide> {
+    let tile = |(x, y): (f64, f64)| tile_index(size, x as i32, y as i32);
+    up_after(walls, tile((r.x, r.y)), r.up, path.iter().map(|&p| tile(p)))
+}
+
+/// Whether a walker's next step of `path` gets them up onto a wall walk or down from it
+/// (`CONTEXT.md`: Wall walk).
+fn gets_up_or_down(walls: &WallMap, size: i32, r: &Resident, path: &TilePath) -> bool {
+    up_next(walls, size, r, path).is_some() != r.up.is_some()
 }
 
 /// `o.path = null` alone, progress kept, on a moving order.
