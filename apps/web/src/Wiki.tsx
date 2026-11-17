@@ -178,6 +178,7 @@ import {
   NPC_WAY_CLEARANCE,
   TRADING_POST_REGION,
   NPC_FULL_DIP_DAYS,
+  NPC_FOUND_FOOD_SURPLUS_SHARE,
   NPC_FULL_RESIDENTS_PER_DAY,
   NPC_GATE_WATCH_RANGE,
   NPC_VILLAGE,
@@ -2328,8 +2329,10 @@ export function Wiki() {
           but may always take {num(WAITING_HORSE_FOOD)} Food for the horse. Short of Food, they top
           up from the goods warehouse, which the stock floor fills each day, so buying Food there
           can keep them waiting a little longer. A caravan with a delivery or transfer waiting wants
-          all it keeps on board, as there is no Food on that way. Away from the HQ nothing waits: a
-          carriage takes what a post's storage has and drives on.
+          all it keeps on board, as there is no Food on that way. A caravan away from the HQ takes
+          what a post's storage has and drives on. A wandering trader waits at a post as at the HQ:
+          it leaves only with enough Food to reach its next stop, topping up from the post's goods
+          warehouse, and stands there until that has some.
         </p>
         <p>
           On its way a wandering trader stops at each NPC or Player city whose town hall lies within{' '}
@@ -2944,7 +2947,7 @@ export function Wiki() {
           resident would walk, tile by tile, so a road goes round a lake, and they skip tiles that
           already have a road. They only use materials above its reserve and what its project still
           needs; with none to spare, or with something short that they can work for, they go back to
-          other work and bring back what they carry. Once the city would otherwise be full, they
+          other work and bring back what they carry. Once its full wait is under way, they
           also leave a town hall's and a storage's materials untouched, so founding comes before
           roads. Like any road it belongs to nobody, and anyone can use it or tear it down; a tile
           torn down is laid again in time.
@@ -3052,7 +3055,16 @@ export function Wiki() {
           A city is full once it has had spare hands, idle, on a road crew, scouting or working for
           surplus, and nothing short of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus
           and its founding party's materials above its reserve; Coins it has no way to earn don't
-          count as short. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less
+          count as short, and nor do weapons it can't make, nor the Iron it keeps to forge them
+          (it can make them with a smithy, or with nodes it knows of for all they are made from),
+          though it still buys them. Once it lacks nothing but its founding party's materials, those
+          count as short: its spare hands gather them, it builds a workplace for one it has none
+          of, and they are still spare hands while they do. Food, Coins and weapons come first, Food
+          its surplus too: only once it holds {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus
+          cap past its reserve. Its workplaces come first as well: its spare hands go on a road
+          crew, scout and work at its workplaces for surplus, and only those left over gather for
+          the party.
+          Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less
           for each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}.
           A dip below its reserve only restarts that wait if it lasts longer than{' '}
           {days(NPC_FULL_DIP_DAYS)}, though nobody sets out during one. A full city founds a
@@ -3064,7 +3076,8 @@ export function Wiki() {
           to {num(NPC_FOUND_PARTY_MOST)}, one of them armed, sets out carrying a town hall's and a
           storage's materials, a house's for each {num(HOUSING_ROOM.house ?? 1)} members past{' '}
           {num(NPC_VILLAGE.residents)}, and Food for twice the walk and {days(NPC_FOUND_FOOD_DAYS)}{' '}
-          there, and builds the town hall, which founds the daughter: an NPC city of its own with a
+          there, with as many more adults as it takes to carry all of it, and builds the town hall,
+          which founds the daughter: an NPC city of its own with a
           name from the game. It then builds its storage, a farm and a house, and once its storage
           holds the Wood of its reserve, its first wall, a ring{' '}
           {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its home. Mother and daughter start at
