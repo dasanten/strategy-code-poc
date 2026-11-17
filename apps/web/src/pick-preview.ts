@@ -41,6 +41,8 @@ const RESIDENT_PREVIEWS = {
   // Over water, which the client finds no way for: the tile alone (`CONTEXT.md`: Rowing).
   row: { kind: 'tile' },
   rowOff: { kind: 'tile' },
+  // Slowly, where a carriage could go (`CONTEXT.md`: Siege machine): the tile alone.
+  push: { kind: 'tile' },
   roadFrom: { kind: 'lineStart', building: 'road' },
   wallFrom: { kind: 'lineStart', building: 'wall' },
 } as const

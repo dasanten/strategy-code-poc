@@ -6,7 +6,8 @@ use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::{terrain_at, TerrainMap};
 use csp_shared::world::{
     BuildOrder, Building, BuildingKind, Carriage, ConstructionSite, LinePhase, OrderRequest,
-    Resident, ResidentOrder, SkillName, Stock, Tile, Vessel, VesselKind, WallMaterial, WorldState,
+    Resident, ResidentOrder, SiegeMachine, SkillName, Stock, Tile, Vessel, VesselKind,
+    WallMaterial, WorldState,
 };
 
 use crate::cities::update_city_membership;
@@ -202,6 +203,24 @@ pub fn finish_site(
             y: f64::from(y),
             load: Stock::new(),
             rower_id: None,
+            crew_ids: Vec::new(),
+        });
+        return true;
+    }
+    if let Some(kind) = crate::siege::machine_kind(b.kind) {
+        // `CONTEXT.md`: Siege machine: the site is gone, and the machine of the finisher's realm
+        // stands where it was, with no crew yet.
+        let (x, y) = (b.x, b.y);
+        world.buildings.remove(site);
+        let id = new_id(crate::siege::machine_name(kind), &mut world.next_id);
+        world.siege_machines.push(SiegeMachine {
+            id,
+            kind,
+            realm_id: r.owner.clone(),
+            x,
+            y,
+            damage: None,
+            teardown: None,
             crew_ids: Vec::new(),
         });
         return true;

@@ -128,6 +128,7 @@ fn a_walker_finds_a_new_way_when_a_gate_closes_before_them() {
         carriage_id: None,
         horse_id: None,
         vessel_id: None,
+        machine_id: None,
     };
     walking.resolve(&mut world, &mut scratch, &[step]);
     assert_eq!((world.residents[0].x, world.residents[0].y), (8.0, 12.0));

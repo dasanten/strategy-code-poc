@@ -300,6 +300,15 @@ import {
   Terrain,
   WALL_DEFENCE,
   WALL_STRENGTH,
+  RAM_CREW,
+  RAM_STRENGTH,
+  RAM_BLOW,
+  RAM_STRIKE_TICKS,
+  CATAPULT_CREW,
+  CATAPULT_REACH,
+  CATAPULT_SHOT_TICKS,
+  CATAPULT_BLOW,
+  CATAPULT_STRENGTH,
   STONE_WALL_STRENGTH,
   WALL_WALK_TICKS,
   FALL_DAMAGE,
@@ -364,6 +373,10 @@ import {
   carriageCost,
   boatCost,
   shipCost,
+  ramCost,
+  ramPushTicks,
+  ramBreakTicks,
+  catapultBreak,
   cityControl,
   coinsPerMintWorkerDay,
   crimeForgotten,
@@ -446,6 +459,7 @@ export const WIKI_TOPICS = [
   { id: 'standing', title: 'Standing & reactions' },
   { id: 'demands', title: 'Demands' },
   { id: 'combat', title: 'Combat & walls' },
+  { id: 'siege', title: 'Siege machines' },
   { id: 'territory', title: 'Territory' },
   { id: 'language', title: 'Script language' },
   { id: 'api', title: 'Game API' },
@@ -3463,8 +3477,8 @@ export function Wiki() {
           and goes back on when they put a one-handed weapon in its place), and a shield can't be
           put on beside one. In a blow they add nothing, so an archer in a brawl fights with their
           fists. They shoot <strong>Arrows</strong>, a plain good that is carried, stored and traded
-          like any other and goes in no slot. A smithy makes each, the smith saying which as for
-          the other gear:
+          like any other and goes in no slot. A smithy makes each, the smith saying which as for the
+          other gear:
         </p>
         <table>
           <thead>
@@ -3498,8 +3512,8 @@ export function Wiki() {
           from there. Each shot uses up one Arrow they carry, whether it lands or not; out of Arrows
           they fight with their fists and have to walk into contact. Nothing blocks a shot for now.
           A shot is a strike like a blow: the one hit is under attack and fights back or flees,
-          their city's alarm goes, and it is a crime where a blow would be. Agility dodges a shot
-          as it does a blow, and a shield and armour take damage off it, but a Crossbow's bolt goes
+          their city's alarm goes, and it is a crime where a blow would be. Agility dodges a shot as
+          it does a blow, and a shield and armour take damage off it, but a Crossbow's bolt goes
           through part of them. Strength adds nothing to a shot; Combat skill makes a Bow much
           better, a Crossbow only a little.
         </p>
@@ -3529,24 +3543,24 @@ export function Wiki() {
         </table>
         <p>
           <strong>Archers by default.</strong> Struck, an archer's Defend default shoots back from
-          where they stand, walking only until the one who struck them is in reach. On an alarm,
-          the Alarm default sends an archer on the ground up onto the city's wall tile between them
-          and whoever they go after, and they shoot from there; up on the wall they wait for them
-          to come in reach rather than come down. With no wall between them they shoot from where
-          they stand. Out of Arrows an archer does what anyone armed does and closes in. Scripts see
-          a resident's <code>reach</code> (null without a Bow or Crossbow) and the Arrows they carry
+          where they stand, walking only until the one who struck them is in reach. On an alarm, the
+          Alarm default sends an archer on the ground up onto the city's wall tile between them and
+          whoever they go after, and they shoot from there; up on the wall they wait for them to
+          come in reach rather than come down. With no wall between them they shoot from where they
+          stand. Out of Arrows an archer does what anyone armed does and closes in. Scripts see a
+          resident's <code>reach</code> (null without a Bow or Crossbow) and the Arrows they carry
           in <code>carried.arrows</code>; <code>shoot(targetId)</code> shoots someone in reach
           without a step, and <code>attack</code> walks only until they are in reach.
         </p>
         <p>
-          <strong>NPC archers.</strong> An NPC city with a smithy arms{' '}
-          {pct(NPC_ARCHER_SHARE)} of its soldiers with a Bow (rounded down) and keeps{' '}
-          {num(NPC_ARCHER_ARROWS)} Arrows in its reserve for each of them; its smithy forges them
-          once its soldiers are armed. Each archer carries {num(NPC_ARCHER_ARROWS)} Arrows and
-          fetches more from its storage as they run low. While the city has a wall, its archers
-          stand on it and leave the town hall and the gates to the others. One without a smithy, and
-          the Trade Organization's cities, keep no archers. A resident hired from an NPC city who
-          takes a Bow from its surplus takes Arrows along too, also only from its surplus.
+          <strong>NPC archers.</strong> An NPC city with a smithy arms {pct(NPC_ARCHER_SHARE)} of
+          its soldiers with a Bow (rounded down) and keeps {num(NPC_ARCHER_ARROWS)} Arrows in its
+          reserve for each of them; its smithy forges them once its soldiers are armed. Each archer
+          carries {num(NPC_ARCHER_ARROWS)} Arrows and fetches more from its storage as they run low.
+          While the city has a wall, its archers stand on it and leave the town hall and the gates
+          to the others. One without a smithy, and the Trade Organization's cities, keep no archers.
+          A resident hired from an NPC city who takes a Bow from its surplus takes Arrows along too,
+          also only from its surplus.
         </p>
         <p>
           To <strong>swap</strong> gear, pick another item they carry for a slot on their card (or
@@ -3593,19 +3607,19 @@ export function Wiki() {
           <strong>The high ground.</strong> Whoever is up strikes down at anyone on the ground next
           to the wall, but nobody on the ground can strike anyone up: from below there is only the
           wall or gate itself to break, or climbing it, both while being struck from above, or
-          shooting up at them with a Bow or Crossbow. Order a resident below without Arrows to
-          shoot to attack someone up and they won't (“they are up on the wall”). A climber is on the
-          ground until over; one who made it and stands on the wall fights those up as anywhere,
-          and so do those up on two walls that touch. Up on their own city's wall, defenders still
-          take only {pct(WALL_DEFENCE)} of each blow and each shot.
+          shooting up at them with a Bow or Crossbow. Order a resident below without Arrows to shoot
+          to attack someone up and they won't (“they are up on the wall”). A climber is on the
+          ground until over; one who made it and stands on the wall fights those up as anywhere, and
+          so do those up on two walls that touch. Up on their own city's wall, defenders still take
+          only {pct(WALL_DEFENCE)} of each blow and each shot.
         </p>
         <p>
           <strong>Archers on the wall.</strong> An archer up on a wall walk shoots{' '}
           {num(WALL_SHOT_REACH_BONUS)} tiles further than on the ground: a Bow{' '}
           {num((SHOT_REACH.bow ?? 0) + WALL_SHOT_REACH_BONUS)} tiles, a Crossbow{' '}
           {num((SHOT_REACH.crossbow ?? 0) + WALL_SHOT_REACH_BONUS)}. So archers on a wall shoot
-          attackers before those can shoot back, and take only {pct(WALL_DEFENCE)} of what does
-          come back up.
+          attackers before those can shoot back, and take only {pct(WALL_DEFENCE)} of what does come
+          back up.
         </p>
         <p>
           <strong>A tile breaks.</strong> When a wall or gate tile breaks, whoever is up on it falls
@@ -3775,6 +3789,77 @@ export function Wiki() {
           its stables join, and the rest stay with their realm. Either way a horse a joining
           resident rides and a carriage one drives join with them, and a carriage's hitched horse
           with it. Another NPC city's or realm's that happen to stand there don't.
+        </p>
+      </Section>
+
+      <Section id="siege">
+        <p>
+          A <b>siege machine</b> is a machine of a realm, built in the field where it is needed, so
+          a siege needs a supply line like an army. There are two: a <b>ram</b>, a roofed frame on
+          wheels round a heavy beam, and a <b>catapult</b>, which throws Stone at walls from far
+          off. NPC cities and the Trade Organization don't build them, for now.
+        </p>
+        <p>
+          <b>Building a ram.</b> A resident lays out a <b>ram site</b> with Build (in the Build menu
+          under Siege) on any tile a carriage could stand on, off resource nodes and buildings, one
+          to a tile. It is a construction site like any other: it takes {goods(ramCost().materials)}{' '}
+          and {duration(ramCost().buildTicks)} of one average resident's work, carried there and put
+          in by anyone. Once finished the site is gone and a ram of the realm of whoever finished it
+          stands on its tile.
+        </p>
+        <p>
+          <b>Crew.</b> Residents of its realm join its <b>crew</b> with Crew the ram on its card:
+          they walk onto its tile, following it if it moves, and are its crew while they stand
+          there. Children don't crew it. With at least {num(RAM_CREW)} of its crew on it, one of
+          them <b>pushes</b> it (Push the ram to…) to a tile a carriage could go to, along a way a
+          carriage could take: a tile of Plains takes about {duration(ramPushTicks()[0]!.ticks)}, of
+          Forest or Hills {duration(ramPushTicks()[1]!.ticks)} and of road{' '}
+          {duration(ramPushTicks()[2]!.ticks)}. The crew go along on its tile. One who walks off is
+          no longer of its crew, and below {num(RAM_CREW)} it stops where it is.
+        </p>
+        <p>
+          <b>Ramming.</b> Pushed next to a wall or gate of another realm's city, or of nobody's, one
+          of its crew swings it with the whole crew (Ram the gate on its card, or{' '}
+          <code>ram(machine, wall)</code> in a script). It strikes every{' '}
+          {duration(RAM_STRIKE_TICKS)} for {num(RAM_BLOW)} damage, far harder than any blow: a tile
+          of wooden wall falls in {duration(ramBreakTicks('wall'))}, a stone gate in{' '}
+          {duration(ramBreakTicks('gate', true))}. Each strike raises the alarm as a blow at the
+          wall does, and breaking another realm's wall is a crime of tearing down, as by hand. Below
+          its crew size it stops. Its crew is under its roof: nobody up on a wall strikes them, and
+          no shot reaches them, so defenders have to come down and out to fight them or to strike
+          the ram, which is struck only from the ground.
+        </p>
+        <p>
+          <b>Breaking and tearing down.</b> Anyone may attack a ram of another realm, as a wall:
+          every blow lands, and after {num(RAM_STRENGTH)} damage it breaks, leaving{' '}
+          {goods(ramCost().broken)} on its tile. Breaking another realm's ram is a crime of tearing
+          down. Its own realm tears it down from its tile in {duration(ramCost().teardownTicks)} of
+          one average resident's work, which leaves {goods(ramCost().tornDown)}.
+        </p>
+        <p>
+          <b>The catapult.</b> It is built, crewed, pushed, broken and torn down as a ram is: its
+          site (Build, under Siege) takes {goods(ramCost('catapult').materials)} and{' '}
+          {duration(ramCost('catapult').buildTicks)} of one average resident's work, it needs{' '}
+          {num(CATAPULT_CREW)} of its crew on it, and it breaks after {num(CATAPULT_STRENGTH)}{' '}
+          damage. One of its crew aims it with the whole crew (Throw Stone at… on its card, then the
+          wall on the map, or <code>throw(machine, wall)</code> or <code>throw(machine, x, y)</code>{' '}
+          in a script) at a wall, gate or tower of another realm's city, or of nobody's, within{' '}
+          {num(CATAPULT_REACH)} tiles: well beyond a Bow's{' '}
+          {num((SHOT_REACH.bow ?? 0) + WALL_SHOT_REACH_BONUS)} from up on a wall. Every{' '}
+          {duration(CATAPULT_SHOT_TICKS)} it throws one Stone for {num(CATAPULT_BLOW)} damage: a
+          tile of wooden wall falls to {num(catapultBreak('wall').shots)} Stone in{' '}
+          {duration(catapultBreak('wall').ticks)}, a stone gate to{' '}
+          {num(catapultBreak('gate', true).shots)} in {duration(catapultBreak('gate', true).ticks)}.
+          The Stone is what its crew carry, then what lies on its tile; out of Stone it stops. It
+          hits the building only, never anyone on it or by it. Each shot raises the alarm and
+          breaking another realm's wall is a crime, as with a ram. Its crew stands in the open:
+          archers in reach shoot them and anyone can strike them.
+        </p>
+        <p>
+          A ram shows on the map to whoever sees its tile, with whose it is and its crew, but Last
+          seen doesn't keep it, as it moves. A ram of a realm that ends belongs to nobody. Scripts
+          see the machines in sight with <code>machines()</code>, join a crew with{' '}
+          <code>crew(machine)</code> and push one with <code>push(machine, x, y)</code>.
         </p>
       </Section>
 

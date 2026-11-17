@@ -9,6 +9,7 @@ import type {
   SeenResident,
   SeenTrader,
   SeenVessel,
+  SeenMachine,
   Waypoint,
 } from '@csp/shared-types'
 import type { CityEmblem, FarMarker } from './far.js'
@@ -38,6 +39,8 @@ export interface MapWorld {
   traders: SeenTrader[]
   /** Boats on the water (`CONTEXT.md`: Vessel); none on the admin map yet. */
   vessels?: SeenVessel[]
+  /** Siege machines in sight (`CONTEXT.md`: Siege machine); none on the admin map yet. */
+  machines?: SeenMachine[]
   /**
    * Buildings and cities the Player remembers out of their sight (`CONTEXT.md`: Last seen), drawn
    * faded; none on the admin map.

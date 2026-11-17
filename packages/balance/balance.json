@@ -656,6 +656,15 @@
     "ship": {
       "wood": 120.0,
       "iron": 15.0
+    },
+    "ram": {
+      "wood": 40.0,
+      "iron": 5.0
+    },
+    "catapult": {
+      "wood": 30.0,
+      "iron": 5.0,
+      "stone": 10.0
     }
   },
   "BUILD_WORK": {
@@ -677,7 +686,9 @@
     "haven": 5760.0,
     "carriage": 2880.0,
     "boat": 1440.0,
-    "ship": 14400.0
+    "ship": 14400.0,
+    "ram": 2880.0,
+    "catapult": 2880.0
   },
   "STONE_BUILD_MATERIALS": {
     "wall": {
@@ -894,6 +905,16 @@
     "gate": 18000.0
   },
   "BROKEN_MATERIALS_RETURNED": 0.34,
+  "RAM_CREW": 4.0,
+  "SIEGE_PUSH_SHARE": 0.25,
+  "RAM_STRENGTH": 6000.0,
+  "RAM_STRIKE_TICKS": 10.0,
+  "RAM_BLOW": 150.0,
+  "CATAPULT_CREW": 3.0,
+  "CATAPULT_STRENGTH": 3000.0,
+  "CATAPULT_REACH": 20.0,
+  "CATAPULT_SHOT_TICKS": 60.0,
+  "CATAPULT_BLOW": 600.0,
   "CLIMB_TICKS": 360.0,
   "WALL_WALK_TICKS": 20.0,
   "FALL_DAMAGE": 30.0,
@@ -1013,6 +1034,8 @@
     "carriage": 1,
     "boat": 1,
     "ship": 1,
+    "ram": 1,
+    "catapult": 1,
     "house": 2,
     "storage": 2,
     "smelter": 2,
