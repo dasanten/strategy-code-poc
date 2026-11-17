@@ -606,3 +606,21 @@ fn with_nothing_else_short_builds_a_farm_until_it_holds_the_food_founding_wants_
     assert!(crate::npc_founding::holds_food_first(&v.world, &city));
     assert!(!matches!(project(&v), Some(CityProject::Build { building: BuildingKind::Farm, .. })));
 }
+
+#[test]
+fn below_its_reserve_keeps_the_farmers_who_win_back_what_its_food_lacks() {
+    // #1379: on those who feed everyone and one more, its Food sank to where it runs short.
+    use csp_shared::balance::{NPC_FOOD_REFILL_DAYS, WORK_OUTPUT_PER_DAY};
+    let mut v = village(None);
+    fill_houses(&mut v.world, &v.city, &v.home);
+    let city = v.city().clone();
+    let reserve = crate::queries::npc_trade::npc_reserve(&v.world, &city)[&Good::Food];
+    set_stock(&mut v, &[(Good::Food, reserve)]);
+    let fed = farmers_wanted(&v.world, &city);
+    let per = WORK_OUTPUT_PER_DAY.get("food").unwrap() * NPC_FOOD_REFILL_DAYS;
+    set_stock(&mut v, &[(Good::Food, reserve - 3.0 * per)]);
+    assert_eq!(farmers_wanted(&v.world, &city), fed + 3.0);
+    // One more while it has no food surplus, if that is more.
+    set_stock(&mut v, &[(Good::Food, reserve - 1.0)]);
+    assert_eq!(farmers_wanted(&v.world, &city), fed + 1.0);
+}

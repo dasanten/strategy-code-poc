@@ -67,6 +67,12 @@ fn npc_cities_step_as_in_typescript() {
         .expect("npc-stepped.json");
     for case in stepped.as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
+        // #1379: the village a game week in holds less Food than its reserve and now keeps the
+        // farmers who win it back, unlike the TypeScript; `npc_growth::tests::
+        // below_its_reserve_keeps_the_farmers_who_win_back_what_its_food_lacks` covers that rule.
+        if name == "village-10080" {
+            continue;
+        }
         let file = read_json(&format!("worlds/{name}.json"));
         let terrain = terrain_of(&file);
         let mut world: WorldState = serde_json::from_value(file["world"].clone()).unwrap();

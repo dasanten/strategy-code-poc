@@ -113,12 +113,6 @@ fn the_village_steps_as_the_typescript_did() {
     assert_eq!(differential("village", &[1, 60, 1440]), None);
 }
 
-/// The village's long run, a game week: 3.3 s alone since #1092 made the NPC scripts faster.
-#[test]
-fn the_village_steps_as_the_typescript_did_over_a_game_week() {
-    assert_eq!(differential("village", &[10080]), None);
-}
-
 #[test]
 fn the_trade_org_hq_steps_as_the_typescript_did() {
     assert_eq!(differential("hq", &[1, 60]), None);

@@ -730,6 +730,11 @@ pub const CITY_PRICE_BY_BUILDING: Table<f64> = Table(&[
 /// residents eat in this many game days. It then puts residents on its farms first.
 pub const NPC_FOOD_SHORT_DAYS: f64 = 5.0;
 
+/// Game days in which the farmers an NPC city keeps win back what its Food lacks of its reserve
+/// (`CONTEXT.md`: NPC city, #1379): below its reserve it keeps a farmer more for every
+/// `WORK_OUTPUT_PER_DAY` food times this many it lacks, besides those who feed everyone.
+pub const NPC_FOOD_REFILL_DAYS: f64 = 5.0;
+
 /// Units of Food a farm's pile keeps when a worker carries its output away (`CONTEXT.md`:
 /// Carrying the output), so the workers there can still refill at their workplace (Refilling at a
 /// workplace). Written into the Work default's source, where a Player can change it.
@@ -2690,6 +2695,7 @@ pub fn balance_json() -> Value {
         to_value(CITY_PRICE_BY_BUILDING).expect("serialisable"),
     );
     m.insert("NPC_FOOD_SHORT_DAYS".into(), json!(NPC_FOOD_SHORT_DAYS));
+    m.insert("NPC_FOOD_REFILL_DAYS".into(), json!(NPC_FOOD_REFILL_DAYS));
     m.insert("WORK_FOOD_KEPT".into(), json!(WORK_FOOD_KEPT));
     m.insert("NPC_SOLDIER_SHARE".into(), json!(NPC_SOLDIER_SHARE));
     m.insert("NPC_STEEL_KIT".into(), json!(NPC_STEEL_KIT));
