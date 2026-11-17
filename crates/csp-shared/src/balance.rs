@@ -733,7 +733,7 @@ pub const NPC_FOOD_SHORT_DAYS: f64 = 5.0;
 /// Game days in which the farmers an NPC city keeps win back what its Food lacks of its reserve
 /// (`CONTEXT.md`: NPC city, #1379): below its reserve it keeps a farmer more for every
 /// `WORK_OUTPUT_PER_DAY` food times this many it lacks, besides those who feed everyone.
-pub const NPC_FOOD_REFILL_DAYS: f64 = 5.0;
+pub const NPC_FOOD_REFILL_DAYS: f64 = 10.0;
 
 /// Units of Food a farm's pile keeps when a worker carries its output away (`CONTEXT.md`:
 /// Carrying the output), so the workers there can still refill at their workplace (Refilling at a

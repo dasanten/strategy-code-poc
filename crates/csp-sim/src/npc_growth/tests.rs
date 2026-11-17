@@ -295,7 +295,7 @@ fn builds_a_farm_beyond_its_next_wall_when_the_farmers_it_wants_do_not_fit() {
         .clone();
     let mut m = Mulberry32::new(5.0);
     let most = max_workers(BuildingKind::Farm).expect("farm workers");
-    while farmers_wanted(&v.world, v.city()) <= most {
+    while crate::npc_plan::farmers_to_feed(&v.world, v.city()) <= most {
         let id = new_id("r", &mut v.world.next_id);
         let fields = NewResident {
             id: &id,
@@ -618,8 +618,9 @@ fn below_its_reserve_keeps_the_farmers_who_win_back_what_its_food_lacks() {
     set_stock(&mut v, &[(Good::Food, reserve)]);
     let fed = farmers_wanted(&v.world, &city);
     let per = WORK_OUTPUT_PER_DAY.get("food").unwrap() * NPC_FOOD_REFILL_DAYS;
-    set_stock(&mut v, &[(Good::Food, reserve - 3.0 * per)]);
-    assert_eq!(farmers_wanted(&v.world, &city), fed + 3.0);
+    set_stock(&mut v, &[(Good::Food, reserve - 2.0 * per)]);
+    assert!(!crate::npc_plan::food_short(&v.world, &city));
+    assert_eq!(farmers_wanted(&v.world, &city), fed + 2.0);
     // One more while it has no food surplus, if that is more.
     set_stock(&mut v, &[(Good::Food, reserve - 1.0)]);
     assert_eq!(farmers_wanted(&v.world, &city), fed + 1.0);
@@ -670,7 +671,8 @@ fn a_builder_of_a_far_site_takes_their_food_from_the_storage_before_setting_out(
     };
     assert!(super::take_part(&mut v.world, 0, &far, Some(storage), false, None));
     let r = &v.world.residents[0];
-    assert!(r.script.is_none());
+    // With the Build default started, which waits until they have it.
+    assert!(r.script.is_some());
     assert!(
         matches!(&r.order, Some(ResidentOrder::PickUp(o)) if o.goods[&Good::Food] >= 4.0),
         "{:?}",

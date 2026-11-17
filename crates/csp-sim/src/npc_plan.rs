@@ -369,12 +369,21 @@ pub fn plan_city(
 }
 
 /// How many farmers an NPC city keeps (`farmersWanted`): as many as feed all its residents, and
-/// one more while it has no food surplus; below its reserve, as many more as win back what its Food
-/// lacks of it in `NPC_FOOD_REFILL_DAYS` until it runs short (#1379: on those who feed everyone alone, its Food sank
-/// to where it runs short and stayed there), if that is more.
+/// one more while it has no food surplus (`farmers_to_feed`); below its reserve, as many more as
+/// win back what its Food lacks of it in `NPC_FOOD_REFILL_DAYS` until it runs short, if that is
+/// more (#1379: on those who feed everyone alone, its Food sank to where it runs short and stayed
+/// there).
 pub fn farmers_wanted(world: &WorldState, city: &City) -> f64 {
     let more: f64 = if has_food_surplus(world, city) { 0.0 } else { 1.0 };
     feeders(city_residents(world, &city.id).len()) + more.max(refill_farmers(world, city))
+}
+
+/// The farmers who feed all an NPC city's residents, and one more while it has no food surplus
+/// (`farmers_wanted` but for those who win back its reserve): it builds a farm when they don't fit
+/// on its farms (`farmers_dont_fit`), not for those who only refill it.
+pub fn farmers_to_feed(world: &WorldState, city: &City) -> f64 {
+    let more = if has_food_surplus(world, city) { 0.0 } else { 1.0 };
+    feeders(city_residents(world, &city.id).len()) + more
 }
 
 /// The farmers more an NPC city keeps to win back what its Food lacks of its reserve

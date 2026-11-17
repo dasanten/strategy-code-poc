@@ -4122,6 +4122,7 @@ fn walkBack() {
   } else {
     if (walkTo(memory.at.x, memory.at.y) == null) { wait() } // until I am there
     if (away != null) { away.walked = true }
+    if (memory.setOut != null) { memory.setOut = null } // set out: my walk may be judged now
   }
   return true
 }

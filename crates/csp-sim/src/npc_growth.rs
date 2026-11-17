@@ -28,7 +28,7 @@ use crate::npc_chain::{
     short_goods, SurplusWork,
 };
 use crate::npc_inner_wall::{inner_wall_project, outer_walls, Rings as InnerRings};
-use crate::npc_plan::farmers_wanted;
+use crate::npc_plan::farmers_to_feed;
 use crate::npc_scouts::knows_node;
 use crate::npc_training::wants_training_ground;
 use crate::placing::Ground;
@@ -304,8 +304,10 @@ pub fn take_part(
     };
     let far_food =
         storage.and_then(|s| far_site_food(world, i, &world.buildings[s], (x, y), terrain));
-    // For a far site they take their Food from the storage first: the Build default walks to the
-    // site before it looks at what they carry.
+    // For a far site they take their Food from the storage as they start: the Build default walks
+    // to the site before it looks at what they carry, and a pass that came between would put it
+    // away again (as a worker's set-out Food, `take_set_out_food`).
+    let mut set_out: Option<ResidentOrder> = None;
     if let (Some((_, take)), Some(s)) = (far_food, storage) {
         let store = &world.buildings[s];
         let has = held_in(store.stock.as_ref(), Good::Food).floor();
@@ -317,19 +319,23 @@ pub fn take_part(
             if is_at((r.x as i32, r.y as i32), placed(store), MAP_SIZE) {
                 let from = GoodsSpot::Storage { storage_id: sid };
                 let goods = Stock::from([(Good::Food, units)]);
-                world.residents[i].order = Some(ResidentOrder::PickUp(PickUpOrder { from, goods }));
+                set_out = Some(ResidentOrder::PickUp(PickUpOrder { from, goods }));
             } else {
                 walk_to(&mut world.residents[i], at);
+                return true;
             }
-            return true;
         }
     }
     let start_build = |world: &mut WorldState| {
-        world.residents[i].order = None;
+        world.residents[i].order = set_out.clone();
         let mut memory = json!({ "building": kind_name(building), "at": { "x": x, "y": y } });
         if let Some((at, take)) = far_food {
             memory["foodAt"] = json!(at);
             memory["foodTake"] = json!(take);
+        }
+        // Until the Build default walks out, nobody takes them for stuck (`no_way_out`).
+        if set_out.is_some() {
+            memory["setOut"] = json!(true);
         }
         world.residents[i].script = Some(default_script(Task::Build, memory));
         true
@@ -1119,7 +1125,8 @@ pub fn far_stable_spot(
     free.first().map(|t| (t.0, t.1))
 }
 
-/// Whether the farmers an NPC city wants don't fit on the farms it has (`farmersDontFit`).
+/// Whether the farmers who feed an NPC city don't fit on the farms it has (`farmersDontFit`;
+/// `farmers_to_feed`, not those who only win its reserve back).
 fn farmers_dont_fit(world: &WorldState, city: &City) -> bool {
     let farms = world
         .buildings
@@ -1131,7 +1138,7 @@ fn farmers_dont_fit(world: &WorldState, city: &City) -> bool {
     if farms == 0 {
         return false;
     }
-    farmers_wanted(world, city) > farms as f64 * max_workers(BuildingKind::Farm).unwrap_or(0.0)
+    farmers_to_feed(world, city) > farms as f64 * max_workers(BuildingKind::Farm).unwrap_or(0.0)
 }
 
 /// The city's walls as rings round its home (`wallRings`). A city expands once it has a house,
