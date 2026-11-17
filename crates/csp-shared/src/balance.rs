@@ -1400,6 +1400,21 @@ pub const WORN_FROM: f64 = 0.5;
 /// Share of its life worn away from which a piece's condition reads "nearly broken".
 pub const NEARLY_BROKEN_FROM: f64 = 0.85;
 
+/// Share of a piece's smithy recipe that mending it takes (`CONTEXT.md`: Mending): each input's
+/// units times this, rounded, and at least one unit of its biggest input. A worn Sword takes 1
+/// Iron, worn Armour 2 Iron, a worn Spear or Shield 1 Wood.
+pub const MEND_RECIPE_SHARE: f64 = 0.3;
+
+/// Share of a batch's work that mending a piece takes (`CONTEXT.md`: Mending): a smithy worker
+/// mends twice as many pieces a day as they forge.
+pub const MEND_WORK_SHARE: f64 = 0.5;
+
+/// What a worn piece sells and buys for, as a share of a new one's price (`CONTEXT.md`: Wear).
+pub const WORN_PRICE_SHARE: f64 = 0.6;
+
+/// What a nearly broken piece sells and buys for, as a share of a new one's price.
+pub const NEARLY_BROKEN_PRICE_SHARE: f64 = 0.25;
+
 /// Carry capacity of a resident with no Strength at all, in kg.
 pub const CARRY_BASE: f64 = 10.0;
 
@@ -2933,6 +2948,10 @@ pub fn balance_json() -> Value {
     m.insert("TRAINING_WEAR_BLOWS_PER_DAY".into(), json!(TRAINING_WEAR_BLOWS_PER_DAY));
     m.insert("WORN_FROM".into(), json!(WORN_FROM));
     m.insert("NEARLY_BROKEN_FROM".into(), json!(NEARLY_BROKEN_FROM));
+    m.insert("MEND_RECIPE_SHARE".into(), json!(MEND_RECIPE_SHARE));
+    m.insert("MEND_WORK_SHARE".into(), json!(MEND_WORK_SHARE));
+    m.insert("WORN_PRICE_SHARE".into(), json!(WORN_PRICE_SHARE));
+    m.insert("NEARLY_BROKEN_PRICE_SHARE".into(), json!(NEARLY_BROKEN_PRICE_SHARE));
     m.insert("CARRY_BASE".into(), json!(CARRY_BASE));
     m.insert("CARRY_PER_STRENGTH".into(), json!(CARRY_PER_STRENGTH));
     m.insert("FOOD_PER_DAY".into(), json!(FOOD_PER_DAY));

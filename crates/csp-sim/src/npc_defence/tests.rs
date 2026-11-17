@@ -1080,3 +1080,78 @@ mod tools {
         assert_eq!(held_tools(&p), floor);
     }
 }
+
+/// A village with a smithy it works, Iron and Wood in its storage, run until its soldiers are
+/// armed with spears from it.
+fn village_with_smithy() -> (Place, Runner) {
+    let mut p = village();
+    let hall = p.at(BuildingKind::TownHall);
+    let smithy =
+        crate::test_support::building("smithy", BuildingKind::Smithy, None, hall.x + 3.0, hall.y);
+    p.world.buildings.push(smithy);
+    let city = p.city.clone();
+    p.world.cities.iter_mut().find(|c| c.id == city).unwrap().workplace_ids =
+        Some(vec!["smithy".into()]);
+    let s = p.building(BuildingKind::Storage);
+    let stock = p.world.buildings[s].stock.get_or_insert_with(Stock::new);
+    stock.insert(Good::Iron, 10.0);
+    stock.insert(Good::Wood, 20.0);
+    let mut runner = Runner::new(&p.terrain);
+    p.run(&mut runner, 3 * DAY);
+    (p, runner)
+}
+
+#[test]
+fn a_soldier_takes_a_worn_spear_to_the_smithy_and_has_it_mended() {
+    use crate::wear::in_use;
+    let (mut p, mut runner) = village_with_smithy();
+    let soldier = p
+        .citizens()
+        .into_iter()
+        .find(|&i| held(&p.world.residents[i].carried, Good::Spear) > 0.0)
+        .expect("an armed soldier");
+    let id = p.world.residents[soldier].id.clone();
+    p.world.wear.insert(id.clone(), [(Good::Spear, vec![0.8])].into_iter().collect());
+    // Nobody works its smithy now: a hand from elsewhere takes up mending there.
+    let mut went = false;
+    for _ in 0..2 * DAY {
+        p.run(&mut runner, 1);
+        let smithy = p.world.buildings.iter().find(|b| b.id == "smithy").unwrap().clone();
+        let r = p.r(&id);
+        went |= csp_shared::footprint::is_at(
+            (r.x as i32, r.y as i32),
+            crate::queries::names::placed(&smithy),
+            csp_shared::balance::MAP_SIZE,
+        );
+        if in_use(&p.world, &id, Good::Spear) < csp_shared::balance::WORN_FROM {
+            break;
+        }
+    }
+    assert!(went, "the soldier took it to the smithy");
+    assert_eq!(in_use(&p.world, &id, Good::Spear), 0.0, "mended");
+    assert_eq!(held(&p.r(&id).carried, Good::Spear), 1.0);
+    // Nothing more to mend: its smith goes back to forging.
+    p.run(&mut runner, DAY / 4);
+    let mending =
+        p.world.residents.iter().any(
+            |r| matches!(&r.order, Some(csp_shared::world::ResidentOrder::WorkAt(o)) if o.mends),
+        );
+    assert!(!mending);
+}
+
+#[test]
+fn counts_only_gear_in_good_condition_towards_its_reserve() {
+    use crate::npc_chain::reserve_lacks;
+    use crate::queries::npc_trade::npc_reserve;
+    let mut p = village();
+    let s = p.building(BuildingKind::Storage);
+    let want = held(&npc_reserve(&p.world, p.city()), Good::Spear);
+    assert!(want >= 2.0, "a village keeps spears in its reserve");
+    p.world.buildings[s].stock.get_or_insert_with(Stock::new).insert(Good::Spear, want);
+    let short =
+        |p: &Place| reserve_lacks(&p.world, p.city(), None).iter().any(|s| s.good == Good::Spear);
+    assert!(!short(&p));
+    let storage_id = p.world.buildings[s].id.clone();
+    p.world.wear.insert(storage_id, [(Good::Spear, vec![0.6])].into_iter().collect());
+    assert!(short(&p), "a worn spear doesn't count");
+}

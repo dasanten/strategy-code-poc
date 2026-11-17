@@ -268,10 +268,14 @@ fn run_city(
         // At a workplace that processes goods with nothing left to process, with none in the store,
         // they get their next job.
         let at = workplace_of(&world.residents[i]);
+        // A mender goes by `steer_menders` instead (`CONTEXT.md`: Mending).
+        let mending =
+            matches!(&world.residents[i].order, Some(ResidentOrder::WorkAt(o)) if o.mends);
         let working = matches!(world.residents[i].order, Some(ResidentOrder::WorkAt(_)));
         if let Some(place) = at.filter(|_| working).and_then(|id| building_index(world, &id)) {
             let pb = &world.buildings[place];
             if processes(pb.kind)
+                && !mending
                 && !input_left(world, pb, i)
                 && !input_in(world, pb, store.map(|s| &world.buildings[s]))
             {
@@ -325,6 +329,7 @@ fn run_city(
             world.city_plans.get(city_id)?.project.clone()
         };
 
+    crate::npc_mending::steer_menders(world, &city);
     // Where its soldiers fetch and put back their gear (`upgrade_soldiers`).
     let stores: Vec<(f64, f64)> = world
         .buildings
@@ -419,6 +424,11 @@ fn run_city(
                     continue;
                 }
             }
+        }
+        // A soldier with worn gear takes it to the smithy, with what mending it takes, before
+        // stowing anything (`CONTEXT.md`: Mending).
+        if crate::npc_mending::go_mend(world, &city, i, storage) {
+            continue;
         }
         // A builder carrying what a repair lacks takes it there rather than putting it away.
         let builder = job.as_ref().is_some_and(|j| j.kind == CityJobKind::Build);

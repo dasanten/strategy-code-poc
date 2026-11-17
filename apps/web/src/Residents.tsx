@@ -133,6 +133,7 @@ import {
   equipmentLine,
   equipmentSlots,
   groupSwapChoices,
+  MEND,
   swapChoices,
   type SlotView,
 } from './equipment-view.js'
@@ -1366,8 +1367,10 @@ export function orderDoing(
     const what = BUILDING_NAMES[o.building].toLowerCase()
     return o.siteId === null ? `Laying out a ${what}` : `Building a ${what}`
   }
-  if (o?.kind === 'workAt')
+  if (o?.kind === 'workAt') {
+    if (o.mends) return 'Mending worn gear'
     return o.makes ? `Making ${GOOD_LABELS[o.makes].toLowerCase()}` : 'Working'
+  }
   if (o?.kind === 'teach') return `Teaching ${subjectLabel(o.subject)}`
   if (o?.kind === 'train')
     return o.learning ? `Training ${subjectLabel(o.learning)}` : 'Waiting to train'
@@ -2459,7 +2462,7 @@ export function ResidentCard({
   /** The Player's realm. */
   realmId: string
   /** Orders the resident to work the workplace on their tile, making `makes` at a smithy. */
-  onWork: (makes?: Good) => void
+  onWork: (makes?: Good | typeof MEND) => void
   /** Gives the resident the Feed the stable task for the stable they stand in. */
   onFeedStable: (stableId: string) => void
   /** Gives the resident the Train task for the training ground they stand on. */
@@ -3676,7 +3679,7 @@ function WorkBlock({
   workers: number
   holders: string[]
   realmId: string
-  onWork: (makes?: Good) => void
+  onWork: (makes?: Good | typeof MEND) => void
 }) {
   const max = building && !building.site ? MAX_WORKERS[building.kind] : undefined
   const skill = building && WORKPLACE_SKILL[building.kind]
@@ -3701,28 +3704,49 @@ function WorkBlock({
       </div>
       <p className="small">{holding(holders, realmId)}</p>
       {recipes.length > 1 ? (
-        // A smithy: each worker says what they make (`CONTEXT.md`: Smithy).
-        recipes.map((r) => {
-          const made = recipeGood(r)
-          const making = working && o.makes === made
-          return (
-            <div key={made} className="goods-row">
-              <span>{GOOD_LABELS[made]}</span>
-              <span className="muted small">{stockText(r.input)}</span>
-              <span className="buttons">
-                <button type="button" disabled={blocked || making} onClick={() => onWork(made)}>
-                  {making ? 'Making…' : working ? 'Make instead' : 'Make'}
-                </button>
-                <CustomiseButton
-                  order={taskStart('work', building.id)}
-                  of={`Make ${GOOD_LABELS[made].toLowerCase()}`}
-                  disabled={blocked || making}
-                  give={() => onWork(made)}
-                />
-              </span>
-            </div>
-          )
-        })
+        // A smithy: each worker says what they make (`CONTEXT.md`: Smithy), or mends (Mending).
+        [
+          ...recipes.map((r) => {
+            const made = recipeGood(r)
+            const making = working && !o.mends && o.makes === made
+            return (
+              <div key={made} className="goods-row">
+                <span>{GOOD_LABELS[made]}</span>
+                <span className="muted small">{stockText(r.input)}</span>
+                <span className="buttons">
+                  <button type="button" disabled={blocked || making} onClick={() => onWork(made)}>
+                    {making ? 'Making…' : working ? 'Make instead' : 'Make'}
+                  </button>
+                  <CustomiseButton
+                    order={taskStart('work', building.id)}
+                    of={`Make ${GOOD_LABELS[made].toLowerCase()}`}
+                    disabled={blocked || making}
+                    give={() => onWork(made)}
+                  />
+                </span>
+              </div>
+            )
+          }),
+          <div key="mend" className="goods-row">
+            <span>Mend</span>
+            <span className="muted small">worn gear here, for a share of its recipe</span>
+            <span className="buttons">
+              <button
+                type="button"
+                disabled={blocked || (working && !!o.mends)}
+                onClick={() => onWork(MEND)}
+              >
+                {working && o.mends ? 'Mending…' : working ? 'Mend instead' : 'Mend'}
+              </button>
+              <CustomiseButton
+                order={taskStart('work', building.id)}
+                of="Mend"
+                disabled={blocked || (working && !!o.mends)}
+                give={() => onWork(MEND)}
+              />
+            </span>
+          </div>,
+        ]
       ) : (
         <div className="order-buttons">
           <button

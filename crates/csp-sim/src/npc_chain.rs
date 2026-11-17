@@ -17,8 +17,8 @@ use crate::queries::building::{
 };
 use crate::queries::names::{good_name, held, held_in};
 use crate::queries::npc_trade::{
-    npc_city_stock, npc_makes_steel, npc_needs_scale, npc_reserve, npc_smithy_good,
-    NPC_SMITHY_WEAPON,
+    npc_city_good_stock, npc_city_stock, npc_makes_steel, npc_needs_scale, npc_reserve,
+    npc_smithy_good, NPC_SMITHY_WEAPON,
 };
 use crate::queries::warehouse::{stock_floor, warehouse_keeps};
 
@@ -161,7 +161,7 @@ pub fn reserve_lacks(
     let stock = if city.trade_org.is_some() {
         warehouse_stock(world, city)
     } else {
-        npc_city_stock(world, city)
+        npc_city_good_stock(world, city)
     };
     let mut out: Vec<Shortage> = want
         .iter()

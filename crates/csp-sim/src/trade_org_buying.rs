@@ -113,7 +113,7 @@ fn sale_at(
     let mut got = 0.0;
     if b.kind == BuildingKind::Warehouse && city.trade_org.is_some() && city.id != hq.id {
         let owed = owed_by(world, &b.id, Good::Food);
-        got = quote_trade(world, b, hands, TradeSide::Buy, Good::Food, units, owed).units;
+        got = quote_trade(world, b, hands, TradeSide::Buy, Good::Food, units, owed, &[]).units;
     } else if b.kind == BuildingKind::Storage
         && for_sale(city)
         && city.id != p.city_id
@@ -129,6 +129,7 @@ fn sale_at(
             Good::Food,
             units,
             Some(TRADE_ORG),
+            &[],
         )
         .units;
     }

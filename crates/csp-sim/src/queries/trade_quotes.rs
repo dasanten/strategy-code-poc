@@ -3,6 +3,7 @@
 //! buying a city (`city.ts`). Pure: nothing moves; `trading.rs` and `buying.rs` move what they
 //! quote.
 
+use crate::mending::{share_of, worn_price};
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::footprint::{covers, is_at};
 use csp_shared::world::{
@@ -59,6 +60,7 @@ pub fn quote_npc_trade(
     good: Good,
     wanted: f64,
     trader_id: Option<&str>,
+    shares: &[f64],
 ) -> TradeQuote {
     if !for_sale(city) || storage.city_id.as_deref() != Some(city.id.as_str()) {
         return TradeQuote::NONE;
@@ -80,7 +82,10 @@ pub fn quote_npc_trade(
             if n > held_units || total + n > keep {
                 break;
             }
-            let p = npc_price_for(good, total + n, &reserve, swing).buy;
+            let p = worn_price(
+                npc_price_for(good, total + n, &reserve, swing).buy,
+                share_of(shares, units as usize),
+            );
             let room = holder.room + n * gw - (coins + p) * cw;
             if coins + p > coin_stock || room < -1e-9 {
                 break;
@@ -90,7 +95,10 @@ pub fn quote_npc_trade(
             if n > here || total - n < keep {
                 break;
             }
-            let p = npc_price_for(good, total - units, &reserve, swing).sell;
+            let p = worn_price(
+                npc_price_for(good, total - units, &reserve, swing).sell,
+                share_of(shares, units as usize),
+            );
             let room = holder.room + (coins + p) * cw - n * gw;
             if coins + p > held_coins || room < -1e-9 {
                 break;
@@ -455,6 +463,7 @@ pub fn quote_trader_trade(
     side: TradeSide,
     good: Good,
     wanted: f64,
+    shares: &[f64],
 ) -> TradeQuote {
     let stock = held(&trader_stock(escorts, load), good);
     let room = 0f64.max(capacity - stock_weight(load));
@@ -469,10 +478,12 @@ pub fn quote_trader_trade(
         wanted,
         0.0,
         room,
+        shares,
     )
 }
 
 /// `quote_trader_trade` on the world as it is (`quoteWithTrader`).
+#[allow(clippy::too_many_arguments)]
 pub fn quote_with_trader(
     world: &WorldState,
     t: &Trader,
@@ -481,9 +492,19 @@ pub fn quote_with_trader(
     side: TradeSide,
     good: Good,
     wanted: f64,
+    shares: &[f64],
 ) -> TradeQuote {
     let capacity = carriage_capacity(world, carriage);
-    quote_trader_trade(t.escort_ids.len(), &carriage.load, capacity, holder, side, good, wanted)
+    quote_trader_trade(
+        t.escort_ids.len(),
+        &carriage.load,
+        capacity,
+        holder,
+        side,
+        good,
+        wanted,
+        shares,
+    )
 }
 
 /// Why a resident can't trade with a wandering trader now (`traderTradeProblem`), or `None`.

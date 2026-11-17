@@ -185,6 +185,7 @@ import {
   rememberedTakeoverSeen,
 } from './realm-log.js'
 import { isNewRealm } from './map/legend.js'
+import { MEND } from './equipment-view.js'
 import {
   GOOD_LABELS,
   GroupCard,
@@ -1287,7 +1288,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * Gives the picked resident the Work task at the workplace on their tile, making `makes` at a
    * smithy: they run the Player's Work (default) script (`CONTEXT.md`: Default script).
    */
-  async function work(makes?: Good) {
+  async function work(makes?: Good | typeof MEND) {
     if (!selected) return
     const workplaceId = buildingHere?.id
     const order = { kind: 'task', task: 'work', residentId: selected.id, workplaceId, makes }

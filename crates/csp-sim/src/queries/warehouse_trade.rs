@@ -2,6 +2,7 @@
 //! Organization, Warehouse prices, Delivery, Trade Org debt): quotes and the checks of trade,
 //! buy-off and pay-debt orders. Pure: nothing moves; `trading.rs` moves what they quote.
 
+use crate::mending::{share_of, worn_price};
 use csp_shared::balance::{DELIVERY_FEE_BASE, DELIVERY_FEE_PER_KG_TILE, DELIVERY_LOAD, MAP_SIZE};
 use csp_shared::footprint::{covers, is_at};
 use csp_shared::world::{
@@ -80,6 +81,7 @@ impl TradeQuote {
 
 /// What a trade of up to `wanted` units at a warehouse would move (`quoteTrade`), the `owed`
 /// units it keeps for deliveries aside.
+#[allow(clippy::too_many_arguments)]
 pub fn quote_trade(
     world: &WorldState,
     warehouse: &Building,
@@ -88,6 +90,7 @@ pub fn quote_trade(
     good: Good,
     wanted: f64,
     owed: f64,
+    shares: &[f64],
 ) -> TradeQuote {
     let floor = stock_floor(world, warehouse).get(&good).copied();
     let coin_warehouse = trade_coin_warehouse(world, warehouse);
@@ -96,7 +99,18 @@ pub fn quote_trade(
     };
     let coin_stock = held_in(coin_warehouse.stock.as_ref(), Good::Coins);
     let stock = held_in(warehouse.stock.as_ref(), good);
-    quote_at_prices(stock, floor, coin_stock, holder, side, good, wanted, owed, f64::INFINITY)
+    quote_at_prices(
+        stock,
+        floor,
+        coin_stock,
+        holder,
+        side,
+        good,
+        wanted,
+        owed,
+        f64::INFINITY,
+        shares,
+    )
 }
 
 /// What a trade of up to `wanted` units would move with a side holding `stock` of the good and
@@ -113,6 +127,7 @@ pub fn quote_at_prices(
     wanted: f64,
     owed: f64,
     their_room: f64,
+    shares: &[f64],
 ) -> TradeQuote {
     let held_units = held(holder.stock, good);
     let held_coins = held(holder.stock, Good::Coins);
@@ -128,7 +143,10 @@ pub fn quote_at_prices(
                 if n > held_units {
                     limit = Some(TradeLimit::Held);
                 } else {
-                    let p = price_for(good, stock + n, floor).buy;
+                    let p = worn_price(
+                        price_for(good, stock + n, floor).buy,
+                        share_of(shares, units as usize),
+                    );
                     let room = holder.room + n * gw - (coins + p) * cw;
                     let added = n * gw - (coins + p) * cw;
                     if coins + p > coin_stock {
@@ -146,7 +164,10 @@ pub fn quote_at_prices(
                 if n > stock - owed {
                     limit = Some(TradeLimit::Stock);
                 } else {
-                    let p = price_for(good, stock - units, floor).sell;
+                    let p = worn_price(
+                        price_for(good, stock - units, floor).sell,
+                        share_of(shares, units as usize),
+                    );
                     let room = holder.room + (coins + p) * cw - n * gw;
                     let added = (coins + p) * cw - n * gw;
                     if coins + p > held_coins {

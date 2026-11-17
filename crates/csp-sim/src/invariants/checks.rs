@@ -1112,8 +1112,18 @@ pub fn work_orders_on_workplaces(world: &WorldState, _: &TerrainMap) -> Out {
         let makes = o.makes.map(good_name);
         match place {
             Some(p) if p.site.is_none() && max_workers(p.kind).is_some() => {
-                // A smithy's workers say what they make; a smelter's may (Steel), else Iron.
-                if makes.is_none() && has_choice(p.kind) && recipe_for(p.kind, None).is_none() {
+                // A smithy's workers say what they make or mend (`CONTEXT.md`: Mending); a
+                // smelter's may say Steel, else Iron.
+                if o.mends && (p.kind != BuildingKind::Smithy || makes.is_some()) {
+                    fail("mending, which only a smithy's worker making nothing else does".into());
+                } else if o.mends {
+                    if !at_building(r.x, r.y, p) || o.at.x != r.x || o.at.y != r.y {
+                        fail("which they don’t stand at".into());
+                    }
+                } else if makes.is_none()
+                    && has_choice(p.kind)
+                    && recipe_for(p.kind, None).is_none()
+                {
                     fail("making nothing".into());
                 } else if makes.is_some() && !has_choice(p.kind) {
                     fail(format!("making {} with nothing to choose", makes.unwrap_or_default()));

@@ -75,6 +75,7 @@ fn a_ruined_workplace_makes_nothing() {
         at: Tile { x: 3.0, y: 3.0 },
         progress: 0.0,
         makes: None,
+        mends: false,
     });
     world.residents[0].order = Some(work.clone());
     let mut scratch = Scratch::default();
