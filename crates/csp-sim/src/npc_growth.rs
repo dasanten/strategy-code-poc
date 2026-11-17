@@ -665,7 +665,7 @@ pub fn chain_project(
 /// The nearest free resource node yielding `good` that the city knows of, with where its workplace
 /// goes (`nearestNode`, `nodeCorner`). The Trade Organization's HQ knows of every node, however far
 /// (`CONTEXT.md`: Trade Org HQ, Running dry).
-fn nearest_node(
+pub(crate) fn nearest_node(
     world: &WorldState,
     city: &City,
     home: &Building,

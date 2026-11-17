@@ -829,7 +829,14 @@ The shared language of the game. Domain terms only — no implementation details
   with an escort. One another Organization holds only a militarist city takes, and only when it far
   outweighs that node's guards: its soldiers drive the workers out and its own move in (Holding a
   workplace). That is an attack like any other, and a crime against the holder. Never against a
-  realm in its shelter.
+  realm in its shelter. Decided overnight 2026-11-17, Daniel to confirm: the escort goes with the
+  crew building on a node out of its City area, a few of its soldiers beyond its hall and gate
+  posts standing at the site until it is built. A node is taken only when no free one of the good
+  is known, and only a workplace in no city that a realm holds (not an NPC city or the Trade
+  Organization). Its holders are that realm's residents within a few tiles of it, working or not;
+  its guards' strength is that of the armed ones among them, and the city sends soldiers until they
+  far outweigh it. They strike everyone of the holder there until none is left up; then the
+  workplace is the city's. With none of its soldiers left up it calls it off.
 - **New realm's shelter:** no NPC city sends a demand to, or marches on, a realm in its first game
   weeks. Players can. Decided overnight 2026-11-17, Daniel to confirm: a realm's weeks count from
   when it began; a realm from before that was kept has none.

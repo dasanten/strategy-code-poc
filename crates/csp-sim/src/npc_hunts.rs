@@ -100,7 +100,7 @@ fn storage_of(world: &WorldState, city_id: &str) -> Option<usize> {
 }
 
 /// Whether a resident's order is a walk to this tile.
-fn walking_to(r: &Resident, to: (i32, i32)) -> bool {
+pub(crate) fn walking_to(r: &Resident, to: (i32, i32)) -> bool {
     matches!(&r.order, Some(ResidentOrder::WalkTo(o)) if (o.target.x as i32, o.target.y as i32) == to)
 }
 
@@ -233,7 +233,7 @@ const CHASE_SLACK: f64 = 8.0;
 
 /// A hunter's next order after thief `t`, if it is to change: in sight, the attack; out of it, a
 /// walk to where the thief is (an attack ends out of the attacker's sight, `combat`).
-fn chase(r: &Resident, t: &Resident, size: i32) -> Option<ResidentOrder> {
+pub(crate) fn chase(r: &Resident, t: &Resident, size: i32) -> Option<ResidentOrder> {
     let at = tile_of(t);
     if wrap_distance(size, tile_of(r), at) <= SIGHT_RANGE {
         let after = matches!(&r.order, Some(ResidentOrder::Attack(o)) if o.target_id == t.id);
@@ -245,7 +245,7 @@ fn chase(r: &Resident, t: &Resident, size: i32) -> Option<ResidentOrder> {
 }
 
 /// A walk to a tile.
-fn walk(to: (i32, i32)) -> ResidentOrder {
+pub(crate) fn walk(to: (i32, i32)) -> ResidentOrder {
     ResidentOrder::WalkTo(WalkOrder {
         target: Tile { x: f64::from(to.0), y: f64::from(to.1) },
         path: None,

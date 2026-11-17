@@ -838,6 +838,23 @@ pub const NPC_DEMAND_REFUSED_STANDING: f64 = -40.0;
 /// shelter): two game weeks, nearly six real hours, to build a first army.
 pub const NEW_REALM_SHELTER_DAYS: f64 = 14.0;
 
+/// Tiles from a workplace within which an Organization's residents hold it (`CONTEXT.md`: Taking a
+/// node, Holding a workplace): its workers and the armed residents guarding it.
+pub const NPC_NODE_GUARD_RANGE: f64 = 12.0;
+
+/// How many times the strength of a node's guards an NPC city's soldiers sent to take it must be
+/// (`CONTEXT.md`: Taking a node): "far outweighs", as for a demand (`NPC_DEMAND_OUTWEIGH_TIMES`).
+pub const NPC_TAKE_OUTWEIGH_TIMES: f64 = 4.0;
+
+/// The fewest soldiers an NPC city sends to take a node, however weak its guards (`CONTEXT.md`:
+/// Taking a node): two, so one can't be caught alone.
+pub const NPC_TAKE_PARTY_MIN: f64 = 2.0;
+
+/// How many soldiers an NPC city in Expand sends along with the crew building on a node out of its
+/// City area (`CONTEXT.md`: Taking a node), as far as it has them beyond its hall and gate posts:
+/// as many as a town's trader takes.
+pub const NPC_SITE_ESCORTS: f64 = 2.0;
+
 /// How many stops a round has along an NPC city's wall, spread evenly round it. Each costs one path
 /// search; a town's wall of 180 tiles gives legs of about 22 tiles, some 3 game hours each.
 pub const NPC_PATROL_WALL_STOPS: f64 = 8.0;
@@ -3212,6 +3229,10 @@ pub fn balance_json() -> Value {
     m.insert("NPC_DEMAND_AGAIN_DAYS".into(), json!(NPC_DEMAND_AGAIN_DAYS));
     m.insert("NPC_DEMAND_REFUSED_STANDING".into(), json!(NPC_DEMAND_REFUSED_STANDING));
     m.insert("NEW_REALM_SHELTER_DAYS".into(), json!(NEW_REALM_SHELTER_DAYS));
+    m.insert("NPC_NODE_GUARD_RANGE".into(), json!(NPC_NODE_GUARD_RANGE));
+    m.insert("NPC_TAKE_OUTWEIGH_TIMES".into(), json!(NPC_TAKE_OUTWEIGH_TIMES));
+    m.insert("NPC_TAKE_PARTY_MIN".into(), json!(NPC_TAKE_PARTY_MIN));
+    m.insert("NPC_SITE_ESCORTS".into(), json!(NPC_SITE_ESCORTS));
     m.insert("NPC_PATROL_WALL_STOPS".into(), json!(NPC_PATROL_WALL_STOPS));
     m.insert("NPC_PATROL_ROAD_STOPS".into(), json!(NPC_PATROL_ROAD_STOPS));
     m.insert("NPC_WAR_CHEST_PER_RESIDENT".into(), json!(NPC_WAR_CHEST_PER_RESIDENT));

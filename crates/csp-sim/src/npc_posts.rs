@@ -74,7 +74,8 @@ pub fn soldiers_at_hand(world: &WorldState, city: &City, adults: &[usize]) -> Ve
         .flatten()
         .map(|p| &p.resident_id)
         .collect();
-    let hunting = crate::npc_hunts::hunters(world, &city.id);
+    let mut hunting = crate::npc_hunts::hunters(world, &city.id);
+    hunting.extend(crate::npc_take_node::out_on_node(world, &city.id));
     adults
         .iter()
         .copied()
