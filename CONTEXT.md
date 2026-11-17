@@ -621,7 +621,7 @@ The shared language of the game. Domain terms only — no implementation details
   and otherwise work at its workplaces for **surplus**, past the reserve, up to a cap per good (a
   balance number that grows with its residents). Once every good they could work for is at its cap,
   they work on past it, the good least far past its cap first, up to a few times the cap (a balance
-  number), farms aside, so a city with no one to sell to and no room to found stays busy while wear
+  number), farms aside, and only those left once its founding party has gathered its materials, so a city with no one to sell to and no room to found stays busy while wear
   and decay use its goods up (decided overnight, Daniel to confirm). With a crew full and its good
   below the cap, a big
   city opens a second workplace of that kind on a node it knows. What is short, its traders and a
