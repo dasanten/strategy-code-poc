@@ -756,6 +756,14 @@ pub const NPC_SOLDIER_SHARE: f64 = 0.25;
 /// node in reach keeps to the iron spear (`NPC_SMITHY_WEAPON`).
 pub const NPC_STEEL_KIT: [&str; 3] = ["steelSword", "steelArmour", "steelShield"];
 
+/// Share of an NPC city's soldiers it arms with a Bow once it has a smithy (`CONTEXT.md`: Ranged
+/// combat, NPC reserve), rounded down: a town's 4 soldiers have 2 archers, a village's 2 one.
+pub const NPC_ARCHER_SHARE: f64 = 0.5;
+
+/// The Arrows an NPC city's archer carries, fetched from its storage as they run low; its reserve
+/// keeps as many again in its storages for each archer it wants (`CONTEXT.md`: NPC reserve).
+pub const NPC_ARCHER_ARROWS: f64 = 20.0;
+
 /// How many of an NPC city's soldiers stand on its town hall between fights, the first to be posted
 /// (`CONTEXT.md`: Soldier posts). One there is enough to block an occupation; a second keeps it held
 /// when the first is called away.
@@ -2767,6 +2775,8 @@ pub fn balance_json() -> Value {
     m.insert("WORK_FOOD_KEPT".into(), json!(WORK_FOOD_KEPT));
     m.insert("NPC_SOLDIER_SHARE".into(), json!(NPC_SOLDIER_SHARE));
     m.insert("NPC_STEEL_KIT".into(), json!(NPC_STEEL_KIT));
+    m.insert("NPC_ARCHER_SHARE".into(), json!(NPC_ARCHER_SHARE));
+    m.insert("NPC_ARCHER_ARROWS".into(), json!(NPC_ARCHER_ARROWS));
     m.insert("NPC_SOLDIERS_ON_HALL".into(), json!(NPC_SOLDIERS_ON_HALL));
     m.insert("NPC_SOLDIERS_AT_GATE".into(), json!(NPC_SOLDIERS_AT_GATE));
     m.insert("NPC_POST_AROUND_HALL".into(), json!(NPC_POST_AROUND_HALL));

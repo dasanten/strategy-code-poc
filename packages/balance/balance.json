@@ -216,6 +216,8 @@
     "steelArmour",
     "steelShield"
   ],
+  "NPC_ARCHER_SHARE": 0.5,
+  "NPC_ARCHER_ARROWS": 20.0,
   "NPC_SOLDIERS_ON_HALL": 2.0,
   "NPC_SOLDIERS_AT_GATE": 1.0,
   "NPC_POST_AROUND_HALL": 2.0,

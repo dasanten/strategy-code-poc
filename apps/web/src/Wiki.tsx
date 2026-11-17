@@ -191,6 +191,8 @@ import {
   NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
   NPC_SURPLUS_CAP,
+  NPC_ARCHER_ARROWS,
+  NPC_ARCHER_SHARE,
   NPC_SOLDIER_SHARE,
   NPC_STEEL_KIT,
   NPC_WAR_CHEST_PER_RESIDENT,
@@ -3479,6 +3481,16 @@ export function Wiki() {
           a resident's <code>reach</code> (null without a Bow or Crossbow) and the Arrows they carry
           in <code>carried.arrows</code>; <code>shoot(targetId)</code> shoots someone in reach
           without a step, and <code>attack</code> walks only until they are in reach.
+        </p>
+        <p>
+          <strong>NPC archers.</strong> An NPC city with a smithy arms{' '}
+          {pct(NPC_ARCHER_SHARE)} of its soldiers with a Bow (rounded down) and keeps{' '}
+          {num(NPC_ARCHER_ARROWS)} Arrows in its reserve for each of them; its smithy forges them
+          once its soldiers are armed. Each archer carries {num(NPC_ARCHER_ARROWS)} Arrows and
+          fetches more from its storage as they run low. While the city has a wall, its archers
+          stand on it and leave the town hall and the gates to the others. One without a smithy, and
+          the Trade Organization's cities, keep no archers. A resident hired from an NPC city who
+          takes a Bow from its surplus takes Arrows along too, also only from its surplus.
         </p>
         <p>
           To <strong>swap</strong> gear, pick another item they carry for a slot on their card (or
