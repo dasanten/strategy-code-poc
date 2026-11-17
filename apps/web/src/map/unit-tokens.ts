@@ -162,7 +162,8 @@ export function drawUnits(
   }
   const key = (e: { x: number; y: number }) => `${e.x},${e.y}`
   const built = new Set(world.buildings.filter((b) => !SHARES_A_TILE.includes(b.kind)).map(key))
-  const carted = new Set(world.carriages.map(key))
+  // People and horses step aside of a cart or a siege machine on their tile, as of a building.
+  const carted = new Set([...world.carriages.map(key), ...(world.machines ?? []).map(key)])
   const peopled = new Set(world.residents.map(key))
   const at = (x: number, y: number, dx = 0, dy = 0) =>
     tileToScreen(cam, view, size, x + 0.5 + dx, y + 0.5 + dy)

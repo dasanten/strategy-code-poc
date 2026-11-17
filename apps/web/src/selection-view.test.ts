@@ -893,6 +893,20 @@ describe('the card for a tile with a siege machine', () => {
     expect(theirs.machine?.own).toBe(false)
   })
 
+  it('shows a ram site in the field on a card of its own, with what it still needs', () => {
+    const site = {
+      id: 'rs',
+      kind: 'ram' as const,
+      cityId: null,
+      x: 5,
+      y: 5,
+      site: { delivered: { wood: 10 }, work: 0 },
+    }
+    const card = tile({ buildings: [site] })
+    expect(card).toMatchObject({ title: 'Ram site', what: 'building' })
+    expect(card.sites?.length).toBe(1)
+  })
+
   it('lets the resident picked last crew it, its crew push it once enough, its realm tear it down', () => {
     const card = tile({ machines: [ram] })
     const ids = (r: Resident | undefined) => tileActions(card, r).map((a) => a.id)

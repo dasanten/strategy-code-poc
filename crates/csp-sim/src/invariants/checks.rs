@@ -234,6 +234,9 @@ pub fn buildings_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
             if b.stock.is_some() {
                 fail(&b.id, "is a ram site with a stock".into());
             }
+            if let Some(under) = building_at(world, b.x as i32, b.y as i32, size) {
+                fail(&b.id, format!("is a ram site on a {}", kind_name(under.kind)));
+            }
         } else if b.kind == BuildingKind::Carriage {
             if b.site.is_none() {
                 fail(&b.id, "is a finished carriage site".into());

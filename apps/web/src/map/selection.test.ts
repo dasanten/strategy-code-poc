@@ -81,6 +81,20 @@ describe('what a click on the map picks (CONTEXT.md: Picking on the map)', () =>
   const click = (w: PickWorld, spots: Map<string, Spot>, sx: number, sy: number) =>
     mapPickAt(own(w, spots), sx, sy, Math.floor(sx / 10), Math.floor(sy / 10), w)
 
+  it('shows a siege machine’s tile card beside its crew’s tokens (CONTEXT.md: Siege machine)', () => {
+    const ana = { id: 'ana', owner: 'me', x: 8, y: 8 }
+    const spots = new Map<string, Spot>([['ana', { x: 89, y: 89, r: 2 }]])
+    const w = world({ buildings: [], residents: [ana], machines: [{ x: 8, y: 8 }] })
+    expect(click(w, spots, 81, 81)).toEqual({ kind: 'tile', x: 8, y: 8 })
+    // Their own token still picks them.
+    expect(click(w, spots, 89, 89)).toEqual({ kind: 'resident', id: 'ana' })
+    // Without the machine the lone resident's tile picks the resident.
+    expect(click(world({ buildings: [], residents: [ana] }), spots, 81, 81)).toEqual({
+      kind: 'resident',
+      id: 'ana',
+    })
+  })
+
   it('shows the tile card beside the Player’s tokens on another realm’s free horse', () => {
     const h = { id: 'h', realmId: 'them', x: 8, y: 8 }
     const ana = { id: 'ana', owner: 'me', x: 8, y: 8 }

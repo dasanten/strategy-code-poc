@@ -1810,6 +1810,14 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     sites.push({ ...head, ...describeSite(carriageSite, t) })
     if (carriageSite.teardown) lines.push(teardownLine(carriageSite))
   }
+  const ramSite = here(t.buildings).find((b) => b.kind === 'ram')
+  if (ramSite?.site) {
+    // A ram site in the field (`CONTEXT.md`: Siege machine), worked like a carriage site.
+    const head = card ? { title: 'Ram site' } : {}
+    card ??= { title: 'Ram site', what: 'building' }
+    sites.push({ ...head, ...describeSite(ramSite, t) })
+    if (ramSite.teardown) lines.push(teardownLine(ramSite))
+  }
   if (boatSite?.site) {
     // A boat site has no owner either; on its haven's card under a head of its own
     // (`CONTEXT.md`: Building a boat).

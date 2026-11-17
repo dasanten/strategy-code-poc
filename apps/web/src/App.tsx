@@ -1571,7 +1571,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const buildingHere =
     selected && world?.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && isAt(selected, b))
   const roadHere = onTile(world?.buildings.filter((b) => b.kind === 'road'))
-  const carriageSiteHere = onTile(world?.buildings.filter((b) => b.kind === 'carriage'))
+  // A carriage or ram site on the tile, worked and supplied the same way (`CONTEXT.md`: Siege machine).
+  const carriageSiteHere = onTile(
+    world?.buildings.filter((b) => b.kind === 'carriage' || b.kind === 'ram'),
+  )
   const armyCarriages = commandedCarriages(world?.diplomacy.alliance, world?.home.realmId)
   const isStrangers = (k: { id: string; realmId: string | null }) =>
     strangersCarriage(k, world?.home.realmId, armyCarriages)

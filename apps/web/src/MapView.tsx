@@ -865,6 +865,7 @@ export function MapView({
         buildings: [...w.buildings, ...(w.lastSeen?.buildings ?? [])],
         carriages: w.carriages,
         horses: w.horses,
+        machines: w.machines ?? [],
       })
     }
 

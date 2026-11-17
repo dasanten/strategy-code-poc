@@ -416,6 +416,26 @@ mod seen {
     }
 }
 
+mod sent {
+    use super::*;
+    use crate::sight::{sent_inside_unseen, sent_out_of_sight};
+
+    /// The invariants on what goes out to a Player hold with a ram in sight, and a whole tick with
+    /// one in the world runs (the sight invariant once had no spot for a machine).
+    #[test]
+    fn what_is_sent_of_a_ram_breaks_no_sight_invariant() {
+        let mut game = crewed();
+        let index = WorldIndex::new(&game.world, 24);
+        for realm in ["r1", "r2"] {
+            let sent = entities_in_sight(&game.world, &index, Some(realm), None);
+            assert!(sent.iter().any(|e| e.is() == "machine"), "{realm}");
+            assert!(sent_out_of_sight(&game.world, &index, realm, &sent).is_empty(), "{realm}");
+            assert!(sent_inside_unseen(&game.world, &index, realm, &sent).is_empty(), "{realm}");
+        }
+        game.run(3);
+    }
+}
+
 mod invariants {
     use super::*;
 
@@ -445,6 +465,16 @@ mod invariants {
             broken(&game.world),
             ["resident w1 pushes siege machine m1, but the ram needs 1 more crew to be pushed"]
         );
+    }
+
+    #[test]
+    fn a_ram_site_stands_off_buildings() {
+        let mut world = world();
+        world.buildings.push(building("s1", BuildingKind::Storage, 8.0, 8.0));
+        let mut s = building("rs", BuildingKind::Ram, 9.0, 9.0);
+        s.site = Some(ConstructionSite { delivered: Stock::new(), work: 0.0 });
+        world.buildings.push(s);
+        assert_eq!(broken(&world), ["rs is a ram site on a storage"]);
     }
 
     #[test]

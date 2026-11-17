@@ -1068,6 +1068,7 @@ fn spot_of(e: &SeenEntity) -> Option<Spot> {
         SeenEntity::Horse(h) => Some(Spot { x: h.x, y: h.y }),
         SeenEntity::Carriage(k) => Some(Spot { x: k.x, y: k.y }),
         SeenEntity::Vessel(v) => Some(Spot { x: v.x, y: v.y }),
+        SeenEntity::Machine(m) => Some(Spot { x: m.x, y: m.y }),
         SeenEntity::Pile(p) => Some(Spot { x: p.x, y: p.y }),
         SeenEntity::Building(b) => Some(Spot { x: b.building.x, y: b.building.y }),
         _ => None,

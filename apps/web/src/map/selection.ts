@@ -92,6 +92,8 @@ export interface PickWorld {
   buildings: readonly PickBuilding[]
   carriages: readonly Pick<SeenCarriage, 'id' | 'realmId' | 'x' | 'y' | 'horseId'>[]
   horses: readonly Pick<SeenHorse, 'id' | 'realmId' | 'x' | 'y'>[]
+  /** Siege machines (`CONTEXT.md`: Siege machine): a click on one's tile opens its card. */
+  machines?: readonly { x: number; y: number }[]
 }
 
 /**
@@ -134,7 +136,8 @@ export function mapPickAt(
   const theirs =
     world.carriages.some((k) => k.realmId !== realmId && onThisTile(k)) ||
     world.horses.some((h) => h.realmId !== realmId && !busyHorses(world).has(h.id) && onThisTile(h))
-  if (theirs) return tilePick(x, y, world)
+  // The crew stand on their siege machine, as passengers in a cart: the tile card lists them.
+  if (theirs || world.machines?.some(onThisTile)) return tilePick(x, y, world)
   if (ours.length === 1 && here.length === 1) return { kind: 'resident', id: ours[0]!.id }
   if (ours.length > 1 && ours.length === here.length)
     return { kind: 'group', ids: ours.map((r) => r.id) }
