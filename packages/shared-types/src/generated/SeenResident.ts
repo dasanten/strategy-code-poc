@@ -2,6 +2,7 @@
 import type { AlarmScriptId } from "./AlarmScriptId.js";
 import type { Carrying } from "./Carrying.js";
 import type { Equipment } from "./Equipment.js";
+import type { GearCondition } from "./GearCondition.js";
 import type { Good } from "./Good.js";
 import type { OrderEnded } from "./OrderEnded.js";
 import type { Pair } from "./Pair.js";
@@ -26,7 +27,11 @@ export type SeenResident = { id: string, name: string, gameName?: true, owner: s
 /**
  * What the resident has equipped (`CONTEXT.md`: Equipment).
  */
-equipped?: Equipment, order: ResidentOrder | null, orderEnded?: OrderEnded, struck?: Struck, script?: SeenScript, interrupted?: SeenInterrupted, defenceScriptId?: number, alarmScriptId?: AlarmScriptId, scriptParams?: { [key in number]: { [key in string]: ScriptParamValue } }, queue?: Queue, pair?: Pair, carrying?: Carrying, riding?: string, aboard?: string, up?: UpSide, downUntil?: number, 
+equipped?: Equipment, 
+/**
+ * The condition of what they have equipped (`CONTEXT.md`: Wear): for their own realm only.
+ */
+condition?: GearCondition, order: ResidentOrder | null, orderEnded?: OrderEnded, struck?: Struck, script?: SeenScript, interrupted?: SeenInterrupted, defenceScriptId?: number, alarmScriptId?: AlarmScriptId, scriptParams?: { [key in number]: { [key in string]: ScriptParamValue } }, queue?: Queue, pair?: Pair, carrying?: Carrying, riding?: string, aboard?: string, up?: UpSide, downUntil?: number, 
 /**
  * Set (to `true`) while they are Down, which anyone in sight sees.
  */

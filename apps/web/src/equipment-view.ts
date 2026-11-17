@@ -1,4 +1,4 @@
-import type { Equipment, Good, Stock } from '@csp/shared-types'
+import type { Equipment, GearCondition, Good, PieceCondition, Stock } from '@csp/shared-types'
 import { WEAPON_ATTACK } from './shared/narrowed.js'
 import { GOODS, PROTECTION_KINDS } from './shared/world.js'
 import { GOOD_LABELS } from './goods-grid.js'
@@ -10,6 +10,18 @@ export interface SlotView {
   label: string
   /** What is equipped in it, or `undefined` when empty. */
   item?: string
+  /**
+   * Its condition in words (`CONTEXT.md`: Wear): only for the realm carrying it, `undefined`
+   * otherwise.
+   */
+  condition?: string
+}
+
+/** A piece's condition as a card says it. */
+export const CONDITION_WORDS: Record<PieceCondition, string> = {
+  good: 'good',
+  worn: 'worn',
+  nearlyBroken: 'nearly broken',
 }
 
 const SLOTS: { slot: SlotView['slot']; label: string }[] = [
@@ -18,19 +30,33 @@ const SLOTS: { slot: SlotView['slot']; label: string }[] = [
   { slot: 'armour', label: 'Armour' },
 ]
 
-/** Each slot, weapon first, with what is equipped in it. */
-export function equipmentSlots(equipped: Equipment | undefined): SlotView[] {
+/**
+ * Each slot, weapon first, with what is equipped in it and, for the realm carrying it, its
+ * condition.
+ */
+export function equipmentSlots(
+  equipped: Equipment | undefined,
+  condition?: GearCondition,
+): SlotView[] {
   return SLOTS.map(({ slot, label }) => {
     const good = equipped?.[slot]
-    return good ? { slot, label, item: GOOD_LABELS[good] } : { slot, label }
+    if (!good) return { slot, label }
+    const c = condition?.[slot]
+    return c
+      ? { slot, label, item: GOOD_LABELS[good], condition: CONDITION_WORDS[c] }
+      : { slot, label, item: GOOD_LABELS[good] }
   })
 }
 
-/** One line for a card: "Sword · Shield · no armour", or "Nothing equipped". */
-export function equipmentLine(equipped: Equipment | undefined): string {
-  const slots = equipmentSlots(equipped)
+/**
+ * One line for a card: "Sword (worn) · Shield (good) · no armour", or "Nothing equipped"; the
+ * condition only where it is known.
+ */
+export function equipmentLine(equipped: Equipment | undefined, condition?: GearCondition): string {
+  const slots = equipmentSlots(equipped, condition)
   if (slots.every((s) => !s.item)) return 'Nothing equipped'
-  return slots.map((s) => s.item ?? `no ${s.label.toLowerCase()}`).join(' · ')
+  const named = (s: SlotView) => (s.condition ? `${s.item} (${s.condition})` : s.item)
+  return slots.map((s) => named(s) ?? `no ${s.label.toLowerCase()}`).join(' · ')
 }
 
 /** The slot a good goes into, or `undefined` for a good that is no gear (`CONTEXT.md`: Equipment). */

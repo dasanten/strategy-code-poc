@@ -676,6 +676,35 @@ mod seeing_inside {
             .unwrap();
         assert!(flagged.contains(&hers.id));
     }
+
+    /// Wear (`CONTEXT.md`: Wear): the realm carrying gear sees its condition, a stranger in sight
+    /// sees only what is equipped.
+    #[test]
+    fn shows_the_condition_of_a_residents_gear_to_their_own_realm_only() {
+        use csp_shared::world::{GearCondition, PieceCondition};
+        let mut t = two_realms();
+        let scout = t.world.residents.iter().find(|r| r.id == t.scout).unwrap();
+        let (sx, sy) = (scout.x, scout.y);
+        let hers =
+            t.world.residents.iter_mut().find(|r| r.owner.as_deref() == Some(&t.mara)).unwrap();
+        (hers.x, hers.y) = (sx + 1.0, sy);
+        hers.carried.insert(Good::Sword, 1.0);
+        let id = hers.id.clone();
+        t.world.wear.insert(id.clone(), [(Good::Sword, vec![0.6])].into_iter().collect());
+        csp_sim::equipment::settle_all(&mut t.world);
+        let resident = |seen: &[SeenEntity]| match find(seen, &id) {
+            Some(SeenEntity::Resident(r)) => r.clone(),
+            _ => panic!("she is in sight"),
+        };
+        let own = resident(&t.seen_by(&t.mara));
+        assert_eq!(
+            own.condition,
+            Some(GearCondition { weapon: Some(PieceCondition::Worn), ..Default::default() })
+        );
+        let stranger = resident(&t.seen_by(&t.tobin));
+        assert_eq!(stranger.equipped.weapon, Some(Good::Sword));
+        assert_eq!(stranger.condition, None);
+    }
 }
 
 mod seen_script {

@@ -1351,6 +1351,30 @@ pub const WEAPON_ATTACK: Table<f64> = Table(&[("spear", 4.0), ("sword", 6.0), ("
 pub const PROTECTION_DEFENCE: Table<f64> =
     Table(&[("shield", 3.0), ("armour", 5.0), ("steelShield", 5.0), ("steelArmour", 8.0)]);
 
+/// How many blows each piece of gear lasts before it breaks (`CONTEXT.md`: Wear): a weapon's
+/// blows struck, a shield's or armour's blows taken. A fight to the death is some 15 to 30 blows,
+/// so an iron sword sees about twenty fights; steel lasts half again as long as iron.
+pub const WEAR_BLOWS: Table<f64> = Table(&[
+    ("spear", 400.0),
+    ("sword", 600.0),
+    ("steelSword", 900.0),
+    ("shield", 300.0),
+    ("steelShield", 450.0),
+    ("armour", 400.0),
+    ("steelArmour", 600.0),
+]);
+
+/// How many blows' wear a game day of training puts on each piece a trainee has equipped
+/// (`CONTEXT.md`: Wear): a little, so a soldier training every day wears out an iron sword in
+/// well over a game year.
+pub const TRAINING_WEAR_BLOWS_PER_DAY: f64 = 1.0;
+
+/// Share of its life worn away from which a piece's condition reads "worn" (`CONTEXT.md`: Wear).
+pub const WORN_FROM: f64 = 0.5;
+
+/// Share of its life worn away from which a piece's condition reads "nearly broken".
+pub const NEARLY_BROKEN_FROM: f64 = 0.85;
+
 /// Carry capacity of a resident with no Strength at all, in kg.
 pub const CARRY_BASE: f64 = 10.0;
 
@@ -2806,6 +2830,10 @@ pub fn balance_json() -> Value {
     m.insert("GOOD_WEIGHT".into(), to_value(GOOD_WEIGHT).expect("serialisable"));
     m.insert("WEAPON_ATTACK".into(), to_value(WEAPON_ATTACK).expect("serialisable"));
     m.insert("PROTECTION_DEFENCE".into(), to_value(PROTECTION_DEFENCE).expect("serialisable"));
+    m.insert("WEAR_BLOWS".into(), to_value(WEAR_BLOWS).expect("serialisable"));
+    m.insert("TRAINING_WEAR_BLOWS_PER_DAY".into(), json!(TRAINING_WEAR_BLOWS_PER_DAY));
+    m.insert("WORN_FROM".into(), json!(WORN_FROM));
+    m.insert("NEARLY_BROKEN_FROM".into(), json!(NEARLY_BROKEN_FROM));
     m.insert("CARRY_BASE".into(), json!(CARRY_BASE));
     m.insert("CARRY_PER_STRENGTH".into(), json!(CARRY_PER_STRENGTH));
     m.insert("FOOD_PER_DAY".into(), json!(FOOD_PER_DAY));

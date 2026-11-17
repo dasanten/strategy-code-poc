@@ -305,6 +305,33 @@ fn equipment_view(r: &Resident) -> Value {
     }))
 }
 
+/// The condition of a resident's equipped pieces as their `condition` view (`CONTEXT.md`: Wear),
+/// `null` for an empty slot.
+fn condition_view(world: &WorldState, r: &Resident) -> Value {
+    use crate::equipment::Slot;
+    use crate::wear::{condition_name, slot_condition};
+    let fields = script_view("condition").map_or(&[][..], |v| v.fields);
+    Value::frozen_fields(fields.iter().map(|f| {
+        let slot = match f.name {
+            "weapon" => Some(Slot::Weapon),
+            "shield" => Some(Slot::Shield),
+            "armour" => Some(Slot::Armour),
+            _ => None,
+        };
+        let c = slot.and_then(|s| slot_condition(world, r, s));
+        (f.name, c.map_or(Value::Null, |c| Value::string(condition_name(c))))
+    }))
+}
+
+/// Whether `side` carries `r`'s gear and so sees its condition (`CONTEXT.md`: Wear): a Player's
+/// own resident, or a resident of the NPC city the side is.
+fn carries_gear_of(r: &Resident, side: Option<&str>) -> bool {
+    side.is_some_and(|s| match &r.owner {
+        Some(o) => o == s,
+        None => r.city_id.as_deref() == Some(s),
+    })
+}
+
 /// A resident's `stats` as their view: each stat's `base` and `trained`.
 fn stats_view(stats: &StatRecord<Stat>) -> Value {
     let stat = |s: &Stat| {
@@ -395,6 +422,7 @@ fn resident_view(
             "skills" => numbers_view("skills", &r.skills, skill_name),
             "carried" => numbers_view("goods", &r.carried, good_name),
             "equipped" => equipment_view(r),
+            "condition" if carries_gear_of(r, side) => condition_view(world, r),
             "order" => order_value(r.order.as_ref(), f.r#type, land),
             "orderEnded" => field_value(&r.order_ended, f.r#type),
             "queue" => match &r.queue {
@@ -441,6 +469,8 @@ fn resident_data(
     m.insert("age".into(), json!(age_in_years(r.born_at, world.tick as f64)));
     // The slots as the rules count them, an empty one too (`CONTEXT.md`: Equipment).
     m.insert("equipped".into(), crate::equipment::equipment_json(r));
+    let condition = carries_gear_of(r, side).then(|| crate::wear::condition_json(world, r));
+    m.insert("condition".into(), condition.unwrap_or(Json::Null));
     m
 }
 
@@ -789,6 +819,9 @@ impl<'a> ScriptBindings<'a> {
         // The slots as the rules count them, an empty one too (`CONTEXT.md`: Equipment).
         if let Some(r) = self.ctx.index.resident_by_id(self.world(), id) {
             m.insert("equipped".into(), crate::equipment::equipment_json(r));
+            // The condition of the gear only for the side carrying it (`CONTEXT.md`: Wear).
+            let condition = self.own(r).then(|| crate::wear::condition_json(self.world(), r));
+            m.insert("condition".into(), condition.unwrap_or(Json::Null));
         }
         m
     }
@@ -1146,6 +1179,7 @@ impl<'a> ScriptBindings<'a> {
                         .map(|r| {
                             let mut m = to_json(r);
                             m.insert("equipped".into(), crate::equipment::equipment_json(r));
+                            m.insert("condition".into(), crate::wear::condition_json(world, r));
                             let s = r.script.as_ref().expect("filtered");
                             m.insert(
                                 "script".into(),
