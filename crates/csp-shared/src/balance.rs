@@ -1931,6 +1931,8 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
     ("townHall", Table(&[("wood", 60.0), ("stone", 40.0)])),
     // A tile of wall: about a quarter of what a 40 m stretch took.
     ("wall", Table(&[("wood", 3.0)])),
+    // A tower (`CONTEXT.md`: Tower): a 2×2 timber keep with room on top, about seven tiles of wall.
+    ("tower", Table(&[("wood", 20.0)])),
     // A gate, of a wall's tile.
     ("gate", Table(&[("wood", 4.0)])),
     // A tile of road (`CONTEXT.md`: Road): a little Stone, so a quarry pays for a long road; about a
@@ -1984,6 +1986,7 @@ pub const BUILD_WORK: Table<f64> = Table(&[
     ("smithy", 5.0 * TICKS_PER_GAME_DAY),
     ("townHall", 6.0 * TICKS_PER_GAME_DAY),
     ("wall", TICKS_PER_GAME_DAY / 16.0),
+    ("tower", TICKS_PER_GAME_DAY / 2.0),
     ("gate", TICKS_PER_GAME_DAY / 8.0),
     ("road", TICKS_PER_GAME_DAY / 16.0),
     ("house", TICKS_PER_GAME_DAY),
@@ -2001,13 +2004,19 @@ pub const BUILD_WORK: Table<f64> = Table(&[
 /// What a stone wall or gate takes instead of `BUILD_MATERIALS` (`CONTEXT.md`: Wall / Gate, Wood
 /// or stone): Stone, a little more of it than a wooden one takes Wood, so a quarry pays for a
 /// stone ring.
-pub const STONE_BUILD_MATERIALS: Table<Table<f64>> =
-    Table(&[("wall", Table(&[("stone", 4.0)])), ("gate", Table(&[("stone", 6.0)]))]);
+pub const STONE_BUILD_MATERIALS: Table<Table<f64>> = Table(&[
+    ("wall", Table(&[("stone", 4.0)])),
+    ("gate", Table(&[("stone", 6.0)])),
+    ("tower", Table(&[("stone", 28.0)])),
+]);
 
 /// Work a stone wall or gate takes instead of `BUILD_WORK`: three times a wooden one's, so a
 /// tile of stone wall takes an unskilled resident about a fifth of a game day.
-pub const STONE_BUILD_WORK: Table<f64> =
-    Table(&[("wall", 3.0 * TICKS_PER_GAME_DAY / 16.0), ("gate", 3.0 * TICKS_PER_GAME_DAY / 8.0)]);
+pub const STONE_BUILD_WORK: Table<f64> = Table(&[
+    ("wall", 3.0 * TICKS_PER_GAME_DAY / 16.0),
+    ("gate", 3.0 * TICKS_PER_GAME_DAY / 8.0),
+    ("tower", 3.0 * TICKS_PER_GAME_DAY / 2.0),
+]);
 
 /// How many times `BUILD_WORK.road` a road tile on Mountain takes (`CONTEXT.md`: Road): the same
 /// materials, but building goes at a quarter of the usual speed.
@@ -2303,18 +2312,34 @@ pub const WALL_DEFENCE: f64 = 0.25;
 pub struct WallStrength {
     pub wall: f64,
     pub gate: f64,
+    /// A whole tower (`CONTEXT.md`: Tower): three tiles of its wall's worth, so it holds out longer.
+    pub tower: f64,
 }
+
+/// How many residents a tower holds up on top at once (`CONTEXT.md`: Tower: a few): one to each
+/// of its four tiles, so a small realm can man one; more wait on the walk or below.
+pub const TOWER_ROOM: f64 = 4.0;
+
+/// How far, in tiles, a resident up on a tower sees (`CONTEXT.md`: Tower, Sight): half as far
+/// again as `SIGHT_RANGE`, so a tower warns of an army well before it reaches the wall. At most
+/// twice `SIGHT_RANGE`, which the sight squares are cut for.
+pub const TOWER_SIGHT_RANGE: f64 = 72.0;
+
+/// How much further, in tiles, an archer up on a tower shoots than on the ground
+/// (`CONTEXT.md`: Tower, Ranged combat): beyond a wall archer's `WALL_SHOT_REACH_BONUS`.
+pub const TOWER_SHOT_REACH_BONUS: f64 = 7.0;
 
 /// Damage a wall or gate takes from blows before it falls (`CONTEXT.md`: Walls in combat,
 /// broken). An average unarmed resident (4 a blow, one blow every `STRIKE_TICKS`) breaks a stretch
 /// of wall alone in about 25 minutes, one with a Spear in about 12. A gate holds out half as long
 /// again. Long enough that a starting city's defenders get from their town hall up onto the wall
 /// and beat the breakers first, at twice their numbers too (T105.6).
-pub const WALL_STRENGTH: WallStrength = WallStrength { wall: 3000.0, gate: 4500.0 };
+pub const WALL_STRENGTH: WallStrength = WallStrength { wall: 3000.0, gate: 4500.0, tower: 9000.0 };
 
 /// Damage a stone wall or gate takes before it falls: four times a wooden one's (`CONTEXT.md`:
 /// Wall / Gate, Wood or stone), so a Spear breaks a tile of stone wall alone in about 50 minutes.
-pub const STONE_WALL_STRENGTH: WallStrength = WallStrength { wall: 12000.0, gate: 18000.0 };
+pub const STONE_WALL_STRENGTH: WallStrength =
+    WallStrength { wall: 12000.0, gate: 18000.0, tower: 36000.0 };
 
 /// Share of a broken wall's or gate's materials left on its tile, rounded down to whole units:
 /// less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered;
@@ -3101,6 +3126,9 @@ pub fn balance_json() -> Value {
     m.insert("WALL_STRENGTH".into(), to_value(WALL_STRENGTH).expect("serialisable"));
     m.insert("STONE_WALL_STRENGTH".into(), to_value(STONE_WALL_STRENGTH).expect("serialisable"));
     m.insert("BROKEN_MATERIALS_RETURNED".into(), json!(BROKEN_MATERIALS_RETURNED));
+    m.insert("TOWER_ROOM".into(), json!(TOWER_ROOM));
+    m.insert("TOWER_SIGHT_RANGE".into(), json!(TOWER_SIGHT_RANGE));
+    m.insert("TOWER_SHOT_REACH_BONUS".into(), json!(TOWER_SHOT_REACH_BONUS));
     m.insert("RAM_CREW".into(), json!(RAM_CREW));
     m.insert("SIEGE_PUSH_SHARE".into(), json!(SIEGE_PUSH_SHARE));
     m.insert("RAM_STRENGTH".into(), json!(RAM_STRENGTH));

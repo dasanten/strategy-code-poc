@@ -310,6 +310,9 @@ import {
   CATAPULT_BLOW,
   CATAPULT_STRENGTH,
   STONE_WALL_STRENGTH,
+  TOWER_ROOM,
+  TOWER_SIGHT_RANGE,
+  TOWER_SHOT_REACH_BONUS,
   WALL_WALK_TICKS,
   FALL_DAMAGE,
   WALK_TICKS_PER_TILE,
@@ -1603,8 +1606,7 @@ export function Wiki() {
           city sends to a workplace sets out with Food for the walk there and back plus{' '}
           {days(SET_OUT_WORK_DAYS)} of work, not a fixed amount, so they last until the carrier's
           first round trip. Its builders of a site more than {num(NPC_NODE_REACH)} tiles from its
-          storage take the same, and go back for more while they still have what the walk home
-          eats.
+          storage take the same, and go back for more while they still have what the walk home eats.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -2868,22 +2870,21 @@ export function Wiki() {
           It shares out its adults in this order: soldiers; farmers, as many as feed everyone (each
           eats {num(FOOD_PER_DAY)} Food a day, a farmer makes {num(WORK_OUTPUT_PER_DAY.food ?? 0)})
           and one more while it has no food surplus; with its Food below its reserve but not yet
-          running short, as many more as win back what it lacks in{' '}
-          {days(NPC_FOOD_REFILL_DAYS)}, if that is more; a new farm when they don't fit; up to{' '}
-          {num(NPC_BUILDERS)} builders a step while it has a project; everyone else is a spare hand.
-          A farm is otherwise built only when Food is short of its reserve (
-          {days(NPC_TRADE.reserveFoodDays)} of Food for everyone), or, with nothing else keeping it
-          from being full, short of the Food surplus its founding waits on (below), with every farm
-          at its full crew of {num(WORKPLACE_MAX_WORKERS.farm ?? 0)}; never because spare hands
-          filled the farms working for surplus. It needs nobody idle for that: the new farm's
-          farmers come from those working for surplus and from its scouts first, and from other
-          work only after them. A farm already begun is finished before another, and that new farm
-          comes before anything else it has begun. Spare hands go to the good the reserve is
-          shortest of, as a share of what it wants of it, filling one workplace's crew before the
-          next. Without a workplace for that good, the city builds one: on the nearest fitting
-          resource node it knows of, or a smelter, smithy or mint in its area like a house. With
-          every workplace of another short good at its full crew and someone idle, it opens another
-          of them, however many it has.
+          running short, as many more as win back what it lacks in {days(NPC_FOOD_REFILL_DAYS)}, if
+          that is more; a new farm when they don't fit; up to {num(NPC_BUILDERS)} builders a step
+          while it has a project; everyone else is a spare hand. A farm is otherwise built only when
+          Food is short of its reserve ({days(NPC_TRADE.reserveFoodDays)} of Food for everyone), or,
+          with nothing else keeping it from being full, short of the Food surplus its founding waits
+          on (below), with every farm at its full crew of {num(WORKPLACE_MAX_WORKERS.farm ?? 0)};
+          never because spare hands filled the farms working for surplus. It needs nobody idle for
+          that: the new farm's farmers come from those working for surplus and from its scouts
+          first, and from other work only after them. A farm already begun is finished before
+          another, and that new farm comes before anything else it has begun. Spare hands go to the
+          good the reserve is shortest of, as a share of what it wants of it, filling one
+          workplace's crew before the next. Without a workplace for that good, the city builds one:
+          on the nearest fitting resource node it knows of, or a smelter, smithy or mint in its area
+          like a house. With every workplace of another short good at its full crew and someone
+          idle, it opens another of them, however many it has.
         </p>
         <p>
           Those with nothing to do, those carrying a child and its children stand at a house of the
@@ -2968,10 +2969,10 @@ export function Wiki() {
           resident would walk, tile by tile, so a road goes round a lake, and they skip tiles that
           already have a road. They only use materials above its reserve and what its project still
           needs; with none to spare, or with something short that they can work for, they go back to
-          other work and bring back what they carry. Once its full wait is under way, they
-          also leave a town hall's and a storage's materials untouched, so founding comes before
-          roads. Like any road it belongs to nobody, and anyone can use it or tear it down; a tile
-          torn down is laid again in time.
+          other work and bring back what they carry. Once its full wait is under way, they also
+          leave a town hall's and a storage's materials untouched, so founding comes before roads.
+          Like any road it belongs to nobody, and anyone can use it or tear it down; a tile torn
+          down is laid again in time.
         </p>
         <p>
           With its workplaces joined the crew goes on: to the nearest Trade Organization warehouse
@@ -3076,18 +3077,17 @@ export function Wiki() {
           A city is full once it has had spare hands, idle, on a road crew, scouting or working for
           surplus, and nothing short of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus
           and its founding party's materials above its reserve; Coins it has no way to earn don't
-          count as short, and nor do weapons it can't make, nor the Iron it keeps to forge them
-          (it can make them with a smithy, or with nodes it knows of for all they are made from),
-          though it still buys them. Once it lacks nothing but its founding party's materials, those
-          count as short: its spare hands gather them, it builds a workplace for one it has none
-          of, and they are still spare hands while they do. Food, Coins and weapons come first, Food
-          its surplus too: only once it holds {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus
+          count as short, and nor do weapons it can't make, nor the Iron it keeps to forge them (it
+          can make them with a smithy, or with nodes it knows of for all they are made from), though
+          it still buys them. Once it lacks nothing but its founding party's materials, those count
+          as short: its spare hands gather them, it builds a workplace for one it has none of, and
+          they are still spare hands while they do. Food, Coins and weapons come first, Food its
+          surplus too: only once it holds {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus
           cap past its reserve. Its workplaces come first as well: its spare hands go on a road
           crew, scout and work at its workplaces for surplus, and only those left over gather for
-          the party.
-          Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less
-          for each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}.
-          A dip below its reserve only restarts that wait if it lasts longer than{' '}
+          the party. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less for
+          each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}. A
+          dip below its reserve only restarts that wait if it lasts longer than{' '}
           {days(NPC_FULL_DIP_DAYS)}, though nobody sets out during one. A full city founds a
           daughter. Once a game day it looks for a free Plains site {num(NPC_CITY_MIN_DISTANCE)} to{' '}
           {num(NPC_FOUND_REACH)} tiles away, with room for a village and on no realm's territory,
@@ -3098,13 +3098,13 @@ export function Wiki() {
           storage's materials, a house's for each {num(HOUSING_ROOM.house ?? 1)} members past{' '}
           {num(NPC_VILLAGE.residents)}, and Food for twice the walk and {days(NPC_FOUND_FOOD_DAYS)}{' '}
           there, with as many more adults as it takes to carry all of it, and builds the town hall,
-          which founds the daughter: an NPC city of its own with a
-          name from the game. It then builds its storage, a farm and a house, and once its storage
-          holds the Wood of its reserve, its first wall, a ring{' '}
-          {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its home. Mother and daughter start at
-          a standing of {num(NPC_FOUND_STANDING)} toward each other, which fades like any other, and
-          share nothing. A party whose town hall doesn't stand after {days(NPC_FOUND_GIVE_UP_DAYS)}{' '}
-          gives up and walks home. Trading posts and the Trade Organization's HQ never found cities.
+          which founds the daughter: an NPC city of its own with a name from the game. It then
+          builds its storage, a farm and a house, and once its storage holds the Wood of its
+          reserve, its first wall, a ring {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its
+          home. Mother and daughter start at a standing of {num(NPC_FOUND_STANDING)} toward each
+          other, which fades like any other, and share nothing. A party whose town hall doesn't
+          stand after {days(NPC_FOUND_GIVE_UP_DAYS)} gives up and walks home. Trading posts and the
+          Trade Organization's HQ never found cities.
         </p>
         <p>
           An NPC city sells only what it holds above this reserve and buys only what it is short of.
@@ -3602,6 +3602,39 @@ export function Wiki() {
           attacker at the wall, by the Alarm default or your order, a resident inside gets up onto
           the walk beside them unless the way round through a gate is quicker; a trading post's and
           the HQ's soldiers do the same.
+        </p>
+        <p>
+          <strong>Towers.</strong> A tower is a {num(FOOTPRINT.tower)} × {num(FOOTPRINT.tower)}{' '}
+          building of wood or stone (Build menu, under Defence), standing in a wall's line or alone,
+          off resource nodes and not on Mountain. It isn't built over wall tiles: tear those down
+          first. Like a wall it closes the way, and its top is part of the wall walk wherever a wall
+          tile touches it: residents walk onto it from the walk, or get up onto it from the ground
+          beside it as onto a wall. It holds {num(TOWER_ROOM)} residents up at once; one more waits
+          beside it until someone leaves. It is broken like a wall but holds out longer: wooden,{' '}
+          {num(WALL_STRENGTH.tower)} damage ({duration(breakTicks('tower'))} for that resident), of
+          stone {num(STONE_WALL_STRENGTH.tower)} ({duration(breakTicks('tower', true))}), and it is
+          struck from beside any of its tiles. Whoever is up on it when it breaks falls, as from a
+          wall tile. A tower is broken, not climbed.
+        </p>
+        <p>
+          <strong>Up on a tower.</strong> A resident up on a tower sees {num(TOWER_SIGHT_RANGE)}{' '}
+          tiles around instead of {num(SIGHT_RANGE)}, and what they see is your realm's Sight: it
+          shows on the map, is explored and kept in Last seen like anything else seen. An outsider
+          coming into the city's area that such a lookout sees raises the alarm across the whole of
+          its area, so a tower warns of an army early. An archer up on a tower shoots{' '}
+          {num(TOWER_SHOT_REACH_BONUS)} tiles further than on the ground, beyond an archer on the
+          wall ({num(WALL_SHOT_REACH_BONUS)} further), and up there takes the wall's cover as on the
+          wall.
+        </p>
+        <p>
+          <strong>NPC towers.</strong> A tower is part of a city like its wall, and grows its area
+          the same way. An NPC town whose outer wall is all of stone builds stone towers, each just
+          inside its wall and touching it: first one by each gate, leaving the way in free, then one
+          in each corner. It builds each from Stone it holds beyond its reserve, last of its
+          projects, and quarries for it if it has to. While it waits to found a daughter it starts
+          no new tower, so founding comes first. Its soldiers on wall posts fill its towers first,{' '}
+          {num(TOWER_ROOM)} to a tower, its archers before the others. When the town moves its wall
+          out, it builds towers on the new wall, and tears the old ones down with the old wall.
         </p>
         <p>
           <strong>The high ground.</strong> Whoever is up strikes down at anyone on the ground next

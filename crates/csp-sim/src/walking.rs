@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use csp_shared::balance::{carriage_can_enter, WALL_WALK_TICKS};
+use csp_shared::balance::{carriage_can_enter, TOWER_ROOM, WALL_WALK_TICKS};
 use csp_shared::terrain::{
     beside_step, ground_at, is_passable_terrain, step_length, terrain_at, tile_index, wrap,
     TerrainMap,
@@ -1049,6 +1049,14 @@ impl Walking {
         let terrain = self.terrain.clone();
         let residents: HashMap<String, usize> =
             world.residents.iter().enumerate().map(|(i, r)| (r.id.clone(), i)).collect();
+        // Who is up on each tower now, kept up to date step by step (`CONTEXT.md`: Tower).
+        let mut towers_up: HashMap<String, usize> = HashMap::new();
+        for r in world.residents.iter().filter(|r| r.up.is_some()) {
+            let t = tile_index(size, r.x as i32, r.y as i32);
+            if let Some(tower) = walls.tiles.get(&t).and_then(|w| w.tower.clone()) {
+                *towers_up.entry(tower).or_insert(0) += 1;
+            }
+        }
         for step in steps {
             let Some(&i) = residents.get(&step.resident_id) else { continue };
             if let Some(vid) = &step.vessel_id {
@@ -1099,6 +1107,24 @@ impl Walking {
             if !walked {
                 reset_path(world, i);
                 continue;
+            }
+            // A tower holds only so many up at once (`CONTEXT.md`: Tower): one getting onto a full
+            // one waits where they are, their way kept, until there is room. Along its own top they
+            // go as they like.
+            let tower_of = |t: usize, up: Option<UpSide>| {
+                up.and(walls.tiles.get(&t)).and_then(|w| w.tower.clone())
+            };
+            let (left, onto) = (tower_of(from, up), tower_of(to, to_up));
+            if left != onto {
+                if let Some(t) = &onto {
+                    if towers_up.get(t).copied().unwrap_or(0) >= TOWER_ROOM as usize {
+                        continue;
+                    }
+                    *towers_up.entry(t.clone()).or_insert(0) += 1;
+                }
+                if let Some(n) = left.as_ref().and_then(|t| towers_up.get_mut(t)) {
+                    *n = n.saturating_sub(1);
+                }
             }
             // Getting up or down uses up its ticks of progress (`request_steps`).
             let length = if up.is_some() != to_up.is_some() { WALL_WALK_TICKS } else { length };

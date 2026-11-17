@@ -13,6 +13,7 @@ use crate::terrain::{wrap, wrap_delta};
 pub const FOOTPRINT: Table<i32> = Table(&[
     ("wall", 1),
     ("gate", 1),
+    ("tower", 2),
     ("road", 1),
     ("carriage", 1),
     ("boat", 1),

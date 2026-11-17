@@ -26,7 +26,7 @@ use crate::goods_made::GoodsMade;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::building::{build_materials_of, build_work_for};
-use crate::queries::combat::in_contact;
+
 use crate::queries::driving::carriage_can_go_to;
 use crate::queries::names::{held, placed};
 use crate::queries::residents::{can_work, is_down};
@@ -374,7 +374,8 @@ pub fn ram_problem(
         Err(e) => return Some(e.into()),
     };
     let size = csp_shared::balance::MAP_SIZE;
-    if !in_contact(size, (m.x as i32, m.y as i32), (wall.x as i32, wall.y as i32)) {
+    // Next to any tile of it: a tower is 2×2 (`CONTEXT.md`: Tower).
+    if !near_footprint(placed(wall), (m.x as i32, m.y as i32), 1, size) {
         return Some("push the ram next to it first".into());
     }
     None
@@ -729,3 +730,6 @@ mod strike_tests;
 
 #[cfg(test)]
 mod catapult_tests;
+
+#[cfg(test)]
+mod tower_tests;

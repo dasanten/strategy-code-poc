@@ -443,14 +443,14 @@ pub fn material_field(order: &OrderRequest) -> Option<WallMaterial> {
 }
 
 /// Why an order's `material` won't do: one that is neither wood nor stone, or one for anything but
-/// a wall or gate.
+/// a wall, gate or tower.
 pub fn material_problem(order: &OrderRequest, building: Option<BuildingKind>) -> Option<String> {
     let given = order.fields.get("material").filter(|v| !v.is_null())?;
     if material_field(order).is_none() {
         return Some(format!("a wall is of \"wood\" or \"stone\", not {given}"));
     }
-    if !matches!(building, Some(BuildingKind::Wall | BuildingKind::Gate)) {
-        return Some("only a wall or gate is of wood or stone".into());
+    if !matches!(building, Some(BuildingKind::Wall | BuildingKind::Gate | BuildingKind::Tower)) {
+        return Some("only a wall, gate or tower is of wood or stone".into());
     }
     None
 }

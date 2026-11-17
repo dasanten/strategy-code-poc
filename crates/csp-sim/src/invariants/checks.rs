@@ -2849,7 +2849,7 @@ pub fn outsiders_sound(world: &WorldState, terrain: &TerrainMap) -> Out {
     out
 }
 
-/// Only a wall or gate, or its site, is of stone, and only stone is written down: none is wood
+/// Only a wall, gate or tower, or its site, is of stone, and only stone is written down: none is wood
 /// (`CONTEXT.md`: Wall / Gate, Wood or stone).
 pub fn wall_materials_sound(world: &WorldState, _: &TerrainMap) -> Out {
     let name = "wall-materials-sound";
@@ -2859,7 +2859,10 @@ pub fn wall_materials_sound(world: &WorldState, _: &TerrainMap) -> Out {
         .filter(|b| {
             b.material.is_some_and(|m| {
                 m != WallMaterial::Stone
-                    || !matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate)
+                    || !matches!(
+                        b.kind,
+                        BuildingKind::Wall | BuildingKind::Gate | BuildingKind::Tower
+                    )
             })
         })
         .map(|b| {

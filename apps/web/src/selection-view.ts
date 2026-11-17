@@ -1773,8 +1773,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (stable) lines.push(...pausedBreedingLines(stable, t.residents ?? [], t.horses, t.tick))
-      // What a wall or gate, or its site, is of (`CONTEXT.md`: Wood or stone).
-      if (building.kind === 'wall' || building.kind === 'gate')
+      // What a wall, gate or tower, or its site, is of (`CONTEXT.md`: Wood or stone, Tower).
+      if (building.kind === 'wall' || building.kind === 'gate' || building.kind === 'tower')
         lines.push(isStone(building.kind, building.material) ? 'Of stone' : 'Of wood')
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
       if (building.kind === 'townHall' && live && city)
@@ -1907,10 +1907,13 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         ? t.buildings
             .filter(
               (b) =>
-                (b.kind === 'gate' || b.kind === 'wall') &&
+                (b.kind === 'gate' || b.kind === 'wall' || b.kind === 'tower') &&
                 !b.site &&
-                Math.abs(b.x - x) <= 1 &&
-                Math.abs(b.y - y) <= 1 &&
+                // Next to any tile of it: a tower is two tiles a side (`CONTEXT.md`: Tower).
+                x >= b.x - 1 &&
+                x <= b.x + (FOOTPRINT[b.kind] ?? 1) &&
+                y >= b.y - 1 &&
+                y <= b.y + (FOOTPRINT[b.kind] ?? 1) &&
                 !ownRealm(b),
             )
             .sort((a, b) => Number(b.kind === 'gate') - Number(a.kind === 'gate'))[0]

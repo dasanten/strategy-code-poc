@@ -78,6 +78,7 @@ export const BUILDABLE: readonly BuildingKind[] = [
   'trainingGround',
   'wall',
   'gate',
+  'tower',
   'road',
   'carriage',
   'haven',
@@ -138,6 +139,7 @@ export const OFF_NODES: readonly BuildingKind[] = [
   'storage',
   'wall',
   'gate',
+  'tower',
   'trainingGround',
   'haven',
 ]
@@ -362,9 +364,9 @@ export function buildingWork(kind: BuildingKind, under?: number, material?: Wall
   return workOfKind(kind, material) * workFactor(kind, under)
 }
 
-/** Whether a building of `kind` of `material` is of stone: only a wall or gate can be. */
+/** Whether a building of `kind` of `material` is of stone: only a wall, gate or tower can be. */
 export function isStone(kind: BuildingKind, material?: WallMaterial | null): boolean {
-  return material === 'stone' && (kind === 'wall' || kind === 'gate')
+  return material === 'stone' && (kind === 'wall' || kind === 'gate' || kind === 'tower')
 }
 
 /**
@@ -372,13 +374,13 @@ export function isStone(kind: BuildingKind, material?: WallMaterial | null): boo
  * wall's or gate's from `STONE_BUILD_MATERIALS`, any other's from `BUILD_MATERIALS`.
  */
 export function materialsOfKind(kind: BuildingKind, material?: WallMaterial | null): Stock {
-  if (isStone(kind, material)) return STONE_BUILD_MATERIALS[kind as 'wall' | 'gate']
+  if (isStone(kind, material)) return STONE_BUILD_MATERIALS[kind as 'wall' | 'gate' | 'tower']
   return BUILD_MATERIALS[kind] ?? {}
 }
 
 /** Work a building of `kind` of `material` takes, before `workFactor`. */
 export function workOfKind(kind: BuildingKind, material?: WallMaterial | null): number {
-  if (isStone(kind, material)) return STONE_BUILD_WORK[kind as 'wall' | 'gate']
+  if (isStone(kind, material)) return STONE_BUILD_WORK[kind as 'wall' | 'gate' | 'tower']
   return BUILD_WORK[kind] ?? 0
 }
 

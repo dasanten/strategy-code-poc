@@ -141,6 +141,40 @@ fn refuses_a_save_from_before_the_reset_saying_to_run_it() {
     }
 }
 
+/// A world with a stone tower in it round trips through the database in the current format
+/// (T109.1, format 135). The reset hasn't shipped, so the bump needs no migration step (ADR 0035):
+/// a save from before has no tower, and a server of an older format refuses the new building kind.
+#[test]
+fn a_world_with_a_tower_is_saved_and_loads_back_the_same() {
+    let conn = db();
+    let mut world = live_world();
+    conn.execute(
+        "INSERT INTO terrain (id, seed, diameter, data) VALUES (1, ?1, 16, ?2)",
+        params![world.seed, small_terrain(world.seed).tiles],
+    )
+    .unwrap();
+    world.tick += 1;
+    world.buildings.push(
+        serde_json::from_value(serde_json::json!({
+            "id": "tower1", "kind": "tower", "cityId": null, "x": 3, "y": 4, "material": "stone"
+        }))
+        .unwrap(),
+    );
+    save_world(&conn, &world).unwrap();
+    let (state, v) = latest_save(&conn).unwrap().unwrap();
+    assert_eq!(v, WORLD_FORMAT_VERSION);
+    let saved = state["buildings"].as_array().unwrap().last().unwrap().clone();
+    assert_eq!(
+        (saved["kind"].as_str(), saved["material"].as_str()),
+        (Some("tower"), Some("stone"))
+    );
+    let loaded =
+        load_or_create_world(&conn, |_| panic!("generated"), |_, _| panic!("generated"), 1)
+            .unwrap()
+            .0;
+    assert_eq!(loaded, world);
+}
+
 /// A save from before siege machines (format 133) has none and reads as having none; one with a
 /// ram round trips through the database in the current format (T110.1). The reset hasn't shipped,
 /// so format 134 needs no migration step (ADR 0035): the field is left out while empty.

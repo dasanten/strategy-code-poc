@@ -528,7 +528,7 @@ export const blow = (carried: Stock = {}, combat = 0) =>
   attackPower({ ...wikiResident({}, { combat }), carried }, AT)
 
 /** Ticks an average unarmed resident takes alone to break a tile of wall or a gate, of wood or stone. */
-export const breakTicks = (what: 'wall' | 'gate', stone = false) =>
+export const breakTicks = (what: 'wall' | 'gate' | 'tower', stone = false) =>
   Math.ceil((stone ? STONE_WALL_STRENGTH : WALL_STRENGTH)[what] / blow()) * STRIKE_TICKS
 
 /** A city's control from its residents and armed ones, and how far it reaches. */

@@ -711,6 +711,10 @@ export interface Balance {
       wood: number
       [key: string]: number
     }
+    tower: {
+      wood: number
+      [key: string]: number
+    }
     gate: {
       wood: number
       [key: string]: number
@@ -808,6 +812,7 @@ export interface Balance {
     smithy: number
     townHall: number
     wall: number
+    tower: number
     gate: number
     road: number
     house: number
@@ -831,6 +836,10 @@ export interface Balance {
       stone: number
       [key: string]: number
     }
+    tower: {
+      stone: number
+      [key: string]: number
+    }
     [key: string]: {
       stone: number
       [key: string]: number
@@ -839,6 +848,7 @@ export interface Balance {
   readonly STONE_BUILD_WORK: {
     wall: number
     gate: number
+    tower: number
     [key: string]: number
   }
   readonly MOUNTAIN_ROAD_WORK_FACTOR: number
@@ -1383,14 +1393,19 @@ export interface Balance {
   readonly WALL_STRENGTH: {
     wall: number
     gate: number
+    tower: number
     [key: string]: number
   }
   readonly STONE_WALL_STRENGTH: {
     wall: number
     gate: number
+    tower: number
     [key: string]: number
   }
   readonly BROKEN_MATERIALS_RETURNED: number
+  readonly TOWER_ROOM: number
+  readonly TOWER_SIGHT_RANGE: number
+  readonly TOWER_SHOT_REACH_BONUS: number
   readonly RAM_CREW: number
   readonly SIEGE_PUSH_SHARE: number
   readonly RAM_STRENGTH: number
@@ -1521,6 +1536,7 @@ export interface Balance {
   readonly FOOTPRINT: {
     wall: number
     gate: number
+    tower: number
     road: number
     carriage: number
     boat: number

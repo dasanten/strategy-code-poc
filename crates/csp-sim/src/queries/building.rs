@@ -156,7 +156,7 @@ pub const CARRYING_A_CHILD: &str = "carrying a child";
 pub const VEIN_RAN_DRY: &str = "the vein ran dry";
 
 /// Kinds of building that can be built so far (`BUILDABLE`).
-pub const BUILDABLE: [BuildingKind; 21] = [
+pub const BUILDABLE: [BuildingKind; 22] = [
     BuildingKind::LumberCamp,
     BuildingKind::Quarry,
     BuildingKind::Mine,
@@ -171,6 +171,7 @@ pub const BUILDABLE: [BuildingKind; 21] = [
     BuildingKind::TrainingGround,
     BuildingKind::Wall,
     BuildingKind::Gate,
+    BuildingKind::Tower,
     BuildingKind::Road,
     BuildingKind::Carriage,
     BuildingKind::Haven,
@@ -185,7 +186,7 @@ pub const PROCESSING: [BuildingKind; 3] =
     [BuildingKind::Smelter, BuildingKind::Mint, BuildingKind::Smithy];
 
 /// Kinds that go on passable land but Mountain, off any resource node (`OFF_NODES`).
-pub const OFF_NODES: [BuildingKind; 10] = [
+pub const OFF_NODES: [BuildingKind; 11] = [
     BuildingKind::Smelter,
     BuildingKind::Mint,
     BuildingKind::Smithy,
@@ -194,6 +195,7 @@ pub const OFF_NODES: [BuildingKind; 10] = [
     BuildingKind::Storage,
     BuildingKind::Wall,
     BuildingKind::Gate,
+    BuildingKind::Tower,
     BuildingKind::TrainingGround,
     BuildingKind::Haven,
 ];
@@ -209,12 +211,13 @@ pub const ON_PLAINS: [BuildingKind; 2] = [BuildingKind::Stable, BuildingKind::Fa
 pub const IN_CITY_AREA: [BuildingKind; 1] = [BuildingKind::House];
 
 /// What a build menu offers off any resource node, in its order (`OFF_NODE_BUILDS`).
-pub const OFF_NODE_BUILDS: [BuildingKind; 12] = [
+pub const OFF_NODE_BUILDS: [BuildingKind; 13] = [
     BuildingKind::TownHall,
     BuildingKind::House,
     BuildingKind::Storage,
     BuildingKind::Wall,
     BuildingKind::Gate,
+    BuildingKind::Tower,
     BuildingKind::TrainingGround,
     BuildingKind::Haven,
     BuildingKind::Stable,
@@ -392,7 +395,8 @@ pub fn build_work_of(kind: BuildingKind) -> f64 {
 /// Whether a building of `kind` of `material` is of stone (`CONTEXT.md`: Wall / Gate, Wood or
 /// stone): only a wall or gate can be.
 pub fn is_stone(kind: BuildingKind, material: Option<WallMaterial>) -> bool {
-    material == Some(WallMaterial::Stone) && matches!(kind, BuildingKind::Wall | BuildingKind::Gate)
+    material == Some(WallMaterial::Stone)
+        && matches!(kind, BuildingKind::Wall | BuildingKind::Gate | BuildingKind::Tower)
 }
 
 /// The materials a building of `kind` of `material` takes: a stone wall's or gate's from
