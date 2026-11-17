@@ -2790,11 +2790,13 @@ export function Wiki() {
           and one more while it has no food surplus, a new farm when they don't fit; up to{' '}
           {num(NPC_BUILDERS)} builders a step while it has a project; everyone else is a spare hand.
           A farm is otherwise built only when Food is short of its reserve (
-          {days(NPC_TRADE.reserveFoodDays)} of Food for everyone) with every farm at its full crew
-          of {num(WORKPLACE_MAX_WORKERS.farm ?? 0)}, never because spare hands filled the farms
-          working for surplus. It needs nobody idle for that: the new farm's farmers come from those
-          working for surplus and from its scouts first, and from other work only after them. A farm
-          already begun is finished before another. Spare hands go to the good the reserve is
+          {days(NPC_TRADE.reserveFoodDays)} of Food for everyone), or, with nothing else keeping it
+          from being full, short of the Food surplus its founding waits on (below), with every farm
+          at its full crew of {num(WORKPLACE_MAX_WORKERS.farm ?? 0)}; never because spare hands
+          filled the farms working for surplus. It needs nobody idle for that: the new farm's
+          farmers come from those working for surplus and from its scouts first, and from other
+          work only after them. A farm already begun is finished before another, and that new farm
+          comes before anything else it has begun. Spare hands go to the good the reserve is
           shortest of, as a share of what it wants of it, filling one workplace's crew before the
           next. Without a workplace for that good, the city builds one: on the nearest fitting
           resource node it knows of, or a smelter, smithy or mint in its area like a house. With
