@@ -144,7 +144,9 @@ The shared language of the game. Domain terms only — no implementation details
   workplace). So a far-off crew keeps working while one of them walks, and nobody else goes
   home for Food. How much they bring is a setting of the Work default (`crewFood`); 0 brings
   none. A resident sent to a workplace sets out with Food for the walk there and the first days
-  of work, not a fixed amount, so they last until the carrier's first round trip.
+  of work, not a fixed amount, so they last until the carrier's first round trip. An NPC
+  city's builders of a site beyond its node reach from its storage set out with the same, and go back for
+  more while they still have what the walk home eats (decided overnight, Daniel to confirm).
 - **Holding a workplace:** whoever physically works and guards a workplace gets its output.
   There is no ownership flag. Drive out the workers, move your own in, and it's yours.
 - **Spoilage:** Food slowly goes bad. Other goods don't.
