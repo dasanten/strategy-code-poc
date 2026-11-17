@@ -85,12 +85,18 @@ pub fn step_stances(world: &mut WorldState, size: i32) {
     for ci in 0..world.cities.len() {
         let city = &world.cities[ci];
         if !for_sale(city) {
-            if city.stance.is_some() {
-                world.cities[ci].stance = None;
+            if city.stance.is_some() || city.retaliating.is_some() {
+                (world.cities[ci].stance, world.cities[ci].retaliating) = (None, None);
             }
             continue;
         }
         if !first_pass_of_day(world, &city.id) {
+            continue;
+        }
+        // Turned on an Organization, it stays so until it ends (`npc_retaliate`).
+        if let Some(org) = crate::npc_retaliate::turns_on(world, city) {
+            let c = &mut world.cities[ci];
+            (c.stance, c.retaliating) = (Some(Stance::Retaliate), Some(org));
             continue;
         }
         let stance = pick_stance(world, city, size);
@@ -106,12 +112,18 @@ pub fn mood(stance: Stance) -> &'static str {
         Stance::Fortify => "arming",
         Stance::Trade => "busy trading",
         Stance::Expand => "looking to expand",
+        Stance::Retaliate => "retaliating",
     }
+}
+
+/// Whether `city` arms as under Fortify: in Fortify or Retaliate (`CONTEXT.md`: Retaliating).
+pub fn arming(city: &City) -> bool {
+    matches!(stance_of(city), Stance::Fortify | Stance::Retaliate)
 }
 
 /// How many times the soldiers it keeps by its size `city` keeps for its stance.
 pub fn soldiers_factor(city: &City) -> f64 {
-    if stance_of(city) == Stance::Fortify {
+    if arming(city) {
         NPC_STANCE.fortify_soldiers
     } else {
         1.0
@@ -120,7 +132,7 @@ pub fn soldiers_factor(city: &City) -> f64 {
 
 /// The soldiers more `city` sends with each escort for its stance.
 pub fn extra_escorts(city: &City) -> usize {
-    if stance_of(city) == Stance::Fortify {
+    if arming(city) {
         NPC_STANCE.fortify_escorts as usize
     } else {
         0
@@ -129,7 +141,7 @@ pub fn extra_escorts(city: &City) -> usize {
 
 /// How many times as far off `city` shuts its gates to an armed outsider for its stance.
 pub fn gate_watch_factor(city: &City) -> f64 {
-    if stance_of(city) == Stance::Fortify {
+    if arming(city) {
         NPC_STANCE.fortify_gate_watch
     } else {
         1.0
@@ -172,16 +184,18 @@ pub fn scouts_factor(city: &City) -> f64 {
     }
 }
 
-/// Invariant `stances-sound` (`CONTEXT.md`: Stance; ADR 0004): only an NPC city holds a stance, and
-/// none holds Grow, which is stored as none.
+/// Invariant `stances-sound` (`CONTEXT.md`: Stance; ADR 0004): only an NPC city holds a stance, none
+/// holds Grow, which is stored as none, and a city in Retaliate, and only one, has turned on someone.
 pub fn stances_sound(world: &WorldState) -> Vec<InvariantViolation> {
     world
         .cities
         .iter()
         .filter_map(|c| {
-            let why = match c.stance? {
-                _ if !for_sale(c) => "holds a stance but is no NPC city",
-                Stance::Grow => "holds Grow, which is stored as none",
+            let why = match (c.stance, c.retaliating.is_some()) {
+                (Some(_), _) if !for_sale(c) => "holds a stance but is no NPC city",
+                (Some(Stance::Grow), _) => "holds Grow, which is stored as none",
+                (Some(Stance::Retaliate), false) => "retaliates against nobody",
+                (s, true) if s != Some(Stance::Retaliate) => "turned on someone out of Retaliate",
                 _ => return None,
             };
             Some(InvariantViolation {

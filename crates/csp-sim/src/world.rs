@@ -223,6 +223,8 @@ pub fn step_world(
         // NPC cities seek allies and hire mercenaries on their own (`CONTEXT.md`: Acting first),
         // before the Trade Org army answers offers.
         crate::npc_acting_first::step_npc_acting_first(world, size);
+        // And retaliate against those who hurt them (`CONTEXT.md`: Retaliating).
+        crate::npc_retaliate::step_npc_retaliate(world, size);
         step_trade_org_army(world, size, scratch);
         step_npc_hire(world, size, scratch);
         // Gear handed out with lent soldiers is theirs to fight with now.

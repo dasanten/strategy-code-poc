@@ -93,11 +93,17 @@ pub fn demands_of(world: &WorldState, city: &City, org: &str) -> bool {
 pub fn step_npc_demands(world: &mut WorldState) {
     for ci in 0..world.cities.len() {
         let city = &world.cities[ci];
-        if !sends_demands(world, city) || !crate::npc_stance::first_pass_of_day(world, &city.id) {
+        // A city in Retaliate sends them to the realm it turned on (`CONTEXT.md`: Retaliating).
+        let against = city.retaliating.clone().filter(|_| for_sale(city));
+        if !(sends_demands(world, city) || against.is_some())
+            || !crate::npc_stance::first_pass_of_day(world, &city.id)
+        {
             continue;
         }
-        let to: Vec<String> =
-            realms_known(world, city).into_iter().filter(|r| demands_of(world, city, r)).collect();
+        let mut known =
+            if sends_demands(world, city) { realms_known(world, city) } else { Vec::new() };
+        known.extend(against.filter(|a| !known.contains(a)));
+        let to: Vec<String> = known.into_iter().filter(|r| demands_of(world, city, r)).collect();
         let city_id = city.id.clone();
         let tick = world.tick as f64;
         for org in to {

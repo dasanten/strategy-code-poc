@@ -364,6 +364,7 @@ fn found_at(
         threats: None,
         danger_places: None,
         stance: None,
+        retaliating: None,
         temperament: None,
         layout: None,
     };

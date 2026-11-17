@@ -832,6 +832,14 @@ The shared language of the game. Domain terms only — no implementation details
   city), only with very high threat and very low standing and an army that far outweighs that
   city's defenders. It ends when its threat from them has faded, a demand is paid, or its losses
   leave it the weaker; then it turns to Fortify, and an attack under way is called off.
+  Decided overnight 2026-11-17, Daniel to confirm: it turns on a realm (only a realm for now) whose
+  threat reaches a balance number while it knows of a recent crime of theirs against it, picked
+  at its first planning pass of a game day like any stance, and checks each planning pass whether
+  it is over (faded below a balance number, a paid demand clearing it, or its strength below
+  theirs). It sends that realm demands as a militarist city does. A march takes its soldiers beyond
+  its hall and gate posts to the town hall of the realm's city nearest it; held to the end, that
+  city leaves the realm with its residents and goes on as an NPC city of its own (the NPC city
+  takes no city into itself). Whoever sees it reads "retaliating against" and the realm's name.
 - **Taking a node** (Epic 98): an NPC city in Expand that is short of a good it has no node for
   goes for the nearest node of it that it knows. One nobody works it builds on, sending its crew
   with an escort. One another Organization holds only a militarist city takes, and only when it far

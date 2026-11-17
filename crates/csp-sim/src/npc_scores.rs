@@ -22,7 +22,7 @@ pub fn job_weights(city: &City) -> NpcJobWeights {
         return w;
     }
     let mut w = NPC_JOB_WEIGHTS;
-    if crate::npc_stance::stance_of(city) == csp_shared::world::Stance::Fortify {
+    if crate::npc_stance::arming(city) {
         w.danger *= NPC_STANCE.fortify_danger;
     }
     w

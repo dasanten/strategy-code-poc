@@ -1247,6 +1247,30 @@ pub struct NpcActingFirst {
 pub const NPC_ACTING_FIRST: NpcActingFirst =
     NpcActingFirst { ally_threat: 30.0, hire_threat: 30.0, hire_soldiers: 4.0, hire_days: 7.0 };
 
+/// When an NPC city retaliates and marches (`CONTEXT.md`: Retaliating; T98.8).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NpcRetaliate {
+    /// The threat from one realm at which a city turns on it.
+    pub threat: f64,
+    /// It ends once its threat from them has faded below this.
+    pub ends_below: f64,
+    /// The threat at which it marches on one of their cities.
+    pub march_threat: f64,
+    /// It marches only with its standing toward them at this or below.
+    pub march_standing: f64,
+    /// And only with an army this many times as strong as that city's defenders.
+    pub march_outweigh: f64,
+}
+
+pub const NPC_RETALIATE: NpcRetaliate = NpcRetaliate {
+    threat: 60.0,
+    ends_below: 15.0,
+    march_threat: 120.0,
+    march_standing: -60.0,
+    march_outweigh: 3.0,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TradeOrgHq {
@@ -3310,6 +3334,7 @@ pub fn balance_json() -> Value {
     );
     m.insert("NPC_STANCE".into(), to_value(NPC_STANCE).expect("serialisable"));
     m.insert("NPC_ACTING_FIRST".into(), to_value(NPC_ACTING_FIRST).expect("serialisable"));
+    m.insert("NPC_RETALIATE".into(), to_value(NPC_RETALIATE).expect("serialisable"));
     m.insert("TRADE_ORG_HQ".into(), to_value(TRADE_ORG_HQ).expect("serialisable"));
     m.insert("TRADE_ORG_HQ_MIN_DISTANCE".into(), json!(TRADE_ORG_HQ_MIN_DISTANCE));
     m.insert("TRADING_POST_REGION".into(), json!(TRADING_POST_REGION));

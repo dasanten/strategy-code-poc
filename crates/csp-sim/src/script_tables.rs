@@ -1468,8 +1468,14 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "stance",
                 r#type: ScriptType::String,
-                description: "What an NPC city is after for now: \"grow\", \"fortify\", \"trade\" or \"expand\".",
+                description: "What an NPC city is after for now: \"grow\", \"fortify\", \"trade\", \"expand\" or \"retaliate\".",
                 null_when: Some("for a realm’s city and a city of the Trade Organization"),
+            },
+            ScriptField {
+                name: "retaliatingAgainst",
+                r#type: ScriptType::String,
+                description: "The name of the Organization an NPC city in Retaliate turned on.",
+                null_when: Some("unless its stance is \"retaliate\""),
             },
             ScriptField {
                 name: "refuses",

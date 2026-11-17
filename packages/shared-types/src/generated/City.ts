@@ -39,4 +39,8 @@ temperament?: Temperament,
  * For an NPC city, what it is after for now (`CONTEXT.md`: Stance), picked again each game day.
  * Left out while it grows, and for a trading post and a city a Player holds.
  */
-stance?: Stance, };
+stance?: Stance, 
+/**
+ * For an NPC city in Retaliate, the Organization it turned on (`CONTEXT.md`: Retaliating).
+ */
+retaliating?: string, };

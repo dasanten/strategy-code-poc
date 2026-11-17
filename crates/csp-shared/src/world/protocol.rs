@@ -138,6 +138,12 @@ pub struct RememberedCity {
     pub stance: Option<Stance>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
+    pub retaliating: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub retaliating_against: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub price: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional, type = "true")]

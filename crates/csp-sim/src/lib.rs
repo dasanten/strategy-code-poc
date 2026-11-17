@@ -75,6 +75,7 @@ pub mod npc_patrols;
 pub mod npc_plan;
 pub mod npc_posts;
 pub mod npc_repair;
+pub mod npc_retaliate;
 pub mod npc_revive;
 pub mod npc_roads;
 pub mod npc_scores;

@@ -340,6 +340,13 @@
     "hireSoldiers": 4.0,
     "hireDays": 7.0
   },
+  "NPC_RETALIATE": {
+    "threat": 60.0,
+    "endsBelow": 15.0,
+    "marchThreat": 120.0,
+    "marchStanding": -60.0,
+    "marchOutweigh": 3.0
+  },
   "TRADE_ORG_HQ": {
     "innerRadius": 16.0,
     "outerRadius": 40.0,

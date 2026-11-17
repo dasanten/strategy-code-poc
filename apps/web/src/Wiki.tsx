@@ -174,6 +174,7 @@ import {
   NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT,
   NPC_STANCE,
   NPC_ACTING_FIRST,
+  NPC_RETALIATE,
   NPC_FOUND_VILLAGE_RESIDENTS,
   NPC_FULL_DAYS,
   NPC_FULL_DAYS_LEAST,
@@ -3368,7 +3369,25 @@ export function Wiki() {
         </p>
         <p>
           Whoever sees an NPC city reads its stance on its card as a mood line: growing, arming,
-          busy trading or looking to expand. Scripts see it as the city's stance.
+          busy trading, looking to expand, or retaliating against whom. Scripts see it as the
+          city's stance.
+        </p>
+        <h3>Retaliating</h3>
+        <p>
+          An NPC city turns on a realm (<b>Retaliate</b>) once it feels a threat of{' '}
+          {num(NPC_RETALIATE.threat)} from it and knows of a recent crime of theirs against it,
+          such as its traders killed. It arms as under Fortify and sends that realm demands for
+          Coins. Rarely it marches: with a threat of {num(NPC_RETALIATE.marchThreat)}, its standing
+          toward them at {signed(NPC_RETALIATE.marchStanding)} or below, and its soldiers beyond its
+          hall and gate posts {num(NPC_RETALIATE.marchOutweigh)} times as strong as the defenders
+          of their nearest city, those soldiers walk to that city's town hall and occupy it. Held
+          to the end, the city leaves the realm and goes on as an NPC city of its own. Never
+          against a realm in its shelter.
+        </p>
+        <p>
+          It ends when its threat from them fades below {num(NPC_RETALIATE.endsBelow)} (a paid
+          demand clears it at once) or its losses leave it weaker than them. Then it turns to
+          Fortify, and a march under way is called off: its soldiers walk home.
         </p>
         <p>
           An NPC city sells only what it holds above this reserve and buys only what it is short of.

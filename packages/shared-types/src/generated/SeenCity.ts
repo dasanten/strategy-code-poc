@@ -18,7 +18,12 @@ import type { TradeOrgCity } from "./TradeOrgCity.js";
  * for an NPC city its price or that it won't sell, that it refuses them, what it would lend and
  * its trade prices, and its horses in sight at its stables.
  */
-export type SeenCity = { price?: number, 
+export type SeenCity = { 
+/**
+ * For an NPC city in Retaliate, the name of the Organization it turned on, for its mood line
+ * (`CONTEXT.md`: Retaliating).
+ */
+retaliatingAgainst?: string, price?: number, 
 /**
  * Always `true` when present.
  */
@@ -53,4 +58,8 @@ temperament?: Temperament,
  * For an NPC city, what it is after for now (`CONTEXT.md`: Stance), picked again each game day.
  * Left out while it grows, and for a trading post and a city a Player holds.
  */
-stance?: Stance, };
+stance?: Stance, 
+/**
+ * For an NPC city in Retaliate, the Organization it turned on (`CONTEXT.md`: Retaliating).
+ */
+retaliating?: string, };

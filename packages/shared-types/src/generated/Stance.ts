@@ -4,4 +4,4 @@
  * What an NPC city is after for now (`City.stance`, `CONTEXT.md`: Stance). Retaliate comes with
  * T98.8.
  */
-export type Stance = "grow" | "fortify" | "trade" | "expand";
+export type Stance = "grow" | "fortify" | "trade" | "expand" | "retaliate";
