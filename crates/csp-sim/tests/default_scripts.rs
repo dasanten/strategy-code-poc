@@ -635,6 +635,18 @@ fn stocked(world: &mut WorldState) {
     );
 }
 
+/// Twenty worn houses of c1, w1 its resident (`CONTEXT.md`: Repairing).
+fn many_worn_houses(world: &mut WorldState) {
+    w1(world).city_id = Some("c1".into());
+    for i in 0..20 {
+        add(
+            world,
+            json!({ "id": format!("h{i}"), "kind": "house", "cityId": "c1",
+                    "x": 6 + (i % 5) * 2, "y": 10 + (i / 5) * 2, "decay": 0.3 + 0.01 * f64::from(i) }),
+        );
+    }
+}
+
 fn w1(world: &mut WorldState) -> &mut csp_shared::world::Resident {
     &mut world.residents[0]
 }
@@ -838,6 +850,13 @@ fn keeps_every_default_at_most_a_quarter_of_a_residents_budget() {
             case(stable_memory(), |world| {
                 building_a_stable(world);
                 w1(world).carried = Stock::from([(Good::Food, 4.0), (Good::Wood, 40.0)]);
+            }),
+            // Nothing to build: picking the worst of many worn houses of the city to repair.
+            case(json!({}), many_worn_houses),
+            // Repairing one away from it: walking there, the Wood fetched.
+            case(json!({ "repairId": "h0" }), |world| {
+                many_worn_houses(world);
+                w1(world).carried = Stock::from([(Good::Food, 4.0), (Good::Wood, 5.0)]);
             }),
         ],
     ));

@@ -27,6 +27,7 @@ use crate::npc_growth::{
 use crate::npc_patrols::{next_stop, share_patrols};
 use crate::npc_plan::{food_short, plan_city, plan_due, project_done, run_residents, Places};
 use crate::npc_posts::{free_soldiers, soldier_posts, stands_posts, SoldierPost};
+use crate::npc_repair::take_repair;
 use crate::npc_revive::{revive_target, run_reviver};
 use crate::npc_roads::{lay_road, on_road_work, WayFinder};
 use crate::npc_scouts::{give_up_site, send_scout, step_scouts};
@@ -408,7 +409,8 @@ fn run_city(
         }
         if job.as_ref().is_some_and(|j| j.kind == CityJobKind::Road)
             && world.city_plans.contains_key(city_id)
-            && lay_road(world, &city, i, &crew, store, size)
+            && (lay_road(world, &city, i, &crew, store, size)
+                || take_repair(world, &city, i, store, size, true, true))
         {
             continue;
         }
@@ -426,6 +428,12 @@ fn run_city(
         // A soldier with worn gear takes it to the smithy, with what mending it takes, before
         // stowing anything (`CONTEXT.md`: Mending).
         if crate::npc_mending::go_mend(world, &city, i, storage) {
+            continue;
+        }
+        // A builder carrying what a repair lacks takes it there rather than putting it away.
+        let builder = job.as_ref().is_some_and(|j| j.kind == CityJobKind::Build);
+        if builder && free > 0.0 && take_repair(world, &city, i, store, size, false, false) {
+            free -= 1.0;
             continue;
         }
         let input = input_of(world, job.as_ref());
@@ -487,6 +495,11 @@ fn run_city(
                         free -= 1.0;
                         continue;
                     }
+                }
+                // With nothing to build, they repair its buildings, worst first.
+                if take_repair(world, &city, i, store, size, false, true) {
+                    free -= 1.0;
+                    continue;
                 }
             }
             if let Some(bid) = job.as_ref().and_then(|j| j.building_id.clone()) {

@@ -65,6 +65,7 @@ import {
   WORK_SKILL_EFFECT,
   WORK_SKILL_LIMIT,
   WORK_STRENGTH_AVERAGE,
+  TOOLS_WORK_BONUS,
 } from './constants.js'
 
 /**
@@ -189,13 +190,21 @@ export function carriageCapacityWith(horse: HorseLike | undefined): number {
 export function buildWork(resident: ResidentLike, tick: number): number {
   const strength = statValue(resident, 'strength', tick) / BUILD_STRENGTH_AVERAGE
   const skill = (resident.skills.construction ?? 0) * CONSTRUCTION_SKILL_EFFECT
-  return strength * (1 + Math.min(CONSTRUCTION_SKILL_LIMIT, skill))
+  return strength * (1 + Math.min(CONSTRUCTION_SKILL_LIMIT, skill)) * toolsFactor(resident)
+}
+
+/**
+ * How many times their plain pace a resident works (`CONTEXT.md`: Tools): faster carrying a set of
+ * Tools, however many. Another realm's resident comes without what they carry: the plain pace.
+ */
+export function toolsFactor(resident: { carried?: Partial<Record<string, number>> }): number {
+  return (resident.carried?.tools ?? 0) >= 1 ? 1 + TOOLS_WORK_BONUS : 1
 }
 
 function workPace(resident: ResidentLike, perDay: number, skill: string, tick: number): number {
   const strength = statValue(resident, 'strength', tick) / WORK_STRENGTH_AVERAGE
   const skilled = 1 + Math.min(WORK_SKILL_LIMIT, (resident.skills[skill] ?? 0) * WORK_SKILL_EFFECT)
-  return (perDay / TICKS_PER_GAME_DAY) * strength * skilled
+  return (perDay / TICKS_PER_GAME_DAY) * strength * skilled * toolsFactor(resident)
 }
 
 /** How much of a unit of `good` a worker makes per tick, using `skill`. */

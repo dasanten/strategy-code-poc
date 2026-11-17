@@ -722,6 +722,7 @@ export const GOODS = [
   'steelSword',
   'steelShield',
   'steelArmour',
+  'tools',
 ] as const
 
 /** Goods that make a resident armed (`CONTEXT.md`: Soldier, Weapons and armour). */

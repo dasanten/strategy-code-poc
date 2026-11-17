@@ -17,7 +17,7 @@ use csp_shared::world::{
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::queries::balance::{build_work, construction_learned, skill_of};
 use crate::queries::building::{build_materials, build_work_of, site_work_of, CARRYING_A_CHILD};
-use crate::queries::names::{held, kind_name, placed};
+use crate::queries::names::{held, held_in, kind_name, placed};
 use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
 use crate::world_index::{building_index, resident_index};
@@ -91,6 +91,112 @@ pub fn step_decay(world: &mut WorldState) {
         let lost = ((b.decay.unwrap_or(0.0) + 1.0 / days) * 1e9).round() / 1e9;
         b.decay = Some(lost.min(1.0));
     }
+}
+
+/// The Trade Organization repairs its own from its stock (`CONTEXT.md`: Decay): at the turn of
+/// each game day every worn building of one of its cities, the HQ or a trading post, is good
+/// again, its repair materials taken from what that city's storages and warehouses hold above
+/// their stock floor, as far as that goes: a repair never sends it after goods. So none of them
+/// falls to ruin while it stands. Returns how many it repaired.
+pub fn trade_org_repairs(world: &mut WorldState) -> usize {
+    if world.tick == 0 || world.tick as f64 % TICKS_PER_GAME_DAY != 0.0 {
+        return 0;
+    }
+    let theirs: Vec<String> =
+        world.cities.iter().filter(|c| c.trade_org.is_some()).map(|c| c.id.clone()).collect();
+    if theirs.is_empty() {
+        return 0;
+    }
+    let worn: Vec<usize> = (0..world.buildings.len())
+        .filter(|&i| {
+            let b = &world.buildings[i];
+            b.city_id.as_ref().is_some_and(|c| theirs.contains(c))
+                && condition_of(b).is_some_and(|c| c != Condition::Good)
+        })
+        .collect();
+    for &i in &worn {
+        let city = world.buildings[i].city_id.clone();
+        let stores = |s: &Building| {
+            matches!(s.kind, BuildingKind::Storage | BuildingKind::Warehouse)
+                && s.site.is_none()
+                && s.city_id == city
+        };
+        // What its stores hold above their stock floor, so a repair never sends it after goods.
+        let floor = world
+            .cities
+            .iter()
+            .find(|c| Some(&c.id) == city.as_ref())
+            .map(|c| crate::npc_chain::trade_org_reserve(world, c))
+            .unwrap_or_default();
+        let mut lacks = Stock::new();
+        for (good, units) in repair_materials_of(&world.buildings[i]) {
+            let held_there: f64 = world
+                .buildings
+                .iter()
+                .filter(|s| stores(s))
+                .map(|s| held_in(s.stock.as_ref(), good))
+                .sum();
+            let spare = (held_there - held(&floor, good)).max(0.0).min(units);
+            if spare > 0.0 {
+                lacks.insert(good, spare);
+            }
+        }
+        for s in &mut world.buildings {
+            if lacks.is_empty() {
+                break;
+            }
+            let stores = matches!(s.kind, BuildingKind::Storage | BuildingKind::Warehouse);
+            if !stores || s.site.is_some() || s.city_id != city {
+                continue;
+            }
+            let Some(stock) = s.stock.as_mut() else { continue };
+            take_from(stock, &mut lacks);
+        }
+        let b = &mut world.buildings[i];
+        b.decay = None;
+        b.repair = None;
+        b.ruined_at = None;
+    }
+    worn.len()
+}
+
+/// Takes what `stock` holds of `wanted` out of it, and off `wanted`.
+fn take_from(stock: &mut Stock, wanted: &mut Stock) {
+    for (good, units) in wanted.iter_mut() {
+        let has = held(stock, *good);
+        let n = has.min(*units);
+        if n <= 0.0 {
+            continue;
+        }
+        *units -= n;
+        if has - n > 0.0 {
+            stock.insert(*good, has - n);
+        } else {
+            stock.shift_remove(good);
+        }
+    }
+    wanted.retain(|_, n| *n > 0.0);
+}
+
+/// The buildings of `city_id` that need repairing, worst first (most condition lost), then by
+/// id: its roads alone with `roads`, else all but its roads (`CONTEXT.md`: Repairing: an NPC
+/// city's builders repair its buildings, its road crew its roads).
+pub fn worn_of_city<'w>(world: &'w WorldState, city_id: &str, roads: bool) -> Vec<&'w Building> {
+    let mut out: Vec<&Building> = world
+        .buildings
+        .iter()
+        .filter(|b| {
+            b.city_id.as_deref() == Some(city_id)
+                && repairable(b)
+                && decays(b)
+                && (b.kind == BuildingKind::Road) == roads
+        })
+        .collect();
+    out.sort_by(|a, b| {
+        let lost = |x: &Building| x.decay.unwrap_or(0.0);
+        lost(b).total_cmp(&lost(a)).then_with(|| a.id.cmp(&b.id))
+    });
+    out
 }
 
 /// The materials a repair of a building of `kind` takes (`REPAIR_MATERIALS_SHARE` of its
@@ -245,6 +351,7 @@ pub fn resolve_repairing(
                 x.work = total;
             }
             world.residents[ri].skills.insert(SkillName::Construction, had + learned);
+            crate::wear::wear_tools(world, ri);
         }
         let b = &mut world.buildings[bi];
         if repair_work_needed(b) == 0.0 && repair_materials_needed(b).is_empty() {

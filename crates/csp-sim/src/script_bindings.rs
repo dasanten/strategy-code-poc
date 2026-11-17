@@ -305,20 +305,20 @@ fn equipment_view(r: &Resident) -> Value {
     }))
 }
 
-/// The condition of a resident's equipped pieces as their `condition` view (`CONTEXT.md`: Wear),
-/// `null` for an empty slot.
+/// The condition of a resident's equipped pieces and their Tools as their `condition` view
+/// (`CONTEXT.md`: Wear, Tools), `null` for an empty slot or no Tools.
 fn condition_view(world: &WorldState, r: &Resident) -> Value {
-    use crate::equipment::Slot;
-    use crate::wear::{condition_name, slot_condition};
+    use crate::wear::{condition_name, gear_condition};
+    let gear = gear_condition(world, r);
     let fields = script_view("condition").map_or(&[][..], |v| v.fields);
     Value::frozen_fields(fields.iter().map(|f| {
-        let slot = match f.name {
-            "weapon" => Some(Slot::Weapon),
-            "shield" => Some(Slot::Shield),
-            "armour" => Some(Slot::Armour),
+        let c = match f.name {
+            "weapon" => gear.weapon,
+            "shield" => gear.shield,
+            "armour" => gear.armour,
+            "tools" => gear.tools,
             _ => None,
         };
-        let c = slot.and_then(|s| slot_condition(world, r, s));
         (f.name, c.map_or(Value::Null, |c| Value::string(condition_name(c))))
     }))
 }
@@ -1303,6 +1303,40 @@ impl<'a> ScriptBindings<'a> {
                         .collect(),
                 };
                 Json::Array(goods)
+            }
+            "wornBuildings" => {
+                let city = arg(0)
+                    .and_then(Value::as_str)
+                    .and_then(|id| world.cities.iter().find(|c| c.id == id));
+                let ours = city.is_some_and(|c| {
+                    self.side.is_some()
+                        && (if self.npc() { Some(&c.id) } else { c.realm_id.as_ref() })
+                            == self.side.as_ref()
+                });
+                let Some(city) = city.filter(|_| ours) else { return Ok(Json::Array(vec![])) };
+                let near = self.resident.map(|_| (self.me().x as i32, self.me().y as i32));
+                let mut worn: Vec<&Building> = world
+                    .buildings
+                    .iter()
+                    .filter(|b| {
+                        crate::repair::decays(b)
+                            && crate::repair::repairable(b)
+                            && (self.own_building(b)
+                                || (b.city_id.is_none() && building_realm(world, b).is_none()))
+                            && in_city_area(world, &city.id, b.x, b.y, size)
+                    })
+                    .collect();
+                let away = |b: &Building| {
+                    near.map_or(0.0, |at| wrap_distance(size, at, (b.x as i32, b.y as i32)))
+                };
+                worn.sort_by(|a, b| {
+                    let lost = |x: &Building| x.decay.unwrap_or(0.0);
+                    lost(b)
+                        .total_cmp(&lost(a))
+                        .then_with(|| away(a).total_cmp(&away(b)))
+                        .then_with(|| a.id.cmp(&b.id))
+                });
+                Json::Array(worn.into_iter().filter_map(|b| self.as_seen_building(b)).collect())
             }
             "materialsNeeded" => {
                 let Some(b) = self.building_of(arg(0)).filter(|b| b.site.is_some()) else {

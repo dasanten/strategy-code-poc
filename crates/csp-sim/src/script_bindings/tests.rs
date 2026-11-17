@@ -173,6 +173,7 @@ fn describe_every_field_of_everything_the_queries_and_me_hand_a_script() {
         ("outputOf", "outputOf(building(\"s1\"))"),
         ("materialsNeeded", "materialsNeeded(building(\"site1\"))"),
         ("repairNeeded", "repairNeeded(building(\"s1\"))"),
+        ("wornBuildings", "wornBuildings(\"c1\")"),
         ("terrainAt", "terrainAt(10, 10)"),
         ("distance", "distance(me, building(\"s1\"))"),
         ("floor", "floor(2.5)"),
@@ -644,7 +645,10 @@ fn a_script_sees_the_condition_of_its_own_residents_gear_and_not_of_others() {
         crate::equipment::settle_all(w);
     };
     let out = answers(&[("me", "me.condition"), ("all", "residents()")], worn);
-    assert_eq!(out["me"], json!({ "weapon": "worn", "shield": null, "armour": null }));
+    assert_eq!(
+        out["me"],
+        json!({ "weapon": "worn", "shield": null, "armour": null, "tools": null })
+    );
     let seen =
         |id: &str| out["all"].as_array().unwrap().iter().find(|e| e["id"] == id).unwrap().clone();
     assert_eq!(seen("a1")["condition"], out["me"]);

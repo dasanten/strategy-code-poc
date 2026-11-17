@@ -380,6 +380,7 @@ export interface Balance {
       sword: number
       shield: number
       armour: number
+      tools: number
       [key: string]: number
     }
     [key: string]: number | {
@@ -395,6 +396,7 @@ export interface Balance {
       sword: number
       shield: number
       armour: number
+      tools: number
       [key: string]: number
     }
   }
@@ -415,6 +417,7 @@ export interface Balance {
     steelSword: number
     steelShield: number
     steelArmour: number
+    tools: number
     [key: string]: number
   }
   readonly HQ_FLOOR_FACTOR: number
@@ -435,6 +438,7 @@ export interface Balance {
     steelSword: number
     steelShield: number
     steelArmour: number
+    tools: number
     [key: string]: number
   }
   readonly PRICE_REFERENCE_FLOORS: number
@@ -483,6 +487,7 @@ export interface Balance {
     steelSword: number
     steelShield: number
     steelArmour: number
+    tools: number
     [key: string]: number
   }
   readonly WEAPON_ATTACK: {
@@ -999,6 +1004,24 @@ export interface Balance {
         steelArmour: number
         [key: string]: number
       }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        tools: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        tools: number
+        [key: string]: number
+      }
     })[]
     [key: string]: ({
       input: {
@@ -1176,6 +1199,24 @@ export interface Balance {
         steelArmour: number
         [key: string]: number
       }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        tools: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        tools: number
+        [key: string]: number
+      }
     })[]
   }
   readonly BATCHES_PER_DAY: {
@@ -1197,6 +1238,8 @@ export interface Balance {
   readonly WORK_SKILL_EFFECT: number
   readonly WORK_SKILL_LIMIT: number
   readonly WORK_SKILL_MAX: number
+  readonly TOOLS_WORK_BONUS: number
+  readonly TOOLS_WORK_DAYS: number
   readonly WORK_SKILL_PER_DAY: number
   readonly TEARDOWN_WORK_SHARE: number
   readonly TEARDOWN_MATERIALS_RETURNED: number

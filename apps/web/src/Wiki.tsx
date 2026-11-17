@@ -276,6 +276,8 @@ import {
   STRIKE_TICKS,
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
+  TOOLS_WORK_BONUS,
+  TOOLS_WORK_DAYS,
   DECAY_WORN,
   DECAY_NEARLY_RUIN,
   REPAIR_MATERIALS_SHARE,
@@ -1757,6 +1759,22 @@ export function Wiki() {
             )}
           </tbody>
         </table>
+        <h3>Tools</h3>
+        <p>
+          <strong>Tools</strong> are a good a smithy makes: {num(forged('tools').input.iron ?? 0)}{' '}
+          Iron and {num(forged('tools').input.wood ?? 0)} Wood make a set, which weighs{' '}
+          {num(GOOD_WEIGHT.tools ?? 0)} kg. Iron only. A resident carrying a set works{' '}
+          {pct(TOOLS_WORK_BONUS)} faster: at a workplace they make that much more, and at a
+          construction site they build, tear down and repair that much faster. Without Tools they
+          work at the plain pace, so nothing stops for want of them. They aren't equipped: carrying
+          one set is enough, a second adds nothing, and nobody else sees them. A workplace's card
+          counts them in what each of your workers makes.
+        </p>
+        <p>
+          Tools wear with each day's work and break after about {days(TOOLS_WORK_DAYS)} of it;
+          their condition reads like a weapon's (Wear). Warehouses buy and sell them like any good
+          (a floor of {num(WAREHOUSE_FLOOR.tools ?? 0)}).
+        </p>
         <h3>Production chains</h3>
         <ul>
           <li>One farmer feeds {num(residentsPerFarmer())} residents.</li>
@@ -1877,6 +1895,17 @@ export function Wiki() {
           in any storage, Repair ends and your realm log says why. Anyone's building can be
           repaired. Scripts repair with <code>repair(buildingId)</code> on the building's tile and
           ask what it lacks with <code>repairNeeded(building)</code>.
+        </p>
+        <p>
+          Some repair <strong>on their own</strong>. A resident running your Build default with no
+          construction site to join (none picked, none on their tile) repairs the worn buildings
+          in their city's area instead, worst first, then nearest, one after another, fetching the
+          materials as above; with none left the script ends. Buildings further off take a Repair
+          order. Scripts find what needs repairing with <code>wornBuildings(cityId)</code>. An NPC
+          city's builders repair its buildings and its road crew its roads, worst first, from what
+          its storage holds above its reserve. The Trade Organization repairs its own from its
+          stock at the turn of each day, so the HQ and its trading posts never fall to ruin while
+          it stands.
         </p>
         <table>
           <thead>

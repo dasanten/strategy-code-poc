@@ -186,6 +186,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         },
         Invariant { name: "conditions-in-range", check: checks::conditions_in_range },
         Invariant { name: "repair-orders-on-buildings", check: checks::repair_orders_on_buildings },
+        Invariant { name: "trade-org-kept-up", check: checks::trade_org_kept_up },
         Invariant { name: "ruins-ruined", check: checks::ruins_ruined },
         Invariant { name: "nodes-on-fitting-terrain", check: checks::nodes_on_fitting_terrain },
         Invariant { name: "realm-logs-in-order", check: checks::realm_logs_in_order },

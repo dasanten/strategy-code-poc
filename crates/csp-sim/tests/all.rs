@@ -160,6 +160,8 @@ mod tasks_started_directly;
 mod teaching;
 #[path = "teardown.rs"]
 mod teardown;
+#[path = "tools.rs"]
+mod tools;
 #[path = "trade_org_debt_demand.rs"]
 mod trade_org_debt_demand;
 #[path = "trade_org_layout.rs"]

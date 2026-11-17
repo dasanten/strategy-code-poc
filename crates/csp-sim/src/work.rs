@@ -198,6 +198,7 @@ pub fn resolve_work(world: &mut WorldState, actions: &[WorkAction], scratch: &mu
         let had = skill_of(r, skill);
         work_order(world, ri).progress += gain;
         world.residents[ri].skills.insert(skill, had + learned);
+        crate::wear::wear_tools(world, ri);
         while work_order(world, ri).progress >= 1.0 {
             if let Some(recipe) = recipe {
                 if !has_input(world, &world.buildings[pi], recipe) {
