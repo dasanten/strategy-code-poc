@@ -120,6 +120,7 @@ pub fn heir_takes_over(world: &mut WorldState, realm_id: &str, heir_id: &str, si
     for c in world.cities.iter_mut().filter(|c| others.contains(&c.id)) {
         c.realm_id = None;
         c.layout = Some(pick_layout(seed, &c.id));
+        c.temperament.get_or_insert_with(|| crate::temperament::pick_temperament(seed, &c.id));
     }
     for c in &others {
         change_standing(world, c, realm_id, FORMER_PLAYER_STANDING);

@@ -249,3 +249,16 @@ fn the_escort_fights_whoever_goes_for_the_trader() {
         other => panic!("{other:?}"),
     }
 }
+
+#[test]
+fn more_soldiers_go_along_a_way_past_a_danger_place() {
+    use csp_shared::world::DangerPlace;
+    let mut world = crate::test_world::empty_world();
+    crate::test_world::add_city(&mut world, "n1", None, 100.0, 100.0, None);
+    let city = |w: &WorldState| w.cities[0].clone();
+    let before = super::founding_escorts_wanted(&world, &city(&world), 10, (200, 100));
+    world.cities[0].danger_places = Some(vec![DangerPlace { x: 150.0, y: 105.0, weight: 1.0 }]);
+    assert_eq!(super::founding_escorts_wanted(&world, &city(&world), 10, (200, 100)), before + 1);
+    // Not on the way north.
+    assert_eq!(super::founding_escorts_wanted(&world, &city(&world), 10, (100, 20)), before);
+}

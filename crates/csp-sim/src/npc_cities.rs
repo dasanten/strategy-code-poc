@@ -235,7 +235,14 @@ pub fn found_npc_city(
         outsiders: None,
         alarmed_attackers: None,
         outweighed: None,
+        threats: None,
+        danger_places: None,
         layout: trade_org.is_none().then(|| pick_layout(world.seed, &id)),
+        stance: None,
+        retaliating: None,
+        temperament: trade_org
+            .is_none()
+            .then(|| crate::temperament::pick_temperament(world.seed, &id)),
     };
     let b = |world: &mut WorldState, k, bx, by| {
         building(new_id("b", &mut world.next_id), k, &id, bx, by)

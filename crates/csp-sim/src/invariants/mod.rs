@@ -281,6 +281,7 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "outweighed-sound",
             check: |w, t| crate::persuasion::outweighed_sound(w, t.size),
         },
+        Invariant { name: "threat-sound", check: |w, _| crate::npc_threat::threat_sound(w) },
         Invariant {
             name: "former-players-sound",
             check: |w, _| crate::standing::former_players_sound(w),
@@ -392,6 +393,12 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, _t| crate::city_layout::city_layouts_sound(w),
         },
         Invariant {
+            name: "trading-posts-have-no-temperament",
+            check: |w, _t| crate::temperament::trading_posts_have_no_temperament(w),
+        },
+        Invariant { name: "stances-sound", check: |w, _t| crate::npc_stance::stances_sound(w) },
+        Invariant { name: "marches-sound", check: |w, _t| crate::npc_retaliate::marches_sound(w) },
+        Invariant {
             name: "city-streets-sound",
             check: |w, _t| crate::city_layout::city_streets_sound(w),
         },
@@ -445,6 +452,15 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant {
             name: "npc-patrols-sound",
             check: |w, _t| crate::npc_patrols::npc_patrols_sound(w),
+        },
+        Invariant { name: "npc-hunts-sound", check: |w, _t| crate::npc_hunts::npc_hunts_sound(w) },
+        Invariant {
+            name: "npc-takings-sound",
+            check: |w, _t| crate::npc_take_node::npc_takings_sound(w),
+        },
+        Invariant {
+            name: "npc-demands-sound",
+            check: |w, _t| crate::npc_demands::npc_demands_sound(w),
         },
         Invariant {
             name: "npc-training-grounds-bounded",

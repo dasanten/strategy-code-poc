@@ -58,6 +58,7 @@ mod tests {
             name: None,
             demands_sent_at: None,
             heir_id: None,
+            founded_at: None,
         });
         let what = || RealmEventWhat::FoodSpoiled { units: 1.0 };
         record_event(&mut world, None, what());

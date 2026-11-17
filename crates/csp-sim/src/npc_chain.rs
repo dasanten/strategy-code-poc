@@ -218,6 +218,13 @@ pub fn short_goods(
     shortages(world, city, size, project).into_iter().map(|s| s.good).collect()
 }
 
+/// How many times its `NPC_SURPLUS_CAP` an NPC city works for surplus up to (`surplusSteps`): one
+/// for each step of its needs, less under Trade (`NPC_STANCE.trade_surplus_cap`, `CONTEXT.md`:
+/// Stance), so more goes to market.
+pub fn surplus_steps(world: &WorldState, city: &City) -> f64 {
+    npc_needs_scale(world, city) * crate::npc_stance::surplus_cap_factor(city)
+}
+
 /// How an NPC city weighs its workplaces for surplus work (`surplusWork`, `CONTEXT.md`: Spare
 /// hands' work), from what it holds now: for a workplace, how full its good's cap is
 /// (`NPC_SURPLUS_CAP` for each step of its needs, past the reserve), below 1 and lowest for the
@@ -237,7 +244,7 @@ impl SurplusWork {
     pub fn of(world: &WorldState, city: &City, storage: Option<&Building>) -> Self {
         let stock = npc_city_stock(world, city);
         let reserve = npc_reserve(world, city);
-        let steps = npc_needs_scale(world, city);
+        let steps = surplus_steps(world, city);
         let mut spare = Stock::new();
         for (good, n) in storage.and_then(|s| s.stock.as_ref()).into_iter().flatten() {
             spare.insert(*good, n - held(&reserve, *good));

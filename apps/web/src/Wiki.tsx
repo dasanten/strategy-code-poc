@@ -171,6 +171,10 @@ import {
   NPC_FOUND_REACH,
   NPC_FOUND_RESIDENTS_PER_MEMBER,
   NPC_FOUND_STANDING,
+  NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT,
+  NPC_STANCE,
+  NPC_ACTING_FIRST,
+  NPC_RETALIATE,
   NPC_FOUND_VILLAGE_RESIDENTS,
   NPC_FULL_DAYS,
   NPC_FULL_DAYS_LEAST,
@@ -267,6 +271,16 @@ import {
   DEMAND_YIELD_RESPECT_MIN,
   DEMAND_YIELD_RESPECT_TIMES,
   RESPECT_PER_WALL,
+  THREAT_SEEN_PER_DAY,
+  THREAT_PER_KILLING,
+  THREAT_PER_ROBBERY,
+  THREAT_HALF_LIFE_DAYS,
+  THREAT_FORGOTTEN,
+  DANGER_PLACE_MERGE_RANGE,
+  DANGER_PLACE_HALF_LIFE_DAYS,
+  DANGER_PLACE_WAY_REACH,
+  DANGER_ESCORTS_MAX,
+  NPC_JOB_WEIGHTS,
   OUTWEIGH_HOLD_DAYS,
   STANDING_RANGE,
   STANDING_NPC_TRADE_COINS_PER_POINT,
@@ -364,6 +378,19 @@ import {
   VEIN_THINNING,
   VEIN_NEARLY_GONE,
   NEW_VEIN_SPOT_REACH,
+  NPC_HUNT_REACH,
+  NPC_HUNTERS_PER_THIEF,
+  NPC_DEMAND_OUTWEIGH_TIMES,
+  NPC_DEMAND_MIN_STRENGTH,
+  NPC_DEMAND_COINS,
+  NPC_DEMAND_DAYS,
+  NPC_DEMAND_AGAIN_DAYS,
+  NPC_DEMAND_REFUSED_STANDING,
+  NEW_REALM_SHELTER_DAYS,
+  NPC_NODE_GUARD_RANGE,
+  NPC_TAKE_OUTWEIGH_TIMES,
+  NPC_TAKE_PARTY_MIN,
+  NPC_SITE_ESCORTS,
   carryCapacity,
   walkSpeed,
   workFactor,
@@ -3048,10 +3075,15 @@ export function Wiki() {
           first, and from other work only after them. A farm already begun is finished before
           another, and that new farm comes before anything else it has begun. Spare hands go to the
           good the reserve is shortest of, as a share of what it wants of it, filling one
-          workplace's crew before the next. Without a workplace for that good, the city builds one:
-          on the nearest fitting resource node it knows of, or a smelter, smithy or mint in its area
-          like a house. With every workplace of another short good at its full crew and someone
-          idle, it opens another of them, however many it has.
+          workplace's crew before the next. A workplace by a way where the city lost people (Threat)
+          is worth less to it: each person lost there takes {num(NPC_JOB_WEIGHTS.danger)} from the
+          work's score, at most {num(NPC_JOB_WEIGHTS.most)}. Of several workplaces of a good it
+          picks the safest, and a worker leaves a dangerous camp for a safe one of the same good; a
+          dangerous mine can lose to safe work on another good. Farming while Food is short is never
+          weighed down. Without a workplace for that good, the city builds one: on the nearest
+          fitting resource node it knows of, or a smelter, smithy or mint in its area like a house.
+          With every workplace of another short good at its full crew and someone idle, it opens
+          another of them, however many it has.
         </p>
         <p>
           Those with nothing to do, those carrying a child and its children stand at a house of the
@@ -3283,6 +3315,90 @@ export function Wiki() {
           share nothing. A party whose town hall doesn't stand after {days(NPC_FOUND_GIVE_UP_DAYS)}{' '}
           gives up and walks home. Trading posts and the Trade Organization's HQ never found cities.
         </p>
+        <h3>What drives an NPC city</h3>
+        <p>
+          An NPC city is more than its needs. It has a <b>temperament</b>, fixed for good, which
+          leans it one way; it feels <b>threat</b> from those it sees armed nearby and from those who
+          killed or robbed its people, and remembers where it lost them; and each game day it takes
+          a <b>stance</b> from both: growing, arming, trading, settling further out, or turning on
+          whoever hurt it. The stance decides what it builds and how many soldiers it keeps, its
+          threat how far it sends its traders and where its workers go, and its temperament which
+          stance it reaches for first. Below, each in turn; Threat is under Standing & reactions.
+        </p>
+        <h3>Temperament</h3>
+        <p>
+          Every NPC city has a temperament, fixed when it comes to be: merchant, militarist or
+          settler. A self-managed city gets one when its Leader dies, unless it had one before. A
+          daughter takes its mother's {pct(NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT)} of the time and
+          otherwise draws one of its own, which may still be the same. Whoever sees a city reads its
+          temperament on its card, and keeps it in Last seen; whoever has traded with it reads it
+          in the Standing list while they hold a standing with each other. Scripts see the same.
+          Trading posts and the HQ have none. On its own a temperament changes nothing: it tilts
+          the city's stance.
+        </p>
+        <h3>Stance</h3>
+        <p>
+          What an NPC city is after for now. It picks again at its first planning pass of each game
+          day, from what it needs: <b>Fortify</b> by the threat it feels from the one it fears most,
+          fully at {num(NPC_STANCE.fortifyThreat)}; <b>Trade</b> with a Food surplus and a Trade
+          Organization warehouse within its traders' reach; <b>Expand</b> with a Food surplus and
+          nothing short. Trade and Expand alone are worth {pct(NPC_STANCE.tradeNeed)} and{' '}
+          {pct(NPC_STANCE.expandNeed)} of what it takes. Its temperament's own stance (merchant
+          Trade, militarist Fortify, settler Expand) counts {num(NPC_STANCE.temperamentTilt)} times;
+          the greatest need that is full wins, and it grows (<b>Grow</b>) when none is.
+        </p>
+        <ul>
+          <li>
+            <b>Fortify</b> keeps {num(NPC_STANCE.fortifySoldiers)} times the soldiers it keeps by its
+            size, sends {num(NPC_STANCE.fortifyEscorts)} more with each escort, shuts its gates to
+            armed outsiders {num(NPC_STANCE.fortifyGateWatch)} times as far off, and weighs the
+            danger places by the way to a workplace {num(NPC_STANCE.fortifyDanger)} times as much.
+          </li>
+          <li>
+            <b>Trade</b> works for surplus only up to {pct(NPC_STANCE.tradeSurplusCap)} of its caps,
+            so more goes to market, and has {num(NPC_STANCE.tradeTraders)} more trader out.
+          </li>
+          <li>
+            <b>Expand</b> waits {pct(NPC_STANCE.expandFullDays)} of the days full before it founds
+            and sends {num(NPC_STANCE.expandScouts)} times the scouts.
+          </li>
+        </ul>
+        <p>
+          <b>Taking a node.</b> An NPC city short of a good it has no workplace for builds on the
+          nearest free node of it that it knows. In Expand, when that node lies out of its City
+          area, {num(NPC_SITE_ESCORTS)} of its soldiers beyond its hall and gate posts go along and
+          stand at the site until the workplace is built. A militarist city in Expand that knows no
+          free node of the good goes for the nearest workplace on one that a realm holds, in no
+          city: the realm's residents within {num(NPC_NODE_GUARD_RANGE)} tiles of it hold it. It
+          goes only when the soldiers it can spare are at least {num(NPC_TAKE_OUTWEIGH_TIMES)}{' '}
+          times as strong as the armed ones there, and never fewer than{' '}
+          {num(NPC_TAKE_PARTY_MIN)}. They strike everyone of that realm there, an attack like any
+          other and a crime against it, until none is left up; then the workplace is the city's and
+          its own workers move in (Holding a workplace). It never goes for the node of a realm in
+          its shelter (Demands).
+        </p>
+        <p>
+          Whoever sees an NPC city reads its stance on its card as a mood line: growing, arming,
+          busy trading, looking to expand, or retaliating against whom. Scripts see it as the
+          city's stance.
+        </p>
+        <h3>Retaliating</h3>
+        <p>
+          An NPC city turns on a realm (<b>Retaliate</b>) once it feels a threat of{' '}
+          {num(NPC_RETALIATE.threat)} from it and knows of a recent crime of theirs against it,
+          such as its traders killed. It arms as under Fortify and sends that realm demands for
+          Coins. Rarely it marches: with a threat of {num(NPC_RETALIATE.marchThreat)}, its standing
+          toward them at {signed(NPC_RETALIATE.marchStanding)} or below, and its soldiers beyond its
+          hall and gate posts {num(NPC_RETALIATE.marchOutweigh)} times as strong as the defenders
+          of their nearest city, those soldiers walk to that city's town hall and occupy it. Held
+          to the end, the city leaves the realm and goes on as an NPC city of its own. Never
+          against a realm in its shelter.
+        </p>
+        <p>
+          It ends when its threat from them fades below {num(NPC_RETALIATE.endsBelow)} (a paid
+          demand clears it at once) or its losses leave it weaker than them. Then it turns to
+          Fortify, and a march under way is called off: its soldiers walk home.
+        </p>
         <p>
           An NPC city sells only what it holds above this reserve and buys only what it is short of.
           It lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week, but
@@ -3298,7 +3414,11 @@ export function Wiki() {
           hall nor count as your fighters toward it. Struck by one of its own, they still defend
           themselves. The Trade Organization hires out soldiers at{' '}
           {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A contract runs at most{' '}
-          {days(CONTRACT_MAX_DAYS)}.
+          {days(CONTRACT_MAX_DAYS)}. An NPC city hires too, on its own: once it feels a threat of{' '}
+          {num(NPC_ACTING_FIRST.hireThreat)} from one Organization, it asks the Trade Organization
+          for up to {num(NPC_ACTING_FIRST.hireSoldiers)} soldiers for{' '}
+          {days(NPC_ACTING_FIRST.hireDays)}, if its storages hold the whole price, and pays each week
+          from them. They stand at its town hall and fight attackers in its City area.
         </p>
         <p>
           An NPC city shuts its gates while anyone armed who isn't of the city or its alliance
@@ -3379,6 +3499,14 @@ export function Wiki() {
           what was stolen from you is theft like any other. In your own city's area, force against
           someone occupying its town hall or a thief you know of is no crime (see Under attack).
         </p>
+        <p>
+          An NPC city goes after those who steal from it. Once one of its residents saw the theft,
+          or the news reached it, it sends up to {num(NPC_HUNTERS_PER_THIEF)} soldiers after the
+          thief while they are within {num(NPC_HUNT_REACH)} tiles of its home: only soldiers
+          beyond those holding its town hall and its gates go. They strike the thief down, which is
+          no crime, take what was stolen from where the thief fell and carry it into the city's
+          storage. A thief who gets further off is let go, and the soldiers go back to their posts.
+        </p>
         <table>
           <thead>
             <tr>
@@ -3424,6 +3552,13 @@ export function Wiki() {
             An NPC city joins an alliance when it holds every member at{' '}
             {signed(NPC_ALLIANCE_JOIN_STANDING)} or better, and leaves when any falls below{' '}
             {signed(NPC_ALLIANCE_LEAVE_STANDING)}.
+          </li>
+          <li>
+            An NPC city also seeks allies on its own: once it feels a threat of{' '}
+            {num(NPC_ACTING_FIRST.allyThreat)} from one Organization, it invites into an alliance it
+            leads, founding one if it has none, the realms in no alliance it holds at{' '}
+            {signed(NPC_ALLIANCE_JOIN_STANDING)} or better (never the one it fears), and the NPC cities
+            that feel threatened by the same Organization and hold it that well too.
           </li>
           <li>
             Below {signed(TRADE_ORG_REFUSES_TRADE_BELOW)} the Trade Organization won't trade with
@@ -3529,6 +3664,26 @@ export function Wiki() {
           weighs this at its planning pass, once a game hour, and remembers since when each realm
           has outweighed it; the first pass one doesn't, that time starts again from nothing.
         </p>
+        <h3>Threat</h3>
+        <p>
+          Apart from how it regards you, an NPC city keeps in mind how dangerous you are: its{' '}
+          <strong>threat</strong> from each Organization, a strong friendly neighbour too. At its
+          planning pass it adds what your armed residents weigh, by strength as respect weighs them,
+          wherever it sees them: in its City area or in sight of any of its people, also its traders
+          and scouts far from home. Standing a game day in sight adds{' '}
+          {num(THREAT_SEEN_PER_DAY)} for each point of strength. Learning that you killed one of its
+          people adds {num(THREAT_PER_KILLING)}, that you robbed it {num(THREAT_PER_ROBBERY)}. Threat
+          fades to half every {days(THREAT_HALF_LIFE_DAYS)} and is forgotten below{' '}
+          {num(THREAT_FORGOTTEN)}. You don't see it.
+        </p>
+        <p>
+          It also remembers <strong>danger places</strong>: where one of its people was killed
+          outside its City area, by anyone, bandits too. Another loss within{' '}
+          {num(DANGER_PLACE_MERGE_RANGE)} tiles adds to the same place. A danger place fades to half
+          every {days(DANGER_PLACE_HALF_LIFE_DAYS)}. While it remembers one within{' '}
+          {num(DANGER_PLACE_WAY_REACH)} tiles of a way, the city sends a soldier more along that way
+          for each person lost there, up to {num(DANGER_ESCORTS_MAX)} more.
+        </p>
       </Section>
 
       <Section id="demands">
@@ -3591,6 +3746,23 @@ export function Wiki() {
             <strong>The Trade Organization always declines</strong>, within a game hour, and being
             asked costs you {num(DEMAND_TRADE_ORG_STANDING_LOSS)} of its standing. Everyone knows of
             it.
+          </li>
+          <li>
+            <strong>A militarist NPC city sends demands too.</strong> Once a game day it sends one
+            to each realm it knows of (one it feels threatened by, or one with a standing either
+            way) whose armed residents, wherever they are, its own side outweighs at least{' '}
+            {num(NPC_DEMAND_OUTWEIGH_TIMES)} times over, and by at least{' '}
+            {num(NPC_DEMAND_MIN_STRENGTH)}: {num(NPC_DEMAND_COINS)} Coins within{' '}
+            {days(NPC_DEMAND_DAYS)}, and the next no sooner than {days(NPC_DEMAND_AGAIN_DAYS)}{' '}
+            later. It fetches nothing set aside: you pay by a Transfer from a city of yours to it,
+            in sight or not. Paid, it no longer feels threatened by you and its standing toward you
+            is back to neutral at least. Declined or let lapse, its standing toward you falls to{' '}
+            {num(NPC_DEMAND_REFUSED_STANDING)}: it turns hostile. It never sends one to the Trade
+            Organization.
+          </li>
+          <li>
+            <strong>A new realm is sheltered</strong> for its first {days(NEW_REALM_SHELTER_DAYS)}:
+            no NPC city sends it a demand or marches on it then. Players can.
           </li>
           <li>
             <strong>The threat is only words.</strong> Ignoring a demand does nothing by itself:

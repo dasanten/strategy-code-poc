@@ -17,7 +17,7 @@ use csp_shared::protocol::SeenEntity;
 use csp_shared::time::TICKS_PER_GAME_YEAR;
 use csp_shared::world::{
     Building, BuildingKind, City, CityLayout, ConstructionSite, Good, Horse, HorseStats, Realm,
-    Resident, Standing, Stock, TradeOrgCity, WorldState,
+    Resident, Standing, Stock, Temperament, TradeOrgCity, WorldState,
 };
 use csp_sim::npc_hire::{npc_lending_keeps_reserve, step_npc_hire, LentGear};
 use csp_sim::queries::building::recipe_for;
@@ -70,6 +70,7 @@ fn realm(id: &str, user_id: u64, leader: &str) -> Realm {
         name: None,
         demands_sent_at: None,
         heir_id: None,
+        founded_at: None,
     }
 }
 
@@ -147,6 +148,10 @@ fn change_standing(world: &mut WorldState, of: &str, toward: &str, delta: f64) {
     if value == 0.0 {
         world.standings.retain(|s| s.value != 0.0);
     }
+}
+
+fn city_mut<'w>(world: &'w mut WorldState, id: &str) -> &'w mut City {
+    world.cities.iter_mut().find(|c| c.id == id).unwrap()
 }
 
 fn seen_city(world: &WorldState, realm: &str, id: &str) -> Option<serde_json::Value> {
@@ -235,6 +240,18 @@ mod npc_reaction {
         let seen = seen_city(&world, "r1", "npc").unwrap();
         assert_eq!((&seen["wontSell"], &seen["refuses"]), (&json!(true), &json!(true)));
         assert!(seen.get("price").is_none());
+    }
+
+    #[test]
+    fn whoever_sees_an_npc_city_reads_its_temperament_never_of_a_players_city() {
+        let (mut world, _) = setup();
+        city_mut(&mut world, "npc").temperament = Some(Temperament::Merchant);
+        assert_eq!(seen_city(&world, "r1", "npc").unwrap()["temperament"], "merchant");
+        // One a Player holds now is theirs to run, whatever it was like before.
+        add_city(&mut world, "mine", Some("r2"), 22.0, 22.0, "Ashford");
+        city_mut(&mut world, "mine").temperament = Some(Temperament::Settler);
+        assert!(seen_city(&world, "r1", "mine").unwrap().get("temperament").is_none());
+        // Scripts see what sight sends, so they read the same.
     }
 
     #[test]

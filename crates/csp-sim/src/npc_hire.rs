@@ -20,7 +20,7 @@ use crate::queries::npc_trade::{
     npc_city_stock, npc_hire_problem, npc_reserve, npc_storages, spare_residents,
 };
 use crate::queries::residents::{can_work, carry_capacity, good_weight, is_armed, stock_weight};
-use crate::queries::standing::organization_label;
+use crate::queries::standing::{organization_label, TRADE_ORG};
 use crate::sight::InvariantViolation;
 
 /// The NPC city lending in a contract, if its lender is one (`lenderCity`).
@@ -213,7 +213,7 @@ pub fn npc_lending_keeps_reserve(ledger: &[LentGear]) -> Vec<InvariantViolation>
 
 /// Invariant `npc-hire-sound` (`CONTEXT.md`: Hiring from an NPC city; ADR 0004): an NPC city never
 /// offers on its own, hires out only to a realm, never lends a child, and is paid into a storage of
-/// its own.
+/// its own; it hires only from the Trade Organization.
 pub fn npc_hire_sound(world: &WorldState) -> Vec<InvariantViolation> {
     let mut out = Vec::new();
     let mut fail = |message: String, ids: Vec<String>| {
@@ -225,7 +225,8 @@ pub fn npc_hire_sound(world: &WorldState) -> Vec<InvariantViolation> {
     };
     let tick = world.tick as f64;
     for c in &world.contracts {
-        if world.cities.iter().any(|x| x.id == c.hirer_id) {
+        // A city hires only from the Trade Organization (`CONTEXT.md`: Acting first).
+        if c.lender_id != TRADE_ORG && world.cities.iter().any(|x| x.id == c.hirer_id) {
             fail(format!("contract {} has city {} hiring", c.id, c.hirer_id), vec![c.id.clone()]);
         }
         let Some(city) = lender_city(world, c) else { continue };

@@ -62,6 +62,7 @@ function HandOverGoods({
   carriedWays,
   noCaravans,
   realmId,
+  npcCity,
   onAccept,
 }: {
   goods: Partial<Record<Good, number>>
@@ -73,9 +74,11 @@ function HandOverGoods({
   /** The Trade Org HQ has fallen, so nothing can be carried (`CONTEXT.md`: Fall of the HQ). */
   noCaravans: boolean
   realmId: string
+  /** An NPC city that demanded it: paid only by a Transfer to it (`CONTEXT.md`: NPC demand). */
+  npcCity?: { id: string; name: string }
   onAccept: (handOver: DemandHandOver) => void
 }) {
-  const [way, setWay] = useState<DemandHandOver['way']>('setAside')
+  const [way, setWay] = useState<DemandHandOver['way']>(npcCity ? 'transfer' : 'setAside')
   const [storageId, setStorageId] = useState('')
   const [fromCityId, setFromCityId] = useState('')
   const [toCityId, setToCityId] = useState('')
@@ -86,14 +89,18 @@ function HandOverGoods({
   const storage = storages.find((s) => s.id === storageId) ?? storages[0]
   const cityOf = (s: SeenBuilding) => cities.find((c) => c.id === s.cityId)?.name
   const fromCities = citiesToCarryAt(seen, realmId)
-  const toCities = citiesToCarryAt(seen, senderId)
+  const toCities: { id: string; name: string }[] = npcCity
+    ? [npcCity]
+    : citiesToCarryAt(seen, senderId)
   const fromCity = fromCities.find((c) => c.id === fromCityId) ?? fromCities[0]
   const toCity = toCities.find((c) => c.id === toCityId) ?? toCities[0]
   const fromStorage = fromCity && deliveryStorage(seen, fromCity.id)
 
   const sending = way === 'transfer' && !noCaravans
   let preview: HandOverPreview
-  if (sending) {
+  if (npcCity && noCaravans) {
+    preview = { text: 'With no caravans, nothing can be sent to them.', canAccept: false }
+  } else if (sending) {
     const tiles = carriedWays.find(
       (w) => w.fromCityId === fromCity?.id && w.toCityId === toCity?.id,
     )?.senderTiles
@@ -112,7 +119,7 @@ function HandOverGoods({
 
   return (
     <div className="demand-hand-over">
-      {!noCaravans && (
+      {!noCaravans && !npcCity && (
         <label className="contract-field">
           <span className="contract-label">How</span>
           <select
@@ -280,7 +287,9 @@ export function DemandsPanel({
                     Lapses in {aboutTime(d.deadline - tick)}.{' '}
                     {d.from.realmId === TRADE_ORG
                       ? 'If you decline it or let it lapse, its next army comes for your workplaces. Paying in full at any warehouse stops that.'
-                      : 'Ignoring it does nothing by itself.'}
+                      : d.from.city
+                        ? 'Paid by a Transfer, the city is at peace with you; declined or let lapse, it turns hostile.'
+                        : 'Ignoring it does nothing by itself.'}
                   </span>
                 </span>
                 {d.terms.kind === 'goods' && (
@@ -292,6 +301,7 @@ export function DemandsPanel({
                     carriedWays={carriedWays}
                     noCaravans={noCaravans}
                     realmId={realmId}
+                    npcCity={d.from.city ? { id: d.from.realmId, name: d.from.realm } : undefined}
                     onAccept={(handOver) =>
                       void order({ kind: 'acceptDemand', demandId: d.id, handOver })
                     }

@@ -3,7 +3,68 @@
 //! what each is worth, so each goes to the highest-scoring job with room (`shareOut`). Pure, with
 //! the numbers in `balance.rs`.
 
-use csp_shared::balance::{NPC_JOB_MARGIN, NPC_JOB_SCORE};
+use csp_shared::balance::{
+    NpcJobWeights, NPC_JOB_MARGIN, NPC_JOB_SCORE, NPC_JOB_WEIGHTS, NPC_STANCE,
+};
+use csp_shared::world::City;
+
+#[cfg(test)]
+thread_local! {
+    static WEIGHTS: std::cell::Cell<Option<NpcJobWeights>> = const { std::cell::Cell::new(None) };
+}
+
+/// What weighs on `city`'s jobs at a place now (`jobWeights`, `CONTEXT.md`: Stance): `NPC_JOB_WEIGHTS`,
+/// with danger weighing `NPC_STANCE.fortify_danger` times as much under Fortify. Its temperament
+/// weighs in through the stance it leans to.
+pub fn job_weights(city: &City) -> NpcJobWeights {
+    #[cfg(test)]
+    if let Some(w) = WEIGHTS.with(std::cell::Cell::get) {
+        return w;
+    }
+    let mut w = NPC_JOB_WEIGHTS;
+    if crate::npc_stance::arming(city) {
+        w.danger *= NPC_STANCE.fortify_danger;
+    }
+    w
+}
+
+/// Runs `f` with every city weighing its jobs by `weights`, on this thread.
+#[cfg(test)]
+pub fn with_job_weights<T>(weights: NpcJobWeights, f: impl FnOnce() -> T) -> T {
+    let before = WEIGHTS.with(|w| w.replace(Some(weights)));
+    let out = f();
+    WEIGHTS.with(|w| w.set(before));
+    out
+}
+
+/// What a job at a place costs besides what it is for (`Considerations`, `CONTEXT.md`: Stance).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Considerations {
+    /// Tiles from the city's storage.
+    pub distance: f64,
+    /// The weight of the danger places the city remembers by the way there.
+    pub danger: f64,
+    /// Workers of the city already there, besides the one weighing it.
+    pub crew: f64,
+}
+
+/// How much `at` takes from a job's score under `weights` (`placeCost`): never more than
+/// `weights.most`, never below nothing.
+pub fn place_cost(at: Considerations, weights: &NpcJobWeights) -> f64 {
+    let cost = weights.distance * at.distance.max(0.0)
+        + weights.danger * at.danger.max(0.0)
+        + weights.crew * at.crew.max(0.0);
+    cost.min(weights.most).max(0.0)
+}
+
+/// What a job at a place is worth now (`blendedScore`): what it is for, less what the place costs.
+/// Farming while Food runs short is never weighed down: it comes first.
+pub fn blended_score(job: ScoredJob, at: Considerations, weights: &NpcJobWeights) -> f64 {
+    if job == (ScoredJob::Farm { food_short: true }) {
+        return job_score(job);
+    }
+    job_score(job) - place_cost(at, weights)
+}
 
 /// A job as the pass knows it (`ScoredJob`).
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -168,9 +229,43 @@ mod tests {
         }
     }
 
+    #[test]
+    fn weighs_a_place_by_distance_danger_and_crew_at_most_by_the_cap() {
+        let w = NpcJobWeights { distance: 0.1, danger: 5.0, crew: 1.0, most: 12.0 };
+        let near = Considerations { distance: 10.0, danger: 0.0, crew: 0.0 };
+        let far = Considerations { distance: 100.0, danger: 0.0, crew: 0.0 };
+        let dangerous = Considerations { distance: 10.0, danger: 1.0, crew: 0.0 };
+        assert_eq!(place_cost(near, &w), 1.0);
+        assert_eq!(place_cost(far, &w), 10.0);
+        assert_eq!(place_cost(dangerous, &w), 6.0);
+        assert_eq!(place_cost(Considerations { distance: 10.0, danger: 9.0, crew: 3.0 }, &w), 12.0);
+        let short = ScoredJob::Short { share: 0.5 };
+        assert!(blended_score(short, near, &w) > blended_score(short, dangerous, &w));
+    }
+
+    #[test]
+    fn weighs_nothing_down_with_neutral_weights_nor_farming_while_food_is_short() {
+        let at = Considerations { distance: 80.0, danger: 4.0, crew: 6.0 };
+        for job in [ScoredJob::Short { share: 0.3 }, ScoredJob::Surplus { full: 0.5 }] {
+            assert_eq!(blended_score(job, at, &NpcJobWeights::NEUTRAL), job_score(job));
+        }
+        let food = ScoredJob::Farm { food_short: true };
+        assert_eq!(blended_score(food, at, &NPC_JOB_WEIGHTS), job_score(food));
+    }
+
+    #[test]
+    fn keeps_work_on_a_short_good_ahead_of_the_road_crew_however_far_or_dangerous() {
+        let worst = Considerations { distance: 1e6, danger: 1e6, crew: 1e6 };
+        let short = blended_score(ScoredJob::Short { share: 0.0 }, worst, &NPC_JOB_WEIGHTS);
+        assert!(short > job_score(ScoredJob::Road));
+    }
+
     // "a city shares out its adults by the scores" runs `planCity`: those tests come with
     // `npc_plan`.
 }
 
 #[cfg(test)]
 mod share_tests;
+
+#[cfg(test)]
+mod neutral_tests;

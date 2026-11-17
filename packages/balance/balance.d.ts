@@ -258,6 +258,19 @@ export interface Balance {
   readonly NPC_TRAIN_TURN_TICKS: number
   readonly NPC_PATROLS_MAX: number
   readonly NPC_SOLDIERS_PER_PATROL: number
+  readonly NPC_HUNT_REACH: number
+  readonly NPC_HUNTERS_PER_THIEF: number
+  readonly NPC_DEMAND_OUTWEIGH_TIMES: number
+  readonly NPC_DEMAND_MIN_STRENGTH: number
+  readonly NPC_DEMAND_COINS: number
+  readonly NPC_DEMAND_DAYS: number
+  readonly NPC_DEMAND_AGAIN_DAYS: number
+  readonly NPC_DEMAND_REFUSED_STANDING: number
+  readonly NEW_REALM_SHELTER_DAYS: number
+  readonly NPC_NODE_GUARD_RANGE: number
+  readonly NPC_TAKE_OUTWEIGH_TIMES: number
+  readonly NPC_TAKE_PARTY_MIN: number
+  readonly NPC_SITE_ESCORTS: number
   readonly NPC_PATROL_WALL_STOPS: number
   readonly NPC_PATROL_ROAD_STOPS: number
   readonly NPC_WAR_CHEST_PER_RESIDENT: number
@@ -284,6 +297,13 @@ export interface Balance {
     [key: string]: number
   }
   readonly NPC_JOB_MARGIN: number
+  readonly NPC_JOB_WEIGHTS: {
+    distance: number
+    danger: number
+    crew: number
+    most: number
+    [key: string]: number
+  }
   readonly NPC_RESIDENTS_PER_NEEDS_STEP: number
   readonly NPC_BUILDERS: number
   readonly NPC_ROAD_CREW: number
@@ -335,6 +355,37 @@ export interface Balance {
   readonly NPC_FOUND_FOOD_DAYS: number
   readonly NPC_FOUND_GIVE_UP_DAYS: number
   readonly NPC_FOUND_STANDING: number
+  readonly NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT: number
+  readonly NPC_STANCE: {
+    fortifyThreat: number
+    fortifySoldiers: number
+    fortifyEscorts: number
+    fortifyGateWatch: number
+    fortifyDanger: number
+    tradeNeed: number
+    tradeSurplusCap: number
+    tradeTraders: number
+    expandNeed: number
+    expandFullDays: number
+    expandScouts: number
+    temperamentTilt: number
+    [key: string]: number
+  }
+  readonly NPC_ACTING_FIRST: {
+    allyThreat: number
+    hireThreat: number
+    hireSoldiers: number
+    hireDays: number
+    [key: string]: number
+  }
+  readonly NPC_RETALIATE: {
+    threat: number
+    endsBelow: number
+    marchThreat: number
+    marchStanding: number
+    marchOutweigh: number
+    [key: string]: number
+  }
   readonly TRADE_ORG_HQ: {
     innerRadius: number
     outerRadius: number
@@ -1606,6 +1657,16 @@ export interface Balance {
   readonly DEMAND_YIELD_RESPECT_MIN: number
   readonly RESPECT_PER_WALL: number
   readonly OUTWEIGH_HOLD_DAYS: number
+  readonly THREAT_SEEN_PER_DAY: number
+  readonly THREAT_PER_KILLING: number
+  readonly THREAT_PER_ROBBERY: number
+  readonly THREAT_HALF_LIFE_DAYS: number
+  readonly THREAT_FORGOTTEN: number
+  readonly DANGER_PLACE_HALF_LIFE_DAYS: number
+  readonly DANGER_PLACE_FORGOTTEN: number
+  readonly DANGER_PLACE_MERGE_RANGE: number
+  readonly DANGER_PLACE_WAY_REACH: number
+  readonly DANGER_ESCORTS_MAX: number
   readonly DEMAND_DECLINED_STANDING_LOSS: number
   readonly DEMAND_TRADE_ORG_STANDING_LOSS: number
   readonly DIRECT_OFFER_DAYS: number

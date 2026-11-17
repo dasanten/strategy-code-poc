@@ -348,8 +348,15 @@ fn occupation_of(world: &WorldState, city: &City, size: i32) -> Option<(String, 
         if for_trade_org && city.trade_org == Some(TradeOrgCity::Hq) {
             return None;
         }
-        let realm =
-            if takers.contains(&r.id) { Some(TRADE_ORG.to_string()) } else { r.owner.clone() };
+        // An NPC city's soldiers marching on it hold it for their city (`CONTEXT.md`: Retaliating).
+        let realm = if takers.contains(&r.id) {
+            Some(TRADE_ORG.to_string())
+        } else {
+            r.owner.clone().or_else(|| {
+                crate::npc_retaliate::marching_for(world, &r.id, r.city_id.as_deref())
+                    .filter(|c| *c != city.id)
+            })
+        };
         let Some(realm) = realm else { continue };
         if for_trade_org || (realm != TRADE_ORG && on_city_side(world, city, &realm)) {
             continue;
@@ -385,7 +392,9 @@ pub fn stands_occupying(world: &WorldState, city: &City, r: &Resident, size: i32
         return false;
     }
     !hired_by_trade_org(world, &r.id)
-        && (r.owner.is_some() || city_takers(world, city).contains(&r.id))
+        && (r.owner.is_some()
+            || city_takers(world, city).contains(&r.id)
+            || crate::npc_retaliate::marching_for(world, &r.id, r.city_id.as_deref()).is_some())
 }
 
 /// Food in a city's storages, but for what is set aside for offers (`storedFood`).

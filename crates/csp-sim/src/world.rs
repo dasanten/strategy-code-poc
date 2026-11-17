@@ -218,6 +218,13 @@ pub fn step_world(
         step_caravans(world, size, scratch);
         step_traders(world, size, terrain, scratch);
         step_npc_defence(world, size, scratch);
+        crate::npc_hunts::step_npc_hunts(world, size);
+        crate::npc_take_node::step_npc_take_nodes(world, terrain);
+        // NPC cities seek allies and hire mercenaries on their own (`CONTEXT.md`: Acting first),
+        // before the Trade Org army answers offers.
+        crate::npc_acting_first::step_npc_acting_first(world, size);
+        // And retaliate against those who hurt them (`CONTEXT.md`: Retaliating).
+        crate::npc_retaliate::step_npc_retaliate(world, size);
         step_trade_org_army(world, size, scratch);
         step_npc_hire(world, size, scratch);
         // Gear handed out with lent soldiers is theirs to fight with now.
@@ -377,6 +384,12 @@ fn step_rest(
     // NPC cities weigh who outweighs them at their planning pass, once nothing else changes this
     // tick (ADR 0033).
     step_outweighed(world, size);
+    // And take threat from the armed residents they see, letting old threats and danger places fade
+    // (`CONTEXT.md`: Threat).
+    crate::npc_threat::step_threat(world, size);
+    // And pick their stance at the first of them each game day (`CONTEXT.md`: Stance).
+    crate::npc_stance::step_stances(world, size);
+    crate::npc_demands::step_npc_demands(world);
     // Who is up on a wall walk, now that walls broke, changed hands and residents moved this tick.
     crate::wall_walk::step_wall_walk(world);
     let actions = steps

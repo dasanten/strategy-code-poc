@@ -60,9 +60,11 @@ fn trade_job() -> CityJob {
 }
 
 /// How many traders a city has out at once (`tradersWanted`): one for each
-/// `NPC_RESIDENTS_PER_TRADER` of its residents, and a village keeps one.
+/// `NPC_RESIDENTS_PER_TRADER` of its residents, and a village keeps one; more under Trade
+/// (`NPC_STANCE.trade_traders`).
 pub fn traders_wanted(world: &WorldState, city: &City) -> usize {
     1.max((city_residents(world, &city.id).len() as f64 / NPC_RESIDENTS_PER_TRADER).floor() as usize)
+        + crate::npc_stance::extra_traders(city)
 }
 
 /// The city's traders still out (`tradersOut`), at the start of its planning pass: one out longer

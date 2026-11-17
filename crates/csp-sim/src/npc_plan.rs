@@ -11,7 +11,7 @@ use csp_shared::balance::{
     FOOD_PER_DAY, MAP_SIZE, NPC_FOOD_REFILL_DAYS, NPC_FOOD_SHORT_DAYS, NPC_PLAN_TICKS,
     WORK_OUTPUT_PER_DAY,
 };
-use csp_shared::terrain::TerrainMap;
+use csp_shared::terrain::{wrap_distance, TerrainMap};
 use csp_shared::world::{
     Building, BuildingKind, City, CityJob, CityJobKind, CityPlan, CityProject, Good, ResidentOrder,
     WorldState,
@@ -28,7 +28,9 @@ use crate::npc_growth::{
 };
 use crate::npc_revive::{down_to_revive, goes_on_reviving, send_revivers};
 use crate::npc_roads::{road_crew, WayFinder};
-use crate::npc_scores::{beats, job_score, rank_jobs, ScoredJob};
+use crate::npc_scores::{
+    beats, blended_score, job_score, job_weights, place_cost, Considerations, ScoredJob,
+};
 use crate::npc_scouts::pick_scouts;
 use crate::npc_stable::{feed_job_kept, plan_feeder};
 use crate::npc_trader::{send_traders, traders_out};
@@ -218,6 +220,11 @@ pub fn plan_city(
         scouts: None,
         patrols: None,
         patrolled_last: None,
+        hunts: None,
+        demanded: None,
+        taking: None,
+        site_escort: None,
+        march: None,
     });
     plan.planned_at = tick;
     let Some(city) = world.cities.iter().find(|c| c.id == city_id).cloned() else { return };
@@ -467,15 +474,41 @@ fn share_out(
     // gather them keep their places by going back to them, as with surplus work.
     let founding_short = founding_lacks(world, city, roads.0, size);
     let share_of: HashMap<Good, f64> = short.iter().map(|s| (s.good, s.share)).collect();
-    // What a resident's job at a workplace is worth to them: what its good lacks, or only going back.
-    let held_score = |world: &WorldState, jobs: &Jobs, i: usize| -> f64 {
-        let good = place_of(world, jobs, i)
-            .filter(|&b| world.buildings[b].kind != BuildingKind::Farm)
-            .and_then(|b| chain_good(world, &world.buildings[b]));
-        let Some(good) = good else { return job_score(ScoredJob::Short { share: 0.0 }) };
+    // What weighs on a job at a workplace besides what it is for (`CONTEXT.md`: Stance; ADR 0039):
+    // the way from the storage, the danger places by it, and the crew already there. `mine` when
+    // the one weighing it is of that crew.
+    let weights = job_weights(city);
+    let from = chain_store_index(world, city).map(|s| (world.buildings[s].x, world.buildings[s].y));
+    let at = |world: &WorldState, held: &Places, b: usize, mine: bool| -> Considerations {
+        let place = &world.buildings[b];
+        let Some(from) = from else { return Considerations::default() };
+        Considerations {
+            distance: wrap_distance(
+                size,
+                (from.0 as i32, from.1 as i32),
+                (place.x as i32, place.y as i32),
+            ),
+            danger: crate::npc_threat::danger_by_way(city, from, (place.x, place.y), size),
+            crew: (held.taken(place) - i64::from(mine)) as f64,
+        }
+    };
+    let cost = |world: &WorldState, held: &Places, b: usize| -> f64 {
+        place_cost(at(world, held, b, false), &weights)
+    };
+    // What a resident's job at a workplace is worth to them: what its good lacks, less what the
+    // place costs, or only going back.
+    let held_score = |world: &WorldState, jobs: &Jobs, held: &Places, i: usize| -> f64 {
+        let place =
+            place_of(world, jobs, i).filter(|&b| world.buildings[b].kind != BuildingKind::Farm);
+        let good = place.and_then(|b| chain_good(world, &world.buildings[b]));
+        let (Some(place), Some(good)) = (place, good) else {
+            return job_score(ScoredJob::Short { share: 0.0 });
+        };
         match share_of.get(&good) {
             None => job_score(ScoredJob::Back),
-            Some(&share) => job_score(ScoredJob::Short { share }),
+            Some(&share) => {
+                blended_score(ScoredJob::Short { share }, at(world, held, place, true), &weights)
+            }
         }
     };
     let give = |world: &WorldState,
@@ -506,9 +539,9 @@ fn share_out(
                 job.is_some_and(|j| {
                     j.kind == CityJobKind::Work
                         && place_ids.contains(j.building_id.as_deref().unwrap_or(""))
-                }) && beats(score, held_score(world, jobs, i))
+                }) && beats(score, held_score(world, jobs, held, i))
             })
-            .map(|i| (i, held_score(world, jobs, i)))
+            .map(|i| (i, held_score(world, jobs, held, i)))
             .collect();
         off.extend(
             spare
@@ -547,7 +580,7 @@ fn share_out(
     };
     // Workers of a workplace whose good the city isn't short of become spare hands, the farms aside.
     for &i in adults {
-        if held_score(world, jobs, i) <= only_back
+        if held_score(world, jobs, held, i) <= only_back
             && jobs.contains_key(&world.residents[i].id)
             && !crate::npc_mending::mends(&world.residents[i])
         {
@@ -587,7 +620,7 @@ fn share_out(
         .iter()
         .copied()
         .filter(|&i| jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Work))
-        .map(|i| (i, held_score(world, jobs, i)))
+        .map(|i| (i, held_score(world, jobs, held, i)))
         .collect();
     let storage = chain_store_index(world, city);
     // With nothing to build, its builders repair its buildings (`CONTEXT.md`: Repairing).
@@ -602,12 +635,13 @@ fn share_out(
                     kept: &IndexMap<String, CityJob>,
                     state: &mut Share,
                     ways: &mut Option<&mut dyn WayFinder>,
-                    offers: Vec<(ScoredJob, Offer)>,
+                    mut offers: Vec<(f64, Offer)>,
                     free: Vec<usize>|
      -> Vec<usize> {
         let mut free = free;
-        for (job, offer) in rank_jobs(offers, |o| o.0) {
-            let score = job_score(job);
+        // The highest-scoring first; equal ones in the order given (`rankJobs`, a stable sort).
+        offers.sort_by(|a, b| b.0.total_cmp(&a.0));
+        for (score, offer) in offers {
             let beaten: Vec<usize> = workers
                 .iter()
                 .filter(|(i, holds)| {
@@ -677,7 +711,8 @@ fn share_out(
                 Offer::Short(good) => {
                     let mut took = Vec::new();
                     for i in takers {
-                        let Some(place) = short_place(world, city, good, &own, held, storage)
+                        let Some(place) =
+                            short_place(world, city, good, &own, held, storage, &cost)
                         else {
                             break;
                         };
@@ -765,39 +800,55 @@ fn share_out(
         free
     };
 
-    let mut first: Vec<(ScoredJob, Offer)> = vec![
-        (ScoredJob::Farm { food_short: false }, Offer::Farm),
-        (ScoredJob::Revive, Offer::Revive),
+    let mut first: Vec<(f64, Offer)> = vec![
+        (job_score(ScoredJob::Farm { food_short: false }), Offer::Farm),
+        (job_score(ScoredJob::Revive), Offer::Revive),
     ];
     if project.is_some() || repairs {
-        first.push((ScoredJob::Project, Offer::Project));
+        first.push((job_score(ScoredJob::Project), Offer::Project));
     }
-    first.extend(short.iter().map(|s| (ScoredJob::Short { share: s.share }, Offer::Short(s.good))));
+    // Work on a good that is short is worth what the workplace it would go to costs.
+    for s in &short {
+        let job = ScoredJob::Short { share: s.share };
+        let place = short_place(world, city, s.good, &own, held, storage, &cost);
+        let at = place.map_or_else(Considerations::default, |b| at(world, held, b, false));
+        first.push((blended_score(job, at, &weights), Offer::Short(s.good)));
+    }
     let left = fill(world, jobs, held, &kept, &mut state, &mut ways, first, spare);
     unneeded.extend(left);
     if unneeded.is_empty() {
         return unneeded;
     }
     // Nothing short has a use for them (`CONTEXT.md`: Spare hands' work): work at its workplaces,
-    // going back to their own first, and for surplus.
-    let mut workplaces: Vec<(ScoredJob, Offer)> = vec![(ScoredJob::Back, Offer::Back)];
+    // going back to their own first, and for surplus, each less what its place costs.
+    let mut workplaces: Vec<(f64, Offer)> = vec![(job_score(ScoredJob::Back), Offer::Back)];
     if city.trade_org.is_none() {
         let surplus = SurplusWork::of(world, city, storage.map(|s| &world.buildings[s]));
         for &place in &own {
             if let Some(full) = surplus.full(world, &world.buildings[place]) {
-                workplaces.push((ScoredJob::Surplus { full }, Offer::Surplus(place)));
+                let at = at(world, held, place, false);
+                let score = blended_score(ScoredJob::Surplus { full }, at, &weights);
+                workplaces.push((score, Offer::Surplus(place)));
             }
         }
     }
-    let mut second = vec![(ScoredJob::Road, Offer::Road), (ScoredJob::Scout, Offer::Scout)];
+    let mut second = vec![
+        (job_score(ScoredJob::Road), Offer::Road),
+        (job_score(ScoredJob::Scout), Offer::Scout),
+    ];
     second.extend(workplaces);
     let left = fill(world, jobs, held, &kept, &mut state, &mut ways, second, unneeded.clone());
     // Lacking nothing else, its founding party's materials count as short (`CONTEXT.md`: Full
     // city), but its spare hands' work comes first (Daniel, 2026-11-16, T100.8): only the hands
     // left over gather for the party. All are still spare hands to its founding.
-    let founding: Vec<(ScoredJob, Offer)> = founding_short
+    let founding: Vec<(f64, Offer)> = founding_short
         .iter()
-        .map(|s| (ScoredJob::Short { share: s.share }, Offer::Short(s.good)))
+        .map(|s| {
+            let job = ScoredJob::Short { share: s.share };
+            let place = short_place(world, city, s.good, &own, held, storage, &cost);
+            let at = place.map_or_else(Considerations::default, |b| at(world, held, b, false));
+            (blended_score(job, at, &weights), Offer::Short(s.good))
+        })
         .collect();
     let mut idle = if founding.is_empty() || left.is_empty() {
         left
@@ -808,11 +859,15 @@ fn share_out(
     // party, they work on past the cap, the good least far past first (`NPC_SURPLUS_PAST_CAP`).
     if city.trade_org.is_none() && !idle.is_empty() {
         let surplus = SurplusWork::of(world, city, storage.map(|s| &world.buildings[s]));
-        let past: Vec<(ScoredJob, Offer)> = own
+        let past: Vec<(f64, Offer)> = own
             .iter()
             .filter_map(|&place| {
                 let full = surplus.past(world, &world.buildings[place])?;
-                Some((ScoredJob::Surplus { full }, Offer::Surplus(place)))
+                let at = at(world, held, place, false);
+                Some((
+                    blended_score(ScoredJob::Surplus { full }, at, &weights),
+                    Offer::Surplus(place),
+                ))
             })
             .collect();
         if !past.is_empty() {
@@ -841,8 +896,10 @@ fn short_place(
     own: &[usize],
     held: &Places,
     storage: Option<usize>,
+    cost: &dyn Fn(&WorldState, &Places, usize) -> f64,
 ) -> Option<usize> {
     let stock = storage.and_then(|s| world.buildings[s].stock.as_ref());
+    #[allow(clippy::too_many_arguments)]
     fn work_for(
         world: &WorldState,
         city: &City,
@@ -851,6 +908,7 @@ fn short_place(
         held: &Places,
         stock: Option<&csp_shared::world::Stock>,
         seen: &mut HashSet<Good>,
+        cost: &dyn Fn(&WorldState, &Places, usize) -> f64,
     ) -> Option<usize> {
         if !seen.insert(g) {
             return None;
@@ -860,18 +918,28 @@ fn short_place(
                 if held_in(stock, *from) >= *n {
                     continue;
                 }
-                if let Some(place) = work_for(world, city, *from, own, held, stock, seen) {
+                if let Some(place) = work_for(world, city, *from, own, held, stock, seen, cost) {
                     return Some(place);
                 }
             }
             return None;
         }
-        own.iter().copied().find(|&b| {
-            chain_good(world, &world.buildings[b]) == Some(g)
-                && held.room(&world.buildings[b]) > 0.0
-        })
+        // Of those with room, the one that costs least; the first of equals (ADR 0039).
+        let mut best: Option<(usize, f64)> = None;
+        for &b in own {
+            if chain_good(world, &world.buildings[b]) != Some(g)
+                || held.room(&world.buildings[b]) <= 0.0
+            {
+                continue;
+            }
+            let c = cost(world, held, b);
+            if best.is_none_or(|(_, least)| c < least) {
+                best = Some((b, c));
+            }
+        }
+        best.map(|(b, _)| b)
     }
-    work_for(world, city, good, own, held, stock, &mut HashSet::new())
+    work_for(world, city, good, own, held, stock, &mut HashSet::new(), cost)
 }
 
 /// Whether a resident could help with a project now (`canTakePart`): anything but a site that needs

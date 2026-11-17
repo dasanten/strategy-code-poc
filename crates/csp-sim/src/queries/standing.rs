@@ -5,7 +5,7 @@ use csp_shared::balance::{
     STANDING_RANGE, STANDING_TRADE_COINS_PER_POINT,
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
-use csp_shared::world::{City, WorldState};
+use csp_shared::world::{City, Temperament, WorldState};
 use ts_rs::TS;
 
 use super::alliance::realm_name;
@@ -93,6 +93,10 @@ pub struct StandingView {
     pub is: OrganizationIs,
     pub theirs: f64,
     pub yours: f64,
+    /// For an NPC city, its temperament (`CONTEXT.md`: Temperament): whoever has traded with it
+    /// reads it.
+    #[ts(optional)]
+    pub temperament: Option<Temperament>,
 }
 
 /// The Organizations with a standing other than neutral toward the realm or from it, as its
@@ -113,9 +117,10 @@ pub fn standings_for(world: &WorldState, realm_id: &str) -> Vec<StandingView> {
         if theirs == 0.0 && yours == 0.0 {
             continue;
         }
+        let city = world.cities.iter().find(|c| c.id == org);
         let is = if org == TRADE_ORG {
             OrganizationIs::TradeOrg
-        } else if world.cities.iter().any(|c| c.id == org) {
+        } else if city.is_some() {
             OrganizationIs::City
         } else {
             OrganizationIs::Realm
@@ -126,6 +131,9 @@ pub fn standings_for(world: &WorldState, realm_id: &str) -> Vec<StandingView> {
             is,
             theirs,
             yours,
+            temperament: city
+                .filter(|c| c.realm_id.is_none())
+                .and_then(|c| crate::temperament::temperament_of(world.seed, c)),
         });
     }
     views.sort_by(|a, b| {

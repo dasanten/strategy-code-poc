@@ -6,7 +6,8 @@
 
 use csp_shared::balance::{
     DEMANDS_PER_GAME_DAY, DEMAND_DECLINED_STANDING_LOSS, DEMAND_MAX_DAYS, DEMAND_NOTE_MAX_LENGTH,
-    DEMAND_TRADE_ORG_STANDING_LOSS, NPC_PLAN_TICKS, TRADE_ORG_DEBT_DEMAND_DAYS, TRADE_ORG_LOSS,
+    DEMAND_TRADE_ORG_STANDING_LOSS, NPC_DEMAND_COINS, NPC_DEMAND_DAYS, NPC_PLAN_TICKS,
+    TRADE_ORG_DEBT_DEMAND_DAYS, TRADE_ORG_LOSS,
 };
 use csp_shared::terrain::TerrainMap;
 use csp_shared::time::TICKS_PER_GAME_DAY;
@@ -18,7 +19,7 @@ use serde_json::Value;
 
 use crate::capture::{hand_over_city, return_post};
 use crate::events::record_event;
-use crate::goods_deps::{new_id, realm_name};
+use crate::goods_deps::new_id;
 use crate::invariants::InvariantViolation;
 use crate::npc_plan::plan_due;
 use crate::offers::{sees_storage_of, set_aside_for_demand};
@@ -249,7 +250,10 @@ fn tell_both(
         AnsweredBy::TradeOrg => DemandOtherIs::TradeOrg,
         AnsweredBy::City => DemandOtherIs::City,
     });
-    let sender_is = (d.from_id == TRADE_ORG).then_some(DemandOtherIs::TradeOrg);
+    let sender_is = answered_by_game(world, &d.from_id).map(|a| match a {
+        AnsweredBy::TradeOrg => DemandOtherIs::TradeOrg,
+        AnsweredBy::City => DemandOtherIs::City,
+    });
     let to_sender = RealmEventWhat::Demand {
         demand_id: d.id.clone(),
         what: sender,
@@ -265,7 +269,7 @@ fn tell_both(
         demand_id: d.id.clone(),
         what: receiver,
         mine: false,
-        other: realm_name(world, &d.from_id),
+        other: organization_label(world, &d.from_id),
         other_is: sender_is,
         terms: d.terms.clone(),
         leader_died: extra.leader_died,
@@ -355,10 +359,33 @@ fn answered(
         Answer::Lapsed => DemandWhat::Lapsed,
     };
     tell_both(world, d, what, what, Extra { leader_died: None, handed_over });
+    crate::npc_demands::npc_demand_ended(world, d, answer == Answer::Accepted);
     if answer != Answer::Accepted {
         debt_demand_ended(world, d);
     }
 }
+
+/// An NPC city sends `to` its demand (`CONTEXT.md`: NPC demand): `NPC_DEMAND_COINS`, by
+/// `NPC_DEMAND_DAYS`, with its note.
+pub fn send_npc_demand(world: &mut WorldState, city_id: &str, to: &str) {
+    let tick = world.tick as f64;
+    let demand = Demand {
+        id: new_id(world, "demand"),
+        from_id: city_id.to_string(),
+        to_id: to.to_string(),
+        terms: DemandTerms::Goods {
+            goods: [(Good::Coins, NPC_DEMAND_COINS)].into_iter().collect(),
+        },
+        note: NPC_DEMAND_NOTE.into(),
+        sent_at: tick,
+        deadline: tick + NPC_DEMAND_DAYS * TICKS_PER_GAME_DAY,
+    };
+    world.demands.push(demand.clone());
+    tell_both(world, &demand, DemandWhat::Sent, DemandWhat::Received, Extra::default());
+}
+
+/// What an NPC city writes in its demand (`CONTEXT.md`: NPC demand).
+pub const NPC_DEMAND_NOTE: &str = "We are stronger than you. Send us this by a Transfer, and we stay at peace. Refuse, and you are our enemy.";
 
 /// What the Trade Organization writes in its demand for a debt (`DEBT_DEMAND_NOTE`).
 pub const DEBT_DEMAND_NOTE: &str = "Pay what you owe at any of our warehouses, or hand it over here. Past the deadline our army comes for your workplaces.";
@@ -501,7 +528,7 @@ fn goods_problem(
     if let Some(p) = demand_hand_over_problem(world, &d.to_id, d, how) {
         return Some(p);
     }
-    let size = size.filter(|_| d.from_id != TRADE_ORG)?;
+    let size = size.filter(|_| answered_by_game(world, &d.from_id).is_none())?;
     if how.and_then(|h| h.get("way")).and_then(Value::as_str) != Some("transfer") {
         return None;
     }
@@ -753,6 +780,7 @@ pub fn step_demands(world: &mut WorldState) {
     world.demands.retain(|d| tick < d.deadline);
     for d in &lapsed {
         tell_both(world, d, DemandWhat::Lapsed, DemandWhat::Lapsed, Extra::default());
+        crate::npc_demands::npc_demand_ended(world, d, false);
         debt_demand_ended(world, d);
     }
 }
@@ -777,7 +805,13 @@ pub fn demands_sound(world: &WorldState) -> Vec<InvariantViolation> {
             report(format!("demand {} is sent to its own sender", d.id), &d.id);
         }
         let by_game = answered_by_game(world, &d.to_id).is_some();
-        let sides: &[&String] = if by_game { &[&d.from_id] } else { &[&d.from_id, &d.to_id] };
+        // An NPC city sends its own (`CONTEXT.md`: NPC demand), checked by `npc-demands-sound`.
+        let from_city = answered_by_game(world, &d.from_id) == Some(AnsweredBy::City);
+        let sides: &[&String] = match (by_game, from_city) {
+            (true, _) => &[&d.from_id],
+            (false, true) => &[&d.to_id],
+            (false, false) => &[&d.from_id, &d.to_id],
+        };
         for realm in sides {
             if realm.as_str() != TRADE_ORG && !world.realms.iter().any(|r| &&r.id == realm) {
                 report(format!("demand {} has realm {realm}, which does not exist", d.id), &d.id);

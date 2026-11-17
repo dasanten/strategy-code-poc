@@ -30,8 +30,8 @@ use crate::queries::city::{for_sale, in_city_area, npc_city_refuses};
 use crate::queries::city_area::{defends_city, occupiers_of};
 use crate::queries::names::{good_name, good_of, held, held_in, placed};
 use crate::queries::npc_trade::{
-    is_npc_archer, npc_archer_target, npc_makes_steel, npc_smithy, npc_soldier_kit,
-    npc_soldier_target,
+    is_npc_archer, npc_archer_target, npc_city_soldier_target, npc_makes_steel, npc_smithy,
+    npc_soldier_kit, npc_soldier_target,
 };
 use crate::queries::residents::best_weapon;
 use crate::queries::residents::{can_work, carry_capacity, is_armed, stock_weight};
@@ -116,7 +116,7 @@ pub fn step_npc_defence(world: &mut WorldState, size: i32) {
                 && b.kind == BuildingKind::Storage
                 && b.site.is_none()
         });
-        keep_soldiers(world, &city, &people, npc_soldier_target(adults), storage);
+        keep_soldiers(world, &city, &people, npc_city_soldier_target(&city, adults), storage);
         keep_tools(world, &city, &people, storage);
         watch_gates(world, &city, size);
     }
@@ -459,7 +459,7 @@ pub fn npc_soldiers_stand_down(world: &WorldState, size: i32) -> Vec<InvariantVi
             .copied()
             .filter(|&i| can_work(world.residents[i].born_at, tick))
             .collect();
-        let target = npc_soldier_target(grown.len() as f64);
+        let target = npc_city_soldier_target(city, grown.len() as f64);
         let party: HashSet<String> =
             founding_party(world.city_plans.get(&city.id)).into_iter().collect();
         let adults: Vec<usize> =
@@ -640,7 +640,7 @@ fn watch_gates(world: &mut WorldState, city: &City, size: i32) {
             && gates.iter().any(|&g| {
                 let b = &world.buildings[g];
                 wrap_distance(size, (r.x as i32, r.y as i32), (b.x as i32, b.y as i32))
-                    <= NPC_GATE_WATCH_RANGE
+                    <= NPC_GATE_WATCH_RANGE * crate::npc_stance::gate_watch_factor(city)
             })
     });
     for g in gates {

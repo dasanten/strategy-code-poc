@@ -733,7 +733,7 @@ fn places(
         if !eyes.building_seen(placed(b)) {
             continue;
         }
-        out.push(SeenEntity::Building(seen_building(world, insight, b)));
+        out.push(SeenEntity::Building(Box::new(seen_building(world, insight, b))));
         if let Some(city) = b.city_id.as_deref() {
             seen_cities.insert(city);
             if b.kind == BuildingKind::Storage && b.site.is_none() {
@@ -811,8 +811,27 @@ fn places(
         // Since when it has felt outweighed is its own mind (ADR 0033); demands show what it
         // means to their sides.
         shown.outweighed = None;
-        out.push(SeenEntity::City(SeenCity {
+        // So is how dangerous it thinks others are and where it lost people (`CONTEXT.md`: Threat).
+        shown.threats = None;
+        shown.danger_places = None;
+        // Whoever sees an NPC city reads its temperament (`CONTEXT.md`: Temperament); a city a
+        // Player holds now is theirs to run, whatever it was like before.
+        shown.temperament = if shown.realm_id.is_some() {
+            None
+        } else {
+            crate::temperament::temperament_of(world.seed, c)
+        };
+        // And its stance, as a mood line (`CONTEXT.md`: Stance); Grow too, which it stores as none.
+        shown.stance = crate::queries::city::for_sale(c).then(|| crate::npc_stance::stance_of(c));
+        // In Retaliate, against whom, by name (`CONTEXT.md`: Retaliating).
+        let retaliating_against = shown
+            .retaliating
+            .take()
+            .filter(|_| shown.stance.is_some())
+            .map(|org| crate::queries::standing::organization_label(world, &org));
+        out.push(SeenEntity::City(Box::new(SeenCity {
             city: shown,
+            retaliating_against,
             price,
             wont_sell,
             refuses: refuses.then_some(true),
@@ -820,7 +839,7 @@ fn places(
             trade,
             horses: (!horses.is_empty()).then_some(horses),
             horses_to_sell: (!to_sell.is_empty()).then_some(to_sell),
-        }));
+        })));
     }
     out
 }
@@ -899,7 +918,7 @@ impl SideSight {
             return None;
         }
         let insight = self.insight(world, index);
-        Some(SeenEntity::Building(seen_building(world, insight, b)))
+        Some(SeenEntity::Building(Box::new(seen_building(world, insight, b))))
     }
 
     /// Everything in its sight.

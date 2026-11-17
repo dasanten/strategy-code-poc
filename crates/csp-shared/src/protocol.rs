@@ -217,6 +217,11 @@ pub struct SeenBuilding {
 pub struct SeenCity {
     #[serde(flatten)]
     pub city: City,
+    /// For an NPC city in Retaliate, the name of the Organization it turned on, for its mood line
+    /// (`CONTEXT.md`: Retaliating).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub retaliating_against: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub price: Option<f64>,
@@ -442,8 +447,10 @@ pub struct SeenTrader {
 pub enum SeenEntity {
     /// Boxed: a resident carries far more than anything else seen.
     Resident(Box<SeenResident>),
-    Building(SeenBuilding),
-    City(SeenCity),
+    /// Boxed too: a building with its stock, prices and offers outweighs the rest.
+    Building(Box<SeenBuilding>),
+    /// Boxed too: a city carries its prices and what it keeps in mind.
+    City(Box<SeenCity>),
     Horse(SeenHorse),
     Carriage(SeenCarriage),
     Pile(Pile),
@@ -508,7 +515,7 @@ mod tests {
         .unwrap();
         let mut seen = SeenBuilding { building: b, prices: None, offers: None };
         seen.building.stock = None;
-        let e = SeenEntity::Building(seen);
+        let e = SeenEntity::Building(Box::new(seen));
         assert_eq!(
             serde_json::to_value(&e).unwrap(),
             json!({ "is": "building", "id": "b1", "kind": "storage", "cityId": "c1", "x": 3.0, "y": 4.0 })

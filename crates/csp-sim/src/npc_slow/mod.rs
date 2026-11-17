@@ -19,6 +19,7 @@ mod early_siege;
 mod far_nodes;
 mod game_year;
 mod inner_wall;
+mod intent;
 mod roads;
 mod scouts;
 mod steel;

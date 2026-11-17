@@ -1677,6 +1677,69 @@ pub struct CityPlan {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub patrolled_last: Option<String>,
+    /// Its soldiers out after thieves (`CONTEXT.md`: Acting first).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub hunts: Option<Vec<CityHunt>>,
+    /// When it last sent a demand to each Organization, by its id (`CONTEXT.md`: NPC demand), so
+    /// it doesn't send the next too soon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub demanded: Option<IndexMap<String, f64>>,
+    /// Its soldiers out to take a node another Organization holds (`CONTEXT.md`: Taking a node).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub taking: Option<NodeTaking>,
+    /// The soldiers it sent along with the crew building on a node out of its City area
+    /// (`CONTEXT.md`: Taking a node), by resident id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub site_escort: Option<Vec<String>>,
+    /// Its soldiers marching on a city of the Organization it retaliates against
+    /// (`CONTEXT.md`: Retaliating).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub march: Option<CityMarch>,
+}
+
+/// An NPC city's soldiers out to take a workplace on a node another Organization holds
+/// (`CONTEXT.md`: Taking a node): they drive its workers and guards off, then it is the city's.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NodeTaking {
+    pub building_id: String,
+    /// The Organization that held it.
+    pub holder: String,
+    pub soldier_ids: Vec<String>,
+}
+
+/// An NPC city's soldiers marching on a city to take it (`CityPlan.march`, `CONTEXT.md`: Retaliating).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CityMarch {
+    pub city_id: String,
+    pub resident_ids: Vec<String>,
+}
+
+/// A soldier of an NPC city out after a thief it knows of, to take back what was taken
+/// (`CONTEXT.md`: Acting first). While the thief lives they go after them; once the thief has
+/// fallen, they take the goods from the pile where they fell and carry them home.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CityHunt {
+    pub resident_id: String,
+    pub thief_id: String,
+    /// What the thief took from the city, as far as it knows: what the soldier takes back.
+    pub goods: Stock,
+    /// Where the thief was last seen: once they have fallen, where.
+    pub last_at: Tile,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
+    pub fell: Option<bool>,
+    /// The goods are picked up and on their way home.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
+    pub home: Option<bool>,
 }
 
 /// A soldier of an NPC city walking a round (`CONTEXT.md`: Soldier posts).
@@ -3303,6 +3366,11 @@ pub struct Realm {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub heir_id: Option<String>,
+    /// The tick the realm began, for its shelter (`CONTEXT.md`: New realm's shelter). Left out for
+    /// a realm from before it was kept, which is past its shelter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub founded_at: Option<f64>,
 }
 
 /// Why a realm's heir lapsed (`CONTEXT.md`: Heir).
@@ -3465,6 +3533,63 @@ pub struct City {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub outweighed: Option<Vec<Outweighed>>,
+    /// For an NPC city, how dangerous it thinks each Organization is, by its id (`CONTEXT.md`:
+    /// Threat), apart from Standing. Its own mind: nobody else sees it. Left out while there are
+    /// none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub threats: Option<IndexMap<String, f64>>,
+    /// For an NPC city, the places where it lost people, to anyone (`CONTEXT.md`: Threat). Its own
+    /// mind too. Left out while there are none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub danger_places: Option<Vec<DangerPlace>>,
+    /// For an NPC city, what it is like (`CONTEXT.md`: Temperament), fixed when it comes into
+    /// being. Left out for a trading post and a city founded by a Player.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub temperament: Option<Temperament>,
+    /// For an NPC city, what it is after for now (`CONTEXT.md`: Stance), picked again each game day.
+    /// Left out while it grows, and for a trading post and a city a Player holds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub stance: Option<Stance>,
+    /// For an NPC city in Retaliate, the Organization it turned on (`CONTEXT.md`: Retaliating).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub retaliating: Option<String>,
+}
+
+/// A place where an NPC city lost people (`City.danger_places`, `CONTEXT.md`: Threat). How much it
+/// still fears it fades over game days.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DangerPlace {
+    pub x: f64,
+    pub y: f64,
+    /// About one for each person lost there, fading.
+    pub weight: f64,
+}
+
+/// What an NPC city is like (`City.temperament`, `CONTEXT.md`: Temperament).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum Temperament {
+    Merchant,
+    Militarist,
+    Settler,
+}
+
+/// What an NPC city is after for now (`City.stance`, `CONTEXT.md`: Stance). Retaliate comes with
+/// T98.8.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum Stance {
+    Grow,
+    Fortify,
+    Trade,
+    Expand,
+    Retaliate,
 }
 
 /// Since when a realm's fighters near an NPC city have outweighed it without a break

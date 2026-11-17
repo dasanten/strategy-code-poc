@@ -178,7 +178,10 @@ pub fn full_but_materials(world: &WorldState, city: &City, plan: &CityPlan) -> b
     if !founding_party(Some(plan)).is_empty() {
         return false;
     }
-    let wait = npc_full_days(city_residents(world, &city.id).len() as f64) * TICKS_PER_GAME_DAY;
+    // Under Expand it counts as full sooner (`NPC_STANCE.expand_full_days`).
+    let wait = npc_full_days(city_residents(world, &city.id).len() as f64)
+        * crate::npc_stance::full_days_factor(city)
+        * TICKS_PER_GAME_DAY;
     world.tick as f64 - since >= wait && has_food_surplus(world, city)
 }
 
@@ -732,6 +735,7 @@ pub fn found_daughter(world: &mut WorldState, city_id: &str) -> Option<String> {
     }
     plan.full_since = None;
     plan.founding_site = None;
+    crate::temperament::inherit_temperament(world, city_id, &daughter);
     raise_standing_both_ways(world, city_id, &daughter, NPC_FOUND_STANDING);
     Some(daughter)
 }

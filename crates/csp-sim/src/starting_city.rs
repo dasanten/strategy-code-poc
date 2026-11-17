@@ -361,6 +361,11 @@ fn found_at(
         outsiders: None,
         alarmed_attackers: None,
         outweighed: None,
+        threats: None,
+        danger_places: None,
+        stance: None,
+        retaliating: None,
+        temperament: None,
         layout: None,
     };
     let building = |world: &mut WorldState, kind: BuildingKind, (bx, by): (i32, i32)| Building {
@@ -463,6 +468,7 @@ fn found_at(
         name: None,
         demands_sent_at: None,
         heir_id: None,
+        founded_at: Some(world.tick as f64),
     };
     if let (Some(names), Some(leader_name)) = (names, &leader_name) {
         realm.name = Some(crate::queries::people::js_trim(&names.realm_name).to_string());

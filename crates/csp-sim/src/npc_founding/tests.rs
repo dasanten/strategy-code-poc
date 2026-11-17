@@ -13,7 +13,7 @@ use csp_shared::terrain::{tile_index, wrap_distance, Terrain, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
     Building, BuildingKind, CityJob, CityJobKind, CityPlan, Good, ResidentOrder, ResourceKind,
-    ResourceNode, RunningScript, Stock, Tile, WorldState,
+    ResourceNode, RunningScript, Stock, Temperament, Tile, WorldState,
 };
 use serde_json::json;
 
@@ -40,6 +40,7 @@ use crate::queries::territory::compute_territory;
 use crate::random::{new_id, Mulberry32};
 use crate::residents::{new_resident, NewResident};
 use crate::starting_city::found_starting_city;
+use crate::temperament::daughter_temperament;
 use crate::world::create_world;
 
 const DAY: f64 = TICKS_PER_GAME_DAY;
@@ -966,12 +967,20 @@ fn has_a_founder_gone_back_for_materials_come_to_it_instead_once_the_town_hall_s
     t.plan_city();
     let (back_id, there_id) =
         (t.world.residents[back].id.clone(), t.world.residents[there].id.clone());
+    // A militarist mother hands its temperament on, mostly (`CONTEXT.md`: Temperament).
+    let mother = t.world.cities.iter_mut().find(|c| c.id == city).unwrap();
+    mother.temperament = Some(Temperament::Militarist);
     let plan = t.plan_mut();
     plan.founding_site = Some(Tile { x: 700.0, y: 60.0 });
     plan.jobs.insert(back_id, found_job());
     plan.jobs.insert(there_id, found_job());
 
     assert_eq!(found_daughter(&mut t.world, &city), Some(daughter.clone()));
+    let d = t.world.cities.iter().find(|c| c.id == daughter).unwrap();
+    assert_eq!(
+        d.temperament,
+        Some(daughter_temperament(t.world.seed, &daughter, Temperament::Militarist))
+    );
 
     let b = &t.world.residents[back];
     assert_eq!(b.city_id.as_deref(), Some(daughter.as_str()));

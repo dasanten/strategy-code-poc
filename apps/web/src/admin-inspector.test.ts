@@ -180,6 +180,7 @@ describe('the admin inspector', () => {
       storage: { wood: 7 },
       gates: { open: 1, shut: 2 },
       soldiers: 4,
+      threats: [],
     })
     expect(card.title).toBe('Nook')
     expect(card.owner).toBe('NPC city Nook')
@@ -193,6 +194,40 @@ describe('the admin inspector', () => {
     expect(row(card, 'Gates')?.text).toBe('1 open, 2 shut')
     expect(row(card, 'Soldiers')?.text).toBe('4')
     expect(card.directive).toEqual({ org: 'n1', name: 'Nook' })
+    expect(row(card, 'Threat')).toBeUndefined()
+    expect(row(card, 'Danger places')).toBeUndefined()
+  })
+
+  it("shows an NPC city's threats and danger places, most first", () => {
+    const card = inspectorCard({
+      tick: 1,
+      org: npc,
+      is: 'city',
+      city: {
+        id: 'n1',
+        name: 'Nook',
+        realmId: null,
+        townHallId: 'h',
+        occupation: null,
+        dangerPlaces: [
+          { x: 5, y: 6, weight: 0.5 },
+          { x: 7, y: 8, weight: 2 },
+        ],
+        x: 40,
+        y: 41,
+      },
+      residents: [],
+      buildings: [],
+      storage: {},
+      gates: { open: 0, shut: 0 },
+      soldiers: 0,
+      threats: [
+        { org: { id: 'r1', is: 'realm', name: 'Mara', alliance: null }, threat: 31.6 },
+        { org: trade, threat: 2 },
+      ],
+    })
+    expect(row(card, 'Threat')?.text).toBe('Mara 32, Trade Organization 2')
+    expect(row(card, 'Danger places')?.text).toBe('7, 8 (2.0); 5, 6 (0.5)')
   })
 
   it('shows a wandering trader with where it goes, its load, loop and crew', () => {

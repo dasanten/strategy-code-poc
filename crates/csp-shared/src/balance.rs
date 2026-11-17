@@ -796,6 +796,65 @@ pub const NPC_PATROLS_MAX: f64 = 8.0;
 /// two in three of them, so in peace few just stand on a post (`CONTEXT.md`: Soldiers in peace).
 pub const NPC_SOLDIERS_PER_PATROL: f64 = 1.5;
 
+/// How far from its home an NPC city sends soldiers after a thief it knows of (`CONTEXT.md`:
+/// Acting first), in tiles: its set reach (`NPC_NODE_REACH`). A thief further off is let go.
+pub const NPC_HUNT_REACH: f64 = 160.0;
+
+/// How many soldiers an NPC city sends after each thief, as far as it has soldiers beyond its hall
+/// and gate posts (`CONTEXT.md`: Acting first).
+pub const NPC_HUNTERS_PER_THIEF: f64 = 2.0;
+
+/// How many times an Organization's strength (all its armed residents, as respect weighs them) an
+/// NPC city's own side must be before it sends that Organization a demand (`CONTEXT.md`: NPC
+/// demand): "far outweighs", as a realm must far outweigh a city for it to yield to one
+/// (`DEMAND_YIELD_RESPECT_TIMES`).
+pub const NPC_DEMAND_OUTWEIGH_TIMES: f64 = 4.0;
+
+/// The least strength an NPC city's own side must have to send a demand (`CONTEXT.md`: NPC
+/// demand): as much as a city must see to yield to one (`DEMAND_YIELD_RESPECT_MIN`), so a village
+/// without soldiers asks nobody for anything.
+pub const NPC_DEMAND_MIN_STRENGTH: f64 = 25.0;
+
+/// The Coins an NPC city demands (`CONTEXT.md`: NPC demand): about what a few days of a small
+/// realm's trade bring in, enough to sting, not to ruin.
+pub const NPC_DEMAND_COINS: f64 = 50.0;
+
+/// An NPC city's demand's deadline, in game days (`CONTEXT.md`: NPC demand): one real day, as the
+/// Trade Organization gives for a debt (`TRADE_ORG_DEBT_DEMAND_DAYS`), so a Player who comes by
+/// once a day can still pay.
+pub const NPC_DEMAND_DAYS: f64 = 60.0;
+
+/// Game days before an NPC city sends the same Organization its next demand, from the last
+/// (`CONTEXT.md`: NPC demand): two real days, so one is answered or lapsed a real day before the
+/// next comes.
+pub const NPC_DEMAND_AGAIN_DAYS: f64 = 120.0;
+
+/// Where an NPC city's standing toward an Organization falls to, at most, when it refuses or lets
+/// lapse that city's demand (`CONTEXT.md`: NPC demand): hostile, below where it refuses them
+/// (`NPC_CITY_REFUSES_STANDING`).
+pub const NPC_DEMAND_REFUSED_STANDING: f64 = -40.0;
+
+/// How long a new realm is sheltered from NPC cities, in game days (`CONTEXT.md`: New realm's
+/// shelter): two game weeks, nearly six real hours, to build a first army.
+pub const NEW_REALM_SHELTER_DAYS: f64 = 14.0;
+
+/// Tiles from a workplace within which an Organization's residents hold it (`CONTEXT.md`: Taking a
+/// node, Holding a workplace): its workers and the armed residents guarding it.
+pub const NPC_NODE_GUARD_RANGE: f64 = 12.0;
+
+/// How many times the strength of a node's guards an NPC city's soldiers sent to take it must be
+/// (`CONTEXT.md`: Taking a node): "far outweighs", as for a demand (`NPC_DEMAND_OUTWEIGH_TIMES`).
+pub const NPC_TAKE_OUTWEIGH_TIMES: f64 = 4.0;
+
+/// The fewest soldiers an NPC city sends to take a node, however weak its guards (`CONTEXT.md`:
+/// Taking a node): two, so one can't be caught alone.
+pub const NPC_TAKE_PARTY_MIN: f64 = 2.0;
+
+/// How many soldiers an NPC city in Expand sends along with the crew building on a node out of its
+/// City area (`CONTEXT.md`: Taking a node), as far as it has them beyond its hall and gate posts:
+/// as many as a town's trader takes.
+pub const NPC_SITE_ESCORTS: f64 = 2.0;
+
 /// How many stops a round has along an NPC city's wall, spread evenly round it. Each costs one path
 /// search; a town's wall of 180 tiles gives legs of about 22 tiles, some 3 game hours each.
 pub const NPC_PATROL_WALL_STOPS: f64 = 8.0;
@@ -882,6 +941,38 @@ pub const NPC_JOB_SCORE: NpcJobScore = NpcJobScore {
     surplus: 10.0,
     surplus_range: 5.0,
 };
+
+/// What weighs on a job at a place besides what it is for (`CONTEXT.md`: Stance; ADR 0039): each
+/// takes from the job's score, together at most `most`, so a dangerous far workplace can lose to a
+/// safe near one. All zero ([`NpcJobWeights::NEUTRAL`]) chooses as the fixed bands did.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NpcJobWeights {
+    /// Per tile from the city's storage to the workplace.
+    pub distance: f64,
+    /// Per unit of the danger places the city remembers by the way there (about one per person
+    /// lost, fading).
+    pub danger: f64,
+    /// Per worker of the city already there.
+    pub crew: f64,
+    /// The most all of them take from one job.
+    pub most: f64,
+}
+
+impl NpcJobWeights {
+    /// Nothing weighs but what the job is for.
+    pub const NEUTRAL: NpcJobWeights =
+        NpcJobWeights { distance: 0.0, danger: 0.0, crew: 0.0, most: 0.0 };
+}
+
+/// What weighs on an NPC city's jobs at a place (`NpcJobWeights`). One person lost by the way
+/// costs more than `NPC_JOB_MARGIN`, so workers move to a safer workplace of the same good. Distance
+/// and crew weigh nothing yet: weighed on their own they pull spare hands from far surplus work
+/// (a new mine past a dry one) and shake the farmers of a big city (the slow NPC tests); a stance
+/// tilts them (T98.4). At most `most`, under the gap from `NPC_JOB_SCORE.short` to `road`, so work
+/// on a good that is short stays ahead of the road crew however dangerous.
+pub const NPC_JOB_WEIGHTS: NpcJobWeights =
+    NpcJobWeights { distance: 0.0, danger: 7.0, crew: 0.0, most: 15.0 };
 
 /// How much more another job must score for an NPC city's worker to leave theirs (`CONTEXT.md`: NPC
 /// city; ADR 0029), so nobody goes back and forth: more than the whole of `NPC_JOB_SCORE.shortRange`
@@ -1088,6 +1179,97 @@ pub const NPC_FOUND_GIVE_UP_DAYS: f64 = 20.0;
 /// The standing a daughter and its mother start at toward each other (`CONTEXT.md`: Founding):
 /// high, of `STANDING_RANGE`, fading like any standing.
 pub const NPC_FOUND_STANDING: f64 = 80.0;
+
+/// The chance a daughter takes its mother's temperament (`CONTEXT.md`: Temperament); otherwise it
+/// is drawn from its id like any NPC city's, so it may still come out the same.
+pub const NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT: f64 = 0.75;
+
+/// What an NPC city's stance does and when it takes one (`CONTEXT.md`: Stance; T98.4).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NpcStance {
+    /// The threat from the one Organization it fears most at which Fortify's need reaches one.
+    pub fortify_threat: f64,
+    /// Fortify keeps this many times the soldiers it keeps by its size.
+    pub fortify_soldiers: f64,
+    /// Fortify sends this many soldiers more with each escort.
+    pub fortify_escorts: f64,
+    /// Fortify shuts its gates to an armed outsider this many times as far off.
+    pub fortify_gate_watch: f64,
+    /// Fortify weighs the danger places by the way to a workplace this many times as much.
+    pub fortify_danger: f64,
+    /// Trade's need with a Trade Org warehouse in its traders' reach and a Food surplus.
+    pub trade_need: f64,
+    /// Under Trade a city's surplus caps are this share of their size, so more goes to market.
+    pub trade_surplus_cap: f64,
+    /// Trade has this many traders more out.
+    pub trade_traders: f64,
+    /// Expand's need with a Food surplus and no good short.
+    pub expand_need: f64,
+    /// Under Expand a city waits this share of the days full before it founds.
+    pub expand_full_days: f64,
+    /// Expand sends this many times the scouts.
+    pub expand_scouts: f64,
+    /// The temperament's own stance (merchant Trade, militarist Fortify, settler Expand) weighs
+    /// this many times its need.
+    pub temperament_tilt: f64,
+}
+
+pub const NPC_STANCE: NpcStance = NpcStance {
+    fortify_threat: 35.0,
+    fortify_soldiers: 1.5,
+    fortify_escorts: 1.0,
+    fortify_gate_watch: 1.5,
+    fortify_danger: 2.0,
+    trade_need: 0.8,
+    trade_surplus_cap: 0.5,
+    trade_traders: 1.0,
+    expand_need: 0.8,
+    expand_full_days: 0.5,
+    expand_scouts: 2.0,
+    temperament_tilt: 1.5,
+};
+
+/// When an NPC city acts first against a threat (`CONTEXT.md`: Acting first; T98.5).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NpcActingFirst {
+    /// The threat from one Organization at which a city seeks allies against it.
+    pub ally_threat: f64,
+    /// The threat from one Organization at which a city hires mercenaries.
+    pub hire_threat: f64,
+    /// How many Trade Org soldiers it hires at most.
+    pub hire_soldiers: f64,
+    /// For how many game days.
+    pub hire_days: f64,
+}
+
+pub const NPC_ACTING_FIRST: NpcActingFirst =
+    NpcActingFirst { ally_threat: 30.0, hire_threat: 30.0, hire_soldiers: 4.0, hire_days: 7.0 };
+
+/// When an NPC city retaliates and marches (`CONTEXT.md`: Retaliating; T98.8).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NpcRetaliate {
+    /// The threat from one realm at which a city turns on it.
+    pub threat: f64,
+    /// It ends once its threat from them has faded below this.
+    pub ends_below: f64,
+    /// The threat at which it marches on one of their cities.
+    pub march_threat: f64,
+    /// It marches only with its standing toward them at this or below.
+    pub march_standing: f64,
+    /// And only with an army this many times as strong as that city's defenders.
+    pub march_outweigh: f64,
+}
+
+pub const NPC_RETALIATE: NpcRetaliate = NpcRetaliate {
+    threat: 60.0,
+    ends_below: 15.0,
+    march_threat: 120.0,
+    march_standing: -60.0,
+    march_outweigh: 3.0,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -2881,6 +3063,48 @@ pub const RESPECT_PER_WALL: f64 = 0.25;
 /// have time to come to help, and one army can't collect villages by walking through.
 pub const OUTWEIGH_HOLD_DAYS: f64 = 1.0;
 
+/// Threat an NPC city takes from an Organization for each point of its armed residents' strength
+/// (as respect weighs them) it sees near itself or its people for a whole game day (`CONTEXT.md`:
+/// Threat). An untrained spearman passing in sight for a game hour adds about a fifth; ten of them
+/// camped at the gate for a day add about fifty.
+pub const THREAT_SEEN_PER_DAY: f64 = 1.0;
+
+/// Threat an NPC city takes from an Organization once it knows that one killed one of its people
+/// (`CONTEXT.md`: Threat): as much as the standing it loses for it.
+pub const THREAT_PER_KILLING: f64 = 30.0;
+
+/// Threat an NPC city takes from an Organization once it knows that one robbed it (`CONTEXT.md`:
+/// Threat): as much as the standing it loses for it.
+pub const THREAT_PER_ROBBERY: f64 = 10.0;
+
+/// Game days for an NPC city's threat to fade to half (`CONTEXT.md`: Threat): a killing is down to
+/// what it forgets in about 25 game days, some ten real hours.
+pub const THREAT_HALF_LIFE_DAYS: f64 = 3.0;
+
+/// Below this an NPC city forgets a threat (`CONTEXT.md`: Threat): under what one untrained
+/// spearman in sight for a planning pass adds, so a passer-by is remembered for a few game days.
+pub const THREAT_FORGOTTEN: f64 = 0.1;
+
+/// Game days for a danger place to fade to half (`CONTEXT.md`: Threat): a place where one person
+/// was lost is forgotten after twelve game days.
+pub const DANGER_PLACE_HALF_LIFE_DAYS: f64 = 6.0;
+
+/// Below this weight an NPC city forgets a danger place (`CONTEXT.md`: Threat). A place starts at
+/// one for each person lost there.
+pub const DANGER_PLACE_FORGOTTEN: f64 = 0.25;
+
+/// Tiles within which a new loss counts toward a danger place the city already remembers instead
+/// of being a new one (`CONTEXT.md`: Threat).
+pub const DANGER_PLACE_MERGE_RANGE: f64 = 8.0;
+
+/// Tiles from a way within which a danger place makes it dangerous (`CONTEXT.md`: Threat, Escort).
+pub const DANGER_PLACE_WAY_REACH: f64 = 12.0;
+
+/// Most soldiers an NPC city sends along beyond its usual escort on a dangerous way: one for each
+/// person it lost by the way, rounded up while it remembers, up to this (`CONTEXT.md`: Threat,
+/// Escort).
+pub const DANGER_ESCORTS_MAX: f64 = 3.0;
+
 /// What an NPC city's standing toward a realm drops by when it declines that realm's demand
 /// (`CONTEXT.md`: Demand): as much as a theft, so three in a game day shut its gates.
 pub const DEMAND_DECLINED_STANDING_LOSS: f64 = 10.0;
@@ -3037,6 +3261,19 @@ pub fn balance_json() -> Value {
     m.insert("NPC_TRAIN_TURN_TICKS".into(), json!(NPC_TRAIN_TURN_TICKS));
     m.insert("NPC_PATROLS_MAX".into(), json!(NPC_PATROLS_MAX));
     m.insert("NPC_SOLDIERS_PER_PATROL".into(), json!(NPC_SOLDIERS_PER_PATROL));
+    m.insert("NPC_HUNT_REACH".into(), json!(NPC_HUNT_REACH));
+    m.insert("NPC_HUNTERS_PER_THIEF".into(), json!(NPC_HUNTERS_PER_THIEF));
+    m.insert("NPC_DEMAND_OUTWEIGH_TIMES".into(), json!(NPC_DEMAND_OUTWEIGH_TIMES));
+    m.insert("NPC_DEMAND_MIN_STRENGTH".into(), json!(NPC_DEMAND_MIN_STRENGTH));
+    m.insert("NPC_DEMAND_COINS".into(), json!(NPC_DEMAND_COINS));
+    m.insert("NPC_DEMAND_DAYS".into(), json!(NPC_DEMAND_DAYS));
+    m.insert("NPC_DEMAND_AGAIN_DAYS".into(), json!(NPC_DEMAND_AGAIN_DAYS));
+    m.insert("NPC_DEMAND_REFUSED_STANDING".into(), json!(NPC_DEMAND_REFUSED_STANDING));
+    m.insert("NEW_REALM_SHELTER_DAYS".into(), json!(NEW_REALM_SHELTER_DAYS));
+    m.insert("NPC_NODE_GUARD_RANGE".into(), json!(NPC_NODE_GUARD_RANGE));
+    m.insert("NPC_TAKE_OUTWEIGH_TIMES".into(), json!(NPC_TAKE_OUTWEIGH_TIMES));
+    m.insert("NPC_TAKE_PARTY_MIN".into(), json!(NPC_TAKE_PARTY_MIN));
+    m.insert("NPC_SITE_ESCORTS".into(), json!(NPC_SITE_ESCORTS));
     m.insert("NPC_PATROL_WALL_STOPS".into(), json!(NPC_PATROL_WALL_STOPS));
     m.insert("NPC_PATROL_ROAD_STOPS".into(), json!(NPC_PATROL_ROAD_STOPS));
     m.insert("NPC_WAR_CHEST_PER_RESIDENT".into(), json!(NPC_WAR_CHEST_PER_RESIDENT));
@@ -3050,6 +3287,7 @@ pub fn balance_json() -> Value {
     m.insert("NPC_PLAN_TICKS".into(), json!(NPC_PLAN_TICKS));
     m.insert("NPC_JOB_SCORE".into(), to_value(NPC_JOB_SCORE).expect("serialisable"));
     m.insert("NPC_JOB_MARGIN".into(), json!(NPC_JOB_MARGIN));
+    m.insert("NPC_JOB_WEIGHTS".into(), to_value(NPC_JOB_WEIGHTS).expect("serialisable"));
     m.insert("NPC_RESIDENTS_PER_NEEDS_STEP".into(), json!(NPC_RESIDENTS_PER_NEEDS_STEP));
     m.insert("NPC_BUILDERS".into(), json!(NPC_BUILDERS));
     m.insert("NPC_ROAD_CREW".into(), json!(NPC_ROAD_CREW));
@@ -3090,6 +3328,13 @@ pub fn balance_json() -> Value {
     m.insert("NPC_FOUND_FOOD_DAYS".into(), json!(NPC_FOUND_FOOD_DAYS));
     m.insert("NPC_FOUND_GIVE_UP_DAYS".into(), json!(NPC_FOUND_GIVE_UP_DAYS));
     m.insert("NPC_FOUND_STANDING".into(), json!(NPC_FOUND_STANDING));
+    m.insert(
+        "NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT".into(),
+        json!(NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT),
+    );
+    m.insert("NPC_STANCE".into(), to_value(NPC_STANCE).expect("serialisable"));
+    m.insert("NPC_ACTING_FIRST".into(), to_value(NPC_ACTING_FIRST).expect("serialisable"));
+    m.insert("NPC_RETALIATE".into(), to_value(NPC_RETALIATE).expect("serialisable"));
     m.insert("TRADE_ORG_HQ".into(), to_value(TRADE_ORG_HQ).expect("serialisable"));
     m.insert("TRADE_ORG_HQ_MIN_DISTANCE".into(), json!(TRADE_ORG_HQ_MIN_DISTANCE));
     m.insert("TRADING_POST_REGION".into(), json!(TRADING_POST_REGION));
@@ -3362,6 +3607,16 @@ pub fn balance_json() -> Value {
     m.insert("DEMAND_YIELD_RESPECT_MIN".into(), json!(DEMAND_YIELD_RESPECT_MIN));
     m.insert("RESPECT_PER_WALL".into(), json!(RESPECT_PER_WALL));
     m.insert("OUTWEIGH_HOLD_DAYS".into(), json!(OUTWEIGH_HOLD_DAYS));
+    m.insert("THREAT_SEEN_PER_DAY".into(), json!(THREAT_SEEN_PER_DAY));
+    m.insert("THREAT_PER_KILLING".into(), json!(THREAT_PER_KILLING));
+    m.insert("THREAT_PER_ROBBERY".into(), json!(THREAT_PER_ROBBERY));
+    m.insert("THREAT_HALF_LIFE_DAYS".into(), json!(THREAT_HALF_LIFE_DAYS));
+    m.insert("THREAT_FORGOTTEN".into(), json!(THREAT_FORGOTTEN));
+    m.insert("DANGER_PLACE_HALF_LIFE_DAYS".into(), json!(DANGER_PLACE_HALF_LIFE_DAYS));
+    m.insert("DANGER_PLACE_FORGOTTEN".into(), json!(DANGER_PLACE_FORGOTTEN));
+    m.insert("DANGER_PLACE_MERGE_RANGE".into(), json!(DANGER_PLACE_MERGE_RANGE));
+    m.insert("DANGER_PLACE_WAY_REACH".into(), json!(DANGER_PLACE_WAY_REACH));
+    m.insert("DANGER_ESCORTS_MAX".into(), json!(DANGER_ESCORTS_MAX));
     m.insert("DEMAND_DECLINED_STANDING_LOSS".into(), json!(DEMAND_DECLINED_STANDING_LOSS));
     m.insert("DEMAND_TRADE_ORG_STANDING_LOSS".into(), json!(DEMAND_TRADE_ORG_STANDING_LOSS));
     m.insert("DIRECT_OFFER_DAYS".into(), json!(DIRECT_OFFER_DAYS));

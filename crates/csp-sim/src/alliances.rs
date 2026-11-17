@@ -152,17 +152,53 @@ pub const INVITE_TO_ALLIANCE: AllianceOrder = AllianceOrder {
     act: |world, realm_id, order| {
         let a = alliance_index_of(world, realm_id).expect("the leader's alliance");
         let id = str_field(order, "realmId").expect("checked").to_string();
-        if is_alliance_city(world, &id) {
-            return answer_as_city(world, a, &id);
-        }
-        world.alliances[a].invites.push(id.clone());
-        let what = RealmEventWhat::AllianceInvited {
-            alliance_id: world.alliances[a].id.clone(),
-            name: world.alliances[a].name.clone(),
-        };
-        record_event(world, Some(&id), what);
+        invite(world, a, &id);
     },
 };
+
+/// The alliance `a` invites the realm or NPC city `id` (`invite`): an NPC city answers at once
+/// (`answer_as_city`); a realm hears of it and answers when it will.
+pub fn invite(world: &mut WorldState, a: usize, id: &str) {
+    if is_alliance_city(world, id) {
+        return answer_as_city(world, a, id);
+    }
+    world.alliances[a].invites.push(id.to_string());
+    let what = RealmEventWhat::AllianceInvited {
+        alliance_id: world.alliances[a].id.clone(),
+        name: world.alliances[a].name.clone(),
+    };
+    record_event(world, Some(id), what);
+}
+
+/// An NPC city founds an alliance on its own (`CONTEXT.md`: Acting first), named after itself; it
+/// is its only member and its leader. Its place in `world.alliances`.
+pub fn npc_found_alliance(world: &mut WorldState, city_id: &str) -> usize {
+    let city = world.cities.iter().find(|c| c.id == city_id).map_or("", |c| c.name.as_str());
+    let mut name = String::new();
+    for ch in city.chars() {
+        if name.encode_utf16().count() + ch.len_utf16() > ALLIANCE_NAME_MAX_LENGTH - " League".len()
+        {
+            break;
+        }
+        name.push(ch);
+    }
+    name.push_str(" League");
+    let id = new_id("alliance", &mut world.next_id);
+    world.alliances.push(Alliance {
+        id,
+        name: name.trim().to_string(),
+        leader_id: city_id.to_string(),
+        members: vec![AllianceMember {
+            realm_id: city_id.to_string(),
+            joined_at: world.tick as f64,
+            leaving: None,
+        }],
+        invites: Vec::new(),
+        army: Vec::new(),
+    });
+    drop_invites_to(world, city_id);
+    world.alliances.len() - 1
+}
 
 /// The NPC city `city_id` answers the alliance's invitation: it joins or declines
 /// (`answerAsCity`).
@@ -537,8 +573,8 @@ fn tell_members(world: &mut WorldState, a: usize, what: RealmEventWhat) {
 }
 
 /// Ends a member's membership now (`endMembership`): it and the members staying are told; what it
-/// handed over comes back; the alliance leader's role passes to the longest-standing realm left;
-/// an alliance with no realm left ends.
+/// handed over comes back; the alliance leader's role passes to the longest-standing realm left, or
+/// NPC city with no realm left; an alliance with nobody left ends.
 fn end_membership(world: &mut WorldState, a: usize, realm_id: &str, why: AllianceLeftWhy) {
     let city = world.cities.iter().any(|c| c.id == realm_id);
     let realm =
@@ -562,10 +598,14 @@ fn end_membership(world: &mut WorldState, a: usize, realm_id: &str, why: Allianc
         .collect();
     give_back(world, a, own);
     world.alliances[a].members.retain(|m| m.realm_id != realm_id);
-    let next = world.alliances[a]
-        .members
+    // The longest-standing realm takes over, or with none left the longest-standing NPC city (an
+    // alliance an NPC city founded, `CONTEXT.md`: Acting first; decided overnight, Daniel to
+    // confirm). With nobody left it ends.
+    let members = &world.alliances[a].members;
+    let next = members
         .iter()
         .find(|m| world.realms.iter().any(|r| r.id == m.realm_id))
+        .or_else(|| members.first())
         .map(|m| m.realm_id.clone());
     let Some(next) = next else {
         world.alliances.remove(a);
@@ -578,7 +618,7 @@ fn end_membership(world: &mut WorldState, a: usize, realm_id: &str, why: Allianc
     let what = RealmEventWhat::AllianceLeader {
         alliance_id,
         name,
-        realm: realm_name(world, &next),
+        realm: organization_label(world, &next),
         realm_id: next,
     };
     tell_members(world, a, what);

@@ -1,13 +1,14 @@
 //! The rest of `npc-scores.test.ts`: a city shares out its adults by the scores.
 
-use csp_shared::balance::NPC_BUILDERS;
+use csp_shared::balance::{NpcJobWeights, NPC_BUILDERS};
 use csp_shared::world::{
-    BuildingKind, CityJob, CityJobKind, CityScouted, Good, RunningScript, Stock,
+    BuildingKind, CityJob, CityJobKind, CityScouted, DangerPlace, Good, RunningScript, Stock,
 };
 use indexmap::IndexMap;
 use serde_json::json;
 
 use crate::npc_plan::{farmers_wanted, plan_city};
+use crate::npc_scores::with_job_weights;
 use crate::npc_test_world::{fill_houses, village, Village, FOREST};
 use crate::queries::names::held;
 use crate::queries::npc_trade::npc_reserve;
@@ -109,4 +110,70 @@ fn moves_a_worker_for_what_beats_theirs_by_the_margin_a_farm_lacking_farmers() {
     }
     let jobs = plan(&mut v);
     assert_eq!(jobs[&worker].kind, CityJobKind::Farm);
+}
+
+/// The workshop with a second lumber camp far out, listed before the near one, and the Wood its
+/// reserve wants missing.
+fn two_camps() -> Village {
+    let mut v = workshop();
+    let (fx, fy) = (f64::from(FOREST.0), f64::from(FOREST.1));
+    let b = crate::test_support::building;
+    let camp = v.world.buildings.iter().position(|b| b.id == "camp").expect("the camp");
+    crate::npc_slow::add_node(
+        &mut v.world,
+        &mut v.terrain,
+        csp_shared::world::ResourceKind::Forest,
+        fx + 60.0,
+        fy,
+    );
+    v.world.buildings.insert(camp, b("far", BuildingKind::LumberCamp, None, fx + 60.0, fy));
+    v.city_mut().workplace_ids = Some(vec!["far".into(), "camp".into(), "smithy".into()]);
+    set_stock(&mut v, Stock::from([(Good::Food, 1000.0), (Good::Wood, 0.0), (Good::Spear, 99.0)]));
+    v
+}
+
+#[test]
+fn sends_wood_cutters_to_the_near_safe_camp_before_the_far_one_with_a_danger_place() {
+    let mut v = two_camps();
+    let (fx, fy) = (f64::from(FOREST.0), f64::from(FOREST.1));
+    v.city_mut().danger_places = Some(vec![DangerPlace { x: fx + 55.0, y: fy, weight: 2.0 }]);
+    let jobs = plan(&mut v);
+    assert!(at(&jobs, "camp") > 0);
+    assert!(at(&jobs, "far") < at(&jobs, "camp"));
+}
+
+#[test]
+fn sends_them_to_the_first_camp_listed_with_neutral_weights() {
+    let mut v = two_camps();
+    let jobs = with_job_weights(NpcJobWeights::NEUTRAL, || plan(&mut v));
+    assert!(at(&jobs, "far") > 0);
+    assert!(at(&jobs, "far") >= at(&jobs, "camp"));
+}
+
+#[test]
+fn moves_a_worker_from_a_dangerous_camp_to_a_safe_one_of_the_same_good() {
+    let mut v = two_camps();
+    let (fx, fy) = (f64::from(FOREST.0), f64::from(FOREST.1));
+    v.city_mut().danger_places = Some(vec![DangerPlace { x: fx + 55.0, y: fy, weight: 2.0 }]);
+    v.world.residents[0].script = Some(
+        serde_json::from_value(
+            json!({ "scriptId": 0, "task": "work", "memory": { "workplaceId": "far" } }),
+        )
+        .unwrap(),
+    );
+    let worker = v.world.residents[0].id.clone();
+    let jobs = plan(&mut v);
+    assert_eq!(jobs[&worker].building_id.as_deref(), Some("camp"));
+}
+
+#[test]
+fn still_sends_everyone_to_the_farm_first_while_food_is_short_however_dangerous() {
+    let mut v = two_camps();
+    set_stock(&mut v, Stock::new());
+    let (fx, fy) = (f64::from(FOREST.0), f64::from(FOREST.1));
+    v.city_mut().danger_places = Some(vec![DangerPlace { x: fx, y: fy, weight: 50.0 }]);
+    v.world.residents[0].script = Some(at_camp());
+    let jobs = plan(&mut v);
+    let kinds: Vec<CityJobKind> = jobs.values().map(|j| j.kind).collect();
+    assert_eq!(kinds, vec![CityJobKind::Farm; v.world.residents.len()]);
 }

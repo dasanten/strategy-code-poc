@@ -11,7 +11,7 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    set_out_food, CARAVAN_GUARD_RANGE, NPC_ESCORT_TOWN_RESIDENTS, NPC_FOUND_ESCORT_SHARE,
+    set_out_food, CARAVAN_GUARD_RANGE, MAP_SIZE, NPC_ESCORT_TOWN_RESIDENTS, NPC_FOUND_ESCORT_SHARE,
     NPC_TRADER_ESCORTS, WALK_TICKS_PER_TILE,
 };
 use csp_shared::footprint::is_at;
@@ -31,10 +31,12 @@ use crate::queries::residents::is_armed;
 use crate::sight::InvariantViolation;
 use crate::world_index::resident_index;
 
-/// Soldiers more a city sends along on a way it knows to be dangerous (`CONTEXT.md`: Escort).
-/// None yet: Epic 98 has cities learn which ways are dangerous, and adds to the escort here.
-pub fn escorts_for_danger(_world: &WorldState, _city: &City, _to: (i32, i32)) -> usize {
-    0
+/// Soldiers more a city sends along on a way it knows to be dangerous (`CONTEXT.md`: Escort): by
+/// the danger places it remembers by the way from its town hall (`npc_threat::danger_escorts`), and
+/// more under Fortify (`NPC_STANCE.fortify_escorts`).
+pub fn escorts_for_danger(world: &WorldState, city: &City, to: (i32, i32)) -> usize {
+    crate::npc_threat::danger_escorts(world, city, to, MAP_SIZE)
+        + crate::npc_stance::extra_escorts(city)
 }
 
 /// How many soldiers a city's trader takes along on a run to `to` (`CONTEXT.md`: Escort): a

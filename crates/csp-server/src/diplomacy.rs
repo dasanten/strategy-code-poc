@@ -11,12 +11,12 @@ use csp_shared::protocol::SeenEntity;
 use csp_shared::world::offers::SeenOffer;
 use csp_shared::world::{
     AllianceArmyPart, AllianceArmyPartIs, BuildingKind, DeliveryKind, DemandTerms,
-    DirectOfferTerms, Good, WorldState,
+    DirectOfferTerms, Good, Temperament, WorldState,
 };
 use csp_sim::directive::{directives_for, DirectiveView};
-use csp_sim::queries::alliance::{alliance_of, realm_name, sharing_sight};
+use csp_sim::queries::alliance::{alliance_of, sharing_sight};
 use csp_sim::queries::alliance_rules::is_alliance_city;
-use csp_sim::queries::city::town_hall_of;
+use csp_sim::queries::city::{for_sale, town_hall_of};
 use csp_sim::queries::contract::{contracts_for, ContractView, RealmLabel};
 use csp_sim::queries::demand::{
     answered_by_game, demand_wavering, npc_orgs_known_to, realms_known_to, AnsweredBy,
@@ -146,6 +146,8 @@ pub struct StandingShown {
     pub is: &'static str,
     pub theirs: f64,
     pub yours: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperament: Option<Temperament>,
 }
 
 impl From<StandingView> for StandingShown {
@@ -155,7 +157,14 @@ impl From<StandingView> for StandingShown {
             OrganizationIs::City => "city",
             OrganizationIs::TradeOrg => "tradeOrg",
         };
-        StandingShown { org: s.org, name: s.name, is, theirs: s.theirs, yours: s.yours }
+        StandingShown {
+            org: s.org,
+            name: s.name,
+            is,
+            theirs: s.theirs,
+            yours: s.yours,
+            temperament: s.temperament,
+        }
     }
 }
 
@@ -344,6 +353,14 @@ pub fn carried_ways_for<'a>(
             others.push(&city.id);
         }
     }
+    // An NPC city that demanded something of the realm is paid by Transfer, seen or not
+    // (`CONTEXT.md`: NPC demand).
+    for d in world.demands.iter().filter(|d| d.to_id == realm_id) {
+        let npc = world.cities.iter().any(|c| c.id == d.from_id && for_sale(c));
+        if npc && !others.contains(&d.from_id.as_str()) {
+            others.push(&d.from_id);
+        }
+    }
     if others.is_empty() {
         return Vec::new();
     }
@@ -437,7 +454,7 @@ pub fn diplomacy_for<'a>(
         .map(|a| InvitationView {
             alliance_id: a.id.clone(),
             name: a.name.clone(),
-            leader: realm_name(world, &a.leader_id),
+            leader: organization_label(world, &a.leader_id),
         })
         .collect();
     let realms: HashSet<&str> = world.realms.iter().map(|r| r.id.as_str()).collect();
