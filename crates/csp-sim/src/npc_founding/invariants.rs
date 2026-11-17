@@ -2,16 +2,16 @@
 
 use std::collections::HashMap;
 
-use csp_shared::balance::NPC_FOUND_PARTY_MOST;
 use csp_shared::world::WorldState;
 
 use super::founding_party;
 use crate::npc_plan::violation;
 use crate::sight::InvariantViolation;
 
-/// Invariant `founding-parties-sound` (`CONTEXT.md`: Founding): a founding party has a site and
-/// at most `NPC_FOUND_PARTY_MOST` members, each in one party only and, while alive and of no
-/// realm, of the city that sends it.
+/// Invariant `founding-parties-sound` (`CONTEXT.md`: Founding): a founding party has a site, and
+/// each member is in one party only and, while alive and of no realm, of the city that sends it.
+/// Its size isn't held to `NPC_FOUND_PARTY_MOST`: as many more go as it takes to carry its load
+/// (Daniel, 2026-11-15; #1379: a city of 110 sent 16).
 pub fn founding_parties_sound(world: &WorldState) -> Vec<InvariantViolation> {
     const NAME: &str = "founding-parties-sound";
     let mut out = Vec::new();
@@ -21,9 +21,8 @@ pub fn founding_parties_sound(world: &WorldState) -> Vec<InvariantViolation> {
         if party.is_empty() {
             continue;
         }
-        if plan.founding_site.is_none() || party.len() as f64 > NPC_FOUND_PARTY_MOST {
-            let site = if plan.founding_site.is_some() { "" } else { " and no site" };
-            let message = format!("{city_id} has a party of {}{site}", party.len());
+        if plan.founding_site.is_none() {
+            let message = format!("{city_id} has a party of {} and no site", party.len());
             out.push(violation(NAME, message, vec![city_id.clone()]));
         }
         for id in party {

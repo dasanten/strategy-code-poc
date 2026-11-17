@@ -8,7 +8,8 @@
 use std::collections::{HashMap, HashSet};
 
 use csp_shared::balance::{
-    FOOD_PER_DAY, MAP_SIZE, NPC_FOOD_SHORT_DAYS, NPC_PLAN_TICKS, WORK_OUTPUT_PER_DAY,
+    FOOD_PER_DAY, MAP_SIZE, NPC_FOOD_REFILL_DAYS, NPC_FOOD_SHORT_DAYS, NPC_PLAN_TICKS,
+    WORK_OUTPUT_PER_DAY,
 };
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
@@ -370,10 +371,35 @@ pub fn plan_city(
 }
 
 /// How many farmers an NPC city keeps (`farmersWanted`): as many as feed all its residents, and
-/// one more while it has no food surplus.
+/// one more while it has no food surplus (`farmers_to_feed`); below its reserve, as many more as
+/// win back what its Food lacks of it in `NPC_FOOD_REFILL_DAYS` until it runs short, if that is
+/// more (#1379: on those who feed everyone alone, its Food sank to where it runs short and stayed
+/// there).
 pub fn farmers_wanted(world: &WorldState, city: &City) -> f64 {
-    feeders(city_residents(world, &city.id).len())
-        + if has_food_surplus(world, city) { 0.0 } else { 1.0 }
+    let more: f64 = if has_food_surplus(world, city) { 0.0 } else { 1.0 };
+    feeders(city_residents(world, &city.id).len()) + more.max(refill_farmers(world, city))
+}
+
+/// The farmers who feed all an NPC city's residents, and one more while it has no food surplus
+/// (`farmers_wanted` but for those who win back its reserve): it builds a farm when they don't fit
+/// on its farms (`farmers_dont_fit`), not for those who only refill it.
+pub fn farmers_to_feed(world: &WorldState, city: &City) -> f64 {
+    let more = if has_food_surplus(world, city) { 0.0 } else { 1.0 };
+    feeders(city_residents(world, &city.id).len()) + more
+}
+
+/// The farmers more an NPC city keeps to win back what its Food lacks of its reserve
+/// (`farmers_wanted`), rounded up. None once its Food runs short: then its workers go to the farms
+/// with room and its spare hands still buy Food and revive those who are Down (`share_out`).
+fn refill_farmers(world: &WorldState, city: &City) -> f64 {
+    if city.trade_org.is_some() || food_short(world, city) {
+        return 0.0;
+    }
+    use crate::queries::npc_trade::{npc_city_stock, npc_reserve};
+    let lacks = held(&npc_reserve(world, city), Good::Food)
+        - held(&npc_city_stock(world, city), Good::Food);
+    let per = WORK_OUTPUT_PER_DAY.get("food").unwrap_or(1.0) * NPC_FOOD_REFILL_DAYS;
+    (lacks / per - 1e-9).ceil().max(0.0)
 }
 
 /// Farmers who feed `residents`, rounded up (`feeders`).

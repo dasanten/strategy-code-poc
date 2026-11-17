@@ -767,8 +767,18 @@ fn holds_for_the_largest_party() {
 }
 
 #[test]
-fn finds_a_party_past_the_largest() {
-    let t = with_party(NPC_FOUND_PARTY_MOST as usize + 1);
+fn holds_for_a_party_past_the_largest_with_those_who_carry_its_load() {
+    // As many more go as it takes to carry the load (Daniel, 2026-11-15; #1379).
+    let t = with_party(NPC_FOUND_PARTY_MOST as usize + 2);
+    assert_eq!(founding_parties_sound(&t.world), []);
+}
+
+#[test]
+fn finds_a_party_with_no_site() {
+    let mut t = with_party(NPC_VILLAGE.residents as usize);
+    for plan in t.world.city_plans.values_mut() {
+        plan.founding_site = None;
+    }
     assert_eq!(founding_parties_sound(&t.world).len(), 1);
 }
 
