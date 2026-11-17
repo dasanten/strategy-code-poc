@@ -5,7 +5,7 @@
 use std::collections::{HashMap, HashSet};
 
 use csp_shared::balance::{MAP_SIZE, SIGHT_RANGE, STRIKE_TICKS, WALL_DEFENCE};
-use csp_shared::footprint::is_at;
+use csp_shared::footprint::{is_at, near_footprint};
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::{
     AttackOrder, Building, CrimeKind, DeathCause, Good, Realm, RealmEventWhat, Resident,
@@ -97,8 +97,12 @@ fn reaches(world: &WorldState, size: i32, ai: usize, t: Target) -> bool {
                 (contact || across_docked_ship(world, a, b)) && reaches_for_height(world, a, b);
             (blow || within_shot(world, size, a, b)) && !between_vessels(world, a, b)
         }
-        // A wall or gate is struck in contact, never shot at.
-        Target::Building(_) => contact,
+        // A wall or gate is struck in contact, never shot at; a tower from beside any tile of it
+        // (`CONTEXT.md`: Tower).
+        Target::Building(bi) => {
+            let b = &world.buildings[bi];
+            contact || near_footprint(placed(b), tile((a.x, a.y)), 1, size)
+        }
     }
 }
 

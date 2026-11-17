@@ -2,11 +2,15 @@
 //! Walls in combat). Movement's wall map (`wallMap`, `mayStep`, `climbLanding`) is T86.6's to
 //! add here.
 
-use csp_shared::balance::{BROKEN_MATERIALS_RETURNED, STONE_WALL_STRENGTH, WALL_STRENGTH};
+use csp_shared::balance::{
+    BROKEN_MATERIALS_RETURNED, MAP_SIZE, STONE_WALL_STRENGTH, WALL_STRENGTH,
+};
+use csp_shared::footprint::covers;
 use csp_shared::world::{Building, BuildingKind, Resident, Stock, WorldState};
 
 use super::alliance::allied;
 use super::building::{is_stone, materials_of};
+use super::names::placed;
 
 /// Whose side a resident is on at walls and gates (`wallSide`): their realm, or for a resident of
 /// an NPC city, that city. None for a resident of nobody.
@@ -14,20 +18,31 @@ pub fn wall_side(r: &Resident) -> Option<&str> {
     r.owner.as_deref().or(r.city_id.as_deref())
 }
 
-/// Whether a building is a finished wall or gate (`isWallOrGate`).
+/// Whether a building is a finished wall, gate or tower (`isWallOrGate`, `CONTEXT.md`: Tower): what
+/// closes the way, carries the wall walk and is broken by blows.
 pub fn is_wall_or_gate(b: &Building) -> bool {
-    matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate) && b.site.is_none()
+    matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate | BuildingKind::Tower)
+        && b.site.is_none()
+}
+
+/// The finished wall or tower standing on tile (x, y), if one does: what a resident there is up on
+/// (a gate is passed under). A tower covers its whole footprint.
+pub fn wall_or_tower_at(world: &WorldState, x: f64, y: f64) -> Option<&Building> {
+    world.buildings.iter().find(|b| {
+        b.site.is_none()
+            && match b.kind {
+                BuildingKind::Wall => b.x == x && b.y == y,
+                BuildingKind::Tower => covers(placed(b), x as i32, y as i32, MAP_SIZE),
+                _ => false,
+            }
+    })
 }
 
 /// Whether a resident is up (`CONTEXT.md`: Wall walk, High ground): on the wall walk, or a climber
 /// who made it and came down on top of a finished wall, the far side being no way down. Someone
 /// on a gate tile and not on its walk passes under it, on the ground.
 pub fn is_up(world: &WorldState, r: &Resident) -> bool {
-    r.up.is_some()
-        || world
-            .buildings
-            .iter()
-            .any(|b| b.x == r.x && b.y == r.y && b.kind == BuildingKind::Wall && b.site.is_none())
+    r.up.is_some() || wall_or_tower_at(world, r.x, r.y).is_some()
 }
 
 /// Whether a blow from `a` can reach `b` for height (`CONTEXT.md`: High ground): nobody on the
@@ -50,10 +65,10 @@ pub fn on_own_wall(world: &WorldState, r: &Resident) -> bool {
 /// Damage a finished wall or gate takes before it falls (`wallStrength`).
 pub fn wall_strength(b: &Building) -> f64 {
     let of = if is_stone(b.kind, b.material) { STONE_WALL_STRENGTH } else { WALL_STRENGTH };
-    if b.kind == BuildingKind::Gate {
-        of.gate
-    } else {
-        of.wall
+    match b.kind {
+        BuildingKind::Gate => of.gate,
+        BuildingKind::Tower => of.tower,
+        _ => of.wall,
     }
 }
 
@@ -86,7 +101,7 @@ pub fn foreign_wall<'w>(
         .buildings
         .iter()
         .find(|x| x.id == wall_id)
-        .filter(|b| matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate))
+        .filter(|b| matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate | BuildingKind::Tower))
         .ok_or("no such wall or gate")?;
     if b.site.is_some() {
         return Err("that wall is not finished yet");

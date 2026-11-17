@@ -114,7 +114,7 @@ fn refuses_a_material_that_is_not_wood_or_stone_or_on_anything_but_a_wall_or_gat
     assert!(no.contains("\"wood\" or \"stone\""), "{no}");
     assert_eq!(
         orders.receive(&world, &me, build("house", Some("stone")), &terrain),
-        Err("only a wall or gate is of wood or stone".into())
+        Err("only a wall, gate or tower is of wood or stone".into())
     );
     assert_eq!(orders.receive(&world, &me, build("gate", Some("stone")), &terrain), Ok(()));
 }

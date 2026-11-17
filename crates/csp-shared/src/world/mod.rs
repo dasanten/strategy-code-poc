@@ -3396,6 +3396,8 @@ pub enum BuildingKind {
     Warehouse,
     Wall,
     Gate,
+    /// A 2×2 tower of wood or stone, part of the wall walk (`CONTEXT.md`: Tower).
+    Tower,
     Farm,
     Stable,
     Mine,
@@ -3444,8 +3446,8 @@ pub struct Building {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub breedings: Option<Vec<KeptBreeding>>,
-    /// What a wall or gate, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or
-    /// stone). Only walls and gates have one.
+    /// What a wall, gate or tower, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate,
+    /// Wood or stone, Tower). Only walls, gates and towers have one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub material: Option<WallMaterial>,
