@@ -304,6 +304,7 @@ import {
   RECIPES,
   BATCHES_PER_DAY,
   WORK_OUTPUT_PER_DAY,
+  NPC_FOOD_REFILL_DAYS,
   RICHNESS_FACTOR,
   FRONTIER_RICH_NODES,
   RICHER_NODE_REACH,
@@ -2787,7 +2788,9 @@ export function Wiki() {
         <p>
           It shares out its adults in this order: soldiers; farmers, as many as feed everyone (each
           eats {num(FOOD_PER_DAY)} Food a day, a farmer makes {num(WORK_OUTPUT_PER_DAY.food ?? 0)})
-          and one more while it has no food surplus, a new farm when they don't fit; up to{' '}
+          and one more while it has no food surplus; with its Food below its reserve but not yet
+          running short, as many more as win back what it lacks in{' '}
+          {days(NPC_FOOD_REFILL_DAYS)}, if that is more; a new farm when they don't fit; up to{' '}
           {num(NPC_BUILDERS)} builders a step while it has a project; everyone else is a spare hand.
           A farm is otherwise built only when Food is short of its reserve (
           {days(NPC_TRADE.reserveFoodDays)} of Food for everyone), or, with nothing else keeping it

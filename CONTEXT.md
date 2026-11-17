@@ -528,7 +528,9 @@ The shared language of the game. Domain terms only — no implementation details
   the walk and the first days, and the carrier brings the crew's Food back: Crew food), pairs its adults,
   builds a house when it has a food surplus and no free housing, and shares its adults out:
   soldiers by its size first; then farmers, as many as feed everyone (one farmer feeds about
-  four) and one more while it has no food surplus, building a farm when those it keeps don't
+  four) and one more while it has no food surplus; with its Food below its reserve but not yet
+  running short, as many more as win back what it lacks in a few game days (a balance number;
+  decided overnight, Daniel to confirm), if that is more; building a farm when those it keeps don't
   fit, or when Food is short of its reserve, or with nothing else keeping it from being full of the Food surplus its founding waits on (Full city; decided overnight, Daniel to confirm), with every farm at its full crew (below); then builders while it has a project, at most two in a village and more as it grows (a balance
   number); everyone else is its **spare hands**. Its planning pass gives each free adult the job
   that scores highest (ADR 0029). A worker stays where they are until another job beats theirs by a
