@@ -1057,7 +1057,7 @@
         {
           "name": "condition",
           "type": "string",
-          "description": "How it has decayed: \"good\", \"worn\" or \"nearlyRuin\"; a worn one, or worse, can be repaired (`repair`).",
+          "description": "How it has decayed: \"good\", \"worn\", \"nearlyRuin\" or \"ruin\"; a worn one, or worse, can be repaired (`repair`), and repairing a ruin rebuilds it.",
           "nullWhen": "for a construction site and a building that never decays"
         }
       ]

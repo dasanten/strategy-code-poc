@@ -21,6 +21,7 @@ use crate::queries::command::steals_carriage;
 use crate::queries::goods::{can_handle, free_stock, put_away_units};
 use crate::queries::names::{good_of, held, placed};
 use crate::queries::vessels::{docked_at, resident_beside_vessel, vessel_by_id};
+use crate::ruins::is_ruin;
 use csp_shared::balance::MAP_SIZE;
 
 /// `Number.MAX_SAFE_INTEGER`: a fetch of as many as there are.
@@ -183,15 +184,22 @@ fn store_place(
 ) -> Result<GoodsPlace, String> {
     let side = side_of(world, sender);
     if let Some(to) = to.filter(|v| !v.is_null()) {
-        return named_place(world, side.as_deref(), to)
-            .ok_or_else(|| "to must be a storage, a stable, a carriage or a boat of yours".into());
+        let place = named_place(world, side.as_deref(), to)
+            .ok_or("to must be a storage, a stable, a carriage or a boat of yours")?;
+        // A ruin takes nothing in (`CONTEXT.md`: Ruin).
+        if let GoodsPlace::Storage { storage_id } = &place {
+            if crate::world_index::building_by_id(world, storage_id).is_some_and(is_ruin) {
+                return Err("that is a ruin, it takes nothing in".into());
+            }
+        }
+        return Ok(place);
     }
     let storages = world
         .buildings
         .iter()
         .filter(|b| {
             b.kind == BuildingKind::Storage
-                && b.site.is_none()
+                && crate::ruins::standing(b)
                 && side.is_some()
                 && building_organization(world, b) == side
         })

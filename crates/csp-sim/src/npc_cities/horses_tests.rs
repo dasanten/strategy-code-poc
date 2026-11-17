@@ -102,6 +102,7 @@ fn stabled() -> (Village, String) {
         damage: None,
         breedings: None,
         decay: None,
+        ruined_at: None,
         repair: None,
     };
     stable.stock = Some(stock(&[(Good::Food, 500.0)]));
@@ -548,6 +549,7 @@ mod a_daughter_with_no_horse {
             damage: None,
             breedings: None,
             decay: None,
+            ruined_at: None,
             repair: None,
         };
         b.stock = None;

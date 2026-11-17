@@ -3444,6 +3444,12 @@ pub struct Building {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub repair: Option<ConstructionSite>,
+    /// The tick a building nobody repaired became a ruin (`CONTEXT.md`: Ruin): it stands but does
+    /// nothing, and collapses `RUIN_COLLAPSE_DAYS` game days later. Gone once it is rebuilt; left
+    /// out of a save while it is none, so a building from before format 135 is no ruin.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub ruined_at: Option<f64>,
 }
 
 /// The breeding progress a stable keeps for two horses in it.

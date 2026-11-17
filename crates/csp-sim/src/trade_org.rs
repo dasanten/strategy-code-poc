@@ -311,6 +311,7 @@ fn new_building(
         damage: None,
         breedings: None,
         decay: None,
+        ruined_at: None,
         repair: None,
     }
 }

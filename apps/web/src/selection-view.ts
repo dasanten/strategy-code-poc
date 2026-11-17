@@ -119,7 +119,7 @@ import type {
   VeinWord,
 } from '@csp/shared-types'
 import { covers, FOOTPRINT, footprintTiles } from './shared/footprint.js'
-import { conditionLine, repairable } from './shared/decay.js'
+import { conditionLine, isRuin, repairable } from './shared/decay.js'
 import { wrap, Terrain, UNEXPLORED } from './shared/terrain.js'
 import { handOverProblem, heirProblem } from './shared/leader.js'
 import { aboutTime, workLeft } from './shared/estimates.js'
@@ -1005,9 +1005,10 @@ export interface TileCard {
    */
   /**
    * A worn building, wall, gate or road on the tile, in sight, which the resident picked last may
-   * repair (`CONTEXT.md`: Repairing): they walk there, fetching what the repair lacks.
+   * repair, or a ruin rebuild (`CONTEXT.md`: Repairing, Ruin): they walk there, fetching what the
+   * repair lacks.
    */
-  repair?: { buildingId: string; name: string }
+  repair?: { buildingId: string; name: string; rebuild?: true }
   stealHorse?: {
     horseId: string
     residents: { id: string; name: string; problem: string | undefined }[]
@@ -1781,7 +1782,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     if (building.teardown) lines.push(teardownLine(building))
     const condition = conditionLine(building)
     if (condition) lines.push(condition)
-    if (live && repairable(live)) repair = { buildingId: live.id, name: name.toLowerCase() }
+    if (live && repairable(live))
+      repair = { buildingId: live.id, name: name.toLowerCase(), ...rebuildOf(live) }
     if (remembered && t.lastSeen) {
       card.lastSeen = {
         when: lastSeenText(remembered.seenAt, t.lastSeen.tick),
@@ -1969,7 +1971,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     const condition = conditionLine(road)
     if (condition) lines.push(condition)
     // The building's repair first; a worn road under it waits for the next.
-    if (!repair && repairable(road)) repair = { buildingId: road.id, name: 'road' }
+    if (!repair && repairable(road)) repair = { buildingId: road.id, name: 'road', ...rebuildOf(road) }
   }
   if (terrain && !(road && !road.site)) lines.push(terrain)
   // A wandering trader standing at a stop buys and sells on its tile (`CONTEXT.md`: Trader stop).
@@ -2479,6 +2481,11 @@ function horseTradeLine(b: { id: string }, city: TileThings['cities'][number]): 
       : 'Sells horses here'
 }
 
+/** A ruin's repair rebuilds it (`CONTEXT.md`: Ruin): the card's button says so. */
+function rebuildOf(b: Building): { rebuild?: true } {
+  return isRuin(b) ? { rebuild: true } : {}
+}
+
 /** How far tearing a building or site down has come (`CONTEXT.md`: Tearing down). */
 function teardownLine(b: Building): string {
   const work = teardownWork(b)
@@ -2552,7 +2559,7 @@ export function tileActions(
     const reason = canWork(actor, tick) ? undefined : 'children can’t repair buildings'
     actions.push({
       id: 'repair',
-      label: `Repair ${card.repair.name}`,
+      label: `${card.repair.rebuild ? 'Rebuild' : 'Repair'} ${card.repair.name}`,
       key: ACTION_KEYS.repair,
       ...(reason ? { disabled: true as const, reason } : {}),
     })

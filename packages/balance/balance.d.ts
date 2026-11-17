@@ -1207,6 +1207,10 @@ export interface Balance {
   readonly DECAY_NEARLY_RUIN: number
   readonly REPAIR_MATERIALS_SHARE: number
   readonly REPAIR_WORK_SHARE: number
+  readonly RUIN_COLLAPSE_DAYS: number
+  readonly REBUILD_MATERIALS_SHARE: number
+  readonly REBUILD_WORK_SHARE: number
+  readonly COLLAPSE_MATERIALS_LEFT: number
   readonly ALLIANCE_LEAVE_DELAY: number
   readonly ALLIANCE_RECALL_DELAY: number
   readonly NPC_ALLIANCE_JOIN_STANDING: number
