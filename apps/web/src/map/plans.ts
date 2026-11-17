@@ -47,9 +47,17 @@ interface Planners {
     SeenResident,
     'id' | 'owner' | 'order' | 'queue' | 'interrupted' | 'script'
   >[]
-  buildings: readonly Pick<Building, 'kind' | 'x' | 'y'>[]
+  buildings: readonly Pick<Building, 'kind' | 'x' | 'y' | 'material'>[]
   home: { realmId: string }
   map: { size: number }
+}
+
+/** A line a resident is on or has queued: road or wall, and its tiles in order. */
+export interface PlannedLine {
+  kind: LineBuilding
+  tiles: readonly (readonly [number, number])[]
+  /** A stone wall line, which builds over wooden walls and gates too (`CONTEXT.md`: Wood or stone). */
+  stone?: true
 }
 
 /**
@@ -61,13 +69,17 @@ interface Planners {
 export function plannedLines(
   r: Pick<SeenResident, 'order' | 'queue' | 'interrupted' | 'script'>,
   size: number,
-): { kind: LineBuilding; tiles: readonly (readonly [number, number])[] }[] {
-  const out: { kind: LineBuilding; tiles: readonly (readonly [number, number])[] }[] = []
+): PlannedLine[] {
+  const out: PlannedLine[] = []
   for (const o of [r.order, r.interrupted?.order]) {
-    if (isLineOrder(o)) out.push({ kind: LINE_BUILDING[o.kind], tiles: o.tiles })
+    if (isLineOrder(o))
+      out.push({ kind: LINE_BUILDING[o.kind], tiles: o.tiles, ...stoneIf(o.material === 'stone') })
   }
   for (const s of [r.script, r.interrupted?.script]) {
-    if (s?.line) out.push({ kind: s.line.building, tiles: roadLine(s.line.from, s.line.to, size) })
+    if (s?.line) {
+      const tiles = roadLine(s.line.from, s.line.to, size)
+      out.push({ kind: s.line.building, tiles, ...stoneIf(s.line.material === 'stone') })
+    }
   }
   const q = r.queue
   if (q) {
@@ -95,7 +107,8 @@ function queuedLine(order: OrderRequest, size: number) {
         : undefined
   const { from, to } = order
   if (!kind || !isTile(from) || !isTile(to)) return undefined
-  return { kind, tiles: roadLine(from, to, size) }
+  const stone = kind === 'wall' && order.material === 'stone'
+  return { kind, tiles: roadLine(from, to, size), ...stoneIf(stone) }
 }
 
 const isLineKind = (k: unknown): k is LineBuilding => k === 'road' || k === 'wall'
@@ -153,15 +166,24 @@ const isTile = (t: unknown): t is { x: number; y: number } =>
 export function plannedBuilding(world: Planners, picked: readonly string[]): Plans {
   const { size } = world.map
   const built = new Set<string>()
+  // Wall and gate tiles of stone: all a stone line passes (`CONTEXT.md`: Wood or stone).
+  const stone = new Set<string>()
   for (const b of world.buildings) {
     built.add(`${b.kind}:${b.x},${b.y}`)
     if (b.kind === 'gate') built.add(`wall:${b.x},${b.y}`)
+    if ((b.kind === 'wall' || b.kind === 'gate') && b.material === 'stone')
+      stone.add(`${b.x},${b.y}`)
   }
   const lines = new Map<string, GhostTile>()
   const footprints = new Map<string, GhostFootprint>()
-  const add = <G extends GhostTile | GhostFootprint>(to: Map<string, G>, ghost: G) => {
+  // `over`: a ghost even where one of its kind stands, as a stone line over a wooden wall.
+  const add = <G extends GhostTile | GhostFootprint>(
+    to: Map<string, G>,
+    ghost: G,
+    over = false,
+  ) => {
     const key = `${ghost.kind}:${ghost.x},${ghost.y}`
-    if (built.has(key)) return
+    if (built.has(key) && !over) return
     const had = to.get(key)
     if (!had) to.set(key, ghost)
     else if (ghost.strong) had.strong = true
@@ -169,8 +191,12 @@ export function plannedBuilding(world: Planners, picked: readonly string[]): Pla
   for (const r of world.residents) {
     if (r.owner !== world.home.realmId) continue
     const strong = picked.includes(r.id)
-    for (const { kind, tiles } of plannedLines(r, size)) {
-      for (const [x, y] of tiles) add(lines, { x, y, kind, strong })
+    for (const line of plannedLines(r, size)) {
+      for (const [x, y] of line.tiles) {
+        const ghost = { x, y, kind: line.kind, strong }
+        // A stone line builds over wooden walls and gates, passing only those of stone.
+        add(lines, ghost, line.stone === true && !stone.has(`${x},${y}`))
+      }
     }
     for (const { kind, x, y } of plannedBuilds(r)) {
       if (kind === 'road' || kind === 'wall') add(lines, { x, y, kind, strong })
@@ -318,3 +344,6 @@ function stroke(
   for (const [x0, y0, x1, y1] of lines) g.moveTo(x0!, y0!).lineTo(x1!, y1!)
   if (lines.length > 0) g.stroke({ width, color, alpha, cap })
 }
+
+/** `stone: true` for a stone line, nothing for any other. */
+const stoneIf = (stone: boolean): { stone?: true } => (stone ? { stone: true } : {})

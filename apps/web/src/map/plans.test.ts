@@ -85,6 +85,30 @@ describe('the Player’s planned roads and walls', () => {
     ])
   })
 
+  it('ghosts a stone line over wooden walls and gates, leaving out only those of stone', () => {
+    const r = resident('a', {
+      order: {
+        ...wallLine([
+          [3, 4],
+          [4, 4],
+          [5, 4],
+          [6, 4],
+        ]),
+        material: 'stone',
+      },
+    })
+    const buildings = [
+      { kind: 'wall', x: 3, y: 4 },
+      { kind: 'gate', x: 4, y: 4 },
+      { kind: 'wall', x: 5, y: 4, material: 'stone' },
+    ] as const
+    expect(keys(plannedBuilding({ residents: [r], buildings, home, map }, []))).toEqual([
+      'wall:3,4',
+      'wall:4,4',
+      'wall:6,4',
+    ])
+  })
+
   it('draws the picked residents’ plans strong, a tile planned twice once', () => {
     const a = resident('a', {
       order: wallLine([

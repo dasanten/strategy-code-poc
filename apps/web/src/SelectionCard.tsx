@@ -20,6 +20,7 @@ import type {
   Resident,
   ResourceKind,
   Stock,
+  WallMaterial,
   Waypoint,
 } from '@csp/shared-types'
 import { BuildingInfo } from './BuildingInfo.js'
@@ -281,9 +282,12 @@ export function PickBanner({
   onConfirm,
   onWaypoints,
   onCancel,
+  material,
 }: {
   prompt: string
   hint?: string
+  /** For a wall line: what it is built of, and how to change it (`CONTEXT.md`: Wood or stone). */
+  material?: { value: WallMaterial; onChange: (m: WallMaterial) => void }
   /** What is under the pointer, or the tile tapped, and what the pick would do there. */
   under?: string
   /** Picks the tile previewed by a tap, on a touch screen. */
@@ -299,6 +303,20 @@ export function PickBanner({
         <strong>{prompt}</strong>
         {line && <span className="small">{line}</span>}
       </div>
+      {material && (
+        <div className="material-pick" role="group" aria-label="Wall of">
+          {(['wood', 'stone'] as const).map((m) => (
+            <button
+              type="button"
+              key={m}
+              aria-pressed={material.value === m}
+              onClick={() => material.onChange(m)}
+            >
+              {m === 'wood' ? 'Wood' : 'Stone'}
+            </button>
+          ))}
+        </div>
+      )}
       {onConfirm && (
         <button type="button" className="primary" onClick={onConfirm}>
           Confirm

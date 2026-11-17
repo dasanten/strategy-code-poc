@@ -88,6 +88,9 @@ pub enum Good {
     SteelShield,
     SteelArmour,
     Tools,
+    Bow,
+    Crossbow,
+    Arrows,
 }
 
 /// `PricedGood`: every good but Coins (`Exclude<Good, 'coins'>`), the goods with a price.
@@ -110,6 +113,9 @@ pub enum PricedGood {
     SteelShield,
     SteelArmour,
     Tools,
+    Bow,
+    Crossbow,
+    Arrows,
 }
 
 /// A resident's stats (`STAT_NAMES`).
@@ -970,6 +976,10 @@ pub struct BuildOrder {
     pub building: BuildingKind,
     pub at: Tile,
     pub site_id: Option<String>,
+    /// What a wall or gate is built of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or stone).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub material: Option<WallMaterial>,
 }
 
 /// Working at a workplace.
@@ -1142,6 +1152,10 @@ pub struct LineOrder {
     pub path: Option<TilePath>,
     pub progress: f64,
     pub site_id: Option<String>,
+    /// What a wall line builds of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or stone).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub material: Option<WallMaterial>,
 }
 
 /// Climbing a wall or gate.
@@ -1490,8 +1504,19 @@ pub struct CityRoad {
     deny_unknown_fields
 )]
 pub enum CityProject {
-    Build { building: BuildingKind, x: f64, y: f64 },
-    TearDown { building_id: String },
+    Build {
+        building: BuildingKind,
+        x: f64,
+        y: f64,
+        /// Stone for a stone wall or gate, over a wooden one or new; none is wood (`CONTEXT.md`:
+        /// Wood or stone).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        material: Option<WallMaterial>,
+    },
+    TearDown {
+        building_id: String,
+    },
 }
 
 /// Where a trader is in a run to an offer.
@@ -3496,6 +3521,21 @@ pub struct Building {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub ruined_at: Option<f64>,
+    /// What a wall or gate, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or
+    /// stone). Only walls and gates have one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub material: Option<WallMaterial>,
+}
+
+/// What a wall or gate is built of (`CONTEXT.md`: Wall / Gate, Wood or stone): wood from Wood, or
+/// stone from Stone with more work, holding out several times longer against blows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum WallMaterial {
+    #[default]
+    Wood,
+    Stone,
 }
 
 /// The breeding progress a stable keeps for two horses in it.

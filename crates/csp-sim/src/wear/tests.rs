@@ -33,7 +33,11 @@ fn fight() -> WorldState {
     b.stats.agility = Stat { base: 0.0, trained: 0.0 };
     b.health = 1000.0;
     crate::equipment::settle_all(&mut world);
-    let request = AttackRequest { resident_id: Some("a1".into()), target_id: Some("b1".into()) };
+    let request = AttackRequest {
+        resident_id: Some("a1".into()),
+        target_id: Some("b1".into()),
+        shoot: false,
+    };
     apply_attack(&mut world, &request, Some(256));
     world
 }

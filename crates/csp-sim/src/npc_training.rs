@@ -313,7 +313,7 @@ pub fn go_train(
 pub fn npc_training_grounds_bounded(world: &WorldState, size: i32) -> Vec<InvariantViolation> {
     let mut out = Vec::new();
     for (city_id, plan) in &world.city_plans {
-        let Some(CityProject::Build { building, x, y }) = &plan.project else { continue };
+        let Some(CityProject::Build { building, x, y, .. }) = &plan.project else { continue };
         if plan.planned_at != world.tick as f64 || *building != BuildingKind::TrainingGround {
             continue;
         }

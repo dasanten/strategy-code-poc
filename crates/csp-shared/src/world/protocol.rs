@@ -12,7 +12,7 @@ use super::offers::SeenOffer;
 use super::warehouse::ShownWarehousePrice;
 use super::{
     BuildingKind, CityLayout, CityScouted, ConstructionSite, FormerPlayer, KeptBreeding,
-    Occupation, Stock, TradeOrgCity,
+    Occupation, Stock, TradeOrgCity, WallMaterial,
 };
 
 /// An order from the UI or a script (`OrderRequest`): `kind` picks the order, the rest is its
@@ -76,6 +76,9 @@ pub struct RememberedBuilding {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub ruined_at: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub material: Option<WallMaterial>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub prices: Option<Vec<ShownWarehousePrice>>,

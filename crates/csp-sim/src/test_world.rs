@@ -114,6 +114,7 @@ pub fn building(
         decay: None,
         ruined_at: None,
         repair: None,
+        material: None,
     });
     world.buildings.len() - 1
 }

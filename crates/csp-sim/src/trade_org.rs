@@ -313,6 +313,7 @@ fn new_building(
         decay: None,
         ruined_at: None,
         repair: None,
+        material: None,
     }
 }
 

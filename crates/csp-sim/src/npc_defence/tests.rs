@@ -1023,11 +1023,20 @@ mod tools {
     fn with_nothing_short_its_spare_hands_forge_tools_once_its_soldiers_are_armed() {
         let mut p = armed_village(0.0);
         add_smithy(&mut p);
-        assert_eq!(npc_smithy_good(&p.world, p.city()), Good::Tools, "spears in store: Tools next");
         let s = p.building(BuildingKind::Storage);
         let stock = p.world.buildings[s].stock.get_or_insert_with(Stock::new);
-        stock.insert(Good::Spear, 0.0);
+        let spears = stock.insert(Good::Spear, 0.0).unwrap_or(0.0);
         assert_eq!(npc_smithy_good(&p.world, p.city()), Good::Spear, "unarmed soldiers first");
+        let stock = p.world.buildings[s].stock.get_or_insert_with(Stock::new);
+        stock.insert(Good::Spear, spears);
+        // Its archers' Bows and Arrows in store, with some over for those they take
+        // (`CONTEXT.md`: Ranged combat): they come before Tools.
+        let lacks = crate::queries::npc_trade::archer_lacks(&p.world, p.city());
+        let stock = p.world.buildings[s].stock.get_or_insert_with(Stock::new);
+        for (g, n) in lacks {
+            stock.insert(g, 2.0 * n);
+        }
+        assert_eq!(npc_smithy_good(&p.world, p.city()), Good::Tools, "spears in store: Tools next");
         // Nothing short: its spare hands work for surplus, Tools first while below its reserve.
         let stock = p.world.buildings[s].stock.get_or_insert_with(Stock::new);
         for (g, n) in [

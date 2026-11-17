@@ -4,4 +4,4 @@
  * The PoC goods (`GOODS`, `CONTEXT.md`: Good). `Exclude<Good, 'coins'>` in the TypeScript is
  * this type too; the rules check it.
  */
-export type Good = "food" | "wood" | "stone" | "ironOre" | "iron" | "goldOre" | "coins" | "spear" | "sword" | "shield" | "armour" | "coal" | "steel" | "steelSword" | "steelShield" | "steelArmour" | "tools";
+export type Good = "food" | "wood" | "stone" | "ironOre" | "iron" | "goldOre" | "coins" | "spear" | "sword" | "shield" | "armour" | "coal" | "steel" | "steelSword" | "steelShield" | "steelArmour" | "tools" | "bow" | "crossbow" | "arrows";

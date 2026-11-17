@@ -73,12 +73,23 @@ pub fn first_difference(want: &Value, got: &Value, at: &str) -> Option<String> {
     }
 }
 
-/// `v` with Coal, Steel, the steel weapons and armour (`CONTEXT.md`: Coal, T101.3, T101.4, T101.5)
-/// and Tools (`CONTEXT.md`: Tools, T97.3) left out: the frozen TypeScript knew none of them, so a comparison with its fixtures
-/// leaves out every such key and every list entry of them (the good itself, `{ good: "coal", … }`
-/// or `["coal", …]`). Rust tests of these goods check them instead.
+/// `v` with Coal, Steel and the steel weapons and armour, Tools, and the Bow, Crossbow and Arrows,
+/// left out (`CONTEXT.md`: Coal, Tools, Ranged combat; T101.3, T101.4, T101.5, T97.3, T108.1): the
+/// frozen TypeScript knew none of them, so a comparison with its fixtures leaves out every such key
+/// and every list entry of them (the good itself, `{ good: "coal", … }` or `["coal", …]`). Rust
+/// tests of these goods check them instead.
 pub fn without_coal(v: &Value) -> Value {
-    const NEW: [&str; 6] = ["coal", "steel", "steelSword", "steelShield", "steelArmour", "tools"];
+    const NEW: [&str; 9] = [
+        "coal",
+        "steel",
+        "steelSword",
+        "steelShield",
+        "steelArmour",
+        "tools",
+        "bow",
+        "crossbow",
+        "arrows",
+    ];
     let new = |g: &Value| NEW.iter().any(|n| g == n);
     let is_coal = |e: &Value| new(e) || e.get("good").is_some_and(new) || e.get(0).is_some_and(new);
     match v {

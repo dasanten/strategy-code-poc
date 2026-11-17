@@ -22,6 +22,9 @@ export const GOOD_LABELS: Record<Good, string> = {
   steelShield: 'Steel shield',
   steelArmour: 'Steel armour',
   tools: 'Tools',
+  bow: 'Bow',
+  crossbow: 'Crossbow',
+  arrows: 'Arrows',
 }
 
 /**
@@ -46,6 +49,9 @@ export const GOOD_ART: Record<Good, string> = {
   steelShield: 'steel-shield.svg',
   steelArmour: 'steel-armour.svg',
   tools: 'tools.svg',
+  bow: 'bow.svg',
+  crossbow: 'crossbow.svg',
+  arrows: 'arrows.svg',
 }
 
 /** The SVG source of every file in `assets/goods/`, by file name. */

@@ -7,7 +7,8 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    MAP_SIZE, NPC_GATE_WATCH_RANGE, NPC_STEEL_KIT, PROTECTION_DEFENCE, TRADE_ORG_ARMY,
+    MAP_SIZE, NPC_ARCHER_ARROWS, NPC_GATE_WATCH_RANGE, NPC_STEEL_KIT, PROTECTION_DEFENCE,
+    TRADE_ORG_ARMY,
 };
 use csp_shared::footprint::is_at;
 use csp_shared::goods::{PROTECTION_KINDS, WEAPONS};
@@ -27,7 +28,10 @@ use crate::queries::building::{building_pile, recipe_for, recipe_input, work_pro
 use crate::queries::city::{for_sale, in_city_area, npc_city_refuses};
 use crate::queries::city_area::{defends_city, occupiers_of};
 use crate::queries::names::{good_name, good_of, held, held_in, placed};
-use crate::queries::npc_trade::{npc_makes_steel, npc_soldier_kit, npc_soldier_target};
+use crate::queries::npc_trade::{
+    is_npc_archer, npc_archer_target, npc_makes_steel, npc_smithy, npc_soldier_kit,
+    npc_soldier_target,
+};
 use crate::queries::residents::best_weapon;
 use crate::queries::residents::{can_work, carry_capacity, is_armed, stock_weight};
 use crate::queries::standing::TRADE_ORG;
@@ -297,7 +301,8 @@ fn keep_soldiers(
             r.script = None;
         }
     }
-    upgrade_soldiers(world, city, &soldiers, storage);
+    let archers = npc_archer_target(world, city, adults.len() as f64);
+    upgrade_soldiers(world, city, &soldiers, storage, archers);
     if soldiers.len() as f64 >= target {
         return;
     }
@@ -323,12 +328,7 @@ fn keep_soldiers(
     if unarmed.is_empty() {
         return;
     }
-    let smithy = world.buildings.iter().position(|b| {
-        b.kind == BuildingKind::Smithy
-            && b.site.is_none()
-            && (b.city_id.as_ref() == Some(&city.id)
-                || city.workplace_ids.iter().flatten().any(|id| *id == b.id))
-    });
+    let smithy = npc_smithy(world, city);
     if let Some(s) = smithy {
         if take_from_smithy(world, s, &unarmed) {
             return;
@@ -566,6 +566,9 @@ pub fn npc_gate_shut_to_its_punishers(world: &WorldState, size: i32) -> Vec<Inva
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod archer_tests;
+
 /// The steel kit a city's soldiers fetch from its store (`upgradeKit`, `CONTEXT.md`: NPC reserve,
 /// Trade Org army): `NPC_STEEL_KIT` for a Trade Org city and an NPC city that goes for Steel
 /// (`npc_makes_steel`); none for any other, whose soldiers keep the spear they were armed with.
@@ -578,10 +581,13 @@ fn upgrade_kit(world: &WorldState, city: &City) -> Vec<Good> {
 }
 
 /// What a soldier carries beyond their gear and the Food and Coins they keep (`spare`): every
-/// weapon but one of their best, of each kind of protection every piece but one of the best, and
-/// any other goods, such as the Steel a smith who took up arms still carries.
+/// weapon but one of their best (an archer's Bow: `is_npc_archer`), of each kind of protection
+/// every piece but one of the best, and any other goods, such as the Steel a smith who took up arms
+/// still carries; an archer keeps `NPC_ARCHER_ARROWS` Arrows.
 fn spare(carried: &Stock) -> Stock {
-    let mut keep: Vec<Good> = best_weapon(carried).into_iter().collect();
+    let archer = held(carried, Good::Bow) > 0.0;
+    let weapon = if archer { Some(Good::Bow) } else { best_weapon(carried) };
+    let mut keep: Vec<Good> = weapon.into_iter().collect();
     for kind in PROTECTION_KINDS {
         let best = kind
             .iter()
@@ -593,7 +599,14 @@ fn spare(carried: &Stock) -> Stock {
     carried
         .iter()
         .filter(|(g, n)| **n > 0.0 && **g != Good::Food && **g != Good::Coins)
-        .map(|(g, n)| (*g, if keep.contains(g) { n - 1.0 } else { *n }))
+        .map(|(g, n)| {
+            let kept = match *g {
+                Good::Arrows if archer => NPC_ARCHER_ARROWS,
+                g if keep.contains(&g) => 1.0,
+                _ => 0.0,
+            };
+            (*g, n - kept)
+        })
         .filter(|(_, n)| *n > 0.0)
         .collect()
 }
@@ -603,16 +616,20 @@ fn spare(carried: &Stock) -> Stock {
 /// what they carry spare (`spare`: what a better piece outdoes, more than one of a piece, other
 /// goods); one with something spare elsewhere goes there to, one at a time; otherwise one soldier at
 /// a time fetches the first piece of the city's steel kit (`upgrade_kit`) they lack that the store
-/// holds. Only orders a Player could give (ADR 0002).
+/// holds. Before the steel kit, a city that wants `archers` (`npc_archer_target`) has an archer
+/// low on Arrows fetch more, and while it has fewer archers one soldier at a time fetches a Bow and
+/// Arrows (`CONTEXT.md`: Ranged combat); an archer fetches no weapon or shield of the kit. Only
+/// orders a Player could give (ADR 0002).
 fn upgrade_soldiers(
     world: &mut WorldState,
     city: &City,
     soldiers: &[usize],
     storage: Option<usize>,
+    archers: f64,
 ) {
     let Some(st) = storage else { return };
     let kit = upgrade_kit(world, city);
-    if kit.is_empty() {
+    if kit.is_empty() && archers <= 0.0 {
         return;
     }
     let sb = &world.buildings[st];
@@ -648,15 +665,70 @@ fn upgrade_soldiers(
         return;
     }
     let stock = world.buildings[st].stock.clone();
+    if archers > 0.0 && arm_archers(world, st, soldiers, &free, archers) {
+        return;
+    }
     for g in kit {
         if held_in(stock.as_ref(), g) < 1.0 {
             continue;
         }
-        let lacking: Vec<usize> =
-            free.iter().copied().filter(|&i| held(&world.residents[i].carried, g) <= 0.0).collect();
+        let bow_hands = g == Good::SteelShield || WEAPONS.contains(&good_name(g));
+        let lacking: Vec<usize> = free
+            .iter()
+            .copied()
+            .filter(|&i| {
+                let r = &world.residents[i];
+                held(&r.carried, g) <= 0.0 && !(bow_hands && is_npc_archer(r))
+            })
+            .collect();
         if !lacking.is_empty() {
             fetch(world, st, &lacking, &Stock::from([(g, 1.0)]));
             return;
         }
     }
+}
+
+/// The archers' part of `upgrade_soldiers` (`CONTEXT.md`: Ranged combat, NPC reserve): an archer
+/// with fewer than half `NPC_ARCHER_ARROWS` fetches that half from the storage as far as it holds
+/// them; else, with fewer archers among its `soldiers` than it wants, one of its `free` soldiers
+/// who is none, by id, fetches a Bow and up to `NPC_ARCHER_ARROWS`, while the storage holds a Bow
+/// and Arrows. Whether one is on it.
+fn arm_archers(
+    world: &mut WorldState,
+    st: usize,
+    soldiers: &[usize],
+    free: &[usize],
+    archers: f64,
+) -> bool {
+    let stock = world.buildings[st].stock.clone();
+    let arrows = held_in(stock.as_ref(), Good::Arrows);
+    if arrows < 1.0 {
+        return false;
+    }
+    let half = (NPC_ARCHER_ARROWS / 2.0).ceil();
+    let low: Vec<usize> = free
+        .iter()
+        .copied()
+        .filter(|&i| {
+            let r = &world.residents[i];
+            is_npc_archer(r) && held(&r.carried, Good::Arrows) < half
+        })
+        .collect();
+    if !low.is_empty() {
+        fetch(world, st, &low, &Stock::from([(Good::Arrows, half.min(arrows))]));
+        return true;
+    }
+    let now = soldiers.iter().filter(|&&i| is_npc_archer(&world.residents[i])).count() as f64;
+    if now >= archers || held_in(stock.as_ref(), Good::Bow) < 1.0 {
+        return false;
+    }
+    let mut others: Vec<usize> =
+        free.iter().copied().filter(|&i| !is_npc_archer(&world.residents[i])).collect();
+    others.sort_by(|&a, &b| world.residents[a].id.cmp(&world.residents[b].id));
+    if others.is_empty() {
+        return false;
+    }
+    let goods = Stock::from([(Good::Bow, 1.0), (Good::Arrows, NPC_ARCHER_ARROWS.min(arrows))]);
+    fetch(world, st, &others, &goods);
+    true
 }

@@ -33,6 +33,9 @@ import {
   horseFoodFactor,
   Terrain,
   WALL_STRENGTH,
+  STONE_BUILD_MATERIALS,
+  STONE_BUILD_WORK,
+  STONE_WALL_STRENGTH,
   WAREHOUSE_FLOOR,
   WORK_SKILL_MAX,
   WORK_SKILL_PER_DAY,
@@ -337,6 +340,31 @@ export function buildCosts(): BuildCost[] {
 }
 
 /**
+ * The stone wall and gate rows of the cost sheet (`CONTEXT.md`: Wood or stone): Stone and more
+ * work than the wooden ones, and what tearing one down leaves.
+ */
+export function stoneWallCosts(): (BuildCost & { name: string; kind: 'wall' | 'gate' })[] {
+  const pace = buildWork(AVERAGE, AT)
+  return (['wall', 'gate'] as const).map((kind) => {
+    const materials = STONE_BUILD_MATERIALS[kind] as Stock
+    const work = STONE_BUILD_WORK[kind]
+    const returned: Stock = {}
+    for (const [good, units] of Object.entries(materials) as [Good, number][]) {
+      const back = Math.floor(units * TEARDOWN_MATERIALS_RETURNED)
+      if (back > 0) returned[good] = back
+    }
+    return {
+      kind,
+      name: kind === 'wall' ? 'Stone wall' : 'Stone gate',
+      footprint: FOOTPRINT[kind],
+      materials,
+      buildTicks: work / pace,
+      teardownTicks: (work * TEARDOWN_WORK_SHARE) / pace,
+      returned,
+    }
+  })
+}
+/**
  * What a carriage takes to build at a stable (`CONTEXT.md`: Carriage): its materials and the
  * ticks one average builder takes, alone.
  */
@@ -444,9 +472,9 @@ export const COMBAT_SKILL_MAX = COMBAT_SKILL_LIMIT / COMBAT_SKILL_EFFECT
 export const blow = (carried: Stock = {}, combat = 0) =>
   attackPower({ ...wikiResident({}, { combat }), carried }, AT)
 
-/** Ticks an average unarmed resident takes alone to break a tile of wall or a gate. */
-export const breakTicks = (what: 'wall' | 'gate') =>
-  Math.ceil(WALL_STRENGTH[what] / blow()) * STRIKE_TICKS
+/** Ticks an average unarmed resident takes alone to break a tile of wall or a gate, of wood or stone. */
+export const breakTicks = (what: 'wall' | 'gate', stone = false) =>
+  Math.ceil((stone ? STONE_WALL_STRENGTH : WALL_STRENGTH)[what] / blow()) * STRIKE_TICKS
 
 /** A city's control from its residents and armed ones, and how far it reaches. */
 export function cityControl(residents: number, armed: number) {

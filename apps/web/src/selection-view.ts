@@ -22,15 +22,12 @@ import {
   recipeGood,
   teardownWork,
   workFactor,
+  isStone,
+  materialsOfKind,
+  workOfKind,
   type TerrainLookup,
 } from './shared/building.js'
-import {
-  CARRYING_A_CHILD,
-  GOODS,
-  isDown,
-  NODE_WORKPLACE,
-  type HaulOrder,
-} from './shared/world.js'
+import { CARRYING_A_CHILD, GOODS, isDown, NODE_WORKPLACE, type HaulOrder } from './shared/world.js'
 import {
   HORSE_FOOD_PER_DAY,
   HORSE_HUNGRY_SHARE,
@@ -1753,6 +1750,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (stable) lines.push(...pausedBreedingLines(stable, t.residents ?? [], t.horses, t.tick))
+      // What a wall or gate, or its site, is of (`CONTEXT.md`: Wood or stone).
+      if (building.kind === 'wall' || building.kind === 'gate')
+        lines.push(isStone(building.kind, building.material) ? 'Of stone' : 'Of wood')
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
       if (building.kind === 'townHall' && live && city)
         card.occupation = describeOccupation(city, t.tick ?? 0, t.viewer.realmId, t.realms ?? [])
@@ -2222,9 +2222,9 @@ function terrainLine(terrain: number | undefined, road: Building | undefined): s
  * remembered has none.
  */
 function describeSite(site: Building, t: TileThings | undefined): SiteView {
-  const work = BUILD_WORK[site.kind] ?? 0
+  const work = workOfKind(site.kind, site.material)
   const share = work > 0 ? Math.min(1, (site.site?.work ?? 0) / work) : 1
-  const need = BUILD_MATERIALS[site.kind] ?? {}
+  const need = materialsOfKind(site.kind, site.material)
   const left =
     t?.tick === undefined
       ? undefined

@@ -723,10 +723,13 @@ export const GOODS = [
   'steelShield',
   'steelArmour',
   'tools',
+  'bow',
+  'crossbow',
+  'arrows',
 ] as const
 
 /** Goods that make a resident armed (`CONTEXT.md`: Soldier, Weapons and armour). */
-export const WEAPONS = ['spear', 'sword', 'steelSword'] as const satisfies readonly Good[]
+export const WEAPONS = ['spear', 'sword', 'steelSword', 'bow', 'crossbow'] as const satisfies readonly Good[]
 
 /** Goods that take off damage (`CONTEXT.md`: Weapons and armour): shields and armour, of iron or steel. */
 export const PROTECTION = [

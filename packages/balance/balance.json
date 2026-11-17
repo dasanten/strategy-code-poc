@@ -216,6 +216,8 @@
     "steelArmour",
     "steelShield"
   ],
+  "NPC_ARCHER_SHARE": 0.5,
+  "NPC_ARCHER_ARROWS": 20.0,
   "NPC_SOLDIERS_ON_HALL": 2.0,
   "NPC_SOLDIERS_AT_GATE": 1.0,
   "NPC_POST_AROUND_HALL": 2.0,
@@ -270,6 +272,7 @@
   "CITY_SIDE_LANE_GAP": 8.0,
   "CITY_QUARTER_ROWS": 4.0,
   "NPC_WALL_TILES_PER_TRIP": 4.0,
+  "NPC_STONE_WALL_RESIDENTS": 16.0,
   "NPC_NODE_REACH": 160.0,
   "NPC_RESIDENTS_PER_SCOUT": 12.0,
   "NPC_SCOUT_LIMIT": 400.0,
@@ -356,7 +359,10 @@
     "steelSword": 1.0,
     "steelShield": 1.0,
     "steelArmour": 1.0,
-    "tools": 2.0
+    "tools": 2.0,
+    "bow": 1.0,
+    "crossbow": 1.0,
+    "arrows": 40.0
   },
   "HQ_FLOOR_FACTOR": 5.0,
   "HQ_FOOD_FLOOR_FACTOR": 15.0,
@@ -376,7 +382,10 @@
     "steelSword": 50.0,
     "steelShield": 30.0,
     "steelArmour": 160.0,
-    "tools": 25.0
+    "tools": 25.0,
+    "bow": 12.0,
+    "crossbow": 30.0,
+    "arrows": 1.0
   },
   "PRICE_REFERENCE_FLOORS": 4.0,
   "PRICE_ELASTICITY": 0.5,
@@ -423,13 +432,39 @@
     "steelSword": 3.0,
     "steelShield": 4.0,
     "steelArmour": 8.0,
-    "tools": 2.0
+    "tools": 2.0,
+    "bow": 2.0,
+    "crossbow": 4.0,
+    "arrows": 0.1
   },
   "WEAPON_ATTACK": {
     "spear": 4.0,
     "sword": 6.0,
-    "steelSword": 9.0
+    "steelSword": 9.0,
+    "bow": 0.0,
+    "crossbow": 0.0
   },
+  "SHOT_REACH": {
+    "bow": 8.0,
+    "crossbow": 5.0
+  },
+  "SHOT_TICKS": {
+    "bow": 3.0,
+    "crossbow": 6.0
+  },
+  "SHOT_DAMAGE": {
+    "bow": 6.0,
+    "crossbow": 14.0
+  },
+  "SHOT_SKILL_LIMIT": {
+    "bow": 2.0,
+    "crossbow": 0.25
+  },
+  "SHOT_PIERCE": {
+    "bow": 0.0,
+    "crossbow": 0.5
+  },
+  "WALL_SHOT_REACH_BONUS": 4.0,
   "PROTECTION_DEFENCE": {
     "shield": 3.0,
     "armour": 5.0,
@@ -667,6 +702,18 @@
     "boat": 1440.0,
     "ship": 14400.0
   },
+  "STONE_BUILD_MATERIALS": {
+    "wall": {
+      "stone": 4.0
+    },
+    "gate": {
+      "stone": 6.0
+    }
+  },
+  "STONE_BUILD_WORK": {
+    "wall": 270.0,
+    "gate": 540.0
+  },
   "MOUNTAIN_ROAD_WORK_FACTOR": 4.0,
   "ROAD_LINE_MAX_TILES": 128.0,
   "BUILD_STRENGTH_AVERAGE": 10.0,
@@ -804,6 +851,32 @@
         "output": {
           "tools": 1.0
         }
+      },
+      {
+        "input": {
+          "wood": 2.0
+        },
+        "output": {
+          "bow": 1.0
+        }
+      },
+      {
+        "input": {
+          "iron": 1.0,
+          "wood": 3.0
+        },
+        "output": {
+          "crossbow": 1.0
+        }
+      },
+      {
+        "input": {
+          "iron": 1.0,
+          "wood": 3.0
+        },
+        "output": {
+          "arrows": 40.0
+        }
       }
     ]
   },
@@ -876,6 +949,10 @@
   "WALL_STRENGTH": {
     "wall": 3000.0,
     "gate": 4500.0
+  },
+  "STONE_WALL_STRENGTH": {
+    "wall": 12000.0,
+    "gate": 18000.0
   },
   "BROKEN_MATERIALS_RETURNED": 0.34,
   "CLIMB_TICKS": 360.0,

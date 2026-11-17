@@ -24,7 +24,7 @@ use csp_shared::terrain::{
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
     BuildingKind, Good, HaulPhase, HaulStop, LinePhase, ResidentOrder, ResourceKind, SkillName,
-    Stock, VesselKind, WorldState,
+    Stock, VesselKind, WallMaterial, WorldState,
 };
 
 use super::{js_json, js_number, violation, InvariantViolation};
@@ -34,10 +34,10 @@ use crate::pairing::carrying_blocks;
 use crate::queries::alliance::{allied_realms, carriage_commander_of, commander_of};
 use crate::queries::balance::carry_capacity;
 use crate::queries::building::{
-    build_materials, build_work_of, building_at, carriage_can_go_to, has_choice, line_building,
-    line_order, materials_needed, max_workers, node_workplace, recipe_for, teardown_work,
-    work_needed, workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES, ON_PLAINS, ON_SHORE,
-    PROCESSING, SHARES_A_TILE,
+    building_at, carriage_can_go_to, has_choice, is_stone, line_building, line_order,
+    materials_needed, materials_of, max_workers, node_workplace, recipe_for, teardown_work,
+    wooden_wall_index_at, work_needed, work_of, workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES,
+    ON_PLAINS, ON_SHORE, PROCESSING, SHARES_A_TILE,
 };
 use crate::queries::city_area::{city_membership, is_city_building};
 use crate::queries::command::commander_of_resident;
@@ -188,8 +188,18 @@ pub fn buildings_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
         let kind = kind_name(b.kind);
         for &(x, y) in &footprint {
             let key = format!("{x},{y}");
-            let layer =
-                if SHARES_A_TILE.contains(&b.kind) { format!("{kind} {key}") } else { key.clone() };
+            // A stone wall or gate site over the finished wooden one of its kind it upgrades has a
+            // layer of its own (`CONTEXT.md`: Wood or stone); anywhere else it overlaps as any.
+            let upgrades = b.site.is_some()
+                && is_stone(b.kind, b.material)
+                && wooden_wall_index_at(world, x, y, b.kind).is_some();
+            let layer = if SHARES_A_TILE.contains(&b.kind) {
+                format!("{kind} {key}")
+            } else if upgrades {
+                format!("upgrade {key}")
+            } else {
+                key.clone()
+            };
             if let Some(other) = tiles.get(&layer) {
                 fail(&b.id, format!("overlaps {other} on tile ({key})"));
             }
@@ -881,7 +891,7 @@ pub fn sites_within_needs(world: &WorldState, _: &TerrainMap) -> Out {
     let mut fail = |id: &str, m: String| out.push(violation(name, format!("{id} {m}"), &[id]));
     for b in &world.buildings {
         let Some(site) = &b.site else { continue };
-        let needs = build_materials(b.kind);
+        let needs = materials_of(b);
         for (good, units) in &site.delivered {
             let need = needs.get(good).copied().unwrap_or(0.0);
             if *units > need {
@@ -896,7 +906,7 @@ pub fn sites_within_needs(world: &WorldState, _: &TerrainMap) -> Out {
                 );
             }
         }
-        let work = build_work_of(b.kind);
+        let work = work_of(b);
         if !(site.work >= 0.0 && site.work <= work) {
             fail(&b.id, format!("has work {} of {}", js_number(site.work), js_number(work)));
         }
@@ -2212,6 +2222,41 @@ pub fn attack_orders_sound(world: &WorldState, _: &TerrainMap) -> Out {
     out
 }
 
+/// Nobody strikes or shoots from beyond their reach (`CONTEXT.md`: Ranged combat; ADR 0004): a
+/// resident struck in the tick just stepped stands within their striker's `strike_reach`, contact
+/// without a Bow or Crossbow. One tile of slack, as a fall from a broken wall tile can move either
+/// of them a tile after the blow. Those aboard a vessel are left out: from a docked ship anyone on
+/// its haven is in reach (`CONTEXT.md`: Fighting at a vessel).
+pub fn shots_within_reach(world: &WorldState, terrain: &TerrainMap) -> Out {
+    let name = "shots-within-reach";
+    let last = world.tick as f64 - 1.0;
+    let mut out = Vec::new();
+    for t in &world.residents {
+        let Some(s) = t.struck.as_ref().filter(|s| s.tick == last) else { continue };
+        let Some(a) = world.residents.iter().find(|a| a.id == s.by) else { continue };
+        if a.aboard.is_some() || t.aboard.is_some() {
+            continue;
+        }
+        let apart = crate::queries::combat::tiles_apart(
+            terrain.size,
+            (a.x as i32, a.y as i32),
+            (t.x as i32, t.y as i32),
+        );
+        let reach = crate::queries::combat::strike_reach(world, a);
+        if apart > reach + 1.0 {
+            let msg = format!(
+                "resident {} struck {} from {} tiles away, beyond their reach of {}",
+                a.id,
+                t.id,
+                js_number(apart),
+                js_number(reach)
+            );
+            out.push(violation(name, msg, &[&a.id, &t.id]));
+        }
+    }
+    out
+}
+
 /// The longest an alliance's name may be (`ALLIANCE_NAME_MAX_LENGTH`).
 const ALLIANCE_NAME_MAX_LENGTH: usize = 30;
 
@@ -2623,8 +2668,15 @@ pub fn line_orders_sound(world: &WorldState, terrain: &TerrainMap) -> Out {
         }
         let Some(site_id) = &o.site_id else { continue };
         let site = world.buildings.iter().find(|b| &b.id == site_id);
-        let on_it =
-            site.is_some_and(|s| s.site.is_some() && s.kind == kind && s.x == r.x && s.y == r.y);
+        // A stone wall line builds a gate where it upgrades a wooden one (`CONTEXT.md`: Wood or
+        // stone).
+        let fits = |s: &csp_shared::world::Building| {
+            s.kind == kind
+                || (kind == BuildingKind::Wall
+                    && s.kind == BuildingKind::Gate
+                    && is_stone(s.kind, s.material))
+        };
+        let on_it = site.is_some_and(|s| s.site.is_some() && fits(s) && s.x == r.x && s.y == r.y);
         if !on_it || r.x != first.0 || r.y != first.1 {
             fail(format!(
                 "builds {site_id}, which is not the {building} site on their tile and the order’s next"
@@ -2778,4 +2830,24 @@ pub fn outsiders_sound(world: &WorldState, terrain: &TerrainMap) -> Out {
         }
     }
     out
+}
+
+/// Only a wall or gate, or its site, is of stone, and only stone is written down: none is wood
+/// (`CONTEXT.md`: Wall / Gate, Wood or stone).
+pub fn wall_materials_sound(world: &WorldState, _: &TerrainMap) -> Out {
+    let name = "wall-materials-sound";
+    world
+        .buildings
+        .iter()
+        .filter(|b| {
+            b.material.is_some_and(|m| {
+                m != WallMaterial::Stone
+                    || !matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate)
+            })
+        })
+        .map(|b| {
+            let msg = format!("{} {} is of {:?}", kind_name(b.kind), b.id, b.material);
+            violation(name, msg, &[&b.id])
+        })
+        .collect()
 }

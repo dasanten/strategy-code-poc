@@ -93,6 +93,21 @@ export const SKILL_PER_DAY = B.SKILL_PER_DAY as unknown as Readonly<Record<Skill
  */
 export const WALL_STRENGTH = B.WALL_STRENGTH as unknown as Record<'wall' | 'gate', number>
 
+/** Damage a stone wall or gate takes before it falls (`CONTEXT.md`: Wood or stone). */
+export const STONE_WALL_STRENGTH = B.STONE_WALL_STRENGTH as unknown as Record<
+  'wall' | 'gate',
+  number
+>
+
+/** What a stone wall or gate takes instead of `BUILD_MATERIALS`: Stone. */
+export const STONE_BUILD_MATERIALS = B.STONE_BUILD_MATERIALS as unknown as Record<
+  'wall' | 'gate',
+  Stock
+>
+
+/** Work a stone wall or gate takes instead of `BUILD_WORK`. */
+export const STONE_BUILD_WORK = B.STONE_BUILD_WORK as unknown as Record<'wall' | 'gate', number>
+
 /**
  * What a warehouse sells a unit of each good for, in coins, when it holds `PRICE_REFERENCE_FLOORS`
  * times its floor (`CONTEXT.md`: Warehouse prices, Price anchor). Roughly what goes into it: an

@@ -150,6 +150,8 @@ mod stable_hand;
 mod stealing;
 #[path = "stealing_horse.rs"]
 mod stealing_horse;
+#[path = "stone_walls.rs"]
+mod stone_walls;
 #[path = "storing.rs"]
 mod storing;
 #[path = "supply_lines.rs"]
