@@ -328,6 +328,7 @@ fn step_rest(
     world.tick += 1;
     // Buildings lose their day's share of condition at the turn of the day (`CONTEXT.md`: Decay).
     crate::repair::step_decay(world);
+    crate::repair::trade_org_repairs(world);
     // One that lost all of it is a ruin, and a ruin left long enough collapses (`CONTEXT.md`: Ruin).
     crate::ruins::step_ruins(world, size, scratch);
     let aging = step_aging(world, size);
