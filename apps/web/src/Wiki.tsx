@@ -192,6 +192,8 @@ import {
   NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
   NPC_SURPLUS_CAP,
+  NPC_ARCHER_ARROWS,
+  NPC_ARCHER_SHARE,
   NPC_SOLDIER_SHARE,
   NPC_STEEL_KIT,
   NPC_WAR_CHEST_PER_RESIDENT,
@@ -307,6 +309,12 @@ import {
   WAREHOUSE_BASE_PRICE,
   WAREHOUSE_FLOOR,
   WEAPON_ATTACK,
+  SHOT_REACH,
+  SHOT_TICKS,
+  SHOT_DAMAGE,
+  SHOT_SKILL_LIMIT,
+  SHOT_PIERCE,
+  WALL_SHOT_REACH_BONUS,
   WORK_SKILL_EFFECT,
   WORK_SKILL_MAX,
   WORKPLACE_MAX_WORKERS,
@@ -3435,6 +3443,97 @@ export function Wiki() {
           part of what they carry. A resident's card shows their three slots.
         </p>
         <p>
+          A <strong>Bow</strong> and a <strong>Crossbow</strong> are weapons for shooting, and each
+          takes both hands: with one equipped the shield slot stays empty (the shield stays carried
+          and goes back on when they put a one-handed weapon in its place), and a shield can't be
+          put on beside one. In a blow they add nothing, so an archer in a brawl fights with their
+          fists. They shoot <strong>Arrows</strong>, a plain good that is carried, stored and traded
+          like any other and goes in no slot. A smithy makes each, the smith saying which as for
+          the other gear:
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Good</th>
+              <th>Made from</th>
+              <th>A batch makes</th>
+              <th>Weight</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(['bow', 'crossbow', 'arrows'] as const).map((g) => (
+              <tr key={g}>
+                <td>{goodName(g)}</td>
+                <td>
+                  {(Object.entries(forged(g).input) as [Good, number][])
+                    .map(([input, n]) => `${num(n)} ${goodName(input)}`)
+                    .join(', ')}
+                </td>
+                <td>{num(forged(g).output[g] ?? 0)}</td>
+                <td>{num(GOOD_WEIGHT[g])} kg each</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h3>Ranged combat</h3>
+        <p>
+          An armed resident with a Bow or Crossbow equipped <strong>shoots</strong> anyone they may
+          strike whom they see within their weapon's <strong>reach</strong>, in tiles, contact
+          included: given an attack order, they walk only until the target is in reach and shoot
+          from there. Each shot uses up one Arrow they carry, whether it lands or not; out of Arrows
+          they fight with their fists and have to walk into contact. Nothing blocks a shot for now.
+          A shot is a strike like a blow: the one hit is under attack and fights back or flees,
+          their city's alarm goes, and it is a crime where a blow would be. Agility dodges a shot
+          as it does a blow, and a shield and armour take damage off it, but a Crossbow's bolt goes
+          through part of them. Strength adds nothing to a shot; Combat skill makes a Bow much
+          better, a Crossbow only a little.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Weapon</th>
+              <th>Reach</th>
+              <th>A shot every</th>
+              <th>Damage</th>
+              <th>At full Combat skill</th>
+              <th>Through armour</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(['bow', 'crossbow'] as const).map((w) => (
+              <tr key={w}>
+                <td>{goodName(w)}</td>
+                <td>{num(SHOT_REACH[w] ?? 0)} tiles</td>
+                <td>{duration(SHOT_TICKS[w] ?? 0)}</td>
+                <td>{num(SHOT_DAMAGE[w] ?? 0)}</td>
+                <td>{num((SHOT_DAMAGE[w] ?? 0) * (1 + (SHOT_SKILL_LIMIT[w] ?? 0)))}</td>
+                <td>{pct(SHOT_PIERCE[w] ?? 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p>
+          <strong>Archers by default.</strong> Struck, an archer's Defend default shoots back from
+          where they stand, walking only until the one who struck them is in reach. On an alarm,
+          the Alarm default sends an archer on the ground up onto the city's wall tile between them
+          and whoever they go after, and they shoot from there; up on the wall they wait for them
+          to come in reach rather than come down. With no wall between them they shoot from where
+          they stand. Out of Arrows an archer does what anyone armed does and closes in. Scripts see
+          a resident's <code>reach</code> (null without a Bow or Crossbow) and the Arrows they carry
+          in <code>carried.arrows</code>; <code>shoot(targetId)</code> shoots someone in reach
+          without a step, and <code>attack</code> walks only until they are in reach.
+        </p>
+        <p>
+          <strong>NPC archers.</strong> An NPC city with a smithy arms{' '}
+          {pct(NPC_ARCHER_SHARE)} of its soldiers with a Bow (rounded down) and keeps{' '}
+          {num(NPC_ARCHER_ARROWS)} Arrows in its reserve for each of them; its smithy forges them
+          once its soldiers are armed. Each archer carries {num(NPC_ARCHER_ARROWS)} Arrows and
+          fetches more from its storage as they run low. While the city has a wall, its archers
+          stand on it and leave the town hall and the gates to the others. One without a smithy, and
+          the Trade Organization's cities, keep no archers. A resident hired from an NPC city who
+          takes a Bow from its surplus takes Arrows along too, also only from its surplus.
+        </p>
+        <p>
           To <strong>swap</strong> gear, pick another item they carry for a slot on their card (or
           the group card's Equip…, for each of them who carries it), or take a slot's item off;
           scripts do the same with <code>equip(good)</code> and <code>takeOff(slot)</code>, and a
@@ -3478,11 +3577,20 @@ export function Wiki() {
         <p>
           <strong>The high ground.</strong> Whoever is up strikes down at anyone on the ground next
           to the wall, but nobody on the ground can strike anyone up: from below there is only the
-          wall or gate itself to break, or climbing it, both while being struck from above. Order a
-          resident below to attack someone up and they won't (“they are up on the wall”). A climber
-          is on the ground until over; one who made it and stands on the wall fights those up as
-          anywhere, and so do those up on two walls that touch. Up on their own city's wall,
-          defenders still take only {pct(WALL_DEFENCE)} of each blow.
+          wall or gate itself to break, or climbing it, both while being struck from above, or
+          shooting up at them with a Bow or Crossbow. Order a resident below without Arrows to
+          shoot to attack someone up and they won't (“they are up on the wall”). A climber is on the
+          ground until over; one who made it and stands on the wall fights those up as anywhere,
+          and so do those up on two walls that touch. Up on their own city's wall, defenders still
+          take only {pct(WALL_DEFENCE)} of each blow and each shot.
+        </p>
+        <p>
+          <strong>Archers on the wall.</strong> An archer up on a wall walk shoots{' '}
+          {num(WALL_SHOT_REACH_BONUS)} tiles further than on the ground: a Bow{' '}
+          {num((SHOT_REACH.bow ?? 0) + WALL_SHOT_REACH_BONUS)} tiles, a Crossbow{' '}
+          {num((SHOT_REACH.crossbow ?? 0) + WALL_SHOT_REACH_BONUS)}. So archers on a wall shoot
+          attackers before those can shoot back, and take only {pct(WALL_DEFENCE)} of what does
+          come back up.
         </p>
         <p>
           <strong>A tile breaks.</strong> When a wall or gate tile breaks, whoever is up on it falls

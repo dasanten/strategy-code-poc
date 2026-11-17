@@ -11,7 +11,7 @@ use rustc_hash::FxHashMap;
 
 use crate::invariants::{violation, InvariantViolation};
 use crate::queries::city::town_hall_of;
-use crate::queries::combat::in_contact;
+use crate::queries::combat::{in_contact, ranged_weapon};
 use crate::queries::walls::is_up;
 use crate::survival::die_all;
 use crate::walking::order_path_mut;
@@ -147,7 +147,8 @@ pub fn up_only_on_walls(world: &WorldState, _terrain: &TerrainMap) -> Vec<Invari
 }
 
 /// Nobody on the ground holds an attack order on someone up on the wall walk they are in contact
-/// with (`CONTEXT.md`: High ground, ADR 0004): no blow reaches up, so such an order ends.
+/// with (`CONTEXT.md`: High ground, ADR 0004): no blow reaches up, so such an order ends. An
+/// archer is left out: they shoot up (`CONTEXT.md`: Ranged combat).
 pub fn none_attack_up_from_below(
     world: &WorldState,
     terrain: &TerrainMap,
@@ -162,7 +163,9 @@ pub fn none_attack_up_from_below(
         .filter_map(|a| {
             let Some(ResidentOrder::Attack(o)) = &a.order else { return None };
             let t = world.residents.iter().find(|t| t.id == o.target_id)?;
-            if t.up.is_none() || !in_contact(size, tile(a), tile(t)) {
+            // An archer may shoot up at them (`CONTEXT.md`: Ranged combat); one just out of Arrows
+            // gives the order up on the next tick.
+            if t.up.is_none() || !in_contact(size, tile(a), tile(t)) || ranged_weapon(a).is_some() {
                 return None;
             }
             let msg = format!("{} on the ground attacks {}, up on the wall walk", a.id, t.id);

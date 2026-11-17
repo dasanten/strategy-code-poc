@@ -756,6 +756,14 @@ pub const NPC_SOLDIER_SHARE: f64 = 0.25;
 /// node in reach keeps to the iron spear (`NPC_SMITHY_WEAPON`).
 pub const NPC_STEEL_KIT: [&str; 3] = ["steelSword", "steelArmour", "steelShield"];
 
+/// Share of an NPC city's soldiers it arms with a Bow once it has a smithy (`CONTEXT.md`: Ranged
+/// combat, NPC reserve), rounded down: a town's 4 soldiers have 2 archers, a village's 2 one.
+pub const NPC_ARCHER_SHARE: f64 = 0.5;
+
+/// The Arrows an NPC city's archer carries, fetched from its storage as they run low; its reserve
+/// keeps as many again in its storages for each archer it wants (`CONTEXT.md`: NPC reserve).
+pub const NPC_ARCHER_ARROWS: f64 = 20.0;
+
 /// How many of an NPC city's soldiers stand on its town hall between fights, the first to be posted
 /// (`CONTEXT.md`: Soldier posts). One there is enough to block an occupation; a second keeps it held
 /// when the first is called away.
@@ -1169,6 +1177,9 @@ pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("steelSword", 1.0),
     ("steelShield", 1.0),
     ("steelArmour", 1.0),
+    ("bow", 1.0),
+    ("crossbow", 1.0),
+    ("arrows", 40.0),
 ]);
 
 /// How many times a trading post's floor (`WAREHOUSE_FLOOR`) the Trade Org HQ's warehouses keep.
@@ -1201,6 +1212,9 @@ pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("steelSword", 50.0),
     ("steelShield", 30.0),
     ("steelArmour", 160.0),
+    ("bow", 12.0),
+    ("crossbow", 30.0),
+    ("arrows", 1.0),
 ]);
 
 /// Stock, in floors, at which a warehouse sells at its base price; less stock costs more.
@@ -1343,12 +1357,18 @@ pub const GOOD_WEIGHT: Table<f64> = Table(&[
     ("steelSword", 3.0),
     ("steelShield", 4.0),
     ("steelArmour", 8.0),
+    ("bow", 2.0),
+    ("crossbow", 4.0),
+    ("arrows", 0.1),
 ]);
 
 /// Attack each weapon adds to a resident's blow (`CONTEXT.md`: Weapons and armour, Combat). A
 /// sword hits harder than a spear, a steel sword half again as hard as an iron one (`CONTEXT.md`:
-/// Coal); combat (T10.2) adds it to Strength and Combat skill.
-pub const WEAPON_ATTACK: Table<f64> = Table(&[("spear", 4.0), ("sword", 6.0), ("steelSword", 9.0)]);
+/// Coal); combat (T10.2) adds it to Strength and Combat skill. A Bow or Crossbow adds nothing to
+/// a blow: it is a weapon for shooting (`CONTEXT.md`: Ranged combat), and in a blow its archer
+/// fights with their fists.
+pub const WEAPON_ATTACK: Table<f64> =
+    Table(&[("spear", 4.0), ("sword", 6.0), ("steelSword", 9.0), ("bow", 0.0), ("crossbow", 0.0)]);
 
 /// Damage each piece of protection takes off a blow (`CONTEXT.md`: Weapons and armour, Combat).
 /// Armour takes off more than a shield but weighs twice as much; steel takes off more than iron
@@ -2060,7 +2080,9 @@ pub struct Recipe {
 /// of armour, each from Iron and Wood weighing what the good weighs (`GOOD_WEIGHT`): a spear is
 /// mostly wood, a sword mostly iron, a shield wood bound with iron, armour nearly all iron. The
 /// steel Sword, Shield and Armour (`CONTEXT.md`: Coal) take Steel where the iron ones take Iron,
-/// and the same Wood; the Spear is iron only.
+/// and the same Wood; the Spear is iron only. A Bow is all wood, a Crossbow wood with an iron
+/// bow and trigger, and a batch of 40 Arrows mostly wood with a little iron for the heads
+/// (`CONTEXT.md`: Smithy).
 pub const RECIPES: Table<&[Recipe]> = Table(&[
     (
         "smelter",
@@ -2103,6 +2125,15 @@ pub const RECIPES: Table<&[Recipe]> = Table(&[
             Recipe {
                 input: Table(&[("steel", 7.0), ("wood", 1.0)]),
                 output: Table(&[("steelArmour", 1.0)]),
+            },
+            Recipe { input: Table(&[("wood", 2.0)]), output: Table(&[("bow", 1.0)]) },
+            Recipe {
+                input: Table(&[("iron", 1.0), ("wood", 3.0)]),
+                output: Table(&[("crossbow", 1.0)]),
+            },
+            Recipe {
+                input: Table(&[("iron", 1.0), ("wood", 3.0)]),
+                output: Table(&[("arrows", 40.0)]),
             },
         ],
     ),
@@ -2217,6 +2248,32 @@ pub const COMBAT_SKILL_LIMIT: f64 = 1.0;
 
 /// The least damage a blow that lands does, however well the one hit is protected.
 pub const MIN_BLOW_DAMAGE: f64 = 1.0;
+
+/// How far a Bow or Crossbow shoots, in tiles (`CONTEXT.md`: Ranged combat), on the ground: a
+/// Bow further than a Crossbow. Contact counts too.
+pub const SHOT_REACH: Table<f64> = Table(&[("bow", 8.0), ("crossbow", 5.0)]);
+
+/// Ticks between two shots (`CONTEXT.md`: Ranged combat): a Bow looses one every three seconds, a
+/// Crossbow, slow to span, one every six. A blow in contact comes every `STRIKE_TICKS`.
+pub const SHOT_TICKS: Table<f64> = Table(&[("bow", 3.0), ("crossbow", 6.0)]);
+
+/// Damage a shot does before Combat skill and armour (`CONTEXT.md`: Ranged combat): Strength adds
+/// nothing. An unskilled Bow does about what an average fist does, a Crossbow hits hard.
+pub const SHOT_DAMAGE: Table<f64> = Table(&[("bow", 6.0), ("crossbow", 14.0)]);
+
+/// The furthest Combat skill raises a shot, as a share of it, reached at the same skill as a blow's
+/// `COMBAT_SKILL_LIMIT`: a master bowman shoots three times as hard as a beginner, a Crossbow
+/// needs little skill.
+pub const SHOT_SKILL_LIMIT: Table<f64> = Table(&[("bow", 2.0), ("crossbow", 0.25)]);
+
+/// Share of the target's shield and armour a shot goes through (`CONTEXT.md`: Ranged combat): a
+/// Crossbow's bolt half of it, an arrow from a Bow none.
+pub const SHOT_PIERCE: Table<f64> = Table(&[("bow", 0.0), ("crossbow", 0.5)]);
+
+/// Tiles of reach an archer up on a wall walk gets on top of their weapon's (`CONTEXT.md`: Ranged
+/// combat, Walls in combat): half a Bow's again, so a Bow on the wall outshoots one on the ground
+/// by four tiles and a Crossbow on the wall outshoots a Bow below.
+pub const WALL_SHOT_REACH_BONUS: f64 = 4.0;
 
 /// What a blow that lands does to a defender standing on their own city's wall, as a share of its
 /// damage (`CONTEXT.md`: Walls in combat): a quarter, so a wall's defenders hold out four times
@@ -2755,6 +2812,8 @@ pub fn balance_json() -> Value {
     m.insert("WORK_FOOD_KEPT".into(), json!(WORK_FOOD_KEPT));
     m.insert("NPC_SOLDIER_SHARE".into(), json!(NPC_SOLDIER_SHARE));
     m.insert("NPC_STEEL_KIT".into(), json!(NPC_STEEL_KIT));
+    m.insert("NPC_ARCHER_SHARE".into(), json!(NPC_ARCHER_SHARE));
+    m.insert("NPC_ARCHER_ARROWS".into(), json!(NPC_ARCHER_ARROWS));
     m.insert("NPC_SOLDIERS_ON_HALL".into(), json!(NPC_SOLDIERS_ON_HALL));
     m.insert("NPC_SOLDIERS_AT_GATE".into(), json!(NPC_SOLDIERS_AT_GATE));
     m.insert("NPC_POST_AROUND_HALL".into(), json!(NPC_POST_AROUND_HALL));
@@ -2843,6 +2902,12 @@ pub fn balance_json() -> Value {
     m.insert("TRANSFER_FEE_FACTOR".into(), json!(TRANSFER_FEE_FACTOR));
     m.insert("GOOD_WEIGHT".into(), to_value(GOOD_WEIGHT).expect("serialisable"));
     m.insert("WEAPON_ATTACK".into(), to_value(WEAPON_ATTACK).expect("serialisable"));
+    m.insert("SHOT_REACH".into(), to_value(SHOT_REACH).expect("serialisable"));
+    m.insert("SHOT_TICKS".into(), to_value(SHOT_TICKS).expect("serialisable"));
+    m.insert("SHOT_DAMAGE".into(), to_value(SHOT_DAMAGE).expect("serialisable"));
+    m.insert("SHOT_SKILL_LIMIT".into(), to_value(SHOT_SKILL_LIMIT).expect("serialisable"));
+    m.insert("SHOT_PIERCE".into(), to_value(SHOT_PIERCE).expect("serialisable"));
+    m.insert("WALL_SHOT_REACH_BONUS".into(), json!(WALL_SHOT_REACH_BONUS));
     m.insert("PROTECTION_DEFENCE".into(), to_value(PROTECTION_DEFENCE).expect("serialisable"));
     m.insert("CARRY_BASE".into(), json!(CARRY_BASE));
     m.insert("CARRY_PER_STRENGTH".into(), json!(CARRY_PER_STRENGTH));

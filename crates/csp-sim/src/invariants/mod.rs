@@ -223,6 +223,7 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, _| crate::horses::horses_down_lie_still(w),
         },
         Invariant { name: "attack-orders-sound", check: checks::attack_orders_sound },
+        Invariant { name: "shots-within-reach", check: checks::shots_within_reach },
         Invariant { name: "up-only-on-walls", check: crate::wall_walk::up_only_on_walls },
         Invariant { name: "up-only-on-own-walls", check: crate::wall_walk::up_only_on_own_walls },
         Invariant {

@@ -56,7 +56,11 @@ fn text(order: &OrderRequest, key: &str) -> Option<String> {
 }
 
 fn attack_request(order: &OrderRequest) -> AttackRequest {
-    AttackRequest { resident_id: text(order, "residentId"), target_id: text(order, "targetId") }
+    AttackRequest {
+        resident_id: text(order, "residentId"),
+        target_id: text(order, "targetId"),
+        shoot: order.fields.get("shoot").and_then(Value::as_bool).unwrap_or(false),
+    }
 }
 
 fn army_request(order: &OrderRequest) -> ArmyRequest {

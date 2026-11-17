@@ -210,3 +210,30 @@ fn the_script_calls_give_the_same_orders_and_answer_why_not() {
     g.run(EQUIP_TICKS as usize);
     assert_eq!(g.r("a1").equipped.weapon, Some(Good::Spear));
 }
+
+#[test]
+fn swapping_in_a_bow_empties_the_shield_slot_and_a_shield_cant_go_on_beside_a_crossbow() {
+    let mut world = setup();
+    world.residents[0].carried.insert(Good::Shield, 1.0);
+    world.residents[0].carried.insert(Good::Bow, 1.0);
+    world.residents[0].carried.insert(Good::Crossbow, 1.0);
+    settle_equipment(&mut world.residents[0]);
+    assert_eq!(world.residents[0].equipped.shield, Some(Good::Shield));
+    let mut g = game(world);
+    assert_eq!(g.order(7, equip("a1", "bow")), "ack");
+    g.run(EQUIP_TICKS as usize);
+    let a = g.r("a1");
+    assert_eq!(a.equipped.weapon, Some(Good::Bow));
+    assert_eq!(a.equipped.shield, None, "the bow takes both hands");
+    assert_eq!(a.carried.get(&Good::Shield), Some(&1.0), "the shield stays carried");
+    assert_eq!(g.order(7, equip("a1", "shield")), "the bow takes both hands");
+    assert_eq!(g.order(7, equip("a1", "crossbow")), "ack");
+    g.run(EQUIP_TICKS as usize);
+    assert_eq!(g.r("a1").equipped.weapon, Some(Good::Crossbow));
+    assert_eq!(g.order(7, equip("a1", "shield")), "the crossbow takes both hands");
+    // Back to one hand: the shield carried goes on at once.
+    assert_eq!(g.order(7, equip("a1", "sword")), "ack");
+    g.run(EQUIP_TICKS as usize);
+    assert_eq!(g.r("a1").equipped.weapon, Some(Good::Sword));
+    assert_eq!(g.r("a1").equipped.shield, Some(Good::Shield));
+}

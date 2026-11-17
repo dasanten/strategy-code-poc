@@ -396,6 +396,7 @@ fn resident_view(
             "skills" => numbers_view("skills", &r.skills, skill_name),
             "carried" => numbers_view("goods", &r.carried, good_name),
             "equipped" => equipment_view(r),
+            "reach" => crate::queries::combat::shot_reach(world, r).map_or(Value::Null, number),
             "order" => order_value(r.order.as_ref(), f.r#type, land),
             "orderEnded" => field_value(&r.order_ended, f.r#type),
             "queue" => match &r.queue {
@@ -442,6 +443,7 @@ fn resident_data(
     m.insert("age".into(), json!(age_in_years(r.born_at, world.tick as f64)));
     // The slots as the rules count them, an empty one too (`CONTEXT.md`: Equipment).
     m.insert("equipped".into(), crate::equipment::equipment_json(r));
+    m.insert("reach".into(), crate::queries::combat::reach_json(world, r));
     m
 }
 
@@ -790,6 +792,7 @@ impl<'a> ScriptBindings<'a> {
         // The slots as the rules count them, an empty one too (`CONTEXT.md`: Equipment).
         if let Some(r) = self.ctx.index.resident_by_id(self.world(), id) {
             m.insert("equipped".into(), crate::equipment::equipment_json(r));
+            m.insert("reach".into(), crate::queries::combat::reach_json(self.world(), r));
         }
         m
     }
@@ -1148,6 +1151,7 @@ impl<'a> ScriptBindings<'a> {
                         .map(|r| {
                             let mut m = to_json(r);
                             m.insert("equipped".into(), crate::equipment::equipment_json(r));
+                            m.insert("reach".into(), crate::queries::combat::reach_json(world, r));
                             let s = r.script.as_ref().expect("filtered");
                             m.insert(
                                 "script".into(),
@@ -1697,6 +1701,9 @@ impl<'a> ScriptBindings<'a> {
             "breed" => self.request("breed", vec![("stableId", p(0)?), ("horseIds", p(1)?)]),
             "pair" => self.request("pair", vec![("partnerId", p(0)?)]),
             "attack" => self.request("attack", vec![("targetId", p(0)?)]),
+            "shoot" => {
+                self.request("attack", vec![("targetId", p(0)?), ("shoot", Some(Json::Bool(true)))])
+            }
             "feed" => self.request("feed", vec![("targetId", p(0)?), ("units", p(1)?)]),
             "equip" => self.request("equip", vec![("good", p(0)?)]),
             "takeOff" => self.request("takeOff", vec![("slot", p(0)?)]),

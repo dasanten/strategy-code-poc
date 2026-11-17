@@ -30,6 +30,8 @@ struct Post {
     wall: String,
     at: (f64, f64),
     climbs: bool,
+    /// An archer: shoots the nearest defender in reach from their post instead (T108.3).
+    shoots: bool,
 }
 
 /// What came of a siege.
@@ -89,7 +91,7 @@ fn alive(world: &WorldState, id: &str) -> bool {
 /// at home inside their ring, its gate closed by their Player; the attackers stand outside it,
 /// the north side first, each next to a wall tile of its own, every other one to break it and the
 /// rest to climb.
-fn siege(factor: usize) -> Outcome {
+fn siege(factor: usize, archers: bool) -> Outcome {
     let terrain = plains(SIZE);
     let mut world = crate::world::create_world(&terrain, 1);
     world.nodes.clear();
@@ -152,11 +154,21 @@ fn siege(factor: usize) -> Outcome {
             wall,
             at,
             climbs: i % 2 == 1,
+            shoots: archers && i % 3 == 2,
         })
         .collect();
     for p in &posts {
         let r = world.residents.iter_mut().find(|r| r.id == p.id).expect("the attacker");
         (r.x, r.y, r.order, r.script) = (p.at.0, p.at.1, None, None);
+        if p.shoots {
+            to_bow(r);
+        }
+    }
+    // Every other defender an archer (`CONTEXT.md`: Ranged combat).
+    if archers {
+        for id in defenders.iter().skip(1).step_by(2) {
+            to_bow(world.residents.iter_mut().find(|r| &r.id == id).expect("the defender"));
+        }
     }
 
     let mut game = Game::new(world, terrain);
@@ -186,7 +198,12 @@ fn siege(factor: usize) -> Outcome {
                 continue;
             }
             let (rx, ry) = (r.x, r.y);
-            let order = if (rx, ry) == p.at {
+            let order = if p.shoots && (rx, ry) == p.at {
+                // An archer shoots the nearest defender in reach, or else breaks the wall at
+                // their post with their fists.
+                let target = in_reach(&game.world, &defenders, r).unwrap_or_else(|| wall.clone());
+                json!({"kind": "attack", "residentId": id, "targetId": target})
+            } else if (rx, ry) == p.at {
                 if p.climbs {
                     json!({"kind": "climb", "residentId": id, "wallId": wall})
                 } else {
@@ -213,6 +230,32 @@ fn siege(factor: usize) -> Outcome {
         most_damage,
         ticks: game.world.tick - start,
     }
+}
+
+/// Arms `r` with a Bow and 40 Arrows in place of what they had (`CONTEXT.md`: Ranged combat).
+fn to_bow(r: &mut csp_shared::world::Resident) {
+    use csp_shared::world::Good;
+    for g in [Good::Spear, Good::Sword, Good::SteelSword] {
+        r.carried.shift_remove(&g);
+    }
+    r.carried.insert(Good::Bow, 1.0);
+    r.carried.insert(Good::Arrows, 40.0);
+    crate::equipment::settle_equipment(r);
+}
+
+/// The living one of `ids` nearest `r` within their shot's reach, if any.
+fn in_reach(world: &WorldState, ids: &[String], r: &csp_shared::world::Resident) -> Option<String> {
+    use crate::queries::combat::{strike_reach, tiles_apart};
+    let reach = strike_reach(world, r);
+    let apart = |t: &csp_shared::world::Resident| {
+        tiles_apart(SIZE, (r.x as i32, r.y as i32), (t.x as i32, t.y as i32))
+    };
+    world
+        .residents
+        .iter()
+        .filter(|t| ids.contains(&t.id) && apart(t) <= reach)
+        .min_by(|a, b| apart(a).total_cmp(&apart(b)))
+        .map(|t| t.id.clone())
 }
 
 /// The living one of `ids` nearest (x, y).
@@ -249,11 +292,19 @@ fn holds(outcome: &Outcome) {
 #[test]
 #[ignore = "5.1 s alone; see #1132"]
 fn a_starting_city_takes_no_tile_of_anothers_wall_at_equal_numbers() {
-    holds(&siege(1));
+    holds(&siege(1, false));
 }
 
 #[test]
 #[ignore = "6.4 s alone; see #1132"]
 fn nor_at_twice_their_numbers() {
-    holds(&siege(2));
+    holds(&siege(2, false));
+}
+
+/// With archers on both sides (T108.3): every other defender and every third attacker has a Bow,
+/// the attackers' archers shooting up at the wall's defenders from their posts.
+#[test]
+#[ignore = "slow, as the others; see #1132"]
+fn nor_with_archers_on_both_sides() {
+    holds(&siege(1, true));
 }
