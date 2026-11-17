@@ -3100,7 +3100,9 @@ export function Wiki() {
           hands a step, apart from its builders, build its streets, then road from its home to each
           of its workplaces outside its area, farms too, the nearest first. They follow the way a
           resident would walk, tile by tile, so a road goes round a lake, and they skip tiles that
-          already have a road. They only use materials above its reserve and what its project still
+          already have a road. One of them out on a way with a tile's materials and Food in hand
+          lays the tiles nearest them before walking home to a street owed meanwhile. They only use
+          materials above its reserve and what its project still
           needs; with none to spare, or with something short that they can work for, they go back to
           other work and bring back what they carry. Once the city would otherwise be full, they
           also leave a town hall's and a storage's materials untouched, so founding comes before

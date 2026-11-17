@@ -11,7 +11,7 @@ use csp_shared::balance::{
 use csp_shared::terrain::{terrain_at, tile_index, Terrain, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    BuildingKind, CityJobKind, CityLayout, CityPlan, Good, ResourceKind, WorldState,
+    BuildingKind, CityJobKind, CityLayout, CityPlan, Good, ResourceKind, Stock, WorldState,
 };
 
 use super::big_city_fixture::big_city;
@@ -23,7 +23,7 @@ use crate::npc_cities::found_npc_city;
 use crate::npc_founding::{founding_materials, founding_party, full_but_materials};
 use crate::npc_growth::wall_rings;
 use crate::npc_plan::plan_city;
-use crate::npc_roads::WayFinder;
+use crate::npc_roads::{lay_road, WayFinder};
 use crate::npc_test_world::{plains, Runner};
 use crate::pathfinding::{PathFinder, PathOptions, PathResult, Point, WALKING_COSTS};
 use crate::queries::building::{road_at, road_tiles};
@@ -447,6 +447,64 @@ fn on_the_map_finishes_a_road_to_a_far_workplace_round_a_lake() {
         assert_ne!(terrain_at(&terrain, *x as i32, *y as i32), Terrain::Lake as u8);
     }
     hangs_together(terrain.size, &tiles);
+}
+
+/// The tile one of the crew is sent to build, from their Build default.
+fn sent_to(world: &WorldState, i: usize) -> Option<(f64, f64)> {
+    let at = world.residents[i].script.as_ref()?.memory.get("at")?.as_object()?;
+    Some((at.get("x")?.as_f64()?, at.get("y")?.as_f64()?))
+}
+
+#[test]
+fn one_of_the_crew_out_on_a_way_lays_the_tiles_near_them_before_a_street_back_home() {
+    let (mut world, terrain, city, place) = town(&[(Good::Stone, 400.0)], 300, &NPC_TOWN);
+    let mut ways = Ways::new(&terrain);
+    let mut plan = ways.plan(&mut world, &terrain, &city);
+    let mut n = 0;
+    while n < 8 && !plan.roads.iter().flatten().any(|r| r.to == place) {
+        lay_new(&mut world, &all_tiles(&plan));
+        plan = ways.plan(&mut world, &terrain, &city);
+        n += 1;
+    }
+    let tiles = road_to(&world, &city, &place).expect("a way");
+    let cut = tiles.len() - 5;
+    lay_new(&mut world, &tiles[..cut]);
+    // A street owed again, as when a new building stands: its road torn down.
+    let home = npc_home(&world, &city).expect("a home").clone();
+    let (hx, hy) = (home.x as i32, home.y as i32);
+    let street = world
+        .buildings
+        .iter()
+        .filter(|b| b.kind == BuildingKind::Road)
+        .min_by_key(|b| (b.x as i32 - hx).abs() + (b.y as i32 - hy).abs())
+        .map(|b| (b.x, b.y))
+        .expect("a street");
+    world.buildings.retain(|b| !(b.kind == BuildingKind::Road && (b.x, b.y) == street));
+    plan = ways.plan(&mut world, &terrain, &city);
+    assert!(plan.streets.iter().flatten().any(|t| *t == street), "{street:?}");
+    let c = world.cities.iter().find(|c| c.id == city).cloned().expect("the city");
+    let store = crate::npc_chain::chain_store_index(&world, &c);
+    let i = world
+        .residents
+        .iter()
+        .position(|r| r.city_id.as_deref() == Some(city.as_str()))
+        .expect("a resident");
+    // Out on the way, with Stone and Food in hand.
+    let (wx, wy) = tiles[cut - 1];
+    let r = &mut world.residents[i];
+    (r.x, r.y) = (wx, wy);
+    r.order = None;
+    r.script = None;
+    r.carried = Stock::from([(Good::Stone, 3.0), (Good::Food, 10.0)]);
+    assert!(lay_road(&mut world, &c, i, &[i], store, terrain.size));
+    assert_eq!(sent_to(&world, i), Some(tiles[cut]));
+    // Back in the city, its streets come first.
+    let r = &mut world.residents[i];
+    (r.x, r.y) = (home.x, home.y);
+    r.order = None;
+    r.script = None;
+    assert!(lay_road(&mut world, &c, i, &[i], store, terrain.size));
+    assert_eq!(sent_to(&world, i), Some(street));
 }
 
 #[test]

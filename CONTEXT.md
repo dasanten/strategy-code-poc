@@ -651,7 +651,10 @@ The shared language of the game. Domain terms only — no implementation details
   neighbours, nearest first. Like any road nobody owns it, and anyone can use it
   or tear it down; a tile torn down is laid again in time. A way too long (a balance number, in
   tiles) or with no way through is given up. A road two cities would each build between them is
-  built by only one. The crew takes Food along, never starts a tile with too little to walk home
+  built by only one. Streets first goes for what the crew starts from the city: one of them out on
+  a way, with a tile's materials and the Food for it in hand, lays the tiles nearest them before
+  walking home to a street owed meanwhile (decided overnight, Daniel to confirm). The crew takes
+  Food along, never starts a tile with too little to walk home
   on, and fetches more by Getting food.
 - **Scout:** a spare hand an NPC city sends exploring: a few at a time by its size (a balance
   number) run the game's Explore default with no `find`, and come home when their Food says turn
