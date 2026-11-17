@@ -687,7 +687,8 @@ pub const NPC_STARTING_SITE_CLEARANCE: f64 = 96.0;
 pub const NPC_WAY_CLEARANCE: i32 = 24;
 
 /// NPC cities lie at least this many tiles from every other city, starting cities and NPC cities
-/// alike (about an hour's walk on plains), the short way round the map.
+/// alike (about an hour's walk on plains), the short way round the map. A daughter keeps it scaled
+/// with the side on a map of half to all of `MAP_SIZE`'s side (`daughter_min_distance`, T100.8).
 pub const NPC_CITY_MIN_DISTANCE: f64 = 480.0;
 
 /// What an NPC city is placed with, by its size: a walled square like a starting city's.
@@ -1016,6 +1017,12 @@ pub const NPC_FULL_DAYS_LEAST: f64 = 2.0;
 /// Full city): Food its scouts and road crew take out and bring back doesn't count.
 pub const NPC_FULL_DIP_DAYS: f64 = 1.0;
 
+/// How much of its Food surplus cap (`NPC_SURPLUS_CAP`) past its reserve an NPC city holds before
+/// its founding party's materials count as short (`CONTEXT.md`: Full city): Food, its surplus
+/// too, comes first (Daniel, 2026-11-15). Half, so a birth or a party's Food doesn't take it below
+/// its reserve, and spoilage still lets it get there.
+pub const NPC_FOUND_FOOD_SURPLUS_SHARE: f64 = 0.5;
+
 /// Residents past `NPC_FOUND_VILLAGE_RESIDENTS` that add one adult to a founding party
 /// (`npcFoundingPartySize`): a city of 110 sends the most, about one in eight of it.
 pub const NPC_FOUND_RESIDENTS_PER_MEMBER: f64 = 10.0;
@@ -1264,9 +1271,10 @@ pub const CARAVAN_FOOD: f64 = 72.0;
 
 /// How much longer than a plain walk a carriage's way to its next stop may take, for the Food it waits
 /// for at the HQ (`CONTEXT.md`: Waiting for Food): the escort sets its pace, and its way winds and
-/// crosses slower ground. With this a full-size map's longest way, about 4,000 tiles, wants about all
-/// of `CARAVAN_FOOD`.
-pub const WAY_FOOD_MARGIN: f64 = 1.5;
+/// crosses slower ground. On the new land (ADR 0035) a trader's leg took 1.7 to 2.7 times the plain
+/// walk in a game year's run (T100.8), its way going round Mountain ranges to a pass; 1.5 starved a
+/// crew short of its post. A full-size map's longest ways want all of `CARAVAN_FOOD`, its cap.
+pub const WAY_FOOD_MARGIN: f64 = 3.0;
 
 /// What a carriage leaves in the HQ's storage (`CONTEXT.md`: Waiting for Food), in game days of what
 /// its people off the carriages eat. No more than `NPC_FOOD_SHORT_DAYS`, below which the HQ puts
@@ -2896,6 +2904,7 @@ pub fn balance_json() -> Value {
     m.insert("NPC_FULL_RESIDENTS_PER_DAY".into(), json!(NPC_FULL_RESIDENTS_PER_DAY));
     m.insert("NPC_FULL_DAYS_LEAST".into(), json!(NPC_FULL_DAYS_LEAST));
     m.insert("NPC_FULL_DIP_DAYS".into(), json!(NPC_FULL_DIP_DAYS));
+    m.insert("NPC_FOUND_FOOD_SURPLUS_SHARE".into(), json!(NPC_FOUND_FOOD_SURPLUS_SHARE));
     m.insert("NPC_FOUND_RESIDENTS_PER_MEMBER".into(), json!(NPC_FOUND_RESIDENTS_PER_MEMBER));
     m.insert("NPC_FOUND_PARTY_MOST".into(), json!(NPC_FOUND_PARTY_MOST));
     m.insert("NPC_FOUND_SAMPLES".into(), json!(NPC_FOUND_SAMPLES));

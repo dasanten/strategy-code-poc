@@ -488,14 +488,57 @@ fn materials_first(
         carried_by(world, city)
     };
     for (good, units) in &need {
-        if held(&have, *good) >= *units || makes(world, city, *good) {
+        if held(&have, *good) >= *units {
             continue;
         }
-        if let Some(first) = chain_project(world, city, home, terrain, rings, *good, seen) {
+        let Some(first) = built_first(world, city, home, terrain, rings, &have, *good, seen) else {
+            continue;
+        };
+        let same = matches!(&first, CityProject::Build { building: b, x: fx, y: fy, .. }
+            if b == building && *fx as i32 == *x as i32 && *fy as i32 == *y as i32);
+        if !same {
             return materials_first(world, city, home, terrain, rings, first, seen);
         }
     }
     want
+}
+
+/// What an NPC city builds first so a material it lacks can come, if anything (T100.8): nothing
+/// while a finished workplace of its makes it and what that is made from can come too; a site of
+/// its own begun for it, which no other site may wait on for ever; else the workplace for it
+/// (`chain_project`). Before this, a begun mine waited for Stone from a quarry that was only a
+/// site, and a begun smithy for Iron whose ore came from a mine that was only a site.
+#[allow(clippy::too_many_arguments)]
+fn built_first(
+    world: &WorldState,
+    city: &City,
+    home: &Building,
+    terrain: &TerrainMap,
+    rings: Option<&Rings>,
+    have: &Stock,
+    good: Good,
+    seen: &mut HashSet<Good>,
+) -> Option<CityProject> {
+    if seen.contains(&good) {
+        return None;
+    }
+    let own: Vec<&Building> = own_workplaces(world, city)
+        .into_iter()
+        .filter(|b| chain_good(world, b) == Some(good))
+        .collect();
+    if own.iter().any(|b| b.site.is_none()) {
+        seen.insert(good);
+        let input = chain_input(world, city, good).unwrap_or_default();
+        return input
+            .iter()
+            .filter(|(g, n)| held(have, **g) < **n)
+            .find_map(|(g, _)| built_first(world, city, home, terrain, rings, have, *g, seen));
+    }
+    if let Some(site) = own.first() {
+        seen.insert(good);
+        return Some(build(site.kind, (site.x as i32, site.y as i32)));
+    }
+    chain_project(world, city, home, terrain, rings, good, seen)
 }
 
 /// The workplace an NPC city builds next for a good it is short of (`chainProject`), if it can make
@@ -694,6 +737,15 @@ fn wanted(
             rings.is_some_and(|r| r.expanding) && outer_ring_of_stone(world, city, home, size);
         let p = build(next.kind, (next.x, next.y));
         return Some(with_material(p, stone.then_some(WallMaterial::Stone)));
+    }
+    // Lacking nothing else, its wall up, the workplace for a founding material it has none for
+    // (`CONTEXT.md`: Full city).
+    for short in crate::npc_founding::founding_lacks(world, city, Some(home), size) {
+        if let Some(chain) =
+            chain_project(world, city, home, terrain, rings, short.good, &mut HashSet::new())
+        {
+            return Some(chain);
+        }
     }
     if let Some(second) = second_workplace(world, city, home, terrain) {
         return Some(second);

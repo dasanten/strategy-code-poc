@@ -192,7 +192,8 @@ fn keeps_a_resident_carrying_a_child_out_of_work_at_a_house_the_partner_works() 
 fn builds_a_house_inside_its_wall_when_it_has_a_food_surplus_and_no_free_housing() {
     let mut v = village(None);
     fill_houses(&mut v.world, &v.city, &v.home);
-    set_stock(&mut v, &[(Good::Food, 400.0), (Good::Wood, 100.0)]);
+    // Its founding party's materials too, else it builds for them (`CONTEXT.md`: Full city).
+    set_stock(&mut v, &[(Good::Food, 400.0), (Good::Wood, 400.0), (Good::Stone, 200.0)]);
     let (x, y) = build_at(&project(&v), BuildingKind::House);
     assert!(((x - v.home.x).abs().max((y - v.home.y).abs())) < f64::from(WALL - 1));
     // With room in its houses it builds none.
@@ -470,4 +471,53 @@ fn a_village_grows_in_residents_and_area_over_game_weeks() {
     assert!(world.buildings.iter().any(|b| b.kind == BuildingKind::LumberCamp && b.site.is_none()));
     assert!(ring(world, city, home, size, WALL).is_empty());
     assert!(ring(world, city, home, size, WALL + NPC_WALL_STEP as i32).len() > 120);
+}
+
+/// A begun site of the city's own, of `kind` at `at`, and a node of `node` under it if any.
+fn own_site(v: &mut Village, id: &str, kind: &str, at: (f64, f64), node: Option<&str>) {
+    let site: Building = serde_json::from_value(json!({
+        "id": id, "kind": kind, "cityId": null, "x": at.0, "y": at.1,
+        "site": { "delivered": {}, "work": TICKS_PER_GAME_DAY },
+    }))
+    .unwrap();
+    v.world.buildings.push(site);
+    if let Some(node) = node {
+        v.world.nodes.push(
+            serde_json::from_value(json!({
+                "id": format!("{node}-{id}"), "kind": node, "x": at.0, "y": at.1,
+            }))
+            .unwrap(),
+        );
+    }
+    let i = v.world.cities.iter().position(|c| c.id == v.city).unwrap();
+    v.world.cities[i].workplace_ids.get_or_insert_with(Vec::new).push(id.into());
+}
+
+#[test]
+fn finishes_the_begun_quarry_a_begun_mine_waits_on_for_its_stone() {
+    // T100.8: the mine came first and waited for ever on Stone from a quarry that was a site.
+    let mut v = village(None);
+    fill_houses(&mut v.world, &v.city, &v.home);
+    set_stock(&mut v, &[(Good::Food, 400.0), (Good::Wood, 400.0)]);
+    let (hx, hy) = (v.home.x, v.home.y);
+    own_site(&mut v, "mine", "mine", (hx + 40.0, hy + 40.0), Some("ironOre"));
+    own_site(&mut v, "quarry", "quarry", (hx - 40.0, hy + 40.0), Some("stone"));
+    assert_eq!(build_at(&project(&v), BuildingKind::Quarry), (hx - 40.0, hy + 40.0));
+}
+
+#[test]
+fn finishes_the_begun_mine_whose_ore_a_begun_smithys_iron_waits_on() {
+    // T100.8: a smithy needs Iron, which its finished smelter makes only from the begun mine's ore.
+    let mut v = village(None);
+    fill_houses(&mut v.world, &v.city, &v.home);
+    let goods = [(Good::Food, 400.0), (Good::Wood, 400.0), (Good::Stone, 400.0)];
+    set_stock(&mut v, &goods);
+    let (hx, hy) = (v.home.x, v.home.y);
+    own_site(&mut v, "smithy", "smithy", (hx + 6.0, hy + 6.0), None);
+    let mut smelter = placed(BuildingKind::Smelter, (hx - 6.0, hy + 6.0));
+    smelter.id = "smelter".into();
+    smelter.city_id = Some(v.city.clone());
+    v.world.buildings.push(smelter);
+    own_site(&mut v, "mine", "mine", (hx + 40.0, hy - 40.0), Some("ironOre"));
+    assert_eq!(build_at(&project(&v), BuildingKind::Mine), (hx + 40.0, hy - 40.0));
 }

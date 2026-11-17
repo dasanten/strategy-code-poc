@@ -96,16 +96,21 @@ pub fn free_starting_sites(world: &WorldState, region: u32) -> impl Iterator<Ite
 /// generated, before any city stands.
 pub fn place_starting_sites(world: &mut WorldState, terrain: &TerrainMap) {
     let regions = Regions::of(world.seed, terrain);
-    world.nodes = place_resource_nodes_by_region(terrain, world.seed, &regions);
+    place_starting_sites_on(world, terrain, &regions);
+}
+
+/// `place_starting_sites` on the world's regions, worked out already (`Regions::of`).
+pub fn place_starting_sites_on(world: &mut WorldState, terrain: &TerrainMap, regions: &Regions) {
+    world.nodes = place_resource_nodes_by_region(terrain, world.seed, regions);
     world.starting_sites.clear();
     let rules = SiteRules::for_size(terrain.size);
     let heartlands: Vec<Region> = regions.of_kind(RegionKind::Heartland).cloned().collect();
     // Where each kind of node it needs could lie, for every heartland alike.
     let fitting = NODES_IN_REACH.map(|kind| Coarse::of(terrain, node_terrains(kind)));
     for h in &heartlands {
-        place_in_heartland(world, terrain, &regions, h, &rules, &fitting);
+        place_in_heartland(world, terrain, regions, h, &rules, &fitting);
     }
-    assign_richness(&mut world.nodes, terrain, &regions);
+    assign_richness(&mut world.nodes, terrain, regions);
 }
 
 /// A place a site may go, before the nodes and the walk are looked at.
@@ -447,8 +452,26 @@ pub fn walk_seconds(
         }
         TERRAIN_SPEED.get(t).filter(|s| *s > 0.0).map(|s| plains / s)
     };
+    // A* (T100.8): the fewest seconds a walk to the nearest goal could take, every step on the
+    // fastest ground, never more than it does, so the walk it finds is the shortest, and a search
+    // with no goal in reach stops once even that passes `limit`.
+    let fastest = plains / TERRAIN_SPEED.0.iter().map(|&(_, s)| s).fold(1.0, f64::max);
+    let goal_at: Vec<(i32, i32)> =
+        goals.iter().map(|&g| (g as i32 % side, g as i32 / side)).collect();
+    let least = |l: usize| -> f64 {
+        let (lx, ly) = (l as i32 % side, l as i32 / side);
+        goal_at
+            .iter()
+            .map(|&(gx, gy)| {
+                let (ax, ay) = ((gx - lx).abs(), (gy - ly).abs());
+                let (long, short) = (ax.max(ay), ax.min(ay));
+                f64::from(long - short) + f64::from(short) * DIAGONAL_STEP
+            })
+            .fold(f64::INFINITY, f64::min)
+            * fastest
+    };
     #[derive(PartialEq)]
-    struct Open(f64, i32, i32);
+    struct Open(f64, f64, i32, i32);
     impl Eq for Open {}
     impl PartialOrd for Open {
         fn partial_cmp(&self, o: &Self) -> Option<Ordering> {
@@ -462,10 +485,11 @@ pub fn walk_seconds(
     }
     let mut best = vec![f64::INFINITY; (side * side) as usize];
     let mut open = BinaryHeap::new();
-    best[local(from.0, from.1)?] = 0.0;
-    open.push(Open(0.0, from.0, from.1));
-    while let Some(Open(d, x, y)) = open.pop() {
-        if d > limit {
+    let start = local(from.0, from.1)?;
+    best[start] = 0.0;
+    open.push(Open(least(start), 0.0, from.0, from.1));
+    while let Some(Open(f, d, x, y)) = open.pop() {
+        if f > limit {
             return None;
         }
         let l = local(x, y)?;
@@ -486,7 +510,7 @@ pub fn walk_seconds(
             let nd = d + if diagonal { step * DIAGONAL_STEP } else { step };
             if nd < best[nl] {
                 best[nl] = nd;
-                open.push(Open(nd, nx, ny));
+                open.push(Open(nd + least(nl), nd, nx, ny));
             }
         }
     }
