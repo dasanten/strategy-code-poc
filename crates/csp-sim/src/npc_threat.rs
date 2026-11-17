@@ -87,6 +87,7 @@ pub fn seen_armed<'w>(world: &'w WorldState, city: &City, size: i32) -> HashMap<
             || r.health <= 0.0
             || !is_armed(r)
             || is_lent_by(world, &r.id, &city.id)
+            || crate::npc_acting_first::hired_by(world, &r.id, &city.id)
             || !near(tile(r))
         {
             continue;

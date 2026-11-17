@@ -799,7 +799,15 @@ The shared language of the game. Domain terms only — no implementation details
   in high standing into an alliance against a common threat; hires mercenaries with its war chest
   when threatened, as a Player can (Trade Org army, Hiring from an NPC city); sends soldiers after
   residents it saw commit a crime against it, within its reach, to take back what was taken; and
-  sends demands (NPC demand).
+  sends demands (NPC demand). Decided overnight 2026-11-17, Daniel to confirm: it seeks allies and
+  hires once its threat from one Organization reaches a balance number; it invites the realms in
+  no alliance it holds in high standing (never the one it fears) and the NPC cities that hold it
+  in high standing and feel threatened by the same Organization, into an alliance it leads,
+  founding one (named after itself) if it has none; an NPC city that founded an alliance leads
+  it, and the role passes to a realm first when it leaves. It hires from the Trade Org army only,
+  as many as a balance number for a balance number of days, with the whole price in its
+  storages, paying each week from them like a transfer; its mercenaries stand at its town hall
+  and fight attackers in its City area.
   - **Hunting a thief:** for a theft it knows of (seen by one of its residents, or the news
     brought home), a few soldiers (a balance number per thief) go after the thief while they stay
     within its reach of its home (a balance number, its set reach); only soldiers beyond its hall

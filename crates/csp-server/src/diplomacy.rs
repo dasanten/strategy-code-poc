@@ -14,7 +14,7 @@ use csp_shared::world::{
     DirectOfferTerms, Good, Temperament, WorldState,
 };
 use csp_sim::directive::{directives_for, DirectiveView};
-use csp_sim::queries::alliance::{alliance_of, realm_name, sharing_sight};
+use csp_sim::queries::alliance::{alliance_of, sharing_sight};
 use csp_sim::queries::alliance_rules::is_alliance_city;
 use csp_sim::queries::city::{for_sale, town_hall_of};
 use csp_sim::queries::contract::{contracts_for, ContractView, RealmLabel};
@@ -454,7 +454,7 @@ pub fn diplomacy_for<'a>(
         .map(|a| InvitationView {
             alliance_id: a.id.clone(),
             name: a.name.clone(),
-            leader: realm_name(world, &a.leader_id),
+            leader: organization_label(world, &a.leader_id),
         })
         .collect();
     let realms: HashSet<&str> = world.realms.iter().map(|r| r.id.as_str()).collect();
