@@ -152,6 +152,10 @@ fn is_aggression(world: &WorldState, a: &Resident, t: &Resident, size: i32) -> b
         if post.is_some_and(|p| known_thieves(world, &p.id).contains(&t.id)) {
             return false;
         }
+        // An NPC city's soldier out after a thief it knows of takes back what was taken.
+        if crate::npc_hunts::hunting(world, a, t) {
+            return false;
+        }
     }
     let org = organization_of(a);
     if org.is_some_and(|org| wanted_at_home(world, org, t, size)) {
