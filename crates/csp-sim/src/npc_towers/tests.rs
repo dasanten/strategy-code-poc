@@ -276,3 +276,15 @@ fn the_old_wall_takes_its_towers_with_it() {
     assert_eq!(old_tower(&t.world, t.city(), &t.home, wall, wall + 4, 200), Some(id));
     assert_eq!(old_tower(&t.world, t.city(), &t.home, wall, wall, 200), None, "not moving out");
 }
+
+#[test]
+fn a_town_waiting_to_found_a_daughter_starts_no_tower() {
+    let mut t = Town::new(true);
+    t.give_stone(20.0 * tower_stone());
+    spot(&t.next());
+    let mut plan: csp_shared::world::CityPlan =
+        serde_json::from_value(serde_json::json!({ "plannedAt": 0, "jobs": {} })).expect("a plan");
+    plan.full_since = Some(t.world.tick as f64);
+    t.world.city_plans.insert(t.city.clone(), plan);
+    assert_eq!(t.next(), None, "founding comes first");
+}

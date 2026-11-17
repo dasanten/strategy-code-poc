@@ -528,7 +528,8 @@ The shared language of the game. Domain terms only — no implementation details
   further still; it gives the wall's cover and holds a few residents up at once (balance numbers).
   It is broken like a wall and holds out longer; those up on it fall when it does. An NPC city
   with a stone wall builds one by each gate, then at its corners; its wall posts fill its towers
-  first.
+  first. While it waits to found a daughter (Full city) it starts no new one, so founding
+  comes first (decided overnight, Daniel to confirm).
 - **House:** a building in a city's area where a fixed number of residents live (the number is in `balance.ts` and the Wiki). A city's **free housing** is
   its houses' room minus its residents. Houses are the only housing for now; later buildings
   (a palace, a castle) may add room the same way.

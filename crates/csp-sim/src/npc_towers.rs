@@ -165,7 +165,8 @@ fn stone_tower(x: f64, y: f64) -> CityProject {
 
 /// The next tower the city builds (`CONTEXT.md`: Tower), if it is time for one: the tower it has
 /// begun first; else, once it is a town whose outer wall is all of stone and isn't moving out, the
-/// first of `tower_spots` once it holds a stone tower's Stone beyond its reserve.
+/// first of `tower_spots` once it holds a stone tower's Stone beyond its reserve. None while its full
+/// wait is under way, so founding a daughter comes first (`CONTEXT.md`: Full city).
 pub fn tower_project(
     world: &WorldState,
     city: &City,
@@ -180,7 +181,8 @@ pub fn tower_project(
     if let Some(site) = towers_of(world, city, size).into_iter().find(|t| t.site.is_some()) {
         return Some(stone_tower(site.x, site.y));
     }
-    if expanding || !outer_ring_of_stone(world, city, home, size) {
+    let waiting_to_found = world.city_plans.get(&city.id).is_some_and(|p| p.full_since.is_some());
+    if expanding || waiting_to_found || !outer_ring_of_stone(world, city, home, size) {
         return None;
     }
     let materials = build_materials_of(BuildingKind::Tower, Some(WallMaterial::Stone));
