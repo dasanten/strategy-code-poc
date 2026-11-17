@@ -10,7 +10,9 @@ use csp_shared::world::{
 };
 use serde_json::{json, Value};
 
-use super::{attackers_of, npc_gate_shut_to_its_punishers, step_npc_defence};
+use super::{
+    attackers_of, npc_gate_shut_to_its_punishers, npc_soldiers_stand_down, step_npc_defence,
+};
 use crate::alarms::GameAlarms;
 use crate::capture::step_captures;
 use crate::combat::attack_order;
@@ -390,6 +392,54 @@ fn make_spears_in_their_smithy_when_the_storage_has_no_weapons() {
         .filter(|&i| held(&p.world.residents[i].carried, Good::Spear) != 0.0)
         .count();
     assert_eq!(armed as f64, npc_soldier_target(NPC_VILLAGE.residents));
+}
+
+/// The village with every adult armed with a spear, standing on its town hall with nothing to do;
+/// returns their ids.
+fn all_armed(p: &mut Place) -> Vec<String> {
+    let tick = p.world.tick as f64;
+    let hall = p.at(BuildingKind::TownHall);
+    let adults: Vec<String> = p
+        .citizens()
+        .into_iter()
+        .filter(|&i| can_work(p.world.residents[i].born_at, tick))
+        .map(|i| p.world.residents[i].id.clone())
+        .collect();
+    for id in &adults {
+        arm(&mut p.world, id, Good::Spear);
+        let r = p.r_mut(id);
+        (r.x, r.y) = (hall.x, hall.y);
+        r.order = None;
+        r.script = None;
+    }
+    adults
+}
+
+#[test]
+fn stand_down_the_armed_beyond_the_soldiers_they_keep_and_put_their_weapons_into_the_storage() {
+    let mut p = village();
+    let adults = all_armed(&mut p);
+    let target = npc_soldier_target(adults.len() as f64);
+    assert!(adults.len() as f64 > target);
+    let mut runner = Runner::new(&p.terrain);
+    p.run(&mut runner, 2 * DAY);
+    let armed = adults.iter().filter(|id| is_armed(p.r(id))).count();
+    assert_eq!(armed as f64, target);
+    let s = p.building(BuildingKind::Storage);
+    let spears = p.world.buildings[s].stock.as_ref().map_or(0.0, |st| held(st, Good::Spear));
+    assert_eq!(spears, adults.len() as f64 - target);
+}
+
+#[test]
+fn has_an_invariant_catching_more_soldiers_standing_idle_than_they_keep() {
+    let mut p = village();
+    let adults = all_armed(&mut p);
+    let found = npc_soldiers_stand_down(&p.world, p.terrain.size);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].entity_ids.len(), adults.len() + 1);
+    // A pass of its defence stands the extra down: off to the storage.
+    p.defend();
+    assert_eq!(npc_soldiers_stand_down(&p.world, p.terrain.size), []);
 }
 
 #[test]

@@ -14,8 +14,8 @@ use csp_shared::footprint::is_at;
 use csp_shared::goods::{PROTECTION_KINDS, WEAPONS};
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::{
-    Building, BuildingKind, City, DropOrder, Good, GoodsSpot, PickUpOrder, ResidentOrder, Stock,
-    Task, TradeOrgCity, WorldState,
+    Building, BuildingKind, City, DropOrder, Good, GoodsSpot, PickUpOrder, Resident, ResidentOrder,
+    Stock, Task, TradeOrgCity, WorldState,
 };
 
 use crate::combat::attack_order;
@@ -23,6 +23,7 @@ use crate::crimes::{city_organization, known_thieves};
 use crate::npc_behaviour::{stop_work, walk_to};
 use crate::npc_founding::founding_party;
 use crate::npc_growth::no_storage_yet;
+use crate::npc_posts::free_soldiers;
 use crate::queries::alliance::{allied, contract_of};
 use crate::queries::building::{building_pile, recipe_for, recipe_input, work_problem};
 use crate::queries::city::{for_sale, in_city_area, npc_city_refuses};
@@ -286,6 +287,13 @@ fn keep_soldiers(
     let soldiers: Vec<usize> =
         adults.iter().copied().filter(|&i| is_armed(&world.residents[i])).collect();
     let no_storage = no_storage_yet(world, city);
+    let standing_down = if city.trade_org.is_none() && !no_storage {
+        stand_down(world, city, &adults, &soldiers, target, storage)
+    } else {
+        Vec::new()
+    };
+    let soldiers: Vec<usize> =
+        soldiers.into_iter().filter(|i| !standing_down.contains(i)).collect();
     for &i in &soldiers {
         let r = &mut world.residents[i];
         let task = r.script.as_ref().and_then(|s| s.task);
@@ -354,6 +362,130 @@ fn keep_soldiers(
     if enough {
         fetch(world, st, &smiths, &input);
     }
+}
+
+/// With more armed `adults` than the `target` soldiers it keeps, an NPC city stands the extra down
+/// (`CONTEXT.md`: Soldiers in peace): first anyone armed at the Work default, such as a smith
+/// carrying the smithy's weapons to the storage, who goes on with it; then those already walking
+/// to `storage` to stand down; then those free on a post, archers last, by id from the last. One
+/// of them free walks to the storage and there puts their weapons, armour and Arrows into it, and
+/// is a spare hand again at the city's next pass. Those on a round, escorting, training, teaching,
+/// on alarm, fighting or about anything else stay soldiers for now. Only orders a Player could give
+/// (ADR 0002). Returns those standing down.
+fn stand_down(
+    world: &mut WorldState,
+    city: &City,
+    adults: &[usize],
+    soldiers: &[usize],
+    target: f64,
+    storage: Option<usize>,
+) -> Vec<usize> {
+    let Some(st) = storage else { return Vec::new() };
+    let extra = soldiers.len() as f64 - target;
+    if extra < 1.0 {
+        return Vec::new();
+    }
+    let (sx, sy) = (world.buildings[st].x, world.buildings[st].y);
+    let to_store = |r: &Resident| matches!(&r.order, Some(ResidentOrder::WalkTo(w)) if w.target.x == sx && w.target.y == sy);
+    let working = soldiers.iter().copied().filter(|&i| {
+        world.residents[i].script.as_ref().is_some_and(|s| s.task == Some(Task::Work))
+    });
+    let mut free: Vec<usize> = free_soldiers(world, city, adults)
+        .into_iter()
+        .filter(|&i| {
+            let r = &world.residents[i];
+            r.order.is_none() || to_store(r)
+        })
+        .collect();
+    free.sort_by(|&a, &b| {
+        let (ra, rb) = (&world.residents[a], &world.residents[b]);
+        (!to_store(ra), is_npc_archer(ra))
+            .cmp(&(!to_store(rb), is_npc_archer(rb)))
+            .then_with(|| rb.id.cmp(&ra.id))
+    });
+    let chosen: Vec<usize> = working.chain(free).take(extra as usize).collect();
+    for &i in &chosen {
+        let r = &world.residents[i];
+        if r.script.is_some() || r.order.is_some() {
+            continue;
+        }
+        if !is_at(tile(world, i), placed(&world.buildings[st]), MAP_SIZE) {
+            walk_to(&mut world.residents[i], (sx, sy));
+            continue;
+        }
+        let gear = gear_of(&r.carried);
+        if !gear.is_empty() {
+            let to = GoodsSpot::Storage { storage_id: world.buildings[st].id.clone() };
+            world.residents[i].order = Some(ResidentOrder::Drop(DropOrder { to, goods: gear }));
+        }
+    }
+    chosen
+}
+
+/// What one standing down puts into the storage: all they carry but Food, Coins and Tools.
+fn gear_of(carried: &Stock) -> Stock {
+    carried
+        .iter()
+        .filter(|(g, n)| **n > 0.0 && !matches!(g, Good::Food | Good::Coins | Good::Tools))
+        .map(|(g, n)| (*g, *n))
+        .collect()
+}
+
+/// Invariant `npc-soldiers-stand-down` (`CONTEXT.md`: Soldiers in peace; ADR 0004): an NPC city
+/// with a finished storage never has more of its soldiers free on a post with nothing to do (no
+/// order, no script), away from its storage, than the soldiers it keeps by its size: the extra
+/// stand down.
+pub fn npc_soldiers_stand_down(world: &WorldState, size: i32) -> Vec<InvariantViolation> {
+    let mut out = Vec::new();
+    let tick = world.tick as f64;
+    for city in world.cities.iter().filter(|c| c.realm_id.is_none() && c.trade_org.is_none()) {
+        let Some(store) = world.buildings.iter().find(|b| {
+            b.city_id.as_ref() == Some(&city.id)
+                && b.kind == BuildingKind::Storage
+                && b.site.is_none()
+        }) else {
+            continue;
+        };
+        let people: Vec<usize> = (0..world.residents.len())
+            .filter(|&i| {
+                let r = &world.residents[i];
+                r.owner.is_none()
+                    && r.city_id.as_ref() == Some(&city.id)
+                    && r.health > 0.0
+                    && contract_of(world, &r.id).is_none()
+            })
+            .collect();
+        let grown: Vec<usize> = people
+            .iter()
+            .copied()
+            .filter(|&i| can_work(world.residents[i].born_at, tick))
+            .collect();
+        let target = npc_soldier_target(grown.len() as f64);
+        let party: HashSet<String> =
+            founding_party(world.city_plans.get(&city.id)).into_iter().collect();
+        let adults: Vec<usize> =
+            grown.into_iter().filter(|&i| !party.contains(&world.residents[i].id)).collect();
+        let standing: Vec<&str> = free_soldiers(world, city, &adults)
+            .into_iter()
+            .map(|i| &world.residents[i])
+            .filter(|r| r.order.is_none() && !is_at((r.x as i32, r.y as i32), placed(store), size))
+            .map(|r| r.id.as_str())
+            .collect();
+        if standing.len() as f64 > target {
+            out.push(InvariantViolation {
+                invariant: "npc-soldiers-stand-down".into(),
+                message: format!(
+                    "{} has {} soldiers standing with nothing to do, keeps {target}",
+                    city.id,
+                    standing.len()
+                ),
+                entity_ids: std::iter::once(city.id.clone())
+                    .chain(standing.iter().map(|s| s.to_string()))
+                    .collect(),
+            });
+        }
+    }
+    out
 }
 
 /// The best weapon a stock holds, if any (`weaponIn`): steel before iron.

@@ -195,6 +195,7 @@ import {
   NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
   NPC_SURPLUS_CAP,
+  NPC_SURPLUS_PAST_CAP,
   NPC_ARCHER_ARROWS,
   NPC_ARCHER_SHARE,
   NPC_SOLDIER_SHARE,
@@ -3086,9 +3087,11 @@ export function Wiki() {
           ore, Iron and Gold ore, {num(NPC_SURPLUS_CAP.coins ?? 0)} coins and{' '}
           {num(NPC_SURPLUS_CAP[NPC_SMITHY_WEAPON] ?? 0)}{' '}
           {GOOD_LABELS[NPC_SMITHY_WEAPON].toLowerCase()}s above what it keeps. A smelter, smithy or
-          mint is worked for surplus only from input above the reserve. Past the cap they stop and
-          are idle. What is short, its trader and a founding party still take them first, the next
-          time it thinks. So its workplaces stay busy, and its trader has more to sell.
+          mint is worked for surplus only from input above the reserve. Once every good they could
+          work for is at its cap they work on past it, the good least far past first, up to{' '}
+          {num(NPC_SURPLUS_PAST_CAP)} times its cap, farms aside; only past that are they idle. What
+          is short, its trader and a founding party still take them first, the next time it thinks.
+          So its workplaces stay busy, and its trader has more to sell.
         </p>
         <p>
           With nothing short, a big city whose one lumber camp, quarry or mine has its crew full and
@@ -3287,7 +3290,15 @@ export function Wiki() {
           turns (<a href="#training">Training</a>). Trading posts and the HQ don't do this.
         </p>
         <p>
-          For every {num(NPC_SOLDIERS_PER_PATROL)} soldiers on its wall one walks a round, and never
+          The soldiers it keeps by its size ({pct(NPC_SOLDIER_SHARE)} of its adults) are all it keeps
+          in peace. Anyone else armed, such as a smith carrying the smithy’s spears to the
+          storage, stands down: they put their weapons, armour and Arrows into its storage and go
+          back to work, those on a round, escorting, training or on alarm last. Soldiers just
+          standing on a post count as standing idle; those on a round, escorting or training
+          don’t.
+        </p>
+        <p>
+          Of the soldiers on its wall {pct(1 / NPC_SOLDIERS_PER_PATROL)} walk a round, and never
           more than {num(NPC_PATROLS_MAX)} in a city however big: {num(NPC_PATROL_WALL_STOPS)} stops
           along its wall, {num(NPC_PATROL_ROAD_STOPS)} along its roads inside it, and back to where
           they set out. When a round ends the next by id goes, so those on the wall take turns;

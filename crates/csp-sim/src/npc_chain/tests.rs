@@ -387,15 +387,17 @@ fn a_village_with_no_coal_node_in_reach_stays_on_the_iron_spear() {
     }
 }
 
-/// Every adult of the city carries a spear and stands at its storage with nothing to do.
+/// As many adults of the city as the soldiers it keeps carry a spear and stand at its storage with
+/// nothing to do (more would stand down, `CONTEXT.md`: Soldiers in peace).
 fn spears_at_the_storage(world: &mut WorldState, city: &str) -> Vec<usize> {
     let storage = storage_index(world, city);
     let (sx, sy) = (world.buildings[storage].x, world.buildings[storage].y);
     let tick = world.tick as f64;
-    let adults: Vec<usize> = (0..world.residents.len())
+    let mut adults: Vec<usize> = (0..world.residents.len())
         .filter(|&i| world.residents[i].city_id.as_deref() == Some(city))
         .filter(|&i| can_work(world.residents[i].born_at, tick))
         .collect();
+    adults.truncate(crate::queries::npc_trade::npc_soldier_target(adults.len() as f64) as usize);
     for &i in &adults {
         let r = &mut world.residents[i];
         r.carried.insert(Good::Spear, 1.0);

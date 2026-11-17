@@ -323,6 +323,10 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, t| crate::npc_defence::npc_gate_shut_to_its_punishers(w, t.size),
         },
         Invariant {
+            name: "npc-soldiers-stand-down",
+            check: |w, t| crate::npc_defence::npc_soldiers_stand_down(w, t.size),
+        },
+        Invariant {
             name: "supply-wagons-sound",
             check: |w, _| crate::supply_wagons::supply_wagons_sound(w),
         },

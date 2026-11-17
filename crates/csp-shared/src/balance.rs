@@ -781,11 +781,14 @@ pub const NPC_POST_AROUND_HALL: f64 = 2.0;
 pub const NPC_TRAIN_TURN_TICKS: f64 = 5.0 * TICKS_PER_GAME_DAY;
 
 /// The most of an NPC city's soldiers walking a round at once, whatever its size (`CONTEXT.md`: Soldier
-/// posts). They walk every tick, the dearest of a soldier's jobs, so a city's cost stops growing here.
-pub const NPC_PATROLS_MAX: f64 = 3.0;
+/// posts). They walk every tick, the dearest of a soldier's jobs, so a city's cost stops growing here;
+/// eight keep a big city's soldiers busy in peace (`CONTEXT.md`: Soldiers in peace), those just
+/// standing on a post about a tenth of its adults.
+pub const NPC_PATROLS_MAX: f64 = 8.0;
 
-/// One soldier walks a round for every this many on an NPC city's wall, up to `NPC_PATROLS_MAX`.
-pub const NPC_SOLDIERS_PER_PATROL: f64 = 4.0;
+/// One soldier walks a round for every this many on an NPC city's wall, up to `NPC_PATROLS_MAX`:
+/// two in three of them, so in peace few just stand on a post (`CONTEXT.md`: Soldiers in peace).
+pub const NPC_SOLDIERS_PER_PATROL: f64 = 1.5;
 
 /// How many stops a round has along an NPC city's wall, spread evenly round it. Each costs one path
 /// search; a town's wall of 180 tiles gives legs of about 22 tiles, some 3 game hours each.
@@ -923,6 +926,13 @@ pub const NPC_SURPLUS_CAP: Table<f64> = Table(&[
     ("spear", 4.0),
     ("tools", 2.0),
 ]);
+
+/// How many times its surplus cap (`NPC_SURPLUS_CAP`) an NPC city's spare hands work on to, once
+/// every good they could work for is at its cap and nothing else wants them (`CONTEXT.md`: Spare
+/// hands' work): the good least far past its cap first, farms aside. Enough that a big city with no
+/// one to sell to and no room to found keeps its crews at work for a game month or more while wear
+/// and decay use its goods up, and bounded, so its storage never fills without end.
+pub const NPC_SURPLUS_PAST_CAP: f64 = 4.0;
 
 /// How many tiles further out an NPC city puts up its new wall when it has no room left inside
 /// the old one (`CONTEXT.md`: NPC city), on every side, with the gate in the same place. At most
@@ -2956,6 +2966,7 @@ pub fn balance_json() -> Value {
     m.insert("NPC_ROAD_LONGEST".into(), json!(NPC_ROAD_LONGEST));
     m.insert("NPC_REVIVE_REACH".into(), json!(NPC_REVIVE_REACH));
     m.insert("NPC_SURPLUS_CAP".into(), to_value(NPC_SURPLUS_CAP).expect("serialisable"));
+    m.insert("NPC_SURPLUS_PAST_CAP".into(), json!(NPC_SURPLUS_PAST_CAP));
     m.insert("NPC_WALL_STEP".into(), json!(NPC_WALL_STEP));
     m.insert("NPC_INNER_WALL_REACH".into(), json!(NPC_INNER_WALL_REACH));
     m.insert("CITY_GRID_BLOCK".into(), json!(CITY_GRID_BLOCK));

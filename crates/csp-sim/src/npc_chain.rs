@@ -7,7 +7,7 @@
 
 use std::collections::HashSet;
 
-use csp_shared::balance::{MAP_SIZE, NPC_SURPLUS_CAP};
+use csp_shared::balance::{MAP_SIZE, NPC_SURPLUS_CAP, NPC_SURPLUS_PAST_CAP};
 use csp_shared::world::{Building, BuildingKind, City, CityProject, Good, Stock, WorldState};
 
 use crate::npc_coins::earns_coins;
@@ -257,6 +257,24 @@ impl SurplusWork {
         }
         let full = (held(&self.stock, good) - held(&self.reserve, good)) / (cap * self.steps);
         (full < 1.0).then_some(full)
+    }
+
+    /// How full a workplace's good's cap is once it is at its cap, if it is to be worked past it
+    /// (`CONTEXT.md`: Spare hands' work): from 1 up to `NPC_SURPLUS_PAST_CAP`; never a farm.
+    pub fn past(&self, world: &WorldState, place: &Building) -> Option<f64> {
+        if place.kind == BuildingKind::Farm {
+            return None;
+        }
+        let good = chain_good(world, place)?;
+        let cap = NPC_SURPLUS_CAP.get(good_name(good)).filter(|c| *c != 0.0)?;
+        let city = world.cities.iter().find(|c| c.id == self.city_id)?;
+        if let Some(input) = chain_input(world, city, good) {
+            if !holds_batch(Some(&self.spare), &input) {
+                return None;
+            }
+        }
+        let full = (held(&self.stock, good) - held(&self.reserve, good)) / (cap * self.steps);
+        (1.0..NPC_SURPLUS_PAST_CAP).contains(&full).then_some(full)
     }
 }
 

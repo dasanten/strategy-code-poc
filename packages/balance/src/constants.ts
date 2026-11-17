@@ -154,6 +154,7 @@ export const NPC_ROAD_CREW = balance.NPC_ROAD_CREW
 export const NPC_ROAD_LONGEST = balance.NPC_ROAD_LONGEST
 export const NPC_REVIVE_REACH = balance.NPC_REVIVE_REACH
 export const NPC_SURPLUS_CAP = balance.NPC_SURPLUS_CAP
+export const NPC_SURPLUS_PAST_CAP = balance.NPC_SURPLUS_PAST_CAP
 export const NPC_WALL_STEP = balance.NPC_WALL_STEP
 export const NPC_INNER_WALL_REACH = balance.NPC_INNER_WALL_REACH
 export const CITY_GRID_BLOCK = balance.CITY_GRID_BLOCK

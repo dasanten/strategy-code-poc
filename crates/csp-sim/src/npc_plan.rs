@@ -739,7 +739,22 @@ fn share_out(
             }
         }
     }
-    let idle = fill(world, jobs, held, &kept, &mut state, &mut ways, second, unneeded.clone());
+    let mut idle = fill(world, jobs, held, &kept, &mut state, &mut ways, second, unneeded.clone());
+    // With every good they could work for at its cap, they work on past it, the good least far
+    // past first (`NPC_SURPLUS_PAST_CAP`).
+    if city.trade_org.is_none() && !idle.is_empty() {
+        let surplus = SurplusWork::of(world, city, storage.map(|s| &world.buildings[s]));
+        let past: Vec<(ScoredJob, Offer)> = own
+            .iter()
+            .filter_map(|&place| {
+                let full = surplus.past(world, &world.buildings[place])?;
+                Some((ScoredJob::Surplus { full }, Offer::Surplus(place)))
+            })
+            .collect();
+        if !past.is_empty() {
+            idle = fill(world, jobs, held, &kept, &mut state, &mut ways, past, idle);
+        }
+    }
     for i in idle {
         jobs.insert(world.residents[i].id.clone(), job_at(CityJobKind::Idle, None));
     }

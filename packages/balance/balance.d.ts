@@ -300,6 +300,7 @@ export interface Balance {
     tools: number
     [key: string]: number
   }
+  readonly NPC_SURPLUS_PAST_CAP: number
   readonly NPC_WALL_STEP: number
   readonly NPC_INNER_WALL_REACH: number
   readonly CITY_GRID_BLOCK: number
