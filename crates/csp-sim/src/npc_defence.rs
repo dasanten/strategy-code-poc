@@ -7,8 +7,8 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    MAP_SIZE, NPC_ARCHER_ARROWS, NPC_GATE_WATCH_RANGE, NPC_STEEL_KIT, PROTECTION_DEFENCE,
-    TRADE_ORG_ARMY,
+    MAP_SIZE, NPC_ARCHER_ARROWS, NPC_GATE_WATCH_RANGE, NPC_SOLDIERS_ON_HALL, NPC_STEEL_KIT,
+    PROTECTION_DEFENCE, TRADE_ORG_ARMY,
 };
 use csp_shared::footprint::is_at;
 use csp_shared::goods::{PROTECTION_KINDS, WEAPONS};
@@ -287,13 +287,6 @@ fn keep_soldiers(
     let soldiers: Vec<usize> =
         adults.iter().copied().filter(|&i| is_armed(&world.residents[i])).collect();
     let no_storage = no_storage_yet(world, city);
-    let standing_down = if city.trade_org.is_none() && !no_storage {
-        stand_down(world, city, &adults, &soldiers, target, storage)
-    } else {
-        Vec::new()
-    };
-    let soldiers: Vec<usize> =
-        soldiers.into_iter().filter(|i| !standing_down.contains(i)).collect();
     for &i in &soldiers {
         let r = &mut world.residents[i];
         let task = r.script.as_ref().and_then(|s| s.task);
@@ -309,6 +302,13 @@ fn keep_soldiers(
             r.script = None;
         }
     }
+    let standing_down = if city.trade_org.is_none() && !no_storage {
+        stand_down(world, city, &adults, &soldiers, target, storage)
+    } else {
+        Vec::new()
+    };
+    let soldiers: Vec<usize> =
+        soldiers.into_iter().filter(|i| !standing_down.contains(i)).collect();
     let archers = npc_archer_target(world, city, adults.len() as f64);
     upgrade_soldiers(world, city, &soldiers, storage, archers);
     if soldiers.len() as f64 >= target {
@@ -365,13 +365,13 @@ fn keep_soldiers(
 }
 
 /// With more armed `adults` than the `target` soldiers it keeps, an NPC city stands the extra down
-/// (`CONTEXT.md`: Soldiers in peace): first anyone armed at the Work default, such as a smith
-/// carrying the smithy's weapons to the storage, who goes on with it; then those already walking
-/// to `storage` to stand down; then those free on a post, archers last, by id from the last. One
-/// of them free walks to the storage and there puts their weapons, armour and Arrows into it, and
-/// is a spare hand again at the city's next pass. Those on a round, escorting, training, teaching,
-/// on alarm, fighting or about anything else stay soldiers for now. Only orders a Player could give
-/// (ADR 0002). Returns those standing down.
+/// (`CONTEXT.md`: Soldiers in peace): first those free and walking to `storage` already, such as a
+/// smith carrying the smithy's weapons there, then those free on a post, archers last, by id from
+/// the last, always leaving those who hold its town hall (`NPC_SOLDIERS_ON_HALL`, at most
+/// `target`). One standing down walks to the storage and there puts their weapons, armour and
+/// Arrows into it, and is a spare hand again at the city's next pass. Those on a round, escorting,
+/// training, teaching, on alarm, fighting or about anything else stay soldiers for now. Only orders
+/// a Player could give (ADR 0002). Returns those standing down.
 fn stand_down(
     world: &mut WorldState,
     city: &City,
@@ -387,9 +387,6 @@ fn stand_down(
     }
     let (sx, sy) = (world.buildings[st].x, world.buildings[st].y);
     let to_store = |r: &Resident| matches!(&r.order, Some(ResidentOrder::WalkTo(w)) if w.target.x == sx && w.target.y == sy);
-    let working = soldiers.iter().copied().filter(|&i| {
-        world.residents[i].script.as_ref().is_some_and(|s| s.task == Some(Task::Work))
-    });
     let mut free: Vec<usize> = free_soldiers(world, city, adults)
         .into_iter()
         .filter(|&i| {
@@ -403,10 +400,12 @@ fn stand_down(
             .cmp(&(!to_store(rb), is_npc_archer(rb)))
             .then_with(|| rb.id.cmp(&ra.id))
     });
-    let chosen: Vec<usize> = working.chain(free).take(extra as usize).collect();
+    let hold = (NPC_SOLDIERS_ON_HALL.min(target) as usize).min(free.len());
+    let most = (extra as usize).min(free.len() - hold);
+    let chosen: Vec<usize> = free.into_iter().take(most).collect();
     for &i in &chosen {
         let r = &world.residents[i];
-        if r.script.is_some() || r.order.is_some() {
+        if r.order.is_some() {
             continue;
         }
         if !is_at(tile(world, i), placed(&world.buildings[st]), MAP_SIZE) {

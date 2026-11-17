@@ -691,8 +691,8 @@ The shared language of the game. Domain terms only — no implementation details
   rounds, train where it has a training ground (wearing their gear, Wear) and go as escorts.
   Soldiers just standing on a post count as standing idle. Anyone else of the city armed in peace,
   such as a smith carrying the smithy's weapons to its storage, stands down: they put their
-  weapons, armour and Arrows into its storage and go back to work; one at the Work default goes on
-  with it, and those on a round, escorting, training or on alarm stay soldiers until they are free
+  weapons, armour and Arrows into its storage and go back to work, never those holding its town
+  hall; those on a round, escorting, training or on alarm stay soldiers until they are free
   (decided overnight, Daniel to confirm).
 - **Full city:** an NPC city that for a whole game week, less the bigger it is (a balance number), has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
   short of its reserve, holds a food surplus, and holds its founding party's materials
