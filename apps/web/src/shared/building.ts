@@ -84,14 +84,23 @@ export const BUILDABLE: readonly BuildingKind[] = [
   'haven',
   'boat',
   'ship',
+  'ram',
+  'catapult',
 ]
 
 /**
  * Kinds that share a tile with a building rather than taking it (`CONTEXT.md`: Road, Carriage,
- * Building a boat, Building a ship): roads, carriage sites, boat sites and ship sites, one of each
- * per tile at most.
+ * Building a boat, Building a ship, Siege machine): roads, carriage, boat, ship, ram and
+ * catapult sites, one of each per tile at most.
  */
-export const SHARES_A_TILE: readonly BuildingKind[] = ['road', 'carriage', 'boat', 'ship']
+export const SHARES_A_TILE: readonly BuildingKind[] = [
+  'road',
+  'carriage',
+  'boat',
+  'ship',
+  'ram',
+  'catapult',
+]
 
 /** Workplaces that turn goods into other goods (`RECIPES`): smelters, mints and smithies. */
 export const PROCESSING = Object.keys(RECIPES) as readonly BuildingKind[]
@@ -249,6 +258,16 @@ export function shipSiteAt(
   return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'ship')
 }
 
+/** The ram or catapult site on a tile, if there is one (`CONTEXT.md`: Siege machine). */
+export function siegeSiteAt(
+  world: Pick<WorldState, 'buildings'>,
+  x: number,
+  y: number,
+  kind: 'ram' | 'catapult' = 'ram',
+): Building | undefined {
+  return world.buildings.find((b) => b.x === x && b.y === y && b.kind === kind)
+}
+
 /**
  * What of `kind` stands on a tile, finished or not: its road for a road, its carriage, boat or
  * ship site for a carriage, boat or ship, else its building.
@@ -263,6 +282,7 @@ export function constructionAt(
   if (kind === 'carriage') return carriageSiteAt(world, x, y)
   if (kind === 'boat') return boatSiteAt(world, x, y)
   if (kind === 'ship') return shipSiteAt(world, x, y)
+  if (kind === 'ram' || kind === 'catapult') return siegeSiteAt(world, x, y, kind)
   return buildingAt(world, x, y)
 }
 
@@ -431,6 +451,18 @@ export function buildProblem(
     const here = buildingAt(world, x, y, size)
     if (here && here.kind !== 'stable') return 'there is already a building there'
     if (carriageSiteAt(world, x, y)) return 'there is already a carriage site on this tile'
+    return undefined
+  }
+  if (kind === 'ram' || kind === 'catapult') {
+    // `CONTEXT.md`: Siege machine: laid out in the field, anywhere a carriage could stand.
+    const t = at?.(x, y)
+    if (t !== undefined && !carriageCanEnter(t))
+      return `a ${kind} is built where a carriage could stand`
+    if (world.nodes.some((n) => n.x === x && n.y === y))
+      return `a ${kind} goes off any resource node`
+    if (buildingAt(world, x, y, size)) return 'there is already a building there'
+    if (siegeSiteAt(world, x, y, 'ram') || siegeSiteAt(world, x, y, 'catapult'))
+      return 'there is already a siege machine site on this tile'
     return undefined
   }
   if (kind === 'boat') {

@@ -178,6 +178,7 @@ import {
   NPC_WAY_CLEARANCE,
   TRADING_POST_REGION,
   NPC_FULL_DIP_DAYS,
+  NPC_FOUND_FOOD_SURPLUS_SHARE,
   NPC_FULL_RESIDENTS_PER_DAY,
   NPC_GATE_WATCH_RANGE,
   NPC_VILLAGE,
@@ -299,6 +300,15 @@ import {
   Terrain,
   WALL_DEFENCE,
   WALL_STRENGTH,
+  RAM_CREW,
+  RAM_STRENGTH,
+  RAM_BLOW,
+  RAM_STRIKE_TICKS,
+  CATAPULT_CREW,
+  CATAPULT_REACH,
+  CATAPULT_SHOT_TICKS,
+  CATAPULT_BLOW,
+  CATAPULT_STRENGTH,
   STONE_WALL_STRENGTH,
   TOWER_ROOM,
   TOWER_SIGHT_RANGE,
@@ -323,6 +333,7 @@ import {
   RECIPES,
   BATCHES_PER_DAY,
   WORK_OUTPUT_PER_DAY,
+  NPC_FOOD_REFILL_DAYS,
   RICHNESS_FACTOR,
   FRONTIER_RICH_NODES,
   RICHER_NODE_REACH,
@@ -365,6 +376,10 @@ import {
   carriageCost,
   boatCost,
   shipCost,
+  ramCost,
+  ramPushTicks,
+  ramBreakTicks,
+  catapultBreak,
   cityControl,
   coinsPerMintWorkerDay,
   crimeForgotten,
@@ -447,6 +462,7 @@ export const WIKI_TOPICS = [
   { id: 'standing', title: 'Standing & reactions' },
   { id: 'demands', title: 'Demands' },
   { id: 'combat', title: 'Combat & walls' },
+  { id: 'siege', title: 'Siege machines' },
   { id: 'territory', title: 'Territory' },
   { id: 'language', title: 'Script language' },
   { id: 'api', title: 'Game API' },
@@ -1589,7 +1605,9 @@ export function Wiki() {
           pile keeps its own Food instead. <code>crewFood</code> 0 brings none. A resident an NPC
           city sends to a workplace sets out with Food for the walk there and back plus{' '}
           {days(SET_OUT_WORK_DAYS)} of work, not a fixed amount, so they last until the carrier's
-          first round trip.
+          first round trip. Its builders of a site more than {num(NPC_NODE_REACH)} tiles from its
+          storage take the same, and go back for more while they still have what the walk home
+          eats.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -2331,8 +2349,10 @@ export function Wiki() {
           but may always take {num(WAITING_HORSE_FOOD)} Food for the horse. Short of Food, they top
           up from the goods warehouse, which the stock floor fills each day, so buying Food there
           can keep them waiting a little longer. A caravan with a delivery or transfer waiting wants
-          all it keeps on board, as there is no Food on that way. Away from the HQ nothing waits: a
-          carriage takes what a post's storage has and drives on.
+          all it keeps on board, as there is no Food on that way. A caravan away from the HQ takes
+          what a post's storage has and drives on. A wandering trader waits at a post as at the HQ:
+          it leaves only with enough Food to reach its next stop, topping up from the post's goods
+          warehouse, and stands there until that has some.
         </p>
         <p>
           On its way a wandering trader stops at each NPC or Player city whose town hall lies within{' '}
@@ -2850,14 +2870,18 @@ export function Wiki() {
         <p>
           It shares out its adults in this order: soldiers; farmers, as many as feed everyone (each
           eats {num(FOOD_PER_DAY)} Food a day, a farmer makes {num(WORK_OUTPUT_PER_DAY.food ?? 0)})
-          and one more while it has no food surplus, a new farm when they don't fit; up to{' '}
+          and one more while it has no food surplus; with its Food below its reserve but not yet
+          running short, as many more as win back what it lacks in{' '}
+          {days(NPC_FOOD_REFILL_DAYS)}, if that is more; a new farm when they don't fit; up to{' '}
           {num(NPC_BUILDERS)} builders a step while it has a project; everyone else is a spare hand.
           A farm is otherwise built only when Food is short of its reserve (
-          {days(NPC_TRADE.reserveFoodDays)} of Food for everyone) with every farm at its full crew
-          of {num(WORKPLACE_MAX_WORKERS.farm ?? 0)}, never because spare hands filled the farms
-          working for surplus. It needs nobody idle for that: the new farm's farmers come from those
-          working for surplus and from its scouts first, and from other work only after them. A farm
-          already begun is finished before another. Spare hands go to the good the reserve is
+          {days(NPC_TRADE.reserveFoodDays)} of Food for everyone), or, with nothing else keeping it
+          from being full, short of the Food surplus its founding waits on (below), with every farm
+          at its full crew of {num(WORKPLACE_MAX_WORKERS.farm ?? 0)}; never because spare hands
+          filled the farms working for surplus. It needs nobody idle for that: the new farm's
+          farmers come from those working for surplus and from its scouts first, and from other
+          work only after them. A farm already begun is finished before another, and that new farm
+          comes before anything else it has begun. Spare hands go to the good the reserve is
           shortest of, as a share of what it wants of it, filling one workplace's crew before the
           next. Without a workplace for that good, the city builds one: on the nearest fitting
           resource node it knows of, or a smelter, smithy or mint in its area like a house. With
@@ -2947,7 +2971,7 @@ export function Wiki() {
           resident would walk, tile by tile, so a road goes round a lake, and they skip tiles that
           already have a road. They only use materials above its reserve and what its project still
           needs; with none to spare, or with something short that they can work for, they go back to
-          other work and bring back what they carry. Once the city would otherwise be full, they
+          other work and bring back what they carry. Once its full wait is under way, they
           also leave a town hall's and a storage's materials untouched, so founding comes before
           roads. Like any road it belongs to nobody, and anyone can use it or tear it down; a tile
           torn down is laid again in time.
@@ -3055,7 +3079,16 @@ export function Wiki() {
           A city is full once it has had spare hands, idle, on a road crew, scouting or working for
           surplus, and nothing short of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus
           and its founding party's materials above its reserve; Coins it has no way to earn don't
-          count as short. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less
+          count as short, and nor do weapons it can't make, nor the Iron it keeps to forge them
+          (it can make them with a smithy, or with nodes it knows of for all they are made from),
+          though it still buys them. Once it lacks nothing but its founding party's materials, those
+          count as short: its spare hands gather them, it builds a workplace for one it has none
+          of, and they are still spare hands while they do. Food, Coins and weapons come first, Food
+          its surplus too: only once it holds {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus
+          cap past its reserve. Its workplaces come first as well: its spare hands go on a road
+          crew, scout and work at its workplaces for surplus, and only those left over gather for
+          the party.
+          Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less
           for each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}.
           A dip below its reserve only restarts that wait if it lasts longer than{' '}
           {days(NPC_FULL_DIP_DAYS)}, though nobody sets out during one. A full city founds a
@@ -3067,7 +3100,8 @@ export function Wiki() {
           to {num(NPC_FOUND_PARTY_MOST)}, one of them armed, sets out carrying a town hall's and a
           storage's materials, a house's for each {num(HOUSING_ROOM.house ?? 1)} members past{' '}
           {num(NPC_VILLAGE.residents)}, and Food for twice the walk and {days(NPC_FOUND_FOOD_DAYS)}{' '}
-          there, and builds the town hall, which founds the daughter: an NPC city of its own with a
+          there, with as many more adults as it takes to carry all of it, and builds the town hall,
+          which founds the daughter: an NPC city of its own with a
           name from the game. It then builds its storage, a farm and a house, and once its storage
           holds the Wood of its reserve, its first wall, a ring{' '}
           {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its home. Mother and daughter start at
@@ -3791,6 +3825,77 @@ export function Wiki() {
           its stables join, and the rest stay with their realm. Either way a horse a joining
           resident rides and a carriage one drives join with them, and a carriage's hitched horse
           with it. Another NPC city's or realm's that happen to stand there don't.
+        </p>
+      </Section>
+
+      <Section id="siege">
+        <p>
+          A <b>siege machine</b> is a machine of a realm, built in the field where it is needed, so
+          a siege needs a supply line like an army. There are two: a <b>ram</b>, a roofed frame on
+          wheels round a heavy beam, and a <b>catapult</b>, which throws Stone at walls from far
+          off. NPC cities and the Trade Organization don't build them, for now.
+        </p>
+        <p>
+          <b>Building a ram.</b> A resident lays out a <b>ram site</b> with Build (in the Build menu
+          under Siege) on any tile a carriage could stand on, off resource nodes and buildings, one
+          to a tile. It is a construction site like any other: it takes {goods(ramCost().materials)}{' '}
+          and {duration(ramCost().buildTicks)} of one average resident's work, carried there and put
+          in by anyone. Once finished the site is gone and a ram of the realm of whoever finished it
+          stands on its tile.
+        </p>
+        <p>
+          <b>Crew.</b> Residents of its realm join its <b>crew</b> with Crew the ram on its card:
+          they walk onto its tile, following it if it moves, and are its crew while they stand
+          there. Children don't crew it. With at least {num(RAM_CREW)} of its crew on it, one of
+          them <b>pushes</b> it (Push the ram to…) to a tile a carriage could go to, along a way a
+          carriage could take: a tile of Plains takes about {duration(ramPushTicks()[0]!.ticks)}, of
+          Forest or Hills {duration(ramPushTicks()[1]!.ticks)} and of road{' '}
+          {duration(ramPushTicks()[2]!.ticks)}. The crew go along on its tile. One who walks off is
+          no longer of its crew, and below {num(RAM_CREW)} it stops where it is.
+        </p>
+        <p>
+          <b>Ramming.</b> Pushed next to a wall or gate of another realm's city, or of nobody's, one
+          of its crew swings it with the whole crew (Ram the gate on its card, or{' '}
+          <code>ram(machine, wall)</code> in a script). It strikes every{' '}
+          {duration(RAM_STRIKE_TICKS)} for {num(RAM_BLOW)} damage, far harder than any blow: a tile
+          of wooden wall falls in {duration(ramBreakTicks('wall'))}, a stone gate in{' '}
+          {duration(ramBreakTicks('gate', true))}. Each strike raises the alarm as a blow at the
+          wall does, and breaking another realm's wall is a crime of tearing down, as by hand. Below
+          its crew size it stops. Its crew is under its roof: nobody up on a wall strikes them, and
+          no shot reaches them, so defenders have to come down and out to fight them or to strike
+          the ram, which is struck only from the ground.
+        </p>
+        <p>
+          <b>Breaking and tearing down.</b> Anyone may attack a ram of another realm, as a wall:
+          every blow lands, and after {num(RAM_STRENGTH)} damage it breaks, leaving{' '}
+          {goods(ramCost().broken)} on its tile. Breaking another realm's ram is a crime of tearing
+          down. Its own realm tears it down from its tile in {duration(ramCost().teardownTicks)} of
+          one average resident's work, which leaves {goods(ramCost().tornDown)}.
+        </p>
+        <p>
+          <b>The catapult.</b> It is built, crewed, pushed, broken and torn down as a ram is: its
+          site (Build, under Siege) takes {goods(ramCost('catapult').materials)} and{' '}
+          {duration(ramCost('catapult').buildTicks)} of one average resident's work, it needs{' '}
+          {num(CATAPULT_CREW)} of its crew on it, and it breaks after {num(CATAPULT_STRENGTH)}{' '}
+          damage. One of its crew aims it with the whole crew (Throw Stone at… on its card, then the
+          wall on the map, or <code>throw(machine, wall)</code> or <code>throw(machine, x, y)</code>{' '}
+          in a script) at a wall, gate or tower of another realm's city, or of nobody's, within{' '}
+          {num(CATAPULT_REACH)} tiles: well beyond a Bow's{' '}
+          {num((SHOT_REACH.bow ?? 0) + WALL_SHOT_REACH_BONUS)} from up on a wall. Every{' '}
+          {duration(CATAPULT_SHOT_TICKS)} it throws one Stone for {num(CATAPULT_BLOW)} damage: a
+          tile of wooden wall falls to {num(catapultBreak('wall').shots)} Stone in{' '}
+          {duration(catapultBreak('wall').ticks)}, a stone gate to{' '}
+          {num(catapultBreak('gate', true).shots)} in {duration(catapultBreak('gate', true).ticks)}.
+          The Stone is what its crew carry, then what lies on its tile; out of Stone it stops. It
+          hits the building only, never anyone on it or by it. Each shot raises the alarm and
+          breaking another realm's wall is a crime, as with a ram. Its crew stands in the open:
+          archers in reach shoot them and anyone can strike them.
+        </p>
+        <p>
+          A ram shows on the map to whoever sees its tile, with whose it is and its crew, but Last
+          seen doesn't keep it, as it moves. A ram of a realm that ends belongs to nobody. Scripts
+          see the machines in sight with <code>machines()</code>, join a crew with{' '}
+          <code>crew(machine)</code> and push one with <code>push(machine, x, y)</code>.
         </p>
       </Section>
 

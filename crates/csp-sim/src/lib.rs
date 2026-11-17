@@ -121,6 +121,7 @@ pub mod script_runner;
 pub mod script_tables;
 pub mod script_views;
 pub mod scripts;
+pub mod siege;
 pub mod sight;
 pub mod spoilage;
 pub mod standing;

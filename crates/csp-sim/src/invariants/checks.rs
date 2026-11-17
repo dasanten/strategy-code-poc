@@ -115,6 +115,7 @@ pub fn positions_on_map(world: &WorldState, terrain: &TerrainMap) -> Out {
     things.extend(world.horses.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.carriages.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.vessels.iter().map(|t| (t.id.as_str(), t.x, t.y)));
+    things.extend(world.siege_machines.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.buildings.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.nodes.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.piles.iter().map(|t| (t.id.as_str(), t.x, t.y)));
@@ -215,6 +216,26 @@ pub fn buildings_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
             }
             if b.stock.is_some() {
                 fail(&b.id, "is a road with a stock".into());
+            }
+        } else if matches!(b.kind, BuildingKind::Ram | BuildingKind::Catapult) {
+            // `CONTEXT.md`: Siege machine: a site in the field, where a carriage could stand.
+            if b.site.is_none() {
+                fail(&b.id, format!("is a finished {kind} site"));
+            }
+            if !carriage_can_go_to(world, terrain, b.x as i32, b.y as i32) {
+                fail(&b.id, format!("is a {kind} site where no carriage can go"));
+            }
+            if !nodes.is_empty() {
+                fail(&b.id, format!("is a {kind} site on a resource node"));
+            }
+            if let Some(c) = city {
+                fail(&b.id, format!("is a ram site of city {c}"));
+            }
+            if b.stock.is_some() {
+                fail(&b.id, "is a ram site with a stock".into());
+            }
+            if let Some(under) = building_at(world, b.x as i32, b.y as i32, size) {
+                fail(&b.id, format!("is a ram site on a {}", kind_name(under.kind)));
             }
         } else if b.kind == BuildingKind::Carriage {
             if b.site.is_none() {
@@ -965,6 +986,11 @@ pub fn tear_down_orders_on_buildings(world: &WorldState, _: &TerrainMap) -> Out 
         if b.is_some_and(|b| at_building(r.x, r.y, b)) {
             continue;
         }
+        // A siege machine is torn down from its tile (`CONTEXT.md`: Siege machine).
+        let m = crate::siege::machine_by_id(world, &o.building_id);
+        if m.is_some_and(|m| (m.x as i32, m.y as i32) == (r.x as i32, r.y as i32)) {
+            continue;
+        }
         let msg =
             format!("resident {} tears down {}, which they don’t stand at", r.id, o.building_id);
         out.push(violation(name, msg, &[&r.id, &o.building_id]));
@@ -1127,6 +1153,103 @@ pub fn carriages_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
             fail(&k.id, m, &[&k.id, other, horse_id]);
         }
         pulling.insert(horse_id, &k.id);
+    }
+    out
+}
+
+/// A siege machine stands where a carriage could and is not broken, and its crew are residents of
+/// its realm on its tile (`CONTEXT.md`: Siege machine).
+pub fn siege_machines_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
+    let name = "siege-machines-in-place";
+    let mut out = Vec::new();
+    for m in &world.siege_machines {
+        let at = format!("({}, {})", js_number(m.x), js_number(m.y));
+        if !carriage_can_go_to(world, terrain, m.x as i32, m.y as i32) {
+            let msg = format!("siege machine {} stands where no carriage can go at {at}", m.id);
+            out.push(violation(name, msg, &[&m.id]));
+        }
+        if m.damage.unwrap_or(0.0) >= crate::siege::machine_strength(m.kind) {
+            out.push(violation(name, format!("siege machine {} is broken", m.id), &[&m.id]));
+        }
+        let mut seen: HashSet<&str> = HashSet::new();
+        for id in &m.crew_ids {
+            if !seen.insert(id) {
+                let msg = format!("siege machine {} has {id} in its crew twice", m.id);
+                out.push(violation(name, msg, &[&m.id, id]));
+            }
+            // A crew member is within reach of their machine: on its tile, of its realm.
+            let with_it = world.residents.iter().find(|r| r.id == *id).is_some_and(|r| {
+                (r.x as i32, r.y as i32) == (m.x as i32, m.y as i32)
+                    && r.owner.is_some()
+                    && r.owner == m.realm_id
+            });
+            if !with_it {
+                let msg = format!("{id} of siege machine {}’s crew is not with it at {at}", m.id);
+                out.push(violation(name, msg, &[&m.id, id]));
+            }
+        }
+    }
+    // A machine moves only with its crew: whoever pushes one is of its crew on its tile, with as
+    // many crew as it needs there, and one at a time.
+    let mut pushed: HashSet<&str> = HashSet::new();
+    for r in &world.residents {
+        let Some(ResidentOrder::Push(o)) = &r.order else { continue };
+        let Some(m) = crate::siege::machine_by_id(world, &o.machine_id) else {
+            let msg =
+                format!("resident {} pushes siege machine {}, which is gone", r.id, o.machine_id);
+            out.push(violation(name, msg, &[&r.id]));
+            continue;
+        };
+        if let Some(p) = crate::siege::push_problem(world, r, m) {
+            let msg = format!("resident {} pushes siege machine {}, but {p}", r.id, m.id);
+            out.push(violation(name, msg, &[&r.id, &m.id]));
+        }
+        if !pushed.insert(&m.id) {
+            let msg = format!("siege machine {} has two pushers", m.id);
+            out.push(violation(name, msg, &[&m.id, &r.id]));
+        }
+    }
+    // A ram strikes only with its crew, at a foreign wall or gate next to it (`CONTEXT.md`: Ram).
+    for r in &world.residents {
+        let Some(ResidentOrder::Ram(o)) = &r.order else { continue };
+        let problem = match crate::siege::machine_by_id(world, &o.machine_id) {
+            None => "which is gone".to_string(),
+            Some(m) => match crate::siege::ram_problem(world, r, m, &o.target_id) {
+                None => continue,
+                Some(p) => p,
+            },
+        };
+        let msg =
+            format!("resident {} rams {} with {}, but {problem}", r.id, o.target_id, o.machine_id);
+        out.push(violation(name, msg, &[&r.id]));
+    }
+    // A catapult throws only with its crew and a Stone at hand, at a foreign wall or gate in its
+    // reach (`CONTEXT.md`: Catapult).
+    for r in &world.residents {
+        let Some(ResidentOrder::Throw(o)) = &r.order else { continue };
+        let problem = match crate::siege::machine_by_id(world, &o.machine_id) {
+            None => "which is gone".to_string(),
+            Some(m) => match crate::siege::throw_problem(world, r, m, &o.target_id) {
+                None => continue,
+                Some(p) => p,
+            },
+        };
+        let msg = format!(
+            "resident {} throws at {} with {}, but {problem}",
+            r.id, o.target_id, o.machine_id
+        );
+        out.push(violation(name, msg, &[&r.id]));
+    }
+    // Nobody up struck one of a ram's crew under its roof this tick.
+    for r in world.residents.iter().filter(|r| crate::siege::under_roof(world, r)) {
+        let Some(s) = r.struck.as_ref().filter(|s| s.tick + 1.0 == world.tick as f64) else {
+            continue;
+        };
+        let by = world.residents.iter().find(|a| a.id == s.by);
+        if by.is_some_and(|a| crate::queries::walls::is_up(world, a)) {
+            let msg = format!("{} under a ram's roof was struck from above by {}", r.id, s.by);
+            out.push(violation(name, msg, &[&r.id, &s.by]));
+        }
     }
     out
 }
@@ -1741,6 +1864,11 @@ pub fn owners_exist(world: &WorldState, _: &TerrainMap) -> Out {
             problem(&v.id, format!("belongs to ended realm {realm}"));
         }
     }
+    for m in &world.siege_machines {
+        if let Some(realm) = m.realm_id.as_deref().filter(|o| !realms.contains(o)) {
+            problem(&m.id, format!("belongs to ended realm {realm}"));
+        }
+    }
     for (id, realm, city) in things {
         if let Some(realm) = realm.as_deref().filter(|o| !realms.contains(o)) {
             problem(id, format!("belongs to ended realm {realm}"));
@@ -2012,9 +2140,9 @@ pub fn carrying_doesnt_work(world: &WorldState, _: &TerrainMap) -> Out {
 }
 
 /// Orders only a grown resident can hold (`ADULT_ORDERS`).
-const ADULT_ORDERS: [&str; 10] = [
+const ADULT_ORDERS: [&str; 14] = [
     "build", "roadLine", "wallLine", "tearDown", "workAt", "teach", "train", "breed", "drive",
-    "feed",
+    "feed", "crew", "push", "ram", "throw",
 ];
 
 /// Children don't work until they are grown (`childrenDontWork`).

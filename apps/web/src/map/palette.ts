@@ -88,6 +88,8 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   carriage: 0xa0703f,
   boat: 0x8a6a45,
   ship: 0x6b5236,
+  ram: 0x7a5a3a,
+  catapult: 0x6e5a44,
   haven: 0x5f8fa8,
 }
 
@@ -112,6 +114,8 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   carriage: 'Carriage',
   boat: 'Boat',
   ship: 'Ship',
+  ram: 'Ram',
+  catapult: 'Catapult',
   haven: 'Haven',
 }
 /** A Trade Org caravan's carriage and crew (`CONTEXT.md`: Caravan). */

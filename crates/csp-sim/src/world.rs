@@ -71,6 +71,7 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
         horses: Vec::new(),
         carriages: Vec::new(),
         vessels: Vec::new(),
+        siege_machines: Vec::new(),
         piles: Vec::new(),
         events: Vec::new(),
         alliances: Vec::new(),
@@ -111,8 +112,10 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
 /// caravan for each post and wandering traders going round them (`place_on_the_land`).
 pub fn generate_world(terrain: &TerrainMap, seed: i64) -> WorldState {
     let mut world = create_world(terrain, seed);
-    crate::starting_sites::place_starting_sites(&mut world, terrain);
-    place_on_the_land(&mut world, terrain);
+    // Worked out once for both (T100.8): about a second on the full map.
+    let regions = crate::regions::Regions::of(world.seed, terrain);
+    crate::starting_sites::place_starting_sites_on(&mut world, terrain, &regions);
+    place_on_the_land(&mut world, terrain, regions);
     world
 }
 
@@ -243,6 +246,9 @@ pub fn step_world(
     time(timer, TickPhase::Rest, || {
         step_riders(world);
         step_passengers(world, terrain);
+        // A siege machine's crew is who is with it now that everyone moved (`CONTEXT.md`: Siege
+        // machine).
+        crate::siege::step_siege_machines(world);
         // A fight or an army may have given someone Down an order; it ends with the tick.
         keep_down_still(world);
     });
@@ -273,6 +279,19 @@ fn step_rest(
     let strikes = request_strikes(world, size);
     let strikes_len = strikes.len();
     let mut combat = resolve_strikes(world, &strikes, size, &mut GameAlarms, &mut scratch.made);
+    // Crewed rams strike the walls and gates next to them (`CONTEXT.md`: Ram).
+    let rammed = crate::siege::resolve_ram_strikes(world, size, &mut GameAlarms, &mut scratch.made);
+    if !rammed.is_empty() {
+        crate::cities::update_city_membership(world, size);
+    }
+    combat.broken.extend(rammed);
+    // Crewed catapults throw Stone at the walls and gates in their reach (`CONTEXT.md`: Catapult).
+    let thrown =
+        crate::siege::resolve_catapult_shots(world, size, &mut GameAlarms, &mut scratch.made);
+    if !thrown.is_empty() {
+        crate::cities::update_city_membership(world, size);
+    }
+    combat.broken.extend(thrown);
     // Whoever was up on a tile that broke falls (`CONTEXT.md`: A tile breaks).
     let (fell, ended) = crate::wall_walk::fall_from_broken(world, terrain, &combat.broken);
     combat.died.extend(fell);
@@ -384,8 +403,12 @@ fn step_rest(
 
 // T100.5: the Trade Organization and the NPC cities on the land. A post or trader stop the HQ has
 // no carriage way to is a generation error.
-fn place_on_the_land(world: &mut WorldState, terrain: &TerrainMap) {
-    let problems = crate::land_sites::place_on_the_land(world, terrain);
+fn place_on_the_land(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    regions: crate::regions::Regions,
+) {
+    let problems = crate::land_sites::place_on_the_land_in(world, terrain, regions);
     let broken: Vec<&str> = problems
         .iter()
         .filter(|p| p.rule == crate::land_sites::ROUTE_RULE)

@@ -6,8 +6,8 @@
 use csp_shared::balance::{CARRYING_TICKS, CHILD_STAT_SPREAD, HOUSING_ROOM, PAIRING_WAIT_TICKS};
 use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR};
 use csp_shared::world::{
-    BuildingKind, ConstructionSite, DeathCause, Good, RealmEventWhat, ResidentOrder, Stat,
-    WorldState,
+    BuildingKind, ConstructionSite, DeathCause, Good, Interrupted, RealmEventWhat, ResidentOrder,
+    Stat, WorldState,
 };
 
 use super::*;
@@ -239,8 +239,14 @@ fn starts_pairing_wait_days_after_pairing_one_partner_carries_and_stops_the_othe
     pair_up(&mut world, a, b, &ME);
     assert!(days(&mut world, WAIT_DAYS - 1).is_empty());
     assert_eq!(carrier_of(&world, a, b), None);
+    // Both have something kept aside, as under an alarm: the carrier's ends with their work.
+    for id in [a, b] {
+        live_mut(&mut world, id).interrupted =
+            Some(Interrupted { order: None, script: None, alarm: None });
+    }
     days(&mut world, 1);
     let carrier = carrier_of(&world, a, b).unwrap();
+    assert_eq!(live(&world, &carrier).unwrap().interrupted, None);
     let other = if carrier == *a { b } else { a };
     let carrying = live(&world, &carrier).unwrap().carrying.clone().unwrap();
     assert_eq!((carrying.since, carrying.partner_id.as_str()), (world.tick as f64, other.as_str()));

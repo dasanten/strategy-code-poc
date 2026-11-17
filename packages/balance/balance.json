@@ -209,6 +209,7 @@
     "gate": 1.25
   },
   "NPC_FOOD_SHORT_DAYS": 5.0,
+  "NPC_FOOD_REFILL_DAYS": 10.0,
   "WORK_FOOD_KEPT": 2.0,
   "NPC_SOLDIER_SHARE": 0.25,
   "NPC_STEEL_KIT": [
@@ -285,6 +286,7 @@
   "NPC_FULL_RESIDENTS_PER_DAY": 20.0,
   "NPC_FULL_DAYS_LEAST": 2.0,
   "NPC_FULL_DIP_DAYS": 1.0,
+  "NPC_FOUND_FOOD_SURPLUS_SHARE": 0.5,
   "NPC_FOUND_RESIDENTS_PER_MEMBER": 10.0,
   "NPC_FOUND_PARTY_MOST": 14.0,
   "NPC_FOUND_SAMPLES": 200.0,
@@ -392,7 +394,7 @@
   "CARAVAN_FOOD_PER_ESCORT": 16.0,
   "CARAVAN_GUARD_RANGE": 16.0,
   "CARAVAN_FOOD": 72.0,
-  "WAY_FOOD_MARGIN": 1.5,
+  "WAY_FOOD_MARGIN": 3.0,
   "HQ_PEOPLE_FOOD_DAYS": 5.0,
   "WAITING_HORSE_FOOD": 3.0,
   "SET_OFF_FOOD_SLACK": 2.0,
@@ -657,6 +659,15 @@
     "ship": {
       "wood": 120.0,
       "iron": 15.0
+    },
+    "ram": {
+      "wood": 40.0,
+      "iron": 5.0
+    },
+    "catapult": {
+      "wood": 30.0,
+      "iron": 5.0,
+      "stone": 10.0
     }
   },
   "BUILD_WORK": {
@@ -679,7 +690,9 @@
     "haven": 5760.0,
     "carriage": 2880.0,
     "boat": 1440.0,
-    "ship": 14400.0
+    "ship": 14400.0,
+    "ram": 2880.0,
+    "catapult": 2880.0
   },
   "STONE_BUILD_MATERIALS": {
     "wall": {
@@ -905,6 +918,16 @@
   "TOWER_ROOM": 4.0,
   "TOWER_SIGHT_RANGE": 72.0,
   "TOWER_SHOT_REACH_BONUS": 7.0,
+  "RAM_CREW": 4.0,
+  "SIEGE_PUSH_SHARE": 0.25,
+  "RAM_STRENGTH": 6000.0,
+  "RAM_STRIKE_TICKS": 10.0,
+  "RAM_BLOW": 150.0,
+  "CATAPULT_CREW": 3.0,
+  "CATAPULT_STRENGTH": 3000.0,
+  "CATAPULT_REACH": 20.0,
+  "CATAPULT_SHOT_TICKS": 60.0,
+  "CATAPULT_BLOW": 600.0,
   "CLIMB_TICKS": 360.0,
   "WALL_WALK_TICKS": 20.0,
   "FALL_DAMAGE": 30.0,
@@ -1025,6 +1048,8 @@
     "carriage": 1,
     "boat": 1,
     "ship": 1,
+    "ram": 1,
+    "catapult": 1,
     "house": 2,
     "storage": 2,
     "smelter": 2,

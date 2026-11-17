@@ -866,6 +866,7 @@ export function MapView({
         buildings: [...w.buildings, ...(w.lastSeen?.buildings ?? [])],
         carriages: w.carriages,
         horses: w.horses,
+        machines: w.machines ?? [],
       })
     }
 
@@ -1224,10 +1225,12 @@ export function MapView({
     /** The Player's residents where they show on screen, to click or box. */
     function ownOnScreen() {
       const view = size()
-      const { home, residents } = worldRef.current
+      const { home, residents, machines } = worldRef.current
       const place = (x: number, y: number) => tileToScreen(cam, view, mapSize, x, y)
       const close = zoomTier(cam.scale) === 'close'
-      return pickables(residents, home.realmId, drawnSpots, place, cam.scale, close)
+      // A siege machine's crew is inside it, as passengers in a cart: a click there is the machine's.
+      const crew = new Set((machines ?? []).flatMap((m) => m.crewIds))
+      return pickables(residents, home.realmId, drawnSpots, place, cam.scale, close, crew)
     }
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()

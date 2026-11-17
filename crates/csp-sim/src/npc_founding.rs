@@ -7,36 +7,40 @@ use std::f64::consts::PI;
 
 use csp_shared::balance::{
     FOOD_PER_DAY, GOOD_WEIGHT, HOUSING_ROOM, MAP_SIZE, NPC_CITY_MIN_DISTANCE, NPC_FOUND_FOOD_DAYS,
-    NPC_FOUND_GIVE_UP_DAYS, NPC_FOUND_REACH, NPC_FOUND_SAMPLES, NPC_FOUND_STANDING,
-    NPC_FULL_DIP_DAYS, NPC_NODE_REACH, NPC_PLAN_TICKS, NPC_VILLAGE, WALK_TICKS_PER_TILE,
+    NPC_FOUND_FOOD_SURPLUS_SHARE, NPC_FOUND_GIVE_UP_DAYS, NPC_FOUND_REACH, NPC_FOUND_SAMPLES,
+    NPC_FOUND_STANDING, NPC_FULL_DIP_DAYS, NPC_NODE_REACH, NPC_PLAN_TICKS, NPC_SURPLUS_CAP,
+    NPC_VILLAGE, WALK_TICKS_PER_TILE,
 };
 use csp_shared::footprint::is_at;
 use csp_shared::terrain::{wrap, wrap_distance, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    Building, BuildingKind, City, CityJob, CityJobKind, CityPlan, Good, GoodsSpot, PickUpOrder,
-    ResidentOrder, Stock, Task, Tile, WalkOrder, WorldState,
+    Building, BuildingKind, City, CityJob, CityJobKind, CityPlan, DropOrder, Good, GoodsSpot,
+    PickUpOrder, ResidentOrder, Stock, Task, Tile, WalkOrder, WorldState,
 };
 use serde_json::json;
 
 use crate::land_sites::{near_a_starting_site, starting_site_middles, FootReach};
 use crate::npc_behaviour::{default_script, stop_work, Jobs};
-use crate::npc_chain::short_goods;
-use crate::npc_cities::{hall_tile, npc_site_fits, taken_ground, FARM_RING};
+use crate::npc_chain::{short_goods, Shortage};
+use crate::npc_cities::{hall_tile, npc_site_fits_among, taken_ground, SiteWorld, FARM_RING};
 use crate::npc_scouts::knows_node;
+use crate::npc_trader::has_node_for;
 use crate::placing::Ground;
 use crate::queries::building::{build_materials, building_at, node_good};
 use crate::queries::city::{city_residents, has_food_surplus};
 use crate::queries::goods::carried_food;
 use crate::queries::js_round;
+use crate::queries::names::good_name;
 use crate::queries::names::{held, held_in, kind_name, placed};
 use crate::queries::npc_trade::{
-    npc_city_stock, npc_founding_party_size, npc_full_days, npc_reserve,
+    npc_city_stock, npc_founding_party_size, npc_full_days, npc_needs_scale, npc_reserve,
 };
 use crate::queries::residents::{carry_capacity, good_weight, is_armed, stock_weight};
 use crate::random::{hash_str, Mulberry32};
 use crate::sight::InvariantViolation;
 use crate::standing::raise_standing_both_ways;
+use csp_shared::goods::WEAPONS;
 
 /// The ids of a city's founding party (`foundingParty`): those whose job is `found`.
 pub fn founding_party(plan: Option<&CityPlan>) -> Vec<String> {
@@ -78,6 +82,93 @@ pub fn founding_materials(members: Option<f64>) -> Stock {
         (past / HOUSING_ROOM.get("house").unwrap_or(1.0)).ceil(),
     );
     out
+}
+
+/// What keeps an NPC city from being full (`CONTEXT.md`: Full city): what it is short of
+/// (`short_goods`), less the weapons it can't make and the Iron its reserve keeps to forge them,
+/// as with Coins it can't earn (T100.8). It can make a good it has a workplace for, or a node of
+/// everything the good is made from (`has_node_for`). They stay short for all else it does.
+pub fn short_for_founding(
+    world: &WorldState,
+    city: &City,
+    home: Option<&Building>,
+    size: i32,
+) -> Vec<Good> {
+    let short = short_goods(world, city, size, None);
+    let Some(home) = home else { return short };
+    let at = (home.x as i32, home.y as i32);
+    let unmakeable = |g: Good| {
+        (WEAPONS.contains(&good_name(g)) || g == Good::Iron)
+            && !has_node_for(world, city, at, g, size, &mut HashSet::new())
+    };
+    short.into_iter().filter(|g| !unmakeable(*g)).collect()
+}
+
+/// What an NPC city lacks of its founding party's materials above its reserve, the shortest first
+/// (`CONTEXT.md`: Full city, T100.8). Only once nothing else keeps it from being full
+/// (`short_for_founding`) and no party of its is out: then they count as short, so its spare hands
+/// gather them (`share_out`) and it builds the workplace for one it can't get (`wanted`). Food,
+/// Coins and weapons come first, as they keep it from being full; Food its surplus too: only once
+/// it holds `NPC_FOUND_FOOD_SURPLUS_SHARE` of its Food surplus cap past its reserve. Each as a
+/// share of its reserve and the materials together, like any shortage (`reserve_lacks`).
+pub fn founding_lacks(
+    world: &WorldState,
+    city: &City,
+    home: Option<&Building>,
+    size: i32,
+) -> Vec<Shortage> {
+    if city.trade_org.is_some()
+        || home.is_none()
+        || !founding_party(world.city_plans.get(&city.id)).is_empty()
+        || !short_for_founding(world, city, home, size).is_empty()
+    {
+        return Vec::new();
+    }
+    let materials = founding_materials(Some(npc_founding_party_size(
+        city_residents(world, &city.id).len() as f64,
+    )));
+    // Once its hands gather them, they go on until Food runs short, not each time it dips under
+    // the share of its surplus.
+    if !holds_food_first(world, city) && !gathering(world, city, &materials) {
+        return Vec::new();
+    }
+    let reserve = npc_reserve(world, city);
+    let stock = npc_city_stock(world, city);
+    let mut out: Vec<Shortage> = materials
+        .iter()
+        .map(|(good, n)| {
+            let want = held(&reserve, *good) + n;
+            Shortage { good: *good, share: (want - held(&stock, *good)) / want }
+        })
+        .filter(|s| s.share > 1e-9)
+        .collect();
+    out.sort_by(|a, b| b.share.total_cmp(&a.share));
+    out
+}
+
+/// Whether a city holds the Food surplus that comes before its founding party's materials
+/// (`CONTEXT.md`: Full city): `NPC_FOUND_FOOD_SURPLUS_SHARE` of its Food surplus cap past its
+/// reserve.
+pub fn holds_food_first(world: &WorldState, city: &City) -> bool {
+    let cap = NPC_SURPLUS_CAP.get("food").unwrap_or(0.0) * npc_needs_scale(world, city);
+    let past = held(&npc_city_stock(world, city), Good::Food)
+        - held(&npc_reserve(world, city), Good::Food);
+    past >= NPC_FOUND_FOOD_SURPLUS_SHARE * cap
+}
+
+/// Whether the city's last pass had hands at a workplace of one of `materials` (`founding_lacks`
+/// asks only once nothing else is short, so they were gathering them for its founding party).
+fn gathering(world: &WorldState, city: &City, materials: &Stock) -> bool {
+    let Some(plan) = world.city_plans.get(&city.id) else { return false };
+    plan.jobs.values().any(|j| {
+        j.kind == CityJobKind::Work
+            && j.building_id.as_ref().is_some_and(|id| {
+                world.buildings.iter().find(|b| &b.id == id).is_some_and(|b| {
+                    crate::npc_chain::chain_good(world, b)
+                        .is_some_and(|g| materials.contains_key(&g))
+                })
+            })
+    })
 }
 
 /// Whether a city would be full but for its materials (`fullButMaterials`).
@@ -155,7 +246,7 @@ pub fn plan_founding(
         plan.founding_site = None;
         return;
     }
-    if !short_goods(world, city, terrain.map_or(MAP_SIZE, |t| t.size), None).is_empty() {
+    if !short_for_founding(world, city, home, terrain.map_or(MAP_SIZE, |t| t.size)).is_empty() {
         let plan = world.city_plans.get_mut(&city.id).expect("a plan");
         if plan.full_since.is_none() {
             return;
@@ -237,8 +328,9 @@ pub fn far_out(r: (i32, i32), home: (i32, i32), size: i32) -> bool {
 
 /// The founding party (`pickParty`, `CONTEXT.md`: Founding): `npc_founding_party_size` adults, one
 /// of them armed while the city has an armed adult, the rest of its spare hands and its workers off
-/// the farms, those with the most room on them first. None while there aren't enough, or while
-/// their arms can't hold the Food for the walk and all the materials.
+/// the farms, those with the most room on them first, and as many more as it takes for their arms
+/// to hold the Food for the walk and the first weeks and all the materials. None while there aren't
+/// enough.
 fn pick_party(
     world: &WorldState,
     city: &City,
@@ -259,6 +351,9 @@ fn pick_party(
         partner.is_none_or(|p| p.carrying.is_none())
     };
     let food_weight = GOOD_WEIGHT.get("food").expect("a weight");
+    // What they carry of their own Food counts as room: they take along what they need of it and
+    // put the rest into the storage (`step_founders`).
+    let (walk, stay) = founding_food(walk_ticks);
     let room = |i: usize| {
         let r = &world.residents[i];
         carry_capacity(r, tick) - stock_weight(&r.carried) + carried_food(r) * food_weight
@@ -282,13 +377,22 @@ fn pick_party(
     }
     rest.sort_by(|&a, &b| room(b).total_cmp(&room(a)));
     let members = npc_founding_party_size(city_residents(world, &city.id).len() as f64) as usize;
-    let party: Vec<usize> = armed.first().copied().into_iter().chain(rest).take(members).collect();
+    let mut candidates = armed.first().copied().into_iter().chain(rest);
+    let mut party: Vec<usize> = candidates.by_ref().take(members).collect();
     if party.len() < members {
         return None;
     }
-    let load = stock_weight(&founding_materials(Some(members as f64)))
-        + party.len() as f64 * founding_food(walk_ticks).0 * food_weight;
-    (party.iter().map(|&i| room(i)).sum::<f64>() >= load).then_some(party)
+    // Each carries a share of the materials and Food for the walk and the first weeks
+    // (`CONTEXT.md`: Founding): as many more go as it takes to carry it all (Daniel, 2026-11-15,
+    // T100.8). Those bring no house of their own; the daughter builds it later.
+    let materials = stock_weight(&founding_materials(Some(members as f64)));
+    let load = |n: usize| materials + n as f64 * (walk + stay) * food_weight;
+    loop {
+        if party.iter().map(|&i| room(i)).sum::<f64>() >= load(party.len()) {
+            return Some(party);
+        }
+        party.push(candidates.next()?);
+    }
 }
 
 /// A pair ends when one of them leaves to found a daughter (`endPair`).
@@ -322,11 +426,28 @@ fn site_still_fits(
     if x < FARM_RING || y < FARM_RING || x > far || y > far {
         return false;
     }
+    let among = SiteWorld::new(world).keeping(daughter_min_distance(terrain.size));
     match ground {
-        Some(g) => npc_site_fits(world, terrain, &NPC_VILLAGE, x, y, g, false),
+        Some(g) => npc_site_fits_among(&among, terrain, &NPC_VILLAGE, x, y, g, false),
         None => {
-            npc_site_fits(world, terrain, &NPC_VILLAGE, x, y, &taken_ground(world, terrain), false)
+            let g = taken_ground(world, terrain);
+            npc_site_fits_among(&among, terrain, &NPC_VILLAGE, x, y, &g, false)
         }
+    }
+}
+
+/// How far a daughter stands from every city on a map of `size` (`CONTEXT.md`: Founding):
+/// `NPC_CITY_MIN_DISTANCE` on a full-size map. On a smaller one of at least half its side, whose
+/// cities stand closer together, it is scaled with the side (Daniel, 2026-11-15, T100.8), as the
+/// starting sites' clearance is (`starting_site_clearance`). A test map smaller still keeps the
+/// full distance: scaled further, a big mother's defence takes the daughter's armed founder for an
+/// outsider, and a big city with room on a small map founds every few days.
+pub fn daughter_min_distance(size: i32) -> f64 {
+    let f = f64::from(size) / f64::from(MAP_SIZE);
+    if (0.5..1.0).contains(&f) {
+        NPC_CITY_MIN_DISTANCE * f
+    } else {
+        NPC_CITY_MIN_DISTANCE
     }
 }
 
@@ -341,7 +462,7 @@ pub fn lacked_good(world: &WorldState, city: &City, home: (i32, i32), size: i32)
 }
 
 /// A site for a city's daughter (`findFoundingSite`), by its town hall's tile: of
-/// `NPC_FOUND_SAMPLES` random tiles between `NPC_CITY_MIN_DISTANCE` and `NPC_FOUND_REACH` from its
+/// `NPC_FOUND_SAMPLES` random tiles between `daughter_min_distance` and `NPC_FOUND_REACH` from its
 /// home, those where a village fits with no tile of it on a realm's territory, on land its people walk to
 /// (never an island) and clear of the starting sites (`NPC_STARTING_SITE_CLEARANCE`); the one nearest a
 /// node of the good it lacks wins, else the one nearest home.
@@ -400,9 +521,10 @@ pub fn find_founding_site(
     };
     let mut best: Option<((i32, i32), f64)> = None;
     let half = (NPC_VILLAGE.size / 2.0).floor() as i32;
+    let nearest = daughter_min_distance(size);
     for _ in 0..NPC_FOUND_SAMPLES as usize {
         let angle = m.next() * 2.0 * PI;
-        let d = NPC_CITY_MIN_DISTANCE + m.next() * (NPC_FOUND_REACH - NPC_CITY_MIN_DISTANCE);
+        let d = nearest + m.next() * (NPC_FOUND_REACH - nearest);
         let x = wrap(js_round(home.x + d * angle.cos()) as i32 - half, size);
         let y = wrap(js_round(home.y + d * angle.sin()) as i32 - half, size);
         let hall = hall_tile(x, y, NPC_VILLAGE.size as i32);
@@ -462,9 +584,9 @@ fn party_lacks(world: &WorldState, members: &[usize], size: f64) -> [Stock; 2] {
 }
 
 /// What the founding party does each tick (`stepFounders`), for its members that are idle: near
-/// the storage, they first take from it, as much as fits: Food for the walk, what the party still
-/// lacks of its materials, then Food for their first weeks; then they build the town hall on the
-/// site by the Build default.
+/// the storage, they first take from it, as much as fits: Food for the walk and their first weeks,
+/// then what the party still lacks of its materials; then they build the town hall on the site by
+/// the Build default.
 pub fn step_founders(
     world: &mut WorldState,
     city_id: &str,
@@ -474,7 +596,9 @@ pub fn step_founders(
 ) {
     let plan = world.city_plans.get(city_id);
     let Some(site) = plan.and_then(|p| p.founding_site) else { return };
-    let party_size = founding_party(plan).len() as f64;
+    // The materials of the usual party: those who come only to carry bring no house (T100.8).
+    let party_size = npc_founding_party_size(city_residents(world, city_id).len() as f64)
+        .min(founding_party(plan).len() as f64);
     let site_at = (site.x as i32, site.y as i32);
     for &i in members {
         let r = &world.residents[i];
@@ -490,15 +614,27 @@ pub fn step_founders(
                 let on_way = (food_walk - carried_food(r)).max(0.0);
                 let stay = (food_walk + food_stay - carried_food(r) - on_way).max(0.0);
                 let [hall, rest] = party_lacks(world, members, party_size);
+                // Their own Food first, the walk's and the first weeks', so one full of
+                // materials doesn't go without (T100.8); the party has the room for all of it.
                 let parts = [
                     Stock::from([(Good::Food, on_way)]),
+                    Stock::from([(Good::Food, stay)]),
                     hall,
                     rest,
-                    Stock::from([(Good::Food, stay)]),
                 ];
-                if let Some(load) = load_for(world, i, &parts, store) {
+                // Food of their own past that goes into the storage first, to make room for the
+                // materials (T100.8).
+                let spare = (carried_food(r) - food_walk - food_stay).floor();
+                let load = load_for(world, i, &parts, store);
+                if spare >= 1.0 || load.is_some() {
                     let (sid, sx, sy) = (store.id.clone(), store.x, store.y);
-                    let order = if is_at(at, placed(store), size) {
+                    let here = is_at(at, placed(store), size);
+                    let order = if here && spare >= 1.0 {
+                        ResidentOrder::Drop(DropOrder {
+                            to: GoodsSpot::Storage { storage_id: sid },
+                            goods: Stock::from([(Good::Food, spare)]),
+                        })
+                    } else if let (true, Some(load)) = (here, load) {
                         ResidentOrder::PickUp(PickUpOrder {
                             from: GoodsSpot::Storage { storage_id: sid },
                             goods: load,
@@ -569,6 +705,14 @@ pub fn found_daughter(world: &mut WorldState, city_id: &str) -> Option<String> {
             continue;
         }
         r.city_id = Some(daughter.clone());
+        // They leave the mother's defence behind: what it kept aside for them and its defence or
+        // Alarm script end, and the daughter gives them their work (T100.8).
+        let defending =
+            matches!(r.script.as_ref().and_then(|s| s.task), Some(Task::Defend | Task::Alarm));
+        if r.interrupted.take().is_some() || defending {
+            r.order = None;
+            r.script = None;
+        }
         // One gone back to the mother's storage for materials comes to the daughter instead.
         let fetching =
             r.script.as_ref().and_then(|s| s.memory.get("fetch")).is_some_and(|v| !v.is_null());

@@ -1810,6 +1810,66 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
         ],
     },
     ScriptView {
+        name: "machine",
+        description: "A siege machine in the field, as the Player sees it.",
+        fields: &[
+            ScriptField {
+                name: "id",
+                r#type: ScriptType::String,
+                description: "The machine’s id, unique in the world.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "kind",
+                r#type: ScriptType::String,
+                description: "What it is: \"ram\".",
+                null_when: None,
+            },
+            ScriptField {
+                name: "realmId",
+                r#type: ScriptType::String,
+                description: "The realm it belongs to.",
+                null_when: Some("for one of nobody"),
+            },
+            ScriptField {
+                name: "x",
+                r#type: ScriptType::Number,
+                description: "The tile it stands on, from west to east.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "y",
+                r#type: ScriptType::Number,
+                description: "The tile it stands on, from north to south.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "damage",
+                r#type: ScriptType::Number,
+                description: "The damage blows have done it; at its strength it breaks.",
+                null_when: Some("while it is unharmed"),
+            },
+            ScriptField {
+                name: "teardown",
+                r#type: ScriptType::Number,
+                description: "The work put into tearing it down so far.",
+                null_when: Some("while nobody has started"),
+            },
+            ScriptField {
+                name: "crewIds",
+                r#type: ScriptType::List(&ScriptType::String),
+                description: "Its crew on its tile, in the order they joined.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "pusherId",
+                r#type: ScriptType::String,
+                description: "The one of its crew pushing it now.",
+                null_when: Some("while it stands still"),
+            },
+        ],
+    },
+    ScriptView {
         name: "pile",
         description: "Goods lying on a tile.",
         fields: &[
@@ -2401,6 +2461,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::List(&ScriptType::View("vessel")),
     },
     ScriptBinding {
+        name: "machines",
+        is: Is::Query,
+        params: &[],
+        cost: 20.0,
+        description: "The siege machines the Player sees, theirs and others'.",
+        returns: ScriptType::List(&ScriptType::View("machine")),
+    },
+    ScriptBinding {
         name: "traders",
         is: Is::Query,
         params: &[],
@@ -2742,6 +2810,38 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         params: &["ship", "x", "y"],
         cost: 10.0,
         description: "Sail a ship, by it or its id, to the Sea tile x, y, or to the haven on x, y, docking on the free Sea tile beside it nearest the ship. I must be aboard it as one of its crew, with at least the fewest crew it sails with aboard. A Step at a time over Sea only, never onto a Lake; the crew's Seafaring sets the pace, and sailing teaches it to all of them. My order is \"sail\" until it gets there.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "crew",
+        is: Is::Action,
+        params: &["machine"],
+        cost: 10.0,
+        description: "Join the crew of a siege machine of my realm, by it or its id: I walk onto its tile, following it if it is pushed on, and am one of its crew there until I leave its tile. My order is \"crew\" until I get there.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "ram",
+        is: Is::Action,
+        params: &["machine", "wall"],
+        cost: 10.0,
+        description: "Swing a ram, by it or its id, at the wall or gate next to it, by it or its id: one of another realm's city, or of nobody's. I must be one of its crew on its tile, with at least as many crew as it needs there. It strikes far harder than a blow until the wall falls, and nobody up on a wall reaches its crew under its roof. My order is \"ram\" until then.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "throw",
+        is: Is::Action,
+        params: &["machine", "wallOrX", "y?"],
+        cost: 10.0,
+        description: "Shoot a catapult, by it or its id, at a wall, gate or tower within its reach: by it or its id, or by the tile x, y of it. It must be one of another realm's city, or of nobody's. I must be one of its crew on its tile, with at least as many crew as it needs there. Each shot throws one Stone that its crew carry or that lies on its tile; out of Stone it stops. It hits only the building, never anyone. My order is \"throw\" until the wall falls.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "push",
+        is: Is::Action,
+        params: &["machine", "x", "y"],
+        cost: 10.0,
+        description: "Push a siege machine, by it or its id, to the tile x, y, where a carriage could go. I must be one of its crew on its tile, with at least as many crew as it needs there; they go along with it, slowly, a Step at a time. My order is \"push\" until it gets there.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -3299,6 +3399,14 @@ pub static ARMY_SCRIPT_API: &[ScriptBinding] = &[
         cost: 20.0,
         description: "The boats and ships the Player sees on the water.",
         returns: ScriptType::List(&ScriptType::View("vessel")),
+    },
+    ScriptBinding {
+        name: "machines",
+        is: Is::Query,
+        params: &[],
+        cost: 20.0,
+        description: "The siege machines the Player sees, theirs and others'.",
+        returns: ScriptType::List(&ScriptType::View("machine")),
     },
     ScriptBinding {
         name: "traders",
@@ -4131,7 +4239,9 @@ fn goodsText(load, goods) {
 // me I get Food up to params.foodTake at params.food, else params.source,
 // else the nearest storage of my realm with Food, and come back; fetching
 // materials tops my food up to foodTake too. foodAt 0 turns getting food
-// off. At the site we stand spread over its footprint.
+// off. memory.foodAt and memory.foodTake, set with the task, stand in for
+// those two params (an NPC city sets them for a site far from its storage).
+// At the site we stand spread over its footprint.
 param site: building // the construction site to join; none: the one I stand on
 param source: storage // where materials come from; a carriage too; none: the nearest storage holding some
 param food: storage // where Food comes from; a carriage too; none: my source, else the nearest storage with Food
@@ -4223,6 +4333,7 @@ fn walkBack() {
   } else {
     if (walkTo(memory.at.x, memory.at.y) == null) { wait() } // until I am there
     if (away != null) { away.walked = true }
+    if (memory.setOut != null) { memory.setOut = null } // set out: my walk may be judged now
   }
   return true
 }
@@ -4330,8 +4441,8 @@ fn goodsOf(missing) {
 fn getFoodIfLow(from, near) {
   let food = me.carried.food
   if (food == null) { food = 0 }
-  if (food >= params.foodAt) { return false }
-  let units = floor(params.foodTake - food) // fetch takes whole units
+  if (food >= (memory.foodAt || params.foodAt)) { return false }
+  let units = floor((memory.foodTake || params.foodTake) - food) // fetch takes whole units
   if (units < 1) { return false }
   let at = from
   if (at == null || !holdsFood(at)) {
@@ -4356,7 +4467,7 @@ fn holdsFood(at) {
 fn foodToTake() {
   let food = me.carried.food
   if (food == null) { food = 0 }
-  let units = floor(params.foodTake - food)
+  let units = floor((memory.foodTake || params.foodTake) - food)
   if (units < 1) { return 0 }
   return units
 }

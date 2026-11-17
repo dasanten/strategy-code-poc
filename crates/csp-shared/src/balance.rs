@@ -687,7 +687,8 @@ pub const NPC_STARTING_SITE_CLEARANCE: f64 = 96.0;
 pub const NPC_WAY_CLEARANCE: i32 = 24;
 
 /// NPC cities lie at least this many tiles from every other city, starting cities and NPC cities
-/// alike (about an hour's walk on plains), the short way round the map.
+/// alike (about an hour's walk on plains), the short way round the map. A daughter keeps it scaled
+/// with the side on a map of half to all of `MAP_SIZE`'s side (`daughter_min_distance`, T100.8).
 pub const NPC_CITY_MIN_DISTANCE: f64 = 480.0;
 
 /// What an NPC city is placed with, by its size: a walled square like a starting city's.
@@ -741,6 +742,11 @@ pub const CITY_PRICE_BY_BUILDING: Table<f64> = Table(&[
 /// An NPC city's Food runs short (`CONTEXT.md`: NPC city) when its storages hold less than its
 /// residents eat in this many game days. It then puts residents on its farms first.
 pub const NPC_FOOD_SHORT_DAYS: f64 = 5.0;
+
+/// Game days in which the farmers an NPC city keeps win back what its Food lacks of its reserve
+/// (`CONTEXT.md`: NPC city, #1379): below its reserve it keeps a farmer more for every
+/// `WORK_OUTPUT_PER_DAY` food times this many it lacks, besides those who feed everyone.
+pub const NPC_FOOD_REFILL_DAYS: f64 = 10.0;
 
 /// Units of Food a farm's pile keeps when a worker carries its output away (`CONTEXT.md`:
 /// Carrying the output), so the workers there can still refill at their workplace (Refilling at a
@@ -1016,6 +1022,12 @@ pub const NPC_FULL_DAYS_LEAST: f64 = 2.0;
 /// Full city): Food its scouts and road crew take out and bring back doesn't count.
 pub const NPC_FULL_DIP_DAYS: f64 = 1.0;
 
+/// How much of its Food surplus cap (`NPC_SURPLUS_CAP`) past its reserve an NPC city holds before
+/// its founding party's materials count as short (`CONTEXT.md`: Full city): Food, its surplus
+/// too, comes first (Daniel, 2026-11-15). Half, so a birth or a party's Food doesn't take it below
+/// its reserve, and spoilage still lets it get there.
+pub const NPC_FOUND_FOOD_SURPLUS_SHARE: f64 = 0.5;
+
 /// Residents past `NPC_FOUND_VILLAGE_RESIDENTS` that add one adult to a founding party
 /// (`npcFoundingPartySize`): a city of 110 sends the most, about one in eight of it.
 pub const NPC_FOUND_RESIDENTS_PER_MEMBER: f64 = 10.0;
@@ -1264,9 +1276,10 @@ pub const CARAVAN_FOOD: f64 = 72.0;
 
 /// How much longer than a plain walk a carriage's way to its next stop may take, for the Food it waits
 /// for at the HQ (`CONTEXT.md`: Waiting for Food): the escort sets its pace, and its way winds and
-/// crosses slower ground. With this a full-size map's longest way, about 4,000 tiles, wants about all
-/// of `CARAVAN_FOOD`.
-pub const WAY_FOOD_MARGIN: f64 = 1.5;
+/// crosses slower ground. On the new land (ADR 0035) a trader's leg took 1.7 to 2.7 times the plain
+/// walk in a game year's run (T100.8), its way going round Mountain ranges to a pass; 1.5 starved a
+/// crew short of its post. A full-size map's longest ways want all of `CARAVAN_FOOD`, its cap.
+pub const WAY_FOOD_MARGIN: f64 = 3.0;
 
 /// What a carriage leaves in the HQ's storage (`CONTEXT.md`: Waiting for Food), in game days of what
 /// its people off the carriages eat. No more than `NPC_FOOD_SHORT_DAYS`, below which the HQ puts
@@ -1948,6 +1961,12 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
     // A ship, built at a haven on the Sea (`CONTEXT.md`: Building a ship): a hull, a mast and
     // rigging, iron-fastened, so Wood and some Iron; six boats' timber.
     ("ship", Table(&[("wood", 120.0), ("iron", 15.0)])),
+    // A ram (`CONTEXT.md`: Siege machine, Ram): a roofed frame on wheels round a heavy beam with an
+    // iron head, so a little more timber than a carriage and as much Iron; built in the field.
+    ("ram", Table(&[("wood", 40.0), ("iron", 5.0)])),
+    // A catapult (`CONTEXT.md`: Siege machine, Catapult): a timber frame and throwing arm on wheels,
+    // iron-bound, weighted with Stone for its counterweight; a little less timber than a ram.
+    ("catapult", Table(&[("wood", 30.0), ("iron", 5.0), ("stone", 10.0)])),
 ]);
 
 /// Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
@@ -1955,7 +1974,8 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
 /// a mint 5, a smithy 5, a town hall 6, a training ground 3 (about a stable), a haven 4. A tile of wooden
 /// wall takes a sixteenth of a game day, a gate an eighth, a tile of road a sixteenth (a quarter of
 /// what a 40 m tile took), a house one game day, a storage two and a farm half of one; a carriage
-/// two, a boat one, a ship ten. More or stronger workers finish it sooner (`buildWork`).
+/// two, a boat one, a ship ten, a ram two, a catapult two. More or stronger workers finish it
+/// sooner (`buildWork`).
 pub const BUILD_WORK: Table<f64> = Table(&[
     ("lumberCamp", 2.0 * TICKS_PER_GAME_DAY),
     ("quarry", 3.0 * TICKS_PER_GAME_DAY),
@@ -1977,6 +1997,8 @@ pub const BUILD_WORK: Table<f64> = Table(&[
     ("carriage", 2.0 * TICKS_PER_GAME_DAY),
     ("boat", TICKS_PER_GAME_DAY),
     ("ship", 10.0 * TICKS_PER_GAME_DAY),
+    ("ram", 2.0 * TICKS_PER_GAME_DAY),
+    ("catapult", 2.0 * TICKS_PER_GAME_DAY),
 ]);
 
 /// What a stone wall or gate takes instead of `BUILD_MATERIALS` (`CONTEXT.md`: Wall / Gate, Wood
@@ -2323,6 +2345,50 @@ pub const STONE_WALL_STRENGTH: WallStrength =
 /// less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered;
 /// enough that a tile of wall leaves a unit of Wood.
 pub const BROKEN_MATERIALS_RETURNED: f64 = 0.34;
+
+/// The fewest crew on a ram's tile for it to be pushed (`CONTEXT.md`: Siege machine): a few
+/// residents, as many as a ship's, so a ram takes a realm's hands from other work.
+pub const RAM_CREW: f64 = 4.0;
+
+/// How fast a crewed siege machine is pushed, as a share of a carriage's pace on the same ground
+/// (`CONTEXT.md`: Siege machine: slowly, like a carriage with no horse): half of walking on Plains,
+/// a crawl in Forest and Hills, a little faster on a road, and onto Mountain only by road.
+pub const SIEGE_PUSH_SHARE: f64 = 0.25;
+
+/// Damage a ram takes from blows before it breaks (`CONTEXT.md`: Siege machine): twice a tile of
+/// wooden wall, so defenders who come out need a while at it, but less than a stone wall tile.
+pub const RAM_STRENGTH: f64 = 6000.0;
+
+/// Ticks between a crewed ram's strikes at the wall, gate or tower next to it (`CONTEXT.md`: Ram):
+/// a heavy beam swung back and forth by its crew, slower than a resident's blows.
+pub const RAM_STRIKE_TICKS: f64 = 10.0;
+
+/// Damage each strike of a ram does to the wall, gate or tower it is at (`CONTEXT.md`: Ram: many
+/// times harder than a blow): it breaks a tile of wooden wall in 20 strikes, a little over three
+/// minutes, and one of stone in about thirteen, where a Spear alone takes 12 and 50.
+pub const RAM_BLOW: f64 = 150.0;
+
+/// The fewest crew on a catapult's tile for it to be pushed or to shoot (`CONTEXT.md`: Catapult): one
+/// fewer than a ram's, a lighter frame to push and an arm to wind and load.
+pub const CATAPULT_CREW: f64 = 3.0;
+
+/// Damage a catapult takes from blows before it breaks (`CONTEXT.md`: Siege machine): a tile of
+/// wooden wall's, half a ram's, having no roof of planks over it.
+pub const CATAPULT_STRENGTH: f64 = 3000.0;
+
+/// How far a catapult throws, in tiles (`CONTEXT.md`: Catapult: beyond a bow's from a wall): a Bow
+/// reaches 8, 12 from up on a wall, so a catapult shoots from well out of any archer's reach.
+pub const CATAPULT_REACH: f64 = 20.0;
+
+/// Ticks between a crewed catapult's shots (`CONTEXT.md`: Catapult): its arm wound down and a
+/// Stone loaded each time, six times a ram's strikes, so it does less to a wall a minute than a
+/// ram at it.
+pub const CATAPULT_SHOT_TICKS: f64 = 60.0;
+
+/// Damage each Stone a catapult throws does to the wall, gate or tower it hits (`CONTEXT.md`:
+/// Catapult): a tile of wooden wall falls to 5 in five minutes, one of stone to 20 in twenty,
+/// slower than a ram at the wall but from out of reach.
+pub const CATAPULT_BLOW: f64 = 600.0;
 
 /// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): six
 /// minutes, all the while unable to dodge or strike back, so a starting city's defenders get up
@@ -2817,6 +2883,7 @@ pub fn balance_json() -> Value {
         to_value(CITY_PRICE_BY_BUILDING).expect("serialisable"),
     );
     m.insert("NPC_FOOD_SHORT_DAYS".into(), json!(NPC_FOOD_SHORT_DAYS));
+    m.insert("NPC_FOOD_REFILL_DAYS".into(), json!(NPC_FOOD_REFILL_DAYS));
     m.insert("WORK_FOOD_KEPT".into(), json!(WORK_FOOD_KEPT));
     m.insert("NPC_SOLDIER_SHARE".into(), json!(NPC_SOLDIER_SHARE));
     m.insert("NPC_STEEL_KIT".into(), json!(NPC_STEEL_KIT));
@@ -2868,6 +2935,7 @@ pub fn balance_json() -> Value {
     m.insert("NPC_FULL_RESIDENTS_PER_DAY".into(), json!(NPC_FULL_RESIDENTS_PER_DAY));
     m.insert("NPC_FULL_DAYS_LEAST".into(), json!(NPC_FULL_DAYS_LEAST));
     m.insert("NPC_FULL_DIP_DAYS".into(), json!(NPC_FULL_DIP_DAYS));
+    m.insert("NPC_FOUND_FOOD_SURPLUS_SHARE".into(), json!(NPC_FOUND_FOOD_SURPLUS_SHARE));
     m.insert("NPC_FOUND_RESIDENTS_PER_MEMBER".into(), json!(NPC_FOUND_RESIDENTS_PER_MEMBER));
     m.insert("NPC_FOUND_PARTY_MOST".into(), json!(NPC_FOUND_PARTY_MOST));
     m.insert("NPC_FOUND_SAMPLES".into(), json!(NPC_FOUND_SAMPLES));
@@ -3061,6 +3129,16 @@ pub fn balance_json() -> Value {
     m.insert("TOWER_ROOM".into(), json!(TOWER_ROOM));
     m.insert("TOWER_SIGHT_RANGE".into(), json!(TOWER_SIGHT_RANGE));
     m.insert("TOWER_SHOT_REACH_BONUS".into(), json!(TOWER_SHOT_REACH_BONUS));
+    m.insert("RAM_CREW".into(), json!(RAM_CREW));
+    m.insert("SIEGE_PUSH_SHARE".into(), json!(SIEGE_PUSH_SHARE));
+    m.insert("RAM_STRENGTH".into(), json!(RAM_STRENGTH));
+    m.insert("RAM_STRIKE_TICKS".into(), json!(RAM_STRIKE_TICKS));
+    m.insert("RAM_BLOW".into(), json!(RAM_BLOW));
+    m.insert("CATAPULT_CREW".into(), json!(CATAPULT_CREW));
+    m.insert("CATAPULT_STRENGTH".into(), json!(CATAPULT_STRENGTH));
+    m.insert("CATAPULT_REACH".into(), json!(CATAPULT_REACH));
+    m.insert("CATAPULT_SHOT_TICKS".into(), json!(CATAPULT_SHOT_TICKS));
+    m.insert("CATAPULT_BLOW".into(), json!(CATAPULT_BLOW));
     m.insert("CLIMB_TICKS".into(), json!(CLIMB_TICKS));
     m.insert("WALL_WALK_TICKS".into(), json!(WALL_WALK_TICKS));
     m.insert("FALL_DAMAGE".into(), json!(FALL_DAMAGE));

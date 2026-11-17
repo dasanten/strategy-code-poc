@@ -246,6 +246,7 @@ export interface Balance {
     [key: string]: number
   }
   readonly NPC_FOOD_SHORT_DAYS: number
+  readonly NPC_FOOD_REFILL_DAYS: number
   readonly WORK_FOOD_KEPT: number
   readonly NPC_SOLDIER_SHARE: number
   readonly NPC_STEEL_KIT: string[]
@@ -320,6 +321,7 @@ export interface Balance {
   readonly NPC_FULL_RESIDENTS_PER_DAY: number
   readonly NPC_FULL_DAYS_LEAST: number
   readonly NPC_FULL_DIP_DAYS: number
+  readonly NPC_FOUND_FOOD_SURPLUS_SHARE: number
   readonly NPC_FOUND_RESIDENTS_PER_MEMBER: number
   readonly NPC_FOUND_PARTY_MOST: number
   readonly NPC_FOUND_SAMPLES: number
@@ -755,6 +757,17 @@ export interface Balance {
       iron: number
       [key: string]: number
     }
+    ram: {
+      wood: number
+      iron: number
+      [key: string]: number
+    }
+    catapult: {
+      wood: number
+      iron: number
+      stone: number
+      [key: string]: number
+    }
     [key: string]: Record<string, never> | {
       wood: number
       [key: string]: number
@@ -782,6 +795,11 @@ export interface Balance {
       wood: number
       iron: number
       [key: string]: number
+    } | {
+      wood: number
+      iron: number
+      stone: number
+      [key: string]: number
     }
   }
   readonly BUILD_WORK: {
@@ -805,6 +823,8 @@ export interface Balance {
     carriage: number
     boat: number
     ship: number
+    ram: number
+    catapult: number
     [key: string]: number
   }
   readonly STONE_BUILD_MATERIALS: {
@@ -1386,6 +1406,16 @@ export interface Balance {
   readonly TOWER_ROOM: number
   readonly TOWER_SIGHT_RANGE: number
   readonly TOWER_SHOT_REACH_BONUS: number
+  readonly RAM_CREW: number
+  readonly SIEGE_PUSH_SHARE: number
+  readonly RAM_STRENGTH: number
+  readonly RAM_STRIKE_TICKS: number
+  readonly RAM_BLOW: number
+  readonly CATAPULT_CREW: number
+  readonly CATAPULT_STRENGTH: number
+  readonly CATAPULT_REACH: number
+  readonly CATAPULT_SHOT_TICKS: number
+  readonly CATAPULT_BLOW: number
   readonly CLIMB_TICKS: number
   readonly WALL_WALK_TICKS: number
   readonly FALL_DAMAGE: number
@@ -1511,6 +1541,8 @@ export interface Balance {
     carriage: number
     boat: number
     ship: number
+    ram: number
+    catapult: number
     house: number
     storage: number
     smelter: number

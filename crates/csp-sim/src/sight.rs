@@ -18,7 +18,8 @@ use csp_shared::balance::SIGHT_RANGE;
 use csp_shared::footprint::{footprint_tiles, Placed, FOOTPRINT};
 use csp_shared::protocol::{
     BuildLine, ScriptIdOnly, SeenArmy, SeenBuilding, SeenCaravan, SeenCarriage, SeenCity,
-    SeenEntity, SeenHorse, SeenInterrupted, SeenResident, SeenScript, SeenTrader, SeenVessel,
+    SeenEntity, SeenHorse, SeenInterrupted, SeenMachine, SeenResident, SeenScript, SeenTrader,
+    SeenVessel,
 };
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::horse_market::NpcHorseOffer;
@@ -619,6 +620,23 @@ fn everything_seen(
             }));
         }
     }
+    // A siege machine shows to whoever has its tile in sight, with its kind, realm and crew
+    // (`CONTEXT.md`: Siege machine).
+    for m in &world.siege_machines {
+        if in_sight(m.x, m.y) {
+            out.push(SeenEntity::Machine(SeenMachine {
+                id: m.id.clone(),
+                kind: m.kind,
+                realm_id: m.realm_id.clone(),
+                x: m.x,
+                y: m.y,
+                damage: m.damage,
+                teardown: m.teardown,
+                crew_ids: m.crew_ids.clone(),
+                pusher_id: crate::siege::pusher_of(world, m).map(|r| r.id.clone()),
+            }));
+        }
+    }
     for p in &world.piles {
         if in_sight(p.x, p.y) {
             out.push(SeenEntity::Pile(p.clone()));
@@ -1084,6 +1102,7 @@ fn spot_of(e: &SeenEntity) -> Option<Spot> {
         SeenEntity::Horse(h) => Some(Spot { x: h.x, y: h.y }),
         SeenEntity::Carriage(k) => Some(Spot { x: k.x, y: k.y }),
         SeenEntity::Vessel(v) => Some(Spot { x: v.x, y: v.y }),
+        SeenEntity::Machine(m) => Some(Spot { x: m.x, y: m.y }),
         SeenEntity::Pile(p) => Some(Spot { x: p.x, y: p.y }),
         SeenEntity::Building(b) => Some(Spot { x: b.building.x, y: b.building.y }),
         _ => None,

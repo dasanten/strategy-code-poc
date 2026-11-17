@@ -144,7 +144,9 @@ The shared language of the game. Domain terms only — no implementation details
   workplace). So a far-off crew keeps working while one of them walks, and nobody else goes
   home for Food. How much they bring is a setting of the Work default (`crewFood`); 0 brings
   none. A resident sent to a workplace sets out with Food for the walk there and the first days
-  of work, not a fixed amount, so they last until the carrier's first round trip.
+  of work, not a fixed amount, so they last until the carrier's first round trip. An NPC
+  city's builders of a site beyond its node reach from its storage set out with the same, and go back for
+  more while they still have what the walk home eats (decided overnight, Daniel to confirm).
 - **Holding a workplace:** whoever physically works and guards a workplace gets its output.
   There is no ownership flag. Drive out the workers, move your own in, and it's yours.
 - **Tools** (Epic 97): a good a smithy makes from Iron and Wood. A resident carrying Tools works a
@@ -376,7 +378,10 @@ The shared language of the game. Domain terms only — no implementation details
   waits for it, as there is no Food on that way. A carriage leaves the storage what the HQ's own
   people eat in a few days, but may always take a little for its horse, which eats only from the
   load. Short of Food, it tops up from the goods warehouse, which the HQ's people don't eat from
-  and the Stock floor fills each day; only with none there does it stand and wait.
+  and the Stock floor fills each day; only with none there does it stand and wait. A wandering
+  trader waits the same way at each post (Daniel, 2026-11-14, T100.8): it leaves a post only with
+  enough Food to reach its next stop, topping up from the post's goods warehouse, and with none
+  there stands and waits. A caravan away from the HQ takes what a post's storage has and drives on.
 - **Caravan crew lost:** a caravan outlives its crew. When its driver dies, a surviving escort
   takes over driving. With no crew left, its carriage stands where it is and the HQ sends a new
   driver on foot, from the same adults it makes up escorts from, once it has one free. A caravan's
@@ -563,15 +568,17 @@ The shared language of the game. Domain terms only — no implementation details
   the walk and the first days, and the carrier brings the crew's Food back: Crew food), pairs its adults,
   builds a house when it has a food surplus and no free housing, and shares its adults out:
   soldiers by its size first; then farmers, as many as feed everyone (one farmer feeds about
-  four) and one more while it has no food surplus, building a farm when those it keeps don't
-  fit, or when Food is short of its reserve with every farm at its full crew (below); then builders while it has a project, at most two in a village and more as it grows (a balance
+  four) and one more while it has no food surplus; with its Food below its reserve but not yet
+  running short, as many more as win back what it lacks in a few game days (a balance number;
+  decided overnight, Daniel to confirm), if that is more; building a farm when those it keeps don't
+  fit, or when Food is short of its reserve, or with nothing else keeping it from being full of the Food surplus its founding waits on (Full city; decided overnight, Daniel to confirm), with every farm at its full crew (below); then builders while it has a project, at most two in a village and more as it grows (a balance
   number); everyone else is its **spare hands**. Its planning pass gives each free adult the job
   that scores highest (ADR 0029). A worker stays where they are until another job beats theirs by a
   margin, so nobody goes back and forth. Beyond that it is driven by its
   reserve (NPC reserve): its spare hands go to the good shortest of its reserve first; they work
   the workplace that makes the good, or build it first on the nearest fitting resource node
   (within a set reach of its home, or further out where a Scout found one) and work it like its other workplaces, carrying the output to
-  its storage (Crew food). With every workplace of a short good at its full crew and someone idle, it opens another, however many it has: on the nearest fitting node for what is dug or cut, in its area for what is processed. Food short with every farm at its full crew opens another farm even with nobody idle: its farmers come from those working for surplus and from its scouts first (Spare hands' work), and from other work only after them. A farm already begun is finished before another. While Food runs short that farm is the one thing it builds, besides a first farm. So a city builds the whole chain its land allows, one need at a time:
+  its storage (Crew food). With every workplace of a short good at its full crew and someone idle, it opens another, however many it has: on the nearest fitting node for what is dug or cut, in its area for what is processed. Food short with every farm at its full crew opens another farm even with nobody idle: its farmers come from those working for surplus and from its scouts first (Spare hands' work), and from other work only after them. A farm already begun is finished before another, and that new farm comes before anything else it has begun. While Food runs short that farm is the one thing it builds, besides a first farm. So a city builds the whole chain its land allows, one need at a time:
   weapons short means a smithy, which wants Iron, so a smelter, which wants ore, so a mine. A
   good it knows no node of stays short; the city buys it from its trader or a visiting trader,
   or does without. With nothing short its spare hands still have work (Spare hands' work). When it has no room left inside its wall it grows its area
@@ -636,7 +643,7 @@ The shared language of the game. Domain terms only — no implementation details
   stands in line with the outer gate and goes up last, so its people never lose the way to the
   storage. The city grows its outer wall as before, and never tears the inner ring down.
 - **NPC road:** a road an NPC city builds with a **road crew** of its spare hands (at most a balance
-  number at once, which grows with the city, apart from its builders), only from materials above its reserve. Once the city would otherwise be full (Full city), it also leaves a town hall's and a storage's materials untouched, so founding comes before roads. Its layout's
+  number at once, which grows with the city, apart from its builders), only from materials above its reserve. Once its full wait is under way (Full city), it also leaves a town hall's and a storage's materials untouched, so founding comes before roads. Its layout's
   streets come first (City layout). Then it follows the
   way a resident would walk, tile by tile, skipping tiles that have a road: first from its home to
   each of its workplaces outside its area, nearest first; then to the nearest Trade Org warehouse
@@ -679,14 +686,27 @@ The shared language of the game. Domain terms only — no implementation details
 - **Full city:** an NPC city that for a whole game week, less the bigger it is (a balance number), has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
   short of its reserve, holds a food surplus, and holds its founding party's materials
   above its reserve. Coins it has no way to earn are not short (NPC reserve), so a city that can't
-  earn them isn't held back by its war chest. A dip below the reserve only restarts that time if it lasts longer than a game
+  earn them isn't held back by its war chest. Likewise weapons it can't make, and the Iron its
+  reserve keeps to forge them, don't keep it from being full (Daniel, 2026-11-14, T100.8): it can
+  make a good it has the workplace for, or nodes it knows of for everything the good is made from.
+  They stay short for all else it does, so it still buys them. A city that lacks nothing but its
+  founding party's materials counts those as short (Daniel, 2026-11-15, T100.8): its spare hands
+  gather them like any shortage, and it builds the workplace for one it has none of. Food, Coins
+  and weapons still come first, since only once nothing else is short do the materials count; Food
+  its surplus too (Daniel, 2026-11-15): only once it holds a share of its Food surplus cap past its
+  reserve (a balance number). Its workplaces come first too (Daniel, 2026-11-16): its spare hands'
+  work (Spare hands' work: road crew, scouting, its workplaces for surplus) comes before gathering
+  for the party, and only the hands left over gather. Those gathering them are still spare hands
+  for its full wait. A dip below the reserve only restarts that time if it lasts longer than a game
   day, though nothing sets out during one. A full city founds a daughter (Founding).
 - **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
-  from every city, within a set reach of itself and on no realm's territory, nearest a node of
+  from every city (on a map smaller than the game's but at least half its side, scaled with the
+  side: Daniel, 2026-11-15, T100.8), within a set reach of itself and on no realm's territory, nearest a node of
   the good it is short of and has no node for. A **founding party** of a village's worth of
   adults, more from a big city, one of them armed, each carrying a share of the materials (a town
   hall's and a storage's, and houses for those past a village's worth) and Food for the walk and
-  the first weeks, walks there and builds the town hall, which founds the **daughter** as an
+  the first weeks, with as many more as it takes to carry it all (Daniel, 2026-11-15, T100.8;
+  those bring no house of their own), walks there and builds the town hall, which founds the **daughter** as an
   ordinary NPC city with a name from the game; then its storage, a farm and a house. Until its
   storage stands its armed residents build with the rest, since the materials are on them and
   there is nowhere else to put them. A member gone back to the mother's storage for materials
@@ -889,7 +909,9 @@ The shared language of the game. Domain terms only — no implementation details
     down and out can attack the ram, or its crew in contact.
   - **Catapult:** of Wood, Iron and Stone. It throws one Stone a shot at a wall, gate or tower
     within a long reach, beyond a bow's from a wall. It hits buildings only, not people. Its crew
-    stands in the open.
+    stands in the open. The Stone it throws is what its crew on its tile carry, then what lies in
+    the pile on its tile (the machine itself holds no goods); out of Stone it stops. It is aimed
+    at a building or at a tile of one. *(Decided overnight, Daniel to confirm.)*
 - **Loot:** when a resident dies, everything they carried drops on the ground for anyone to take.
 - **Capturing a city:** only by occupying its town hall for a set number of game days without a
   break (Occupying a town hall; ADR 0017). When the time is up, the city and its residents join
