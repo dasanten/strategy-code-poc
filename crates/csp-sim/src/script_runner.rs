@@ -833,13 +833,27 @@ impl OrderKind for ArmyRunScriptOrder {
 /// (`settle`): that is when the world is done advancing orders in place (walking, work, fights),
 /// and before the next scripts run, so an order that differs from it then was replaced
 /// (by an order a Player sent, a queue's next step, or anything else that sets it). Scratch memory,
-/// never saved: after a restart a waiting script runs once more and waits again.
+/// never saved, but a world loaded from a save holds it: see [`Waiting::of`].
 #[derive(Debug, Default)]
 pub struct Waiting {
     on: HashMap<String, ResidentOrder>,
 }
 
 impl Waiting {
+    /// The waits of a world loaded from a save, as they stood when it was saved (T111.5): a save
+    /// is taken between ticks, after `settle`, so every waiting resident with an order waits on the
+    /// order they have. A server that restarts goes on as one that kept running, and a waiting
+    /// script does not run once more.
+    pub fn of(world: &WorldState) -> Self {
+        let on = world
+            .residents
+            .iter()
+            .filter(|r| r.script.as_ref().is_some_and(|s| s.waiting_since.is_some()))
+            .filter_map(|r| Some((r.id.clone(), r.order.clone()?)))
+            .collect();
+        Waiting { on }
+    }
+
     /// Whether resident `r`'s script waits this tick (`waits`): it called `wait()` and the order
     /// it waits on still runs, and no blow struck them since. Otherwise its wait is over.
     fn waits(&self, r: &mut Resident) -> bool {

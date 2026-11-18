@@ -23,6 +23,8 @@ path = "tests/all.rs"
 
 [dev-dependencies]
 sha2.workspace = true
+# The year run's checkpoints are gzipped JSON, as the server's world saves.
+flate2.workspace = true
 
 [lints]
 workspace = true

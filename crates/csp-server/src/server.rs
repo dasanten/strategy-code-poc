@@ -186,8 +186,13 @@ impl<L: LogSink> Game<L> {
         csp_sim::new_veins::hide_new_veins(&world, &mut explored);
         let terrain = Arc::clone(explored.map().terrain());
         let explored = Arc::new(Mutex::new(explored));
-        // The tick places new nodes with it (`CONTEXT.md`: Running dry).
-        let scratch = Scratch { land: Some(Arc::clone(&explored)), ..Scratch::default() };
+        // The tick places new nodes with it (`CONTEXT.md`: Running dry). The scripts that were
+        // waiting when the world was saved go on waiting on the same orders.
+        let scratch = Scratch {
+            land: Some(Arc::clone(&explored)),
+            waiting: csp_sim::script_runner::Waiting::of(&world),
+            ..Scratch::default()
+        };
         Self {
             world,
             orders: OrderQueue::new(order_kinds(), Some(Arc::clone(&terrain))),
