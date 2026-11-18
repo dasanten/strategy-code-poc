@@ -1273,7 +1273,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return site || buildProblemAt(world, tx, ty)(kind, line.material) === undefined
     }
     const problem = lineProblem(line, size, builds)
-    if (problem) return setRealmOrder({ step: 'line', building: o.building, from: o.from, error: problem })
+    if (problem)
+      return setRealmOrder({ step: 'line', building: o.building, from: o.from, error: problem })
     setRealmOrder({ step: 'lineWho', line })
   }
   /**

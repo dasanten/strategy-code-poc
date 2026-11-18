@@ -157,7 +157,12 @@ describe('the who-list’s search and title', () => {
 })
 
 describe('a road or wall line on the who-list', () => {
-  const line: WhoOrder = { kind: 'line', building: 'road', from: { x: 10, y: 10 }, to: { x: 16, y: 10 } }
+  const line: WhoOrder = {
+    kind: 'line',
+    building: 'road',
+    from: { x: 10, y: 10 },
+    to: { x: 16, y: 10 },
+  }
 
   it('says what is to be built and where', () => {
     expect(whoTitle(line, SIZE)).toBe('Build a road line of 7 tiles')

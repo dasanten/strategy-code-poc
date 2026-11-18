@@ -108,7 +108,8 @@ export function lineProblem(
   builds: (x: number, y: number) => boolean,
 ): string | undefined {
   const tiles = lineTiles(line, size)
-  if (tiles.length > ROAD_LINE_MAX_TILES) return `a line covers at most ${ROAD_LINE_MAX_TILES} tiles`
+  if (tiles.length > ROAD_LINE_MAX_TILES)
+    return `a line covers at most ${ROAD_LINE_MAX_TILES} tiles`
   if (!tiles.some((t) => builds(t.x, t.y))) return `no ${line.building} to build on that line`
   return undefined
 }
