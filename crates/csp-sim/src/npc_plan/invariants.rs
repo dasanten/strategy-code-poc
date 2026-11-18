@@ -336,3 +336,49 @@ pub fn npc_leaves_dry_workplaces(world: &WorldState) -> Vec<InvariantViolation> 
     }
     out
 }
+
+/// Invariant `npc-founding-stone-kept` (`CONTEXT.md`: Full city; Daniel, 2026-11-18, #1379): a
+/// plan made this tick by a city saving for its founding party starts no tile of stone wall, gate
+/// or tower whose Stone a builder's trip would take from that party's: it holds a trip's worth
+/// (a tower's) above its reserve and the party's Stone.
+pub fn npc_founding_stone_kept(world: &WorldState) -> Vec<InvariantViolation> {
+    use crate::npc_founding::{holds_for_walls, saving_to_found};
+    use crate::npc_growth::project_site;
+    use crate::queries::building::{build_materials_of, is_stone};
+    let mut out = Vec::new();
+    let tick = world.tick as f64;
+    for (city_id, plan) in &world.city_plans {
+        if plan.planned_at != tick {
+            continue;
+        }
+        let Some(CityProject::Build { building, x, y, material }) = &plan.project else {
+            continue;
+        };
+        if !is_stone(*building, *material)
+            || project_site(world, *building, *material, *x, *y).is_some()
+        {
+            continue;
+        }
+        let Some(city) = world.cities.iter().find(|c| &c.id == city_id) else { continue };
+        if !saving_to_found(world, city) {
+            continue;
+        }
+        let goods = if *building == BuildingKind::Tower {
+            build_materials_of(*building, *material)
+        } else {
+            crate::npc_stone_walls::trip()
+        };
+        if !holds_for_walls(world, city, &goods) {
+            out.push(violation(
+                "npc-founding-stone-kept",
+                format!(
+                    "{city_id} saves for its founding party and starts a stone {} at ({x}, {y}) \
+                     from the party's Stone",
+                    kind_name(*building)
+                ),
+                vec![city_id.clone()],
+            ));
+        }
+    }
+    out
+}

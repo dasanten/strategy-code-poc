@@ -8,6 +8,7 @@ use csp_shared::world::{BuildingKind, Good, ResidentOrder, TradeOrgCity, WorldSt
 use super::*;
 use crate::invariants::check_all;
 use crate::npc_test_world::{plains, village, Runner};
+use crate::queries::npc_trade::npc_reserve;
 use crate::random::Mulberry32;
 use crate::repair::{condition_of, decays, step_decay, trade_org_repairs, Condition};
 use crate::trade_org::found_trade_org_hq;
@@ -211,4 +212,46 @@ fn the_invariant_catches_a_trade_org_building_nearly_a_ruin() {
     assert_eq!(trade_org_kept_up(&v.world, &v.terrain), []);
     v.city_mut().trade_org = Some(TradeOrgCity::Post);
     assert_eq!(trade_org_kept_up(&v.world, &v.terrain).len(), 1);
+}
+
+#[test]
+fn a_city_saving_for_its_founding_party_repairs_from_stone_above_the_partys_too() {
+    // #1379 (Daniel, 2026-11-18): its walls and repairs kept spending the party's Stone, so no
+    // city held it and none founded a daughter.
+    use crate::npc_founding::founding_materials;
+    use crate::queries::city::city_residents;
+    use crate::queries::npc_trade::npc_founding_party_size;
+    use crate::repair::repair_materials_of;
+    let mut v = village(None);
+    let city = v.city.clone();
+    crate::npc_plan::plan_city(&mut v.world, &city, Some(&v.terrain), None, None);
+    let b = v
+        .world
+        .buildings
+        .iter()
+        .position(|b| {
+            b.city_id.as_deref() == Some(&city)
+                && decays(b)
+                && held(&repair_materials_of(b), Good::Stone) > 0.0
+        })
+        .expect("a building of the village whose repair takes Stone");
+    v.world.buildings[b].decay = Some(0.5);
+    let c = v.city().clone();
+    let s = v.storage();
+    // Its reserve and the repair's materials on top: it repairs.
+    let mut stock = npc_reserve(&v.world, &c);
+    for (good, n) in repair_materials_needed(&v.world.buildings[b]) {
+        *stock.entry(good).or_insert(0.0) += n;
+    }
+    v.world.buildings[s].stock = Some(stock.clone());
+    assert!(repair_due(&v.world, &c, Some(s), false));
+    // Saving for its founding party, it leaves the party's Stone too.
+    v.world.city_plans.get_mut(&city).unwrap().full_since = Some(0.0);
+    assert!(!repair_due(&v.world, &c, Some(s), false));
+    let party = founding_materials(Some(npc_founding_party_size(
+        city_residents(&v.world, &city).len() as f64,
+    )));
+    *stock.entry(Good::Stone).or_insert(0.0) += held(&party, Good::Stone);
+    v.world.buildings[s].stock = Some(stock);
+    assert!(repair_due(&v.world, &c, Some(s), false));
 }

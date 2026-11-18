@@ -12,8 +12,8 @@ use csp_shared::world::{
 };
 
 use crate::npc_behaviour::walk_to;
+use crate::npc_founding::kept_from_walls;
 use crate::queries::names::{held, held_in, placed};
-use crate::queries::npc_trade::npc_reserve;
 use crate::repair::{repair_materials_needed, worn_of_city};
 
 /// The buildings the city's other residents are repairing now.
@@ -35,9 +35,10 @@ fn lacking(carried: &Stock, need: &Stock) -> Stock {
     need.iter().map(|(g, n)| (*g, n - held(carried, *g))).filter(|(_, n)| *n > 0.0).collect()
 }
 
-/// What the store holds above the city's reserve, of each good.
+/// What the store holds above what the city's repairs leave there, of each good: its reserve, and
+/// while it saves for its founding party that party's Stone too (`kept_from_walls`, #1379).
 fn above_reserve(world: &WorldState, city: &City, store: &Building) -> Stock {
-    let reserve = npc_reserve(world, city);
+    let reserve = kept_from_walls(world, city);
     store
         .stock
         .iter()

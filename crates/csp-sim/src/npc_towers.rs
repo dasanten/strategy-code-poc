@@ -179,6 +179,13 @@ pub fn tower_project(
         return None;
     }
     if let Some(site) = towers_of(world, city, size).into_iter().find(|t| t.site.is_some()) {
+        // A site begun waits too while the city saves for its founding party and holds what it
+        // still needs beyond the party's Stone (#1379).
+        use crate::npc_founding::{holds_for_walls, saving_to_found};
+        let needs = crate::queries::building::materials_needed(site);
+        if saving_to_found(world, city) && !holds_for_walls(world, city, &needs) {
+            return None;
+        }
         return Some(stone_tower(site.x, site.y));
     }
     let waiting_to_found = world.city_plans.get(&city.id).is_some_and(|p| p.full_since.is_some());

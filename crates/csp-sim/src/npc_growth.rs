@@ -847,8 +847,15 @@ fn wanted(
         // A new outer wall is of the material its old one was (`CONTEXT.md`: Wood or stone).
         let stone =
             rings.is_some_and(|r| r.expanding) && outer_ring_of_stone(world, city, home, size);
-        let p = build(next.kind, (next.x, next.y));
-        return Some(with_material(p, stone.then_some(WallMaterial::Stone)));
+        // Of stone, it waits while the city saves for its founding party and holds no trip's
+        // Stone beyond the party's (#1379).
+        let waits = stone
+            && crate::npc_founding::saving_to_found(world, city)
+            && !crate::npc_founding::holds_for_walls(world, city, &crate::npc_stone_walls::trip());
+        if !waits {
+            let p = build(next.kind, (next.x, next.y));
+            return Some(with_material(p, stone.then_some(WallMaterial::Stone)));
+        }
     }
     // Lacking nothing else, its wall up, the workplace for a founding material it has none for
     // (`CONTEXT.md`: Full city).

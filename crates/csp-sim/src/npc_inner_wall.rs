@@ -316,7 +316,8 @@ pub fn inner_wall_project(
     let trips = NPC_WALL_TILES_PER_TRIP * builders;
     let goods: Stock =
         build_materials(next.kind).into_iter().map(|(g, n)| (g, n * trips)).collect();
-    if !holds_above_reserve(world, city, &goods) {
+    // Its founding party's Stone too while it saves for one (#1379).
+    if !crate::npc_founding::holds_for_walls(world, city, &goods) {
         return None;
     }
     Some(CityProject::Build {

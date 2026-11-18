@@ -3404,16 +3404,18 @@ export function Wiki() {
           gather them, it builds a workplace for one it has none of, and they are still spare hands
           while they do. Food, Wood and Stone come first, Food its surplus too: only once it holds{' '}
           {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus cap past its reserve, and while
-          full its farmers work to win that back as they do its reserve. Its workplaces come first
-          as well: its spare hands go on a road crew, scout and work at its workplaces for surplus,
-          and only those left over gather for the party. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)}{' '}
-          residents it waits a game day less for each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at
-          least {days(NPC_FULL_DAYS_LEAST)}. A dip below its reserve only restarts that wait if it
-          lasts longer than {days(NPC_FULL_DIP_DAYS)}, though nobody sets out during one. A full
-          city founds a daughter. Once a game day it looks for a free Plains site{' '}
-          {num(NPC_CITY_MIN_DISTANCE)} to {num(NPC_FOUND_REACH)} tiles away, with room for a village
-          and on no realm's territory, nearest a node of a material it has none of in reach. A
-          founding party of {num(NPC_VILLAGE.residents)} adults, one more for each{' '}
+          full its farmers work to win that back as they do its reserve. While it saves for its
+          party, its walls and repairs spend only the Stone above its reserve and the party's Stone.
+          Its workplaces come first as well: its spare hands go on a road crew, scout and work at
+          its workplaces for surplus, and only those left over gather for the party. Past{' '}
+          {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less for each{' '}
+          {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}. A dip
+          below its reserve only restarts that wait if it lasts longer than{' '}
+          {days(NPC_FULL_DIP_DAYS)}, though nobody sets out during one. A full city founds a
+          daughter. Once a game day it looks for a free Plains site {num(NPC_CITY_MIN_DISTANCE)} to{' '}
+          {num(NPC_FOUND_REACH)} tiles away, with room for a village and on no realm's territory,
+          nearest a node of a material it has none of in reach. A founding party of{' '}
+          {num(NPC_VILLAGE.residents)} adults, one more for each{' '}
           {num(NPC_FOUND_RESIDENTS_PER_MEMBER)} residents past {num(NPC_FOUND_VILLAGE_RESIDENTS)} up
           to {num(NPC_FOUND_PARTY_MOST)}, sets out. One in{' '}
           {num(Math.round(1 / NPC_FOUND_ESCORT_SHARE))} of them, rounded down and at least one, is a
