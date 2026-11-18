@@ -262,3 +262,31 @@ fn more_soldiers_go_along_a_way_past_a_danger_place() {
     // Not on the way north.
     assert_eq!(super::founding_escorts_wanted(&world, &city(&world), 10, (100, 20)), before);
 }
+
+#[test]
+fn an_escort_not_at_the_storage_goes_for_the_food_for_the_way_first() {
+    // #1414: an escort away from the storage as the trader set out walked out on what they had.
+    let mut f = city_with_soldiers(20.0, 0);
+    let hold = posts_to_hold(&f.world, f.city()) as usize;
+    f = city_with_soldiers(20.0, hold + 1);
+    f.plan();
+    let run = f.runs().into_iter().next().expect("a trader out");
+    let escort = run.escort_ids[0].clone();
+    let i = f.index(&escort);
+    let storage = f.world.buildings.iter().find(|b| b.id == f.storage).unwrap().clone();
+    let r = &mut f.world.residents[i];
+    (r.x, r.y, r.order, r.script) = (storage.x + 6.0, storage.y, None, None);
+    r.carried.shift_remove(&Good::Food);
+    let mut runner = Runner::new(&f.terrain);
+    let mut fed = false;
+    for _ in 0..DAY {
+        runner.step(&mut f.world, &f.terrain);
+        let i = f.index(&escort);
+        fed |= held(&f.world.residents[i].carried, Good::Food) >= 2.0;
+        if fed {
+            break;
+        }
+    }
+    assert!(fed, "the escort never took Food for the way");
+    assert_eq!(check_all(&f.world, &f.terrain), []);
+}
