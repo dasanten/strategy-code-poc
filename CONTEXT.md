@@ -719,7 +719,8 @@ The shared language of the game. Domain terms only — no implementation details
   has none of. Food, Wood and Stone still come first, since only once none of them is short do the
   materials count; Food
   its surplus too (Daniel, 2026-11-15): only once it holds a share of its Food surplus cap past its
-  reserve (a balance number). Its workplaces come first too (Daniel, 2026-11-16): its spare hands'
+  reserve (a balance number); while full, its farmers work to win that back as they do its
+  reserve (Daniel, 2026-11-18, #1379). Its workplaces come first too (Daniel, 2026-11-16): its spare hands'
   work (Spare hands' work: road crew, scouting, its workplaces for surplus) comes before gathering
   for the party, and only the hands left over gather. Those gathering them are still spare hands
   for its full wait. A dip below the reserve only restarts that time if it lasts longer than a game

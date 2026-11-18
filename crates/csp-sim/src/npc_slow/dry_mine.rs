@@ -38,8 +38,8 @@ const MOVING_ON_DAYS: f64 = 15.0;
 const IDLE_SLACK: f64 = 0.01;
 
 /// The share of its plans after moving on that put someone to work at the new mine, at least (81%
-/// when measured).
-const MOST_WORKED: f64 = 0.75;
+/// when measured, 75% since #1379: a full city's farmers win the Food its founding waits on too).
+const MOST_WORKED: f64 = 0.7;
 
 /// The share of its adults the city's plan leaves idle, of those who could work: one carrying a
 /// child gets no work (`CONTEXT.md`: Standing idle). Since its spare hands work past their caps
