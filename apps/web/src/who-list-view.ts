@@ -1,6 +1,8 @@
 import { wrapDelta } from './shared/terrain.js'
 import { BUILDING_NAMES } from './map/palette.js'
-import { groupSkip, type GroupOrder, type GroupSeen } from './group-orders.js'
+import { groupSkip, type GroupSeen } from './group-orders.js'
+import { boundToTile, type BuildingGroupOrder } from './building-orders.js'
+import { subjectLabel } from './Residents.js'
 
 /**
  * The who-list (`CONTEXT.md`: Who-list): the last step of a realm order, listing the realm's
@@ -11,15 +13,22 @@ import { groupSkip, type GroupOrder, type GroupSeen } from './group-orders.js'
 /** A resident as the who-list needs them: what a group order checks, and what they do. */
 export type WhoResident = Parameters<typeof groupSkip>[1]
 
-/** A realm order that reaches the who-list. */
-export type WhoOrder = Extract<GroupOrder, { kind: 'build' }>
+/** A realm order that reaches the who-list: Build, and those a building's card starts. */
+export type WhoOrder = BuildingGroupOrder
 
 /**
  * How many of the nearest idle residents the who-list ticks for an order (`CONTEXT.md`:
- * Who-list, suggests): two builders get a house up in good time without emptying the city.
+ * Who-list, suggests): two builders get a house up (or one down) in good time without emptying
+ * the city; one for the rest, a workplace's other places being the Player's call.
  */
 export const WHO_SUGGESTS: Record<WhoOrder['kind'], number> = {
   build: 2,
+  tearDown: 2,
+  work: 1,
+  feedStable: 1,
+  breed: 1,
+  teach: 1,
+  train: 1,
 }
 
 /**
@@ -43,10 +52,30 @@ export interface WhoRow {
   why?: string
 }
 
-/** What the who-list is for, its title: "Build a house", "Build an inn" (stone: "a stone wall"). */
+/**
+ * What the who-list is for, its title: "Build a house", "Build an inn" (stone: "a stone wall"),
+ * "Work at the farm", "Tear down the house", "Teach Strength".
+ */
 export function whoTitle(order: WhoOrder): string {
-  const name = `${order.material === 'stone' ? 'stone ' : ''}${BUILDING_NAMES[order.building].toLowerCase()}`
-  return `Build ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name}`
+  switch (order.kind) {
+    case 'build': {
+      const stone = order.material === 'stone' ? 'stone ' : ''
+      const name = `${stone}${BUILDING_NAMES[order.building].toLowerCase()}`
+      return `Build ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name}`
+    }
+    case 'work':
+      return `Work at the ${order.name}`
+    case 'tearDown':
+      return `Tear down the ${order.name}`
+    case 'feedStable':
+      return 'Feed the stable'
+    case 'breed':
+      return 'Breed two horses'
+    case 'teach':
+      return `Teach ${subjectLabel(order.subject)}`
+    case 'train':
+      return 'Train at the training ground'
+  }
 }
 
 /** The reason a resident with no way to the target can't take the order. */
@@ -55,16 +84,25 @@ export const NO_WAY_THERE = 'no way there'
 /**
  * Why a resident can't take a realm order, if they can't (`CONTEXT.md`: Who-list): what the
  * group card would skip them for (a child, a partner carrying a child), or no way there. Those
- * elsewhere are not skipped: a realm order walks them there first.
+ * elsewhere are not skipped: a realm order walks them there first, so an order bound to the
+ * target's tile is judged as if they stood `at` it.
  */
 export function whyNot(
   order: WhoOrder,
   r: WhoResident,
   way: WhoWay,
-  { tick, size, seen }: { tick: number; size: number; seen?: GroupSeen },
+  {
+    tick,
+    size,
+    seen,
+    at,
+  }: { tick: number; size: number; seen?: GroupSeen; at?: { x: number; y: number } },
 ): string | undefined {
+  const there = at && boundToTile(order) ? { ...r, x: at.x, y: at.y } : r
   // Queued, a group order skips nobody for standing elsewhere: they walk there first.
-  return groupSkip(order, r, tick, size, true, seen) ?? (way === 'none' ? NO_WAY_THERE : undefined)
+  return (
+    groupSkip(order, there, tick, size, true, seen) ?? (way === 'none' ? NO_WAY_THERE : undefined)
+  )
 }
 
 /** How many tiles apart two tiles are as the crow flies, the short way round, diagonals one step. */
@@ -85,7 +123,7 @@ export function whoRows(
 ): WhoRow[] {
   const rows = residents.map((r): WhoRow => {
     const way = wayOf(r)
-    const why = whyNot(order, r, way, ctx)
+    const why = whyNot(order, r, way, { ...ctx, at })
     const known = typeof way === 'object' ? way : undefined
     return {
       id: r.id,

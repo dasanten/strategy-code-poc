@@ -545,6 +545,7 @@ export function TileCard({
   tile,
   waypoints,
   workSettings,
+  realmOrders,
   mapSize,
   onAddWaypoint,
   onFeed,
@@ -556,6 +557,8 @@ export function TileCard({
   building: Building | undefined
   /** The Work settings panel of a workplace or site of one (`WorkSettings`), if any. */
   workSettings?: ReactNode
+  /** In realm control mode, the orders about the building that end in the who-list (`BuildingOrders`). */
+  realmOrders?: ReactNode
   nodeKind: keyof typeof NODE_ART | undefined
   /** The node under the building's footprint, which picks what a mine yields. */
   buildingNode?: ResourceKind
@@ -728,6 +731,7 @@ export function TileCard({
         />
       )}
       {card.what === 'building' && workSettings}
+      {card.what === 'building' && realmOrders}
       {actions.length > 0 && (
         <ActionRows
           actions={actions}
