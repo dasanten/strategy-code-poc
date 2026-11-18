@@ -257,8 +257,8 @@ describe('Now or After', () => {
     const to = [resident('a', 1, 1), resident('b', 2, 2, working)]
     const walk = { kind: 'walkTo', x: 10, y: 10 } as const
     const { requests } = realmRequests(walk, to, new Set(['b']), sendCtx)
-    const now = requests[0]!.order as { x: number; y: number }
-    const after = requests[1]!.order as { steps: { order: { x: number; y: number } }[] }
+    const now = requests[0]!.order as unknown as { x: number; y: number }
+    const after = requests[1]!.order as unknown as { steps: { order: { x: number; y: number } }[] }
     const last = after.steps.at(-1)!.order
     expect([now.x, now.y]).not.toEqual([last.x, last.y])
   })
