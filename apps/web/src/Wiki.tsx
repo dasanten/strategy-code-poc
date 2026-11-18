@@ -787,6 +787,19 @@ export function Wiki() {
           there just starts.
         </p>
         <p>
+          The card of a carriage of yours starts <b>Haul with this carriage</b> (pick the goods each
+          way and the Food kept on board, then tap the route’s other stop), <b>Drive this to</b>{' '}
+          (tap where) and <b>Board</b>; a boat’s card <b>Row this to</b> and <b>Board</b>; a ship
+          docked at a haven <b>Board</b> as a passenger and <b>Board as crew</b>. Driving, hauling
+          and rowing take one resident: the who-list ticks the nearest idle one, and Confirm is off
+          while more than one is ticked. Board ticks as many as there are seats left, the list
+          counting them (“2 of 3 seats”), and Confirm is off past the seats; crew take no seat. A
+          resident you tick who is elsewhere walks to the carriage, beside the boat or onto the
+          ship’s haven first, then takes the order. A carriage someone already drives says so on
+          its Haul and Drive rows: one you send Now takes it over, its driver stopping; one you send
+          After waits in their queue, and their step fails if it is still driven when its turn comes.
+        </p>
+        <p>
           Switching to realm control mode lets go of the resident, group or army you had picked.
           Picking one some other way (a row or Pick these in the Residents list, a saved group’s
           number key, the Armies drawer, a notice that opens a resident) switches back to unit
@@ -2484,6 +2497,11 @@ export function Wiki() {
           stays aboard while it is driven (see Under attack). Scripts see a resident's{' '}
           <code>aboard</code> and a carriage's <code>passengerIds</code> and{' '}
           <code>standsStill</code>.
+        </p>
+        <p>
+          In realm control mode a carriage’s or vessel’s own card gives these orders the other way
+          round: Haul with this carriage, Drive this to, Row this to or Board first, then who, from
+          the who-list, with anyone far off walking there first (see Controls, Control modes).
         </p>
         <p>
           <strong>Refilling from a carriage:</strong> any of your residents on or next to a carriage
