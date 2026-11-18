@@ -298,22 +298,32 @@ export function parseChoice(text: string | null): ResidentsChoice {
   }
 }
 
-/** The choice this browser remembers; the default without storage. */
-export function loadChoice(storage: Pick<Storage, 'getItem'> | undefined): ResidentsChoice {
+/**
+ * The choice this browser remembers under `key` (the who-list keeps its own); the default without
+ * storage.
+ */
+export function loadChoice(
+  storage: Pick<Storage, 'getItem'> | undefined,
+  key = CHOICE_KEY,
+): ResidentsChoice {
   try {
-    return parseChoice(storage?.getItem(CHOICE_KEY) ?? null)
+    return parseChoice(storage?.getItem(key) ?? null)
   } catch {
     return DEFAULT_CHOICE
   }
 }
 
-/** Remembers the choice in this browser; without storage it lasts until the list closes. */
+/**
+ * Remembers the choice in this browser under `key`; without storage it lasts until the list
+ * closes.
+ */
 export function storeChoice(
   storage: Pick<Storage, 'setItem'> | undefined,
   choice: ResidentsChoice,
+  key = CHOICE_KEY,
 ) {
   try {
-    storage?.setItem(CHOICE_KEY, JSON.stringify(choice))
+    storage?.setItem(key, JSON.stringify(choice))
   } catch {
     // Without storage it just isn't remembered.
   }

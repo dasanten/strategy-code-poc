@@ -407,6 +407,7 @@ import {
   repairWork,
 } from './shared/decay.js'
 import { fighterStrength } from './shared/persuasion.js'
+import { WHO_PAGE, WHO_SUGGESTS } from './who-list-view.js'
 import type {
   BuildingKind,
   CrimeKind,
@@ -721,14 +722,110 @@ export function Wiki() {
           card, then the open drawer.
         </p>
         <p>
-          What a click picks on a tile goes in this order, at every zoom: one of your residents
-          there, then a building, then the bare tile, each showing its card. A carriage of yours, or
-          a horse of yours nobody rides, counts like a building. A click on a stack of your
-          residents (a token with a count, or the +N badge up close) picks them all as a group; its
-          card’s Members tab picks one of them. A stack with someone else’s residents in it opens
-          the tile card instead, which lists them all. With a mouse, what a click would pick is
-          outlined while you hover over it, in its owner’s colour; on a touch screen a tap picks by
-          the same order.
+          In unit control mode, what a click picks on a tile goes in this order, at every zoom: one
+          of your residents there, then a building, then the bare tile, each showing its card. A
+          carriage of yours, or a horse of yours nobody rides, counts like a building. A click on a
+          stack of your residents (a token with a count, or the +N badge up close) picks them all as
+          a group; its card’s Members tab picks one of them. A stack with someone else’s residents
+          in it opens the tile card instead, which lists them all. With a mouse, what a click would
+          pick is outlined while you hover over it, in its owner’s colour; on a touch screen a tap
+          picks by the same order.
+        </p>
+        <h3>Control modes</h3>
+        <p>
+          The Unit | Realm switch at the start of the top bar, or the Tab key, picks how you give
+          orders. This browser remembers it; you start in unit control mode.
+        </p>
+        <p>
+          In <b>unit control mode</b> you pick residents, a group or an army, then say what they do,
+          as the rest of this section tells. In <b>realm control mode</b> you say what is to be done
+          and where, then who does it. There a click or tap on the map picks a building (a carriage,
+          or a horse nobody rides, counts as one), else the bare tile: your residents are drawn but
+          never picked, so a crowded tile is still easy to click, and a drag or the Select button
+          picks no group. The realm bar along the bottom of the map (above the map buttons on a
+          phone) is where those orders start.
+        </p>
+        <p>
+          <b>Build</b> on the realm bar opens the Build menu. Pick a kind (and Customise, if you
+          like), then tap where it goes: the footprint shows under the pointer, marked where it
+          doesn’t fit, and a tile it can’t go on says why and sends nobody. Then the <b>who-list</b>{' '}
+          opens: your residents nearest the place first, each with what they are doing and how long
+          their way there is. The nearest {num(WHO_SUGGESTS.build)} idle ones are already ticked;
+          change the ticks or just Confirm. With nobody idle, nobody is ticked and the list says so.
+          Those who can’t build (children, a partner carrying a child, or with no way there) come
+          last, greyed out, saying why. Those ticked walk there and build as a group sent with Build
+          would; hold Shift while confirming to pick the next place for another of the same kind.
+          <b>Road</b> and <b>Wall</b> beside it lay out a line the same way (see{' '}
+          <a href="#building">Building</a>).
+        </p>
+        <p>
+          A busy resident you tick gets a <b>Now / After</b> switch on their row. <b>Now</b> drops
+          what they are doing and sends them at once. <b>After</b> adds the order to the end of
+          their queue, as Shift does on their card: they finish the steps they have first. Someone
+          walking with no queue yet gets one, the walk first. After is offered only to those two:
+          someone running a script or a task (Work, a haul route, …) or another order without a
+          queue has nothing to add to, as a new queue would end what they do, so their row offers
+          Now only and says “no queue to add to”. The switch starts on After for someone running a
+          queue and on Now for anyone else busy; an idle resident has no switch. The line at the top
+          sums it up: “3 ticked: 2 now, 1 after”.
+        </p>
+        <p>
+          A long who-list can be searched by name and filtered as the Residents list can (idle, by
+          city, has weapons, …); this browser remembers the filters. Ticks stay on those a search or
+          filter hides, and the list says how many are ticked but not shown. Only the nearest{' '}
+          {num(WHO_PAGE)} are drawn at first; Show more draws more.
+        </p>
+        <p>
+          A building’s card starts the orders about it, each ending in the same who-list:{' '}
+          <b>Work here</b> at a workplace (or a site of one), <b>Build this site</b> at a site of
+          yours, <b>Feed the stable</b> and <b>Breed horses</b> (pick the two first) at a stable,{' '}
+          <b>Teach</b> (pick the subject) and <b>Train</b> at a training ground, and{' '}
+          <b>Tear down</b> at any building of yours or a workplace. Only those that fit the building
+          show, greyed with why while they can’t be given. Customise, or a workplace’s Work
+          settings, come before the who-list, as on a resident’s card. The who-list ticks the
+          nearest {num(WHO_SUGGESTS.work)} idle resident for Work, Feed the stable, Breed, Teach and
+          Train, and {num(WHO_SUGGESTS.tearDown)} for Tear down. A resident you tick who stands
+          elsewhere walks there first and then does it, with no second order from you; one already
+          there just starts.
+        </p>
+        <p>
+          The realm bar also has <b>Walk to</b> (tap where; those ticked spread over the free tiles
+          around it, as a group does; Shift picks the next place), <b>Explore</b> (its form first:
+          what to look for, which way, a waypoint, how much food), <b>Run script</b> (pick the
+          script, with Customise for its params; a building, storage or waypoint for a param is
+          picked on the map) and <b>Relocate</b> (pick the city). Each ends in the who-list, the
+          nearest {num(WHO_SUGGESTS.walkTo)} idle one ticked. Explore and a script with no place
+          picked have no target tile, so the list sorts by the distance to your town hall and says
+          so; Relocate sorts by the town hall of the city they move to, and lists those living there
+          already last.
+        </p>
+        <p>
+          A tile’s card in realm control mode offers <b>Walk here</b>, and on a tile with no
+          building <b>Build here</b>: the Build menu for that tile, then the who-list. The card of a
+          storage, stable, haven, or a carriage or boat of yours offers <b>Store here</b> (those
+          carrying something listed first, the nearest {num(WHO_SUGGESTS.store)} idle ones ticked)
+          and <b>Fetch from here</b>, the good picked from what it holds (those with room for it
+          listed first).
+        </p>
+        <p>
+          The card of a carriage of yours starts <b>Haul with this carriage</b> (pick the goods each
+          way and the Food kept on board, then tap the route’s other stop), <b>Drive this to</b>{' '}
+          (tap where) and <b>Board</b>; a boat’s card <b>Row this to</b> and <b>Board</b>; a ship
+          docked at a haven <b>Board</b> as a passenger and <b>Board as crew</b>. Driving, hauling
+          and rowing take one resident: the who-list ticks the nearest idle one, and Confirm is off
+          while more than one is ticked. Board ticks as many as there are seats left, the list
+          counting them (“2 of 3 seats”), and Confirm is off past the seats; crew take no seat. A
+          resident you tick who is elsewhere walks to the carriage, beside the boat or onto the
+          ship’s haven first, then takes the order. A carriage someone already drives says so on its
+          Haul and Drive rows: one you send Now takes it over, its driver stopping; one you send
+          After waits in their queue, and their step fails if it is still driven when its turn
+          comes.
+        </p>
+        <p>
+          Switching to realm control mode lets go of the resident, group or army you had picked.
+          Picking one some other way (a row or Pick these in the Residents list, a saved group’s
+          number key, the Armies drawer, a notice that opens a resident) switches back to unit
+          control mode.
         </p>
         <p>
           The tool rail on the left opens drawers over the map, one at a time, in three groups:
@@ -1902,6 +1999,11 @@ export function Wiki() {
           they leave. A horse left there unridden can't be ridden off a road.
         </p>
         <p>
+          Building is given from a resident’s card or a group card (where to build, then what), or
+          in realm control mode from Build on the realm bar: what, then where, then who builds it,
+          picked from the who-list (see Controls, Control modes).
+        </p>
+        <p>
           Tear down can be run directly too, with Run script or as a queue step: they tear down the
           building or site in its <code>building</code> param, walking there first, or with none
           picked the one they stand on when it starts. Giving Tear down on a building fills it; it
@@ -2073,6 +2175,14 @@ export function Wiki() {
           given it one by one, each take the nearest tile still to build that no other of them has
           taken, so several tiles go up at once; each fetches their own materials. With every tile
           left taken by the others, a builder waits, and they all stop once the line is finished.
+        </p>
+        <p>
+          In <a href="#controls">realm control mode</a> a line starts from the realm bar instead:{' '}
+          <strong>Road</strong> or <strong>Wall</strong> (wood or stone, on the banner), then where
+          the line starts and where it ends, with the same preview. A line too long, or with no tile
+          left to build, says why and you pick its end again. Then the who-list shows your residents
+          with their way to the line’s tile nearest them, the nearest {num(WHO_SUGGESTS.line)} idle
+          ones ticked; those you confirm get Build line as a crew.
         </p>
         <p>
           A storage in a city's area is that city's storage. One outside any city is an{' '}
@@ -2417,6 +2527,11 @@ export function Wiki() {
           stays aboard while it is driven (see Under attack). Scripts see a resident's{' '}
           <code>aboard</code> and a carriage's <code>passengerIds</code> and{' '}
           <code>standsStill</code>.
+        </p>
+        <p>
+          In realm control mode a carriage’s or vessel’s own card gives these orders the other way
+          round: Haul with this carriage, Drive this to, Row this to or Board first, then who, from
+          the who-list, with anyone far off walking there first (see Controls, Control modes).
         </p>
         <p>
           <strong>Refilling from a carriage:</strong> any of your residents on or next to a carriage
@@ -3287,14 +3402,15 @@ export function Wiki() {
           Iron, Iron ore, Coal) don't keep it from being full: it still works and buys them. Once it
           lacks nothing but its founding party's materials, those count as short: its spare hands
           gather them, it builds a workplace for one it has none of, and they are still spare hands
-          while they do. Food, Wood and Stone come first, Food its surplus too: only once it holds {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus
-          cap past its reserve, and while full its farmers work to win that back as they do its
-          reserve. While it saves for its party, its walls and repairs spend only the Stone above its
-          reserve and the party's Stone. Its workplaces come first as well: its spare hands go on a road
-          crew, scout and work at its workplaces for surplus, and only those left over gather for
-          the party. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less for
-          each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}. A
-          dip below its reserve only restarts that wait if it lasts longer than{' '}
+          while they do. Food, Wood and Stone come first, Food its surplus too: only once it holds{' '}
+          {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus cap past its reserve, and while
+          full its farmers work to win that back as they do its reserve. While it saves for its
+          party, its walls and repairs spend only the Stone above its reserve and the party's Stone.
+          Its workplaces come first as well: its spare hands go on a road crew, scout and work at
+          its workplaces for surplus, and only those left over gather for the party. Past{' '}
+          {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less for each{' '}
+          {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}. A dip
+          below its reserve only restarts that wait if it lasts longer than{' '}
           {days(NPC_FULL_DIP_DAYS)}, though nobody sets out during one. A full city founds a
           daughter. Once a game day it looks for a free Plains site {num(NPC_CITY_MIN_DISTANCE)} to{' '}
           {num(NPC_FOUND_REACH)} tiles away, with room for a village and on no realm's territory,
@@ -3319,12 +3435,13 @@ export function Wiki() {
         <h3>What drives an NPC city</h3>
         <p>
           An NPC city is more than its needs. It has a <b>temperament</b>, fixed for good, which
-          leans it one way; it feels <b>threat</b> from those it sees armed nearby and from those who
-          killed or robbed its people, and remembers where it lost them; and each game day it takes
-          a <b>stance</b> from both: growing, arming, trading, settling further out, or turning on
-          whoever hurt it. The stance decides what it builds and how many soldiers it keeps, its
-          threat how far it sends its traders and where its workers go, and its temperament which
-          stance it reaches for first. Below, each in turn; Threat is under Standing & reactions.
+          leans it one way; it feels <b>threat</b> from those it sees armed nearby and from those
+          who killed or robbed its people, and remembers where it lost them; and each game day it
+          takes a <b>stance</b> from both: growing, arming, trading, settling further out, or
+          turning on whoever hurt it. The stance decides what it builds and how many soldiers it
+          keeps, its threat how far it sends its traders and where its workers go, and its
+          temperament which stance it reaches for first. Below, each in turn; Threat is under
+          Standing & reactions.
         </p>
         <h3>Temperament</h3>
         <p>
@@ -3332,10 +3449,10 @@ export function Wiki() {
           settler. A self-managed city gets one when its Leader dies, unless it had one before. A
           daughter takes its mother's {pct(NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT)} of the time and
           otherwise draws one of its own, which may still be the same. Whoever sees a city reads its
-          temperament on its card, and keeps it in Last seen; whoever has traded with it reads it
-          in the Standing list while they hold a standing with each other. Scripts see the same.
-          Trading posts and the HQ have none. On its own a temperament changes nothing: it tilts
-          the city's stance.
+          temperament on its card, and keeps it in Last seen; whoever has traded with it reads it in
+          the Standing list while they hold a standing with each other. Scripts see the same.
+          Trading posts and the HQ have none. On its own a temperament changes nothing: it tilts the
+          city's stance.
         </p>
         <h3>Stance</h3>
         <p>
@@ -3350,9 +3467,9 @@ export function Wiki() {
         </p>
         <ul>
           <li>
-            <b>Fortify</b> keeps {num(NPC_STANCE.fortifySoldiers)} times the soldiers it keeps by its
-            size, sends {num(NPC_STANCE.fortifyEscorts)} more with each escort, shuts its gates to
-            armed outsiders {num(NPC_STANCE.fortifyGateWatch)} times as far off, and weighs the
+            <b>Fortify</b> keeps {num(NPC_STANCE.fortifySoldiers)} times the soldiers it keeps by
+            its size, sends {num(NPC_STANCE.fortifyEscorts)} more with each escort, shuts its gates
+            to armed outsiders {num(NPC_STANCE.fortifyGateWatch)} times as far off, and weighs the
             danger places by the way to a workplace {num(NPC_STANCE.fortifyDanger)} times as much.
           </li>
           <li>
@@ -3371,29 +3488,28 @@ export function Wiki() {
           stand at the site until the workplace is built. A militarist city in Expand that knows no
           free node of the good goes for the nearest workplace on one that a realm holds, in no
           city: the realm's residents within {num(NPC_NODE_GUARD_RANGE)} tiles of it hold it. It
-          goes only when the soldiers it can spare are at least {num(NPC_TAKE_OUTWEIGH_TIMES)}{' '}
-          times as strong as the armed ones there, and never fewer than{' '}
-          {num(NPC_TAKE_PARTY_MIN)}. They strike everyone of that realm there, an attack like any
-          other and a crime against it, until none is left up; then the workplace is the city's and
-          its own workers move in (Holding a workplace). It never goes for the node of a realm in
-          its shelter (Demands).
+          goes only when the soldiers it can spare are at least {num(NPC_TAKE_OUTWEIGH_TIMES)} times
+          as strong as the armed ones there, and never fewer than {num(NPC_TAKE_PARTY_MIN)}. They
+          strike everyone of that realm there, an attack like any other and a crime against it,
+          until none is left up; then the workplace is the city's and its own workers move in
+          (Holding a workplace). It never goes for the node of a realm in its shelter (Demands).
         </p>
         <p>
           Whoever sees an NPC city reads its stance on its card as a mood line: growing, arming,
-          busy trading, looking to expand, or retaliating against whom. Scripts see it as the
-          city's stance.
+          busy trading, looking to expand, or retaliating against whom. Scripts see it as the city's
+          stance.
         </p>
         <h3>Retaliating</h3>
         <p>
           An NPC city turns on a realm (<b>Retaliate</b>) once it feels a threat of{' '}
-          {num(NPC_RETALIATE.threat)} from it and knows of a recent crime of theirs against it,
-          such as its traders killed. It arms as under Fortify and sends that realm demands for
-          Coins. Rarely it marches: with a threat of {num(NPC_RETALIATE.marchThreat)}, its standing
-          toward them at {signed(NPC_RETALIATE.marchStanding)} or below, and its soldiers beyond its
-          hall and gate posts {num(NPC_RETALIATE.marchOutweigh)} times as strong as the defenders
-          of their nearest city, those soldiers walk to that city's town hall and occupy it. Held
-          to the end, the city leaves the realm and goes on as an NPC city of its own. Never
-          against a realm in its shelter.
+          {num(NPC_RETALIATE.threat)} from it and knows of a recent crime of theirs against it, such
+          as its traders killed. It arms as under Fortify and sends that realm demands for Coins.
+          Rarely it marches: with a threat of {num(NPC_RETALIATE.marchThreat)}, its standing toward
+          them at {signed(NPC_RETALIATE.marchStanding)} or below, and its soldiers beyond its hall
+          and gate posts {num(NPC_RETALIATE.marchOutweigh)} times as strong as the defenders of
+          their nearest city, those soldiers walk to that city's town hall and occupy it. Held to
+          the end, the city leaves the realm and goes on as an NPC city of its own. Never against a
+          realm in its shelter.
         </p>
         <p>
           It ends when its threat from them fades below {num(NPC_RETALIATE.endsBelow)} (a paid
@@ -3418,9 +3534,9 @@ export function Wiki() {
           {days(CONTRACT_MAX_DAYS)}. An NPC city hires too, on its own: once it feels a threat of{' '}
           {num(NPC_ACTING_FIRST.hireThreat)} from one Organization, it asks the Trade Organization
           for up to {num(NPC_ACTING_FIRST.hireSoldiers)} soldiers for{' '}
-          {days(NPC_ACTING_FIRST.hireDays)}, if its storages hold the whole price, and pays each week
-          from them. They stand at its town hall and fight attackers in its City area. They set out
-          with the Food for the walk there and back from a storage of their own city, and in its
+          {days(NPC_ACTING_FIRST.hireDays)}, if its storages hold the whole price, and pays each
+          week from them. They stand at its town hall and fight attackers in its City area. They set
+          out with the Food for the walk there and back from a storage of their own city, and in its
           City area they eat from its storage as at home.
         </p>
         <p>
@@ -3505,9 +3621,9 @@ export function Wiki() {
         <p>
           An NPC city goes after those who steal from it. Once one of its residents saw the theft,
           or the news reached it, it sends up to {num(NPC_HUNTERS_PER_THIEF)} soldiers after the
-          thief while they are within {num(NPC_HUNT_REACH)} tiles of its home: only soldiers
-          beyond those holding its town hall and its gates go. They strike the thief down, which is
-          no crime, take what was stolen from where the thief fell and carry it into the city's
+          thief while they are within {num(NPC_HUNT_REACH)} tiles of its home: only soldiers beyond
+          those holding its town hall and its gates go. They strike the thief down, which is no
+          crime, take what was stolen from where the thief fell and carry it into the city's
           storage. A thief who gets further off is let go, and the soldiers go back to their posts.
         </p>
         <table>
@@ -3560,8 +3676,8 @@ export function Wiki() {
             An NPC city also seeks allies on its own: once it feels a threat of{' '}
             {num(NPC_ACTING_FIRST.allyThreat)} from one Organization, it invites into an alliance it
             leads, founding one if it has none, the realms in no alliance it holds at{' '}
-            {signed(NPC_ALLIANCE_JOIN_STANDING)} or better (never the one it fears), and the NPC cities
-            that feel threatened by the same Organization and hold it that well too.
+            {signed(NPC_ALLIANCE_JOIN_STANDING)} or better (never the one it fears), and the NPC
+            cities that feel threatened by the same Organization and hold it that well too.
           </li>
           <li>
             Below {signed(TRADE_ORG_REFUSES_TRADE_BELOW)} the Trade Organization won't trade with
@@ -3673,11 +3789,11 @@ export function Wiki() {
           <strong>threat</strong> from each Organization, a strong friendly neighbour too. At its
           planning pass it adds what your armed residents weigh, by strength as respect weighs them,
           wherever it sees them: in its City area or in sight of any of its people, also its traders
-          and scouts far from home. Standing a game day in sight adds{' '}
-          {num(THREAT_SEEN_PER_DAY)} for each point of strength. Learning that you killed one of its
-          people adds {num(THREAT_PER_KILLING)}, that you robbed it {num(THREAT_PER_ROBBERY)}. Threat
-          fades to half every {days(THREAT_HALF_LIFE_DAYS)} and is forgotten below{' '}
-          {num(THREAT_FORGOTTEN)}. You don't see it.
+          and scouts far from home. Standing a game day in sight adds {num(THREAT_SEEN_PER_DAY)} for
+          each point of strength. Learning that you killed one of its people adds{' '}
+          {num(THREAT_PER_KILLING)}, that you robbed it {num(THREAT_PER_ROBBERY)}. Threat fades to
+          half every {days(THREAT_HALF_LIFE_DAYS)} and is forgotten below {num(THREAT_FORGOTTEN)}.
+          You don't see it.
         </p>
         <p>
           It also remembers <strong>danger places</strong>: where one of its people was killed

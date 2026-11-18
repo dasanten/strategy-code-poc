@@ -135,8 +135,21 @@ body {
 }
 /* The picker's room: without it Log out would run off the bar on a small laptop or tablet. */
 @media (max-width: 1150px) {
-  .hud-top .hud-muted {
+  .hud-top .hud-muted,
+  .hud-top .hud-sep {
     display: none;
+  }
+  /* With the Unit | Realm switch too, the bar fits a 1024 px screen only packed closer, the
+     realm's name giving way last with an ellipsis; else focusing a card scrolls the game aside. */
+  .hud-top,
+  .hud-top .hud-goods {
+    gap: 8px;
+  }
+  .hud-top > b {
+    flex: 0 1 auto;
+    min-width: 3em;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 .hud-good,
@@ -2665,4 +2678,181 @@ button.residents-row.selected:hover {
 }
 .admin-land-legend .swatch.mark {
   transform: rotate(45deg);
+}
+
+/* The Unit | Realm switch at the start of the top bar (`CONTEXT.md`: Control mode). */
+.hud-control {
+  flex: none;
+  display: inline-flex;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.hud-control button {
+  padding: 2px 9px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ui-muted);
+  font: inherit;
+  line-height: 20px;
+}
+.hud-control button + button {
+  border-left: 1px solid var(--ui-line-strong);
+}
+.hud-control button:hover {
+  background: var(--ui-raised-hover);
+}
+.hud-control button.on {
+  background: var(--rel-own);
+  color: var(--ui-ink);
+  font-weight: 600;
+}
+.game.phone .hud-control button {
+  padding: 4px 8px;
+}
+/* The realm bar along the bottom of the map in realm control mode (`CONTEXT.md`: Realm order). */
+.hud-realm-bar {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  width: max-content;
+  max-width: min(680px, calc(100vw - var(--rail-w) - 220px));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  background: var(--ui-bar);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--ui-line);
+  border-radius: 10px;
+}
+/* On a line of its own under the orders. */
+.hud-realm-bar-hint {
+  flex: 1 1 100%;
+  color: var(--ui-muted);
+  white-space: normal;
+}
+.hud-realm-bar button {
+  flex: none;
+  padding: 4px 12px;
+  font-weight: 600;
+}
+.hud-realm-bar button.on {
+  background: var(--rel-own);
+  color: var(--ui-ink);
+}
+/* The who-list (`CONTEXT.md`: Who-list): one row a resident, nearest first, can't-take greyed. */
+.who-choice {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 4px 0 6px;
+}
+.who-search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.who-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.who-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.who-shown {
+  margin: 0 0 4px;
+}
+/* Now / After under a ticked busy resident's row, in line with their name. */
+.who-when {
+  display: flex;
+  gap: 4px;
+  padding: 0 2px 5px 28px;
+  border-bottom: 1px solid var(--ui-line);
+}
+.who-row:has(.who-when) label {
+  border-bottom: none;
+}
+.who-when button {
+  padding: 2px 10px;
+  font-size: 12px;
+}
+.who-when button[aria-pressed='true'] {
+  background: var(--rel-own);
+  color: var(--ui-ink);
+  font-weight: 600;
+}
+.who-more {
+  width: 100%;
+  margin-top: 4px;
+}
+.who-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.who-row label {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: 'tick name way' 'tick doing doing';
+  column-gap: 8px;
+  align-items: baseline;
+  padding: 5px 2px;
+  border-bottom: 1px solid var(--ui-line);
+  cursor: pointer;
+}
+.who-row input {
+  grid-area: tick;
+  align-self: center;
+}
+.who-name {
+  grid-area: name;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.who-way {
+  grid-area: way;
+  white-space: nowrap;
+}
+.who-doing {
+  grid-area: doing;
+  color: var(--ui-muted);
+  min-width: 0;
+}
+.who-cant label {
+  opacity: 0.5;
+  cursor: default;
+}
+.who-actions {
+  margin-top: 8px;
+}
+/* On a phone above the map buttons and the minimap button, clear of the notices up top. */
+.game.phone .hud-realm-bar {
+  bottom: calc(var(--sheet-h, 0px) + 12px + 44px + 6px + 36px + 8px);
+  left: 8px;
+  right: 8px;
+  transform: none;
+  width: auto;
+  max-width: none;
+  padding: 5px 10px;
+  font-size: 12px;
+  gap: 4px 6px;
+}
+/* The orders in as few rows as fit on a phone. */
+.game.phone .hud-realm-bar button {
+  padding: 4px 7px;
 }
