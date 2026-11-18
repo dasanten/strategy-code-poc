@@ -296,7 +296,7 @@ function keepsGoing(r: WhoResident): boolean {
  * Work or a haul route, or another order) the queue it would start ends what they do at once,
  * so After is not offered: "no queue to add to".
  *
- * Provisional (the coordinator's call while Daniel is away): the rule is open as #1444.
+ * Daniel's rule (#1444, 2026-11-18), in `CONTEXT.md` under Who-list.
  */
 export function afterOffered(r: Pick<WhoResident, 'order' | 'script' | 'queue'>): boolean {
   return !!r.queue || (r.order?.kind === 'walkTo' && !r.script)
