@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ROAD_LINE_MAX_TILES } from '@csp/balance'
-import type { ScriptParam } from '@csp/shared-types'
+import type { BuildingKind, ScriptParam } from '@csp/shared-types'
+import { BUILDING_NAMES } from './map/palette.js'
 import type { ArmyPick } from './Armies.js'
 import type { GroupPicking, Picking } from './Residents.js'
 import { nextPick, type Plan } from './plan-step.js'
@@ -16,6 +17,8 @@ export type PickTarget =
   | { kind: 'army'; mode: ArmyPick['kind'] }
   | { kind: 'param'; param: ScriptParam }
   | { kind: 'plan'; prompt: string; error?: string }
+  /** A realm order picking its place (`CONTEXT.md`: Realm order): where the kind goes. */
+  | { kind: 'realm'; building: BuildingKind; error?: string }
 
 /** The target the map waits for, if any; one at a time, the param before the others. */
 export function pickTarget(state: {
@@ -27,8 +30,11 @@ export function pickTarget(state: {
   paramPick: ScriptParam | undefined
   /** The step being planned with Add step, if it still picks a place. */
   plan?: Plan
+  /** The kind a realm order picks a place for, and why the last tile picked would not do. */
+  realm?: { building: BuildingKind; error?: string }
 }): PickTarget | undefined {
   if (state.paramPick) return { kind: 'param', param: state.paramPick }
+  if (state.realm) return { kind: 'realm', ...state.realm }
   if (state.armyPick) return { kind: 'army', mode: state.armyPick.kind }
   const planned = state.plan && nextPick(state.plan)
   if (planned) {
@@ -123,6 +129,10 @@ export function pickHint(target: PickTarget): string | undefined {
   if (target.kind === 'resident') return RESIDENT_HINTS[target.mode]
   if (target.kind === 'group') return GROUP_HINTS[target.mode]
   if (target.kind === 'plan') return target.error && `Nothing picked: ${target.error}.`
+  if (target.kind === 'realm')
+    return target.error
+      ? `Not there: ${target.error}.`
+      : 'Then who builds it: the nearest idle residents are ticked.'
   return undefined
 }
 
@@ -155,6 +165,8 @@ export function pickPrompt(target: PickTarget, touch: boolean): string {
   if (target.kind === 'group') return `${verb} ${GROUP_PROMPTS[target.mode]}`
   if (target.kind === 'army') return `${verb} ${ARMY_PROMPTS[target.mode]}`
   if (target.kind === 'plan') return `${verb} ${target.prompt}`
+  if (target.kind === 'realm')
+    return `${verb} where the ${BUILDING_NAMES[target.building].toLowerCase()} goes`
   return `${verb} ${PARAM_PROMPTS[target.param.type]} for ${target.param.name}`
 }
 

@@ -207,8 +207,20 @@ import {
   type HaulSetup,
   type Picking,
 } from './Residents.js'
-import { arrivalOf } from './doing-view.js'
-import { CardSheet, PickBanner, TileCard, closeOpenPanel, panelOpen } from './SelectionCard.js'
+import { arrivalOf, doingLine } from './doing-view.js'
+import {
+  CardSheet,
+  PickBanner,
+  SelectionCard,
+  TileCard,
+  closeOpenPanel,
+  panelOpen,
+} from './SelectionCard.js'
+import { BuildMenu } from './BuildMenu.js'
+import { kindProblemOn } from './build-menu-view.js'
+import { WhoList } from './WhoList.js'
+import { WHO_SUGGESTS, whoRows, whoTitle, type WhoOrder, type WhoWay } from './who-list-view.js'
+import { searchPath } from './map/path-preview.js'
 import {
   pickHint,
   picksWallLine,
@@ -285,6 +297,16 @@ interface Starting {
   error?: string
   start: (params: StartParamValues) => Promise<void>
 }
+
+/**
+ * A realm order being given (`CONTEXT.md`: Realm order): Build on the realm bar opens the Build
+ * menu, then the kind picks where it goes (with why the last tile would not do), then the
+ * who-list says who builds it there.
+ */
+type RealmOrder =
+  | { step: 'menu' }
+  | { step: 'where'; building: BuildingKind; material?: WallMaterial; error?: string }
+  | { step: 'who'; building: BuildingKind; material?: WallMaterial; at: { x: number; y: number } }
 
 /** What the resident card's script param fields need of the world (`script-params-view`). */
 function paramWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): ParamWorld {
@@ -448,7 +470,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * through what the order picks on the map first, and goes when that is cancelled.
    */
   const customising = useRef(false)
-  const orderPicked = picking !== false || groupPicking !== false || plan !== undefined
+  // A realm order being given in realm control mode (`CONTEXT.md`: Realm order).
+  const [realmOrder, setRealmOrder] = useState<RealmOrder>()
+  const orderPicked =
+    picking !== false || groupPicking !== false || plan !== undefined || realmOrder !== undefined
   useEffect(() => {
     if (!orderPicked) customising.current = false
   }, [orderPicked])
@@ -705,6 +730,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     armyPick,
     paramPick: pickingParam,
     plan,
+    realm:
+      realmOrder?.step === 'where'
+        ? {
+            building: realmOrder.building,
+            ...(realmOrder.error ? { error: realmOrder.error } : {}),
+          }
+        : undefined,
   })
   // The building the tile card is about: in sight, or as last seen.
   const tileBuilding =
@@ -750,6 +782,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setWorkPick(undefined)
     setPlan(undefined)
     setStarting((s) => s && { ...s, picking: undefined })
+    // A realm order picking its place goes back to the realm bar.
+    setRealmOrder((o) => (o?.step === 'where' ? undefined : o))
   }, [])
   /**
    * Switches the control mode (the HUD switch, Tab). Into realm control mode it drops a picked
@@ -766,6 +800,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     },
     [cancelPick, setControlMode],
   )
+  // A realm order is given in realm control mode only: leaving it drops one half given.
+  useEffect(() => {
+    if (controlMode === 'unit') setRealmOrder(undefined)
+  }, [controlMode])
   // Tab flips the control mode, unless the Player is typing or in a dialog, where it moves on
   // as ever (`CONTEXT.md`: Control mode).
   useEffect(() => {
@@ -797,6 +835,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const picked = pick !== undefined
   const formOpen = starting !== undefined
   const tileOpen = selectedTile !== undefined
+  // The realm order's Build menu or who-list, which Escape closes as it does a card.
+  const realmCard = realmOrder !== undefined && realmOrder.step !== 'where'
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing =
@@ -806,7 +846,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         pick: picked,
         panel: formOpen || (shownCard && panelOpen()),
         tile: shownCard && tileOpen,
-        card: shownCard && anySelected,
+        card: shownCard && (anySelected || realmCard),
       })
       // With nothing else open, the drawer's own Escape closes it.
       if (!step) return
@@ -820,10 +860,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       if (step === 'tile') return setSelectedTile(undefined)
       setSelectedIds([])
       setPicking(false)
+      setRealmOrder(undefined)
     }
     window.addEventListener('keydown', onKey, { capture: true })
     return () => window.removeEventListener('keydown', onKey, { capture: true })
-  }, [anySelected, picked, formOpen, tileOpen, shownCard, cancelPick])
+  }, [anySelected, realmCard, picked, formOpen, tileOpen, shownCard, cancelPick])
   useLayoutEffect(() => {
     if (!toShow) return
     const covered = mapCovered()
@@ -940,6 +981,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function goTo(x: number, y: number) {
     const mode = picking
     setPicking(false)
+    if (realmOrder?.step === 'where') return realmTile(x, y, realmOrder)
     if (starting?.picking) {
       // A value for the form before a script starts, which shows again.
       const param = starting.picking
@@ -1148,6 +1190,42 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             // Terrain not loaded counts as unexplored: nothing is laid out there.
             { size: w.map.size, at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED },
           )
+  /**
+   * Why a kind picked before its tile can't go on the tile (`CONTEXT.md`: Realm order), as the
+   * Build menu there would say it: the placement rule, a node's workplace off its node.
+   */
+  const realmBuildProblem = (
+    w: NonNullable<typeof world>,
+    x: number,
+    y: number,
+    kind: BuildingKind,
+    material?: WallMaterial,
+  ) => kindProblemOn(kind, nodeAt?.(x, y), (k) => buildProblemAt(w, x, y)(k, material))
+  /**
+   * The tile picked for a realm order's Build: a kind that can't go there says why, and the
+   * Player picks again; else the who-list opens for it.
+   */
+  function realmTile(x: number, y: number, o: Extract<RealmOrder, { step: 'where' }>) {
+    if (!world) return
+    const size = world.map.size
+    const at = { x: wrap(x, size), y: wrap(y, size) }
+    const problem = realmBuildProblem(world, at.x, at.y, o.building, o.material)
+    const material = o.material ? { material: o.material } : {}
+    if (problem)
+      return setRealmOrder({ step: 'where', building: o.building, ...material, error: problem })
+    setRealmOrder({ step: 'who', building: o.building, ...material, at })
+  }
+  /**
+   * Confirm on the who-list: those ticked get what the group card's Build sends them, the first
+   * there laying out the site and the others joining it, replacing what they do. With Shift held
+   * the same kind stays armed for the next place; else the realm bar is back.
+   */
+  async function confirmRealmOrder(order: WhoOrder, ids: readonly string[], again: boolean) {
+    const to = ids.flatMap((id) => own.filter((r) => r.id === id))
+    const material = order.material ? { material: order.material } : {}
+    setRealmOrder(again ? { step: 'where', building: order.building, ...material } : undefined)
+    await sendGroup(order, false, to)
+  }
   /** The queue planner's Add step, on the resident card and the group card. */
   function addStep(w: NonNullable<typeof world>) {
     const seen = { cities: knownCities, buildings: knownBuildings, residents: w.residents }
@@ -1300,19 +1378,24 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * script starts at once, each going on with what they keep (`CONTEXT.md`: Starting at once),
    * unless the form opens, once for all (`opensForm`), filled with the values all of them keep.
    */
-  async function sendGroup(order: GroupOrder, queued = shift.current) {
+  async function sendGroup(
+    order: GroupOrder,
+    queued = shift.current,
+    /** Who gets it: the picked group, or those ticked on a realm order's who-list. */
+    to: readonly Resident[] = group,
+  ) {
     if (!world) return
     const given = 'params' in order && order.params !== undefined
     const asked =
       !given &&
       opensForm(
         groupOrderStart(order) ?? { kind: order.kind },
-        group.map((r) => r.scriptParams),
-        (params) => sendGroup({ ...order, params } as GroupOrder, queued),
+        to.map((r) => r.scriptParams),
+        (params) => sendGroup({ ...order, params } as GroupOrder, queued, to),
       )
     if (asked) return
     const size = world.map.size
-    const inGroup = new Set(group.map((r) => r.id))
+    const inGroup = new Set(to.map((r) => r.id))
     // Free: explored land a resident can stand on, with no wall or gate and nobody else on it.
     const free = (x: number, y: number) => {
       const t = terrainAt?.(x, y)
@@ -1321,7 +1404,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return !world.residents.some((r) => r.x === x && r.y === y && !inGroup.has(r.id))
     }
     // With Shift held, each one's queue gets the order appended (`CONTEXT.md`: Queue).
-    const { requests, skipped } = groupRequests(order, group, {
+    const { requests, skipped } = groupRequests(order, to, {
       tick: world.tick,
       size,
       free,
@@ -1332,23 +1415,28 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     await sendToGroup(
       requests.map((q) => q.order),
       skipped,
+      to,
     )
   }
   /**
    * Sends the group's requests, one per resident, and says on the card how many went out and who
    * was skipped or turned down and why.
    */
-  async function sendToGroup(requests: OrderRequest[], skipped: Skipped[]) {
+  async function sendToGroup(
+    requests: OrderRequest[],
+    skipped: Skipped[],
+    to: readonly Resident[] = group,
+  ) {
     setGroupError(undefined)
     const answers = await Promise.all(requests.map((o) => sendOrder(o)))
     const turnedDown = requests.flatMap((o, i) => {
       const why = answers[i]
-      const r = group.find((g) => g.id === o.residentId)
+      const r = to.find((g) => g.id === o.residentId)
       return why && r ? [{ id: r.id, name: r.name, why }] : []
     })
     setGroupReport({
       sent: requests.length - turnedDown.length,
-      of: group.length,
+      of: to.length,
       skipped: [...skipped, ...turnedDown],
     })
   }
@@ -1719,38 +1807,50 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   )
   // What the pick waiting for a tile would do under the pointer, or at the tile tapped on a touch
   // screen (`CONTEXT.md`: Picking a target).
-  const preview = (() => {
-    if (!world || !pick || !pickAt) return undefined
-    const size = world.map.size
-    const roads = roadTiles(world, size)
-    // A way doesn't cross a wall, nor a gate unless it is the realm's own or an ally's, or open
-    // (`CONTEXT.md`: Wall, Gate); climbing onto the realm's own walls is left out.
-    const allies = new Set(world.diplomacy.alliance?.members.map((m) => m.realmId))
-    allies.add(world.home.realmId)
-    const blocked = new Set(
+  /**
+   * The ground a way is found on as the Player knows it, and the tiles it can't step onto: a way
+   * doesn't cross a wall, nor a gate unless it is the realm's own or an ally's, or open
+   * (`CONTEXT.md`: Wall, Gate); climbing onto the realm's own walls is left out.
+   */
+  const wayGround = (w: NonNullable<typeof world>) => {
+    const size = w.map.size
+    const roads = roadTiles(w, size)
+    const allies = new Set(w.diplomacy.alliance?.members.map((m) => m.realmId))
+    allies.add(w.home.realmId)
+    const walls = new Set(
       knownBuildings
         .filter((b) => isWallOrGate(b))
         .filter((b) => {
-          const realmId = world.cities.find((c) => c.id === b.cityId)?.realmId
+          const realmId = w.cities.find((c) => c.id === b.cityId)?.realmId
           return b.kind === 'wall' || (b.closed && !(realmId && allies.has(realmId)))
         })
         .map((b) => tileIndex(size, b.x, b.y)),
     )
-    const seen: PreviewWorld = {
-      blocked: (x, y) => blocked.has(tileIndex(size, x, y)),
-      ...planWorld(world),
-      cityNames: knownCities,
-      ground: (x, y) => {
+    return {
+      blocked: (x: number, y: number) => walls.has(tileIndex(size, x, y)),
+      ground: (x: number, y: number): Terrain | undefined => {
         if (roads.has(tileIndex(size, x, y))) return Terrain.Road
         const t = terrainAt?.(x, y)
         return t === undefined || t === UNEXPLORED ? undefined : (t as Terrain)
       },
+    }
+  }
+  const preview = (() => {
+    if (!world || !pick || !pickAt) return undefined
+    const size = world.map.size
+    const seen: PreviewWorld = {
+      ...wayGround(world),
+      ...planWorld(world),
+      cityNames: knownCities,
       nodeAt: (x, y) => nodeAt?.(x, y),
       buildProblem: (kind, x, y) =>
-        buildHereProblem(kind, x, y, world, (nx, ny) => nodeAt?.(nx, ny), {
-          size,
-          at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED,
-        }),
+        // A kind picked before its tile is judged as the Build menu there would (realm control).
+        realmOrder?.step === 'where'
+          ? realmBuildProblem(world, x, y, kind, realmOrder.material)
+          : buildHereProblem(kind, x, y, world, (nx, ny) => nodeAt?.(nx, ny), {
+              size,
+              at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED,
+            }),
     }
     const what = previewPickOf(pick, {
       lineFrom: group.length > 1 ? groupLineFrom : lineFrom,
@@ -1780,6 +1880,45 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         },
       }))
     return pickPreview(what, pickAt, seen, goers)
+  })()
+  // Each resident's way to a realm order's target, by where they stand and the target: found
+  // once, not again each tick while they stand still.
+  const whoWays = useRef(new Map<string, WhoWay>())
+  // The realm order's who-list (`CONTEXT.md`: Who-list): its order and rows, while it is open.
+  const who = (() => {
+    if (!world || realmOrder?.step !== 'who') return undefined
+    const { building, material, at } = realmOrder
+    const order: WhoOrder = { kind: 'build', building, at, ...(material ? { material } : {}) }
+    const size = world.map.size
+    const { ground, blocked } = wayGround(world)
+    const ways = whoWays.current
+    if (ways.size > 2000) ways.clear()
+    const wayOf = (r: Resident): WhoWay => {
+      const key = `${r.id}:${r.x},${r.y}>${at.x},${at.y}`
+      if (ways.has(key)) return ways.get(key)
+      const found = searchPath(size, r, at, ground, 'foot', blocked)
+      const way: WhoWay =
+        found === 'none'
+          ? 'none'
+          : found === 'gaveUp'
+            ? undefined
+            : {
+                tiles: found.length,
+                ticks: arrivesIn?.({
+                  ...r,
+                  order: {
+                    kind: 'walkTo',
+                    target: at,
+                    path: found.map(([x, y]) => [x, y] as [number, number]),
+                    progress: 0,
+                  },
+                }),
+              }
+      ways.set(key, way)
+      return way
+    }
+    const ctx = { tick: world.tick, size, seen: groupSeen }
+    return { order, rows: whoRows(order, own, at, (r) => wayOf(r as Resident), ctx) }
   })()
 
   async function logout() {
@@ -1859,6 +1998,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setWorkPick(undefined)
               setPlan(undefined)
               setOrderError(undefined)
+              // The realm order's Build menu or who-list gives way to the tile's card.
+              setRealmOrder(undefined)
             }}
             selectedCityId={openCityId}
             onSelectCity={(id) => {
@@ -1870,7 +2011,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               armyPick !== undefined ||
               pickingParam !== undefined ||
               pick?.kind === 'plan' ||
-              (group.length > 1 && groupPicking !== false)
+              (group.length > 1 && groupPicking !== false) ||
+              realmOrder?.step === 'where'
             }
             onPickTile={pickTile}
             preview={preview}
@@ -1900,7 +2042,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         onWiki={() => reportFirstDay('openWiki')}
         control={world ? { mode: controlMode, onSwitch: switchControlMode } : undefined}
       />
-      {world && controlMode === 'realm' && <RealmBar />}
+      {world && controlMode === 'realm' && (
+        <RealmBar
+          building={realmOrder !== undefined}
+          onBuild={() => {
+            setSelectedTile(undefined)
+            setRealmOrder((o) => (o ? undefined : { step: 'menu' }))
+          }}
+        />
+      )}
       {phone ? (
         <PhoneMenu
           open={openDrawer}
@@ -2820,6 +2970,55 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               </InsertPointContext.Provider>
             }
             collapsed={pick?.kind === 'group' || (pick?.kind === 'plan' && !picksCity)}
+          />
+        </CardSheet>
+      )}
+      {world && realmOrder?.step === 'menu' && !selectedTile && (
+        <CardSheet phone={phone} pinnedPeek={false} hidden={hideCard}>
+          <SelectionCard
+            rel="own"
+            title="Build"
+            lines={['Pick what to build, then where it goes, then who builds it.']}
+            onClose={() => setRealmOrder(undefined)}
+          >
+            <section className="inspector-block" aria-label="Build">
+              <BuildMenu
+                node={undefined}
+                // Judged once the tile is picked.
+                buildProblem={() => undefined}
+                anywhere
+                onBuild={(building, material) =>
+                  setRealmOrder({ step: 'where', building, ...(material ? { material } : {}) })
+                }
+              />
+            </section>
+          </SelectionCard>
+        </CardSheet>
+      )}
+      {world && who && realmOrder?.step === 'who' && !selectedTile && (
+        <CardSheet phone={phone} pinnedPeek={false} hidden={hideCard}>
+          <WhoList
+            // Another order or place opens a list ticked afresh.
+            key={`${realmOrder.building}:${realmOrder.at.x},${realmOrder.at.y}`}
+            title={whoTitle(who.order)}
+            at={realmOrder.at}
+            rows={who.rows}
+            suggest={WHO_SUGGESTS[who.order.kind]}
+            doing={(id) => {
+              const r = own.find((o) => o.id === id)
+              return r
+                ? doingLine(r, {
+                    scripts,
+                    buildings: world.buildings,
+                    residents: world.residents,
+                    horses: world.horses,
+                    cities: knownCities,
+                    arrives: arrivesIn?.(r),
+                  })
+                : ''
+            }}
+            onConfirm={(ids, again) => void confirmRealmOrder(who.order, ids, again)}
+            onClose={() => setRealmOrder(undefined)}
           />
         </CardSheet>
       )}

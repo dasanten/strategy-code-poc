@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pickPrompt, pickTap, pickTarget } from './pick-mode.js'
+import { pickHint, pickPrompt, pickTap, pickTarget } from './pick-mode.js'
 import type { Plan } from './plan-step.js'
 
 const none = {
@@ -93,5 +93,16 @@ describe('a click or tap while picking', () => {
 
   it('picks the tile previewed on a second tap there', () => {
     expect(pickTap(tile, { ...tile }, true)).toEqual({ pick: tile })
+  })
+})
+
+describe('a realm order picking its place', () => {
+  it('waits for where the kind goes, and says why the last tile would not do', () => {
+    const target = pickTarget({ ...none, realm: { building: 'house' } })
+    expect(target).toEqual({ kind: 'realm', building: 'house' })
+    expect(pickPrompt(target!, true)).toBe('Tap where the house goes')
+    expect(pickHint(target!)).toBe('Then who builds it: the nearest idle residents are ticked.')
+    const missed = { kind: 'realm', building: 'house', error: 'it is not in a city' } as const
+    expect(pickHint(missed)).toBe('Not there: it is not in a city.')
   })
 })

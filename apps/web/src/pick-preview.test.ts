@@ -169,3 +169,21 @@ describe('the preview under the pointer', () => {
     expect(whatIsAt({ x: 3, y: 3 }, world({ carriages }))).toBe('Carriage')
   })
 })
+
+describe('the preview of a kind picked before its place (realm control mode)', () => {
+  it('previews a realm order’s Build as that kind’s footprint', () => {
+    expect(previewPickOf({ kind: 'realm', building: 'house' }, {})).toEqual({
+      kind: 'build',
+      building: 'house',
+    })
+  })
+
+  it('shows the kind’s footprint, marked with why where it doesn’t fit', () => {
+    const fits = pickPreview({ kind: 'build', building: 'house' }, { x: 20, y: 3 }, world(), [])
+    expect(fits.footprint).toEqual({ kind: 'house', x: 20, y: 3 })
+    expect(fits.label).toBe('House here')
+    const not = pickPreview({ kind: 'build', building: 'house' }, { x: 3, y: 3 }, world(), [])
+    expect(not.footprint).toEqual({ kind: 'house', x: 3, y: 3, problem: 'it overlaps a building' })
+    expect(not.label).toBe('No room for a house: it overlaps a building')
+  })
+})

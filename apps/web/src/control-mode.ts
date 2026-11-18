@@ -98,6 +98,6 @@ export function modeAfterPick(mode: ControlMode, picked: Picked): ControlMode {
   return picked.residents > 0 || picked.army ? 'unit' : mode
 }
 
-/** What the realm bar says while it has no orders yet (`CONTEXT.md`: Realm order). */
-export const REALM_BAR_EMPTY =
-  'Realm control: say what is to be done and where, then who does it. A click picks a building or a tile, never a resident.'
+/** What the realm bar says beside its orders (`CONTEXT.md`: Realm order). */
+export const REALM_BAR_HINT =
+  'What, where, then who. A click picks a building or a tile, never a resident.'
