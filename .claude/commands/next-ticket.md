@@ -39,7 +39,9 @@ branches from `origin/dev` instead (ADR 0010).
   through the game API, orders only request actions (ADR 0002).
 - If the next ticket cannot ship without this one (or the reverse), do both in this PR.
 - Tick the ticket's "Done when" boxes as they become true (edit the issue body).
-- Before committing: `pnpm check:rust` when the change touches `crates/`, and
+- While working on the crates, run the tests of the crate you change
+  (`cargo nextest run -p csp-sim [filter]`), not the whole check (ADR 0040).
+- Before committing: `pnpm check:rust` once when the change touches `crates/`, and
   `pnpm check origin/epic/<n>-<slug>` (a `bug`: `origin/dev`), which runs lint, typecheck and the
   client tests the change affects (ADR 0013).
 

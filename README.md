@@ -61,7 +61,7 @@ Admins can also create invite codes and reset passwords in the client.
 Other scripts:
 
 ```sh
-pnpm check:rust    # cargo fmt --check, clippy with warnings as errors, cargo nextest run
+pnpm check:rust    # cargo fmt --check, clippy with warnings as errors, cargo nextest run (shares the machine)
 pnpm types:rust    # the client's types from the crates (commit packages/shared-types/src/generated)
 pnpm balance:rust  # the client's balance numbers from balance.rs
 pnpm build         # type-check and bundle the client
@@ -71,6 +71,12 @@ pnpm check [base]  # lint, typecheck and the client tests affected by changes ag
 pnpm lint          # ESLint
 pnpm format        # Prettier
 ```
+
+While working on a crate, run its tests alone: `cargo nextest run -p csp-sim [filter]` builds in
+about half the time of the whole workspace, since `csp-server` isn't rebuilt. Run
+`pnpm check:rust` once before finishing. It shares the machine with other checks (ADR 0040):
+builds run side by side, and the suite runs one check at a time, so it may say it is waiting for
+another check's suite. A check alone waits for nothing.
 
 A Rust test over 5 s is a regression to fix (nextest flags it); `cargo fmt --all` fixes
 formatting. Each crate's integration tests build into one test binary: `tests/all.rs` lists every

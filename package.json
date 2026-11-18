@@ -19,7 +19,7 @@
     "balance:rust": "cargo run -q -p csp-shared --bin write-balance",
     "wasm:build": "node scripts/wasm-build.mjs",
     "script-data:rust": "cargo run --quiet --package csp-lang-wasm --bin script-data",
-    "check:rust": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo nextest run --workspace",
+    "check:rust": "node scripts/check-rust.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
