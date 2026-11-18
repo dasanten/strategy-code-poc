@@ -807,9 +807,16 @@ The shared language of the game. Domain terms only — no implementation details
   in high standing and feel threatened by the same Organization, into an alliance it leads,
   founding one (named after itself) if it has none; an NPC city that founded an alliance leads
   it, and the role passes to a realm first when it leaves. It hires from the Trade Org army only,
+  only soldiers standing at the HQ and only while its town hall lies within its trader's reach of
+  the HQ (#1414, decided overnight, Daniel to confirm),
   as many as a balance number for a balance number of days, with the whole price in its
   storages, paying each week from them like a transfer; its mercenaries stand at its town hall
-  and fight attackers in its City area.
+  and fight attackers in its City area. They set out with the Food for the walk there and back
+  from a storage of their own city, as a trader does, and in its City area they eat from its
+  storage as at home, up to the Food for the walk home, so they go home fed when the contract
+  ends (#1414: they starved without; decided overnight, Daniel to confirm). Its
+  soldiers guarding a site likewise set out with the Food for the way, and one down to what the
+  walk home eats goes home and leaves the escort, which it fills again with others.
   - **Hunting a thief:** for a theft it knows of (seen by one of its residents, or the news
     brought home), a few soldiers (a balance number per thief) go after the thief while they stay
     within its reach of its home (a balance number, its set reach); only soldiers beyond its hall
