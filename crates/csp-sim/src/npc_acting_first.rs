@@ -265,11 +265,12 @@ fn run_mercenaries(world: &mut WorldState, size: i32) {
     }
 }
 
-/// Before an NPC city's mercenary leaves home for its town hall at `hall`, they take the Food for
-/// the walk there and back from a storage of their own city, as a trader does (`set_out_food`;
-/// #1414: the Trade Org soldiers NPC cities hired walked out with none and starved on the way).
+/// Before a resident sent out for their city leaves home for `hall` (an NPC city's mercenary for its
+/// town hall, a site escort for its site), they take the Food for the walk there and back from a
+/// storage of their own city, as a trader does (`set_out_food`; #1414: the Trade Org soldiers NPC
+/// cities hired, and NPC soldiers sent to guard far sites, walked out with none and starved).
 /// Whether they went for it: walking to the storage, or picking it up there.
-fn take_way_food(world: &mut WorldState, i: usize, hall: (f64, f64), size: i32) -> bool {
+pub(crate) fn take_way_food(world: &mut WorldState, i: usize, hall: (f64, f64), size: i32) -> bool {
     let r = &world.residents[i];
     let Some(home) = r.city_id.clone() else { return false };
     let (x, y) = (r.x as i32, r.y as i32);
