@@ -40,7 +40,9 @@ const walking = {
 } as unknown as Partial<Resident>
 
 const carriage = { id: 'k1', x: 10, y: 10, realmId: 'r1', cityId: 'c1' }
-const cart = (more: Partial<Extract<OrderedVehicle, { what: 'carriage' }>> = {}): OrderedVehicle => ({
+const cart = (
+  more: Partial<Extract<OrderedVehicle, { what: 'carriage' }>> = {},
+): OrderedVehicle => ({
   what: 'carriage',
   carriage,
   seats: 2,
@@ -238,14 +240,15 @@ describe('far residents walk first, to a carriage or vessel', () => {
     const v = cart({ driver: { id: 'd', name: 'D' } })
     const near = resident('a', 10, 10)
     const now = vehicleRequests({ kind: 'drive', x: 5, y: 5 }, v, [near], { ...ctx, at })
-    expect(now.requests.map((q) => q.order.kind)).toEqual(['stop', 'drive'])
-    expect(now.requests[0]).toEqual({ residentId: 'd', order: { kind: 'stop', residentId: 'd' } })
+    expect(now.stop).toBe('d')
+    expect(now.requests.map((q) => q.order.kind)).toEqual(['drive'])
     const busy = resident('a', 10, 10, walking)
     const later = vehicleRequests({ kind: 'drive', x: 5, y: 5 }, v, [busy], {
       ...ctx,
       at,
       after: new Set(['a']),
     })
+    expect(later.stop).toBeUndefined()
     expect(later.requests.map((q) => q.residentId)).toEqual(['a'])
   })
 
@@ -281,7 +284,13 @@ describe('far residents walk first, to a carriage or vessel', () => {
       ...ctx,
       at: { x: 19, y: 20 },
     })
-    expect(requests[0]?.order).toEqual({ kind: 'row', vesselId: 'v1', x: 25, y: 20, residentId: 'a' })
+    expect(requests[0]?.order).toEqual({
+      kind: 'row',
+      vesselId: 'v1',
+      x: 25,
+      y: 20,
+      residentId: 'a',
+    })
   })
 
   it('walks to the haven a ship is docked at, then boards as crew', () => {
@@ -291,7 +300,7 @@ describe('far residents walk first, to a carriage or vessel', () => {
     const far = resident('a', 2, 2)
     const order = vehicleOrder('boardCrew', v)!
     const { requests } = vehicleRequests(order, v, [far], { ...ctx, at: stand! })
-    const steps = (requests[0]?.order as Extract<OrderRequest, { kind: 'queue' }>).steps
+    const steps = (requests[0]?.order as OrderRequest & { steps: unknown[] }).steps
     expect(steps).toEqual([
       { order: { kind: 'walkTo', x: 30, y: 30 } },
       { order: { kind: 'board', vesselId: 's1', asCrew: true } },

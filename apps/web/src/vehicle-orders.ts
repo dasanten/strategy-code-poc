@@ -3,7 +3,7 @@ import { inContact } from './shared/combat.js'
 import { wrap } from './shared/terrain.js'
 import type { Building, Carriage, OrderRequest, SeenVessel, VesselKind } from '@csp/shared-types'
 import { appendRequest } from './queue-view.js'
-import { timedItems } from './plan-blocks.js'
+import { timedItems, type PlanItem } from './plan-blocks.js'
 import { groupRequests, type GroupOrder, type GroupSeen, type GroupSend } from './group-orders.js'
 import type { HaulSetup } from './Residents.js'
 
@@ -66,6 +66,8 @@ export type OrderedVehicle =
 
 /** Why Board is greyed on a full carriage or vessel. */
 export const NO_SEAT_LEFT = 'no seat left'
+/** Why a boat's orders are greyed with no land beside it to stand on (`standAt`). */
+export const NO_STAND = 'no land beside it to stand on'
 /** Why a ship at sea offers no Board: it is boarded only at the haven it is docked at. */
 export const NOT_DOCKED = 'not docked at a haven'
 
@@ -286,7 +288,7 @@ export function driverStops(
  * elsewhere gets a queue, a walk to `at` (`standAt`) and then the order, instead of being
  * skipped. Those in `after` get it appended to their queue, after a walk there. Board still stops
  * at the seats and Drive, Haul and Row at one each. A carriage's driver replaced Now
- * (`driverStops`) is stopped first, so the carriage is free for the new one.
+ * (`driverStops`) is to be stopped first, so the carriage is free for the new one: `stop`.
  */
 export function vehicleRequests(
   order: VehicleGroupOrder,
@@ -308,7 +310,7 @@ export function vehicleRequests(
     at: { x: number; y: number }
     after?: ReadonlySet<string>
   },
-): GroupSend {
+): GroupSend & { stop?: string } {
   const buildings = seen.buildings ?? []
   const there = (r: VehicleResident) => standsThere(v, r, size, buildings)
   const only = onlyThis(v, seen)
@@ -322,14 +324,12 @@ export function vehicleRequests(
     after,
   )
   return {
-    requests: [
-      ...(stop ? [{ residentId: stop, order: { kind: 'stop', residentId: stop } as const }] : []),
-      ...requests.map(({ residentId, order: request }) => {
-        const r = residents.find((x) => x.id === residentId)!
-        return { residentId, order: walkThere(r, request, at, after.has(r.id), there(r)) }
-      }),
-    ],
+    requests: requests.map(({ residentId, order: request }) => {
+      const r = residents.find((x) => x.id === residentId)!
+      return { residentId, order: walkThere(r, request, at, after.has(r.id), there(r)) }
+    }),
     skipped,
+    ...(stop ? { stop } : {}),
   }
 }
 
@@ -354,6 +354,6 @@ export function walkThere(
   const step = { ...request }
   delete step.residentId
   if (walked && (walked.kind === 'queue' || walked.kind === 'editQueue'))
-    return { ...walked, steps: timedItems([...walked.steps, { order: step }]) }
+    return { ...walked, steps: timedItems([...(walked.steps as PlanItem[]), { order: step }]) }
   return appendRequest(base, request, at) ?? request
 }

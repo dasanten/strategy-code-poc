@@ -816,9 +816,10 @@ export function Wiki() {
           while more than one is ticked. Board ticks as many as there are seats left, the list
           counting them (“2 of 3 seats”), and Confirm is off past the seats; crew take no seat. A
           resident you tick who is elsewhere walks to the carriage, beside the boat or onto the
-          ship’s haven first, then takes the order. A carriage someone already drives says so on
-          its Haul and Drive rows: one you send Now takes it over, its driver stopping; one you send
-          After waits in their queue, and their step fails if it is still driven when its turn comes.
+          ship’s haven first, then takes the order. A carriage someone already drives says so on its
+          Haul and Drive rows: one you send Now takes it over, its driver stopping; one you send
+          After waits in their queue, and their step fails if it is still driven when its turn
+          comes.
         </p>
         <p>
           Switching to realm control mode lets go of the resident, group or army you had picked.

@@ -64,6 +64,8 @@ export function WhoList({
   doing,
   groups,
   tick,
+  most,
+  mostNote,
   onConfirm,
   onClose,
 }: {
@@ -79,6 +81,13 @@ export function WhoList({
   /** The realm's residents under their cities, as the Residents drawer has them, to filter. */
   groups: readonly ResidentGroup<Resident>[]
   tick: number
+  /**
+   * How many it may send, if it may send only so many: one driver or rower, the seats left to
+   * board (`vehicleMost`). Confirm is off past it.
+   */
+  most?: number | undefined
+  /** What the list says of the ticks against `most`: "2 of 3 seats" (`mostNote`). */
+  mostNote?: ((ticked: number) => string | undefined) | undefined
   /**
    * Those ticked, in the list's order, and of them those who take it after what they do;
    * `again` when Shift was held.
@@ -116,6 +125,8 @@ export function WhoList({
     storeChoice(browserStorage(), { ...next, search: '' }, WHO_CHOICE_KEY)
     setLimit(WHO_PAGE)
   }
+  const capNote = mostNote?.(ticked.length)
+  const tooMany = most !== undefined && ticked.length > most
   const send = (again: boolean) =>
     onConfirm(
       rows.filter((r) => tickedSet.has(r.id)).map((r) => r.id),
@@ -129,6 +140,7 @@ export function WhoList({
       lines={[
         `${where} · who does it?`,
         <strong key="note">{whoNote(rows, ticked.length, after.length)}</strong>,
+        ...(capNote ? [<span key="most">{capNote}</span>] : []),
       ]}
       onClose={onClose}
     >
@@ -265,7 +277,7 @@ export function WhoList({
         <button
           type="button"
           className="primary"
-          disabled={ticked.length === 0}
+          disabled={ticked.length === 0 || tooMany}
           title="With Shift held, pick the next place for another"
           onClick={(e) => send(e.shiftKey)}
         >

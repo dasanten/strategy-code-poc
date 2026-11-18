@@ -19,9 +19,10 @@ export type PickTarget =
   | { kind: 'plan'; prompt: string; error?: string }
   /**
    * A realm order picking its place (`CONTEXT.md`: Realm order): where the kind goes, or with no
-   * kind where to walk to.
+   * kind where to walk to; with `vehicle`, where to drive or row a carriage or boat, or a haul
+   * route's other stop.
    */
-  | { kind: 'realm'; building?: BuildingKind; error?: string }
+  | { kind: 'realm'; building?: BuildingKind; vehicle?: RealmVehiclePick; error?: string }
   /**
    * A realm order's road or wall line picking its ends (`CONTEXT.md`: Realm order, Build line):
    * where it starts, then, with `from`, where it ends; `error` is why the last line would not do.
@@ -30,6 +31,24 @@ export type PickTarget =
 
 /** A tile of the map. */
 type Tile = { x: number; y: number }
+
+/** What a carriage's or boat's realm order picks on the map: where to haul, drive or row to. */
+export type RealmVehiclePick = 'haul' | 'drive' | 'row'
+
+/** The banner while a carriage's or boat's realm order picks its tile, after "Click"/"Tap". */
+const VEHICLE_PROMPTS: Record<RealmVehiclePick, string> = {
+  haul: 'the haul route’s other stop',
+  drive: 'where to drive the carriage',
+  row: 'where to row the boat',
+}
+
+/** What comes after the tile, under the banner. */
+const VEHICLE_HINTS: Record<RealmVehiclePick, string> = {
+  haul: 'Then who drives it: the nearest idle resident is ticked, and walks to the carriage first.',
+  drive:
+    'Then who drives it: the nearest idle resident is ticked, and walks to the carriage first.',
+  row: 'Then who rows it: the nearest idle resident is ticked, and walks to the boat first.',
+}
 
 /** The target the map waits for, if any; one at a time, the param before the others. */
 export function pickTarget(state: {
@@ -42,7 +61,7 @@ export function pickTarget(state: {
   /** The step being planned with Add step, if it still picks a place. */
   plan?: Plan
   /** The kind a realm order picks a place for, and why the last tile picked would not do. */
-  realm?: { building?: BuildingKind; error?: string }
+  realm?: { building?: BuildingKind; vehicle?: RealmVehiclePick; error?: string }
   /** The line a realm order picks the ends of, and why the last line picked would not do. */
   realmLine?: { building: 'road' | 'wall'; from?: Tile; error?: string }
 }): PickTarget | undefined {
@@ -146,9 +165,11 @@ export function pickHint(target: PickTarget): string | undefined {
   if (target.kind === 'realm')
     return target.error
       ? `Not there: ${target.error}.`
-      : target.building
-        ? 'Then who builds it: the nearest idle residents are ticked.'
-        : 'Then who walks there: the nearest idle resident is ticked.'
+      : target.vehicle
+        ? VEHICLE_HINTS[target.vehicle]
+        : target.building
+          ? 'Then who builds it: the nearest idle residents are ticked.'
+          : 'Then who walks there: the nearest idle resident is ticked.'
   if (target.kind === 'realmLine') {
     if (target.error) return `No line there: ${target.error}.`
     return target.from
@@ -188,9 +209,11 @@ export function pickPrompt(target: PickTarget, touch: boolean): string {
   if (target.kind === 'army') return `${verb} ${ARMY_PROMPTS[target.mode]}`
   if (target.kind === 'plan') return `${verb} ${target.prompt}`
   if (target.kind === 'realm')
-    return target.building
-      ? `${verb} where the ${BUILDING_NAMES[target.building].toLowerCase()} goes`
-      : `${verb} where to walk to`
+    return target.vehicle
+      ? `${verb} ${VEHICLE_PROMPTS[target.vehicle]}`
+      : target.building
+        ? `${verb} where the ${BUILDING_NAMES[target.building].toLowerCase()} goes`
+        : `${verb} where to walk to`
   if (target.kind === 'realmLine')
     return `${verb} where the ${target.building} ${target.from ? 'ends' : 'starts'}`
   return `${verb} ${PARAM_PROMPTS[target.param.type]} for ${target.param.name}`
