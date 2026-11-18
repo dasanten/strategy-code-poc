@@ -18,6 +18,14 @@ import {
   stoneOverAt,
 } from './shared/building.js'
 import { firstDayShown } from './shared/first-day.js'
+import {
+  flipped,
+  flipsControlMode,
+  modeAfterPick,
+  rememberControlMode,
+  rememberedControlMode,
+  type ControlMode,
+} from './control-mode.js'
 import type {
   ClientFirstDayLine,
   Account,
@@ -123,6 +131,7 @@ import {
   IncomingNotice,
   NoticeLane,
   PhoneMenu,
+  RealmBar,
   ToolRail,
   TopBar,
   mapCovered,
@@ -367,6 +376,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   )
   // The residents picked on the map or in the list: one shows their card, several a group card.
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  // Unit or realm control mode (`CONTEXT.md`: Control mode), kept per browser.
+  const [controlMode, setControlModeShown] = useState<ControlMode>(() => rememberedControlMode())
+  const setControlMode = useCallback((mode: ControlMode) => {
+    setControlModeShown(mode)
+    rememberControlMode(mode)
+  }, [])
   // The first-day lines reported and not turned down, so each goes out once (`reportFirstDay`).
   const firstDayReported = useRef(new Set<ClientFirstDayLine>())
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
@@ -736,6 +751,43 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setPlan(undefined)
     setStarting((s) => s && { ...s, picking: undefined })
   }, [])
+  /**
+   * Switches the control mode (the HUD switch, Tab). Into realm control mode it drops a picked
+   * resident, group or army, which are commanded in unit control mode only.
+   */
+  const switchControlMode = useCallback(
+    (mode: ControlMode) => {
+      if (mode === 'realm') {
+        setSelectedIds([])
+        setStarting(undefined)
+        cancelPick()
+      }
+      setControlMode(mode)
+    },
+    [cancelPick, setControlMode],
+  )
+  // Tab flips the control mode, unless the Player is typing or in a dialog, where it moves on
+  // as ever (`CONTEXT.md`: Control mode).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing =
+        e.target instanceof Element &&
+        e.target.closest('input, textarea, select, .cm-editor, [aria-modal="true"]') !== null
+      const { key, ctrlKey, metaKey, altKey, shiftKey } = e
+      if (!flipsControlMode({ key, ctrlKey, metaKey, altKey, shiftKey, typing })) return
+      e.preventDefault()
+      switchControlMode(flipped(controlMode))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [controlMode, switchControlMode])
+  // Picking a resident, a group or an army some other way than a map click (the Residents list,
+  // a saved group's key, the Armies drawer, a notice) switches to unit control mode.
+  const pickedArmy = armyPick !== undefined
+  useEffect(() => {
+    const next = modeAfterPick(controlMode, { residents: selectedIds.length, army: pickedArmy })
+    if (next !== controlMode) setControlMode(next)
+  }, [controlMode, selectedIds.length, pickedArmy, setControlMode])
   // Escape leaves the top-most thing first: pick mode, an open panel (the form before a script
   // starts among them), the tile card, the resident or group card, then the drawer. A card
   // hidden behind the wide drawer is passed over, so Escape closes the drawer in front of it.
@@ -1793,7 +1845,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             keepTerrainFor={{ seed: world.map.seed, player: account.name }}
             selectedIds={selectedIds}
             onSelect={(id) => select([id])}
-            onSelectMany={select}
+            // In realm control mode a drag (or the Select toggle) picks no group.
+            onSelectMany={controlMode === 'unit' ? select : undefined}
+            controlMode={controlMode}
             onSelectTile={(x, y) => {
               // A click on the ground drops a group; one resident stays picked to send there.
               if (group.length > 1) setSelectedIds([])
@@ -1844,7 +1898,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         onPickHeir={pickHeir}
         onLogout={logout}
         onWiki={() => reportFirstDay('openWiki')}
+        control={world ? { mode: controlMode, onSwitch: switchControlMode } : undefined}
       />
+      {world && controlMode === 'realm' && <RealmBar />}
       {phone ? (
         <PhoneMenu
           open={openDrawer}

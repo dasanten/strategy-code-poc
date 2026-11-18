@@ -123,16 +123,9 @@ import { drawPlans, plannedBuilding } from './map/plans.js'
 import { drawPlaces, pickedPlaces } from './map/places.js'
 import { drawMarks, drawPickPreview, type MapMark } from './map/preview-draw.js'
 import type { PickPreview } from './pick-preview.js'
-import {
-  inBox,
-  mapPickAt,
-  pickKey,
-  pickables,
-  toggled,
-  type MapPick,
-  type Point,
-} from './map/selection.js'
+import { inBox, pickKey, pickables, toggled, type MapPick, type Point } from './map/selection.js'
 import { LONG_PRESS_MS, TAP_SLOP, longPresses, pressKind } from './map/gestures.js'
+import { controlPickAt, type ControlMode } from './control-mode.js'
 
 /** No residents selected. */
 const NONE: readonly string[] = []
@@ -184,6 +177,7 @@ export function MapView({
   start,
   onView,
   newRealm = false,
+  controlMode = 'unit',
 }: {
   world: MapWorld
   /** The residents shown with a ring; the way ahead shows when there is just one. */
@@ -256,6 +250,12 @@ export function MapView({
   onView?: (cam: Camera, view: Size) => void
   /** The Player's realm is new (`isNewRealm`): the legend opens unless they folded it here. */
   newRealm?: boolean
+  /**
+   * The control mode (`CONTEXT.md`: Control mode): in realm control mode a click picks a
+   * building or the tile, never a resident (`controlPickAt`). Leave `onSelectMany` out there too,
+   * so a drag picks no group.
+   */
+  controlMode?: ControlMode
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef(world)
@@ -269,6 +269,8 @@ export function MapView({
   const selectedCityRef = useRef(selectedCityId)
   const onSelectCityRef = useRef(onSelectCity)
   onSelectCityRef.current = onSelectCity
+  const controlModeRef = useRef(controlMode)
+  controlModeRef.current = controlMode
   const pickingRef = useRef(picking)
   pickingRef.current = picking
   const onPickTileRef = useRef(onPickTile)
@@ -861,7 +863,7 @@ export function MapView({
         number,
       ]
       const w = worldRef.current
-      return mapPickAt(ownOnScreen(), p.x, p.y, tx, ty, {
+      return controlPickAt(controlModeRef.current, ownOnScreen(), p.x, p.y, tx, ty, {
         realmId: w.home.realmId,
         size: mapSize,
         residents: w.residents,
@@ -1848,7 +1850,14 @@ function drawStructures(
         .rect(sx, sy, side * tile, side * tile)
         .fill({ color: relationshipColor(rel), alpha: 0.18 * fade })
         .stroke({ width: 1.5, color: relationshipColor(rel), alpha: 0.8 * fade })
-      tokens.place(painted, cx, cy, side * tile, ruin ? RUIN_TINT : 0xffffff, (ruin ? 0.6 : 1) * fade)
+      tokens.place(
+        painted,
+        cx,
+        cy,
+        side * tile,
+        ruin ? RUIN_TINT : 0xffffff,
+        (ruin ? 0.6 : 1) * fade,
+      )
       continue
     }
     const alpha = (b.site ? 0.45 : ruin ? 0.3 : 1) * fade

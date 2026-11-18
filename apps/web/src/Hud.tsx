@@ -10,6 +10,7 @@ import {
 import { formatGameTime } from './shared/time.js'
 import type { FirstDay, TraderVisit } from '@csp/shared-types'
 import { DrawerStatus } from './drawer-head.js'
+import { REALM_BAR_EMPTY, type ControlMode } from './control-mode.js'
 import {
   DIPLOMACY_TABS,
   DRAWERS,
@@ -251,6 +252,7 @@ export function TopBar({
   onPickHeir,
   onLogout,
   onWiki,
+  control,
 }: {
   /** The realm's name (`CONTEXT.md`: Realm name), once the world has come. */
   realm?: string
@@ -267,9 +269,12 @@ export function TopBar({
   onLogout: () => void
   /** The Wiki link was followed (`CONTEXT.md`: First day). */
   onWiki?: () => void
+  /** The Unit | Realm switch (`CONTEXT.md`: Control mode), once the world has come. */
+  control?: { mode: ControlMode; onSwitch: (mode: ControlMode) => void }
 }) {
   return (
     <header className="hud-top">
+      {control && <ControlSwitch {...control} />}
       {realm && <b title="Your realm">{realm}</b>}
       {cityName && (
         <span className="hud-muted" title="Your home city">
@@ -317,6 +322,49 @@ export function TopBar({
         Log out
       </button>
     </header>
+  )
+}
+
+/**
+ * The Unit | Realm switch at the start of the top bar (`CONTEXT.md`: Control mode), on a phone
+ * too; Tab flips it as well.
+ */
+function ControlSwitch({
+  mode,
+  onSwitch,
+}: {
+  mode: ControlMode
+  onSwitch: (mode: ControlMode) => void
+}) {
+  const option = (m: ControlMode, label: string, title: string) => (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={mode === m}
+      className={mode === m ? 'on' : undefined}
+      title={title}
+      onClick={() => onSwitch(m)}
+    >
+      {label}
+    </button>
+  )
+  return (
+    <span className="hud-control" role="radiogroup" aria-label="Control mode (Tab)">
+      {option('unit', 'Unit', 'Unit control: pick residents, then say what they do (Tab)')}
+      {option('realm', 'Realm', 'Realm control: say what is to be done and where, then who (Tab)')}
+    </span>
+  )
+}
+
+/**
+ * The realm bar over the map in realm control mode (`CONTEXT.md`: Realm order): where the orders
+ * that begin with a kind or a place start. Until it has some, it says what the mode is for.
+ */
+export function RealmBar() {
+  return (
+    <div className="hud-realm-bar" role="toolbar" aria-label="Realm orders">
+      <span className="hud-realm-bar-empty">{REALM_BAR_EMPTY}</span>
+    </div>
   )
 }
 
