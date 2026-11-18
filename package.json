@@ -22,6 +22,8 @@
     "check:rust": "node scripts/check-rust.mjs",
     "test:slow": "cargo nextest run --cargo-profile slow --profile slow -p csp-sim --lib --run-ignored only -E \"test(/npc_slow::/) and not test(/game_year/)\"",
     "test:year": "cargo nextest run --cargo-profile slow --profile slow -p csp-sim --lib --run-ignored only -E \"test(/npc_slow::game_year::/)\"",
+    "test:ignored": "cargo nextest run --cargo-profile slow --profile ignored --workspace --run-ignored only",
+    "nightly:ignored": "node scripts/nightly-ignored.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
