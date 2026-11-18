@@ -10,7 +10,12 @@ import {
 import { formatGameTime } from './shared/time.js'
 import type { FirstDay, TraderVisit } from '@csp/shared-types'
 import { DrawerStatus } from './drawer-head.js'
-import { REALM_BAR_HINT, type ControlMode } from './control-mode.js'
+import {
+  REALM_BAR_HINT,
+  REALM_BAR_ORDERS,
+  type ControlMode,
+  type RealmBarOrder,
+} from './control-mode.js'
 import {
   DIPLOMACY_TABS,
   DRAWERS,
@@ -361,42 +366,28 @@ function ControlSwitch({
  * that begin with a kind or a place start, beside a line on what the mode is for.
  */
 export function RealmBar({
-  building,
-  onBuild,
-  line,
-  onLine,
+  open,
+  onOpen,
 }: {
-  building: boolean
-  onBuild: () => void
-  /** The road or wall line being given (`CONTEXT.md`: Build line), if one is. */
-  line?: 'road' | 'wall' | undefined
-  onLine?: (building: 'road' | 'wall') => void
+  /** The realm bar's order being given, if one is. */
+  open: RealmBarOrder | undefined
+  /** Starts the order, or with it open already, drops it. */
+  onOpen: (order: RealmBarOrder) => void
 }) {
-  const lineButton = (kind: 'road' | 'wall', label: string) =>
-    onLine && (
-      <button
-        type="button"
-        className={line === kind ? 'on' : undefined}
-        aria-pressed={line === kind}
-        title={`${label}: pick where the line starts and ends, then who builds it`}
-        onClick={() => onLine(kind)}
-      >
-        {label}
-      </button>
-    )
   return (
     <div className="hud-realm-bar" role="toolbar" aria-label="Realm orders">
-      <button
-        type="button"
-        className={building ? 'on' : undefined}
-        aria-pressed={building}
-        title="Build: pick what, then where, then who builds it"
-        onClick={onBuild}
-      >
-        Build
-      </button>
-      {lineButton('road', 'Road')}
-      {lineButton('wall', 'Wall')}
+      {REALM_BAR_ORDERS.map(({ id, label, title }) => (
+        <button
+          key={id}
+          type="button"
+          className={open === id ? 'on' : undefined}
+          aria-pressed={open === id}
+          title={title}
+          onClick={() => onOpen(id)}
+        >
+          {label}
+        </button>
+      ))}
       <span className="hud-realm-bar-hint">{REALM_BAR_HINT}</span>
     </div>
   )

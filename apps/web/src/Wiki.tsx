@@ -789,6 +789,25 @@ export function Wiki() {
           there just starts.
         </p>
         <p>
+          The realm bar also has <b>Walk to</b> (tap where; those ticked spread over the free tiles
+          around it, as a group does; Shift picks the next place), <b>Explore</b> (its form first:
+          what to look for, which way, a waypoint, how much food), <b>Run script</b> (pick the
+          script, with Customise for its params; a building, storage or waypoint for a param is
+          picked on the map) and <b>Relocate</b> (pick the city). Each ends in the who-list, the
+          nearest {num(WHO_SUGGESTS.walkTo)} idle one ticked. Explore and a script with no place
+          picked have no target tile, so the list sorts by the distance to your town hall and says
+          so; Relocate sorts by the town hall of the city they move to, and lists those living there
+          already last.
+        </p>
+        <p>
+          A tile’s card in realm control mode offers <b>Walk here</b>, and on a tile with no
+          building <b>Build here</b>: the Build menu for that tile, then the who-list. The card of a
+          storage, stable, haven, or a carriage or boat of yours offers <b>Store here</b> (those
+          carrying something listed first, the nearest {num(WHO_SUGGESTS.store)} idle ones ticked)
+          and <b>Fetch from here</b>, the good picked from what it holds (those with room for it
+          listed first).
+        </p>
+        <p>
           The card of a carriage of yours starts <b>Haul with this carriage</b> (pick the goods each
           way and the Food kept on board, then tap the route’s other stop), <b>Drive this to</b>{' '}
           (tap where) and <b>Board</b>; a boat’s card <b>Row this to</b> and <b>Board</b>; a ship

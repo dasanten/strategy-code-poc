@@ -17,8 +17,11 @@ export type PickTarget =
   | { kind: 'army'; mode: ArmyPick['kind'] }
   | { kind: 'param'; param: ScriptParam }
   | { kind: 'plan'; prompt: string; error?: string }
-  /** A realm order picking its place (`CONTEXT.md`: Realm order): where the kind goes. */
-  | { kind: 'realm'; building: BuildingKind; error?: string }
+  /**
+   * A realm order picking its place (`CONTEXT.md`: Realm order): where the kind goes, or with no
+   * kind where to walk to.
+   */
+  | { kind: 'realm'; building?: BuildingKind; error?: string }
   /**
    * A realm order's road or wall line picking its ends (`CONTEXT.md`: Realm order, Build line):
    * where it starts, then, with `from`, where it ends; `error` is why the last line would not do.
@@ -39,7 +42,7 @@ export function pickTarget(state: {
   /** The step being planned with Add step, if it still picks a place. */
   plan?: Plan
   /** The kind a realm order picks a place for, and why the last tile picked would not do. */
-  realm?: { building: BuildingKind; error?: string }
+  realm?: { building?: BuildingKind; error?: string }
   /** The line a realm order picks the ends of, and why the last line picked would not do. */
   realmLine?: { building: 'road' | 'wall'; from?: Tile; error?: string }
 }): PickTarget | undefined {
@@ -143,7 +146,9 @@ export function pickHint(target: PickTarget): string | undefined {
   if (target.kind === 'realm')
     return target.error
       ? `Not there: ${target.error}.`
-      : 'Then who builds it: the nearest idle residents are ticked.'
+      : target.building
+        ? 'Then who builds it: the nearest idle residents are ticked.'
+        : 'Then who walks there: the nearest idle resident is ticked.'
   if (target.kind === 'realmLine') {
     if (target.error) return `No line there: ${target.error}.`
     return target.from
@@ -183,7 +188,9 @@ export function pickPrompt(target: PickTarget, touch: boolean): string {
   if (target.kind === 'army') return `${verb} ${ARMY_PROMPTS[target.mode]}`
   if (target.kind === 'plan') return `${verb} ${target.prompt}`
   if (target.kind === 'realm')
-    return `${verb} where the ${BUILDING_NAMES[target.building].toLowerCase()} goes`
+    return target.building
+      ? `${verb} where the ${BUILDING_NAMES[target.building].toLowerCase()} goes`
+      : `${verb} where to walk to`
   if (target.kind === 'realmLine')
     return `${verb} where the ${target.building} ${target.from ? 'ends' : 'starts'}`
   return `${verb} ${PARAM_PROMPTS[target.param.type]} for ${target.param.name}`
