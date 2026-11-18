@@ -2,3 +2,11 @@
 [profile.default]
 slow-timeout = { period = "5s", terminate-after = 12 }
 fail-fast = false
+
+# The slow simulation runs (ADR 0040), built with the `slow` cargo profile: `pnpm test:slow`,
+# `test:year`, `test:ignored`. They are slow on purpose, so no 5 s warning; one that hangs is still
+# killed, after 2 hours (the year run takes about 50 minutes alone). Each test is its own process,
+# which runs them faster than one `cargo test` process (T111.3).
+[profile.slow]
+slow-timeout = { period = "10m", terminate-after = 12 }
+fail-fast = false

@@ -62,6 +62,8 @@ Other scripts:
 
 ```sh
 pnpm check:rust    # cargo fmt --check, clippy with warnings as errors, cargo nextest run (shares the machine)
+pnpm test:slow     # the slow NPC runs (npc_slow without the year runs): an epic's gate, ~8 min
+pnpm test:year     # the year and season runs (about 50 and 15 min): nightly on dev
 pnpm types:rust    # the client's types from the crates (commit packages/shared-types/src/generated)
 pnpm balance:rust  # the client's balance numbers from balance.rs
 pnpm build         # type-check and bundle the client
@@ -85,6 +87,11 @@ file makes a rebuild after a change to `csp-sim` about three times faster on Win
 with `rust-lld` on Windows (`.cargo/config.toml`), so it works from Git Bash too, where
 `/usr/bin/link` used to shadow the MSVC linker.
 
+Tests ignored for time run with `pnpm test:slow` and `pnpm test:year` (ADR 0040): the `slow` cargo
+profile (release without LTO, so it builds in about half the time and gives the same results) and
+the `slow` nextest profile (no 5 s warning, each test its own process). Extra arguments go to
+nextest: a test name narrows the run, `--no-capture` shows the output as it runs.
+
 ### The year run and its checkpoints
 
 `npc_slow::game_year::the_new_world_runs_a_game_year_on_its_own` runs a generated world for a game
@@ -96,12 +103,12 @@ from one is the same run tick for tick (a test in the default suite holds it), s
 failure, or check a fix for it, start from the last checkpoint before the failing day:
 
 ```sh
-# the whole year, writing checkpoints
-cargo test --release -p csp-sim --lib game_year::the_new_world -- --ignored --nocapture
+# the whole year, writing checkpoints (a name narrows `pnpm test:year` to the year run alone)
+pnpm test:year runs_a_game_year --no-capture
 # failed on day 214: copy the day-210 checkpoint out of the way, then go on from it to day 220
 cp target/game-year/day-210.* /tmp/
 GAME_YEAR_FROM=/tmp/day-210.world.json.gz GAME_YEAR_DAYS=220 GAME_YEAR_TRACE=/tmp/trace.txt \
-  cargo test --release -p csp-sim --lib game_year::the_new_world -- --ignored --nocapture
+  pnpm test:year runs_a_game_year --no-capture
 ```
 
 `GAME_YEAR_DAYS` is the game day to stop at (what is judged only at the end of the year is then
