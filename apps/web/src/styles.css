@@ -2718,7 +2718,8 @@ button.residents-row.selected:hover {
   left: 50%;
   transform: translateX(-50%);
   z-index: 3;
-  max-width: min(560px, calc(100vw - var(--rail-w) - 220px));
+  width: max-content;
+  max-width: min(680px, calc(100vw - var(--rail-w) - 220px));
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2845,6 +2846,7 @@ button.residents-row.selected:hover {
   left: 8px;
   right: 8px;
   transform: none;
+  width: auto;
   max-width: none;
   padding: 5px 10px;
   font-size: 12px;
