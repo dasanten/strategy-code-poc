@@ -15,10 +15,15 @@
 //!   from its storages, like a transfer. Its mercenaries go after attackers in its City area and
 //!   otherwise walk to its town hall and stand there.
 
-use csp_shared::balance::{NPC_ACTING_FIRST, NPC_ALLIANCE_JOIN_STANDING, TRADE_ORG_ARMY};
+use csp_shared::balance::{
+    set_out_food, NPC_ACTING_FIRST, NPC_ALLIANCE_JOIN_STANDING, NPC_NODE_REACH, NPC_TRADER_REACH,
+    TRADE_ORG_ARMY, WALK_TICKS_PER_TILE,
+};
+use csp_shared::footprint::is_at;
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::{
-    BuildingKind, City, ContractSide, Good, MercenaryContract, ResidentOrder, WorldState,
+    BuildingKind, City, ContractSide, Good, GoodsSpot, MercenaryContract, PickUpOrder,
+    ResidentOrder, Stock, WorldState,
 };
 
 use crate::alliances::{invite, npc_found_alliance};
@@ -30,7 +35,8 @@ use crate::queries::alliance_rules::{is_alliance_city, knows_recent_crime};
 use crate::queries::city::{for_sale, town_hall_of};
 use crate::queries::city_area::{in_city_area, occupiers_of};
 use crate::queries::contract::{contract_weeks, TICKS_PER_GAME_WEEK};
-use crate::queries::names::held_in;
+use crate::queries::goods::units_that_fit;
+use crate::queries::names::{held, held_in, placed};
 use crate::queries::npc_trade::npc_storages;
 use crate::queries::residents::is_armed;
 use crate::queries::standing::{standing_of, standing_organization, TRADE_ORG};
@@ -154,8 +160,17 @@ fn hire_mercenaries(world: &mut WorldState, city_id: &str, size: i32) {
             d(a).total_cmp(&d(b))
         });
     let Some(warehouse) = warehouse.map(|b| b.id.clone()) else { return };
+    // Its soldiers come from the HQ: only within its trader's reach of it can they get there fed
+    // and in time, and only those at the HQ, not on their way back from another city (#1414: hired
+    // across the map and again on the road, they spent their contracts walking and starved).
+    let Some(hq) = crate::queries::trade_org::trade_org_hq(world) else { return };
+    let Some(hq_hall) = town_hall_of(world, hq).map(|h| (h.x as i32, h.y as i32)) else { return };
+    if wrap_distance(size, at, hq_hall) > NPC_TRADER_REACH {
+        return;
+    }
     let soldiers: Vec<String> = crate::trade_org_army::spare_soldiers(world)
         .into_iter()
+        .filter(|r| wrap_distance(size, (r.x as i32, r.y as i32), hq_hall) <= NPC_NODE_REACH)
         .take(NPC_ACTING_FIRST.hire_soldiers as usize)
         .map(|r| r.id.clone())
         .collect();
@@ -249,13 +264,58 @@ fn run_mercenaries(world: &mut WorldState, size: i32) {
                 go_after_nearest(world, i, &attackers, &occupiers, size);
                 continue;
             }
-            let r = &mut world.residents[i];
-            if r.order.is_none() && (r.x != hall.0 || r.y != hall.1) {
-                walk_to(r, hall);
+            if r.order.is_none()
+                && (r.x != hall.0 || r.y != hall.1)
+                && !take_way_food(world, i, hall, size)
+            {
+                walk_to(&mut world.residents[i], hall);
             }
         }
     }
 }
 
+/// Before a resident sent out for their city leaves home for `hall` (an NPC city's mercenary for its
+/// town hall, a site escort for its site), they take the Food for the walk there and back from a
+/// storage of their own city, as a trader does (`set_out_food`; #1414: the Trade Org soldiers NPC
+/// cities hired, and NPC soldiers sent to guard far sites, walked out with none and starved).
+/// Whether they went for it: walking to the storage, or picking it up there.
+pub(crate) fn take_way_food(world: &mut WorldState, i: usize, hall: (f64, f64), size: i32) -> bool {
+    let r = &world.residents[i];
+    let Some(home) = r.city_id.clone() else { return false };
+    let (x, y) = (r.x as i32, r.y as i32);
+    let walk = wrap_distance(size, (x, y), (hall.0 as i32, hall.1 as i32)) * WALK_TICKS_PER_TILE;
+    let short = (set_out_food(walk) - held(&r.carried, Good::Food)).floor();
+    if short < 1.0 {
+        return false;
+    }
+    // The nearest storage of their city holding Food, within its set reach (`NPC_NODE_REACH`):
+    // further out, they are on their way already.
+    let away =
+        |b: &&csp_shared::world::Building| wrap_distance(size, (x, y), (b.x as i32, b.y as i32));
+    let store = world.buildings.iter().filter(|b| {
+        b.city_id.as_deref() == Some(home.as_str())
+            && matches!(b.kind, BuildingKind::Storage | BuildingKind::Warehouse)
+            && b.site.is_none()
+            && held_in(b.stock.as_ref(), Good::Food) >= 1.0
+            && away(b) <= NPC_NODE_REACH
+    });
+    let store = store.min_by(|a, b| away(a).total_cmp(&away(b)));
+    let Some(store) = store else { return false };
+    let units = short
+        .min(held_in(store.stock.as_ref(), Good::Food).floor())
+        .min(units_that_fit(r, Good::Food, world.tick as f64).floor());
+    if units < 1.0 {
+        return false;
+    }
+    let (sid, at) = (store.id.clone(), (store.x, store.y));
+    if is_at((x, y), placed(store), size) {
+        let from = GoodsSpot::Storage { storage_id: sid };
+        let goods = Stock::from([(Good::Food, units)]);
+        world.residents[i].order = Some(ResidentOrder::PickUp(PickUpOrder { from, goods }));
+    } else {
+        walk_to(&mut world.residents[i], at);
+    }
+    true
+}
 #[cfg(test)]
 mod tests;

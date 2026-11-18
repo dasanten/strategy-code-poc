@@ -187,6 +187,12 @@ fn a_smith_takes_the_iron_and_wood_for_spears_from_the_storage_before_setting_ou
     smith.carried = Stock::from([(Good::Food, OWN_FOOD)]);
     let smith_id = smith.id.clone();
     let storage_id = world.buildings[storage].id.clone();
+    // Food above its reserve but short of what founding waits on, so it gathers nothing for a
+    // founding party: since #1379 its spears don't keep it from that.
+    let c = world.cities.iter().find(|c| c.id == city).unwrap().clone();
+    let food = crate::queries::npc_trade::npc_reserve(&world, &c)[&Good::Food] + 1.0;
+    world.buildings[storage].stock.as_mut().unwrap().insert(Good::Food, food);
+    assert!(!crate::npc_founding::holds_food_first(&world, &c));
     // Spears are short and the storage holds their Iron and Wood: the smithy is worked.
     plan_city(&mut world, &city, Some(&terrain), None, None);
     let work: CityJob =
@@ -218,10 +224,12 @@ fn a_smith_takes_the_iron_and_wood_for_spears_from_the_storage_before_setting_ou
     let smith = &mut world.residents[1];
     (smith.carried, smith.order, smith.script) =
         (Stock::from([(Good::Food, OWN_FOOD)]), None, None);
-    world.buildings[storage].stock = Some(Stock::from([(Good::Food, 200.0), (Good::Wood, 100.0)]));
+    world.buildings[storage].stock = Some(Stock::from([(Good::Food, food), (Good::Wood, 100.0)]));
     plan_city(&mut world, &city, Some(&terrain), None, None);
     step_npc_cities(&mut world, terrain.size, Some(&terrain), None);
-    assert!(world.residents[1].script.is_none());
+    let sent =
+        world.residents[1].script.as_ref().and_then(|s| s.memory.get("workplaceId").cloned());
+    assert_ne!(sent, Some(json!("smithy")));
 }
 
 #[test]

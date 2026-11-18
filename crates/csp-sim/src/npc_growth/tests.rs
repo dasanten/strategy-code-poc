@@ -555,8 +555,11 @@ fn food_short_of_its_reserve_with_every_farm_full_builds_a_farm_before_a_begun_m
         }
     }
     build_at(&project(&v), BuildingKind::Farm);
-    // Its Food back at its reserve, the mine comes first again.
-    set_stock(&mut v, &[(Good::Food, reserve[&Good::Food] + 1.0), (Good::Wood, 400.0)]);
+    // Holding the Food its founding waits on, the mine comes first again (short of that and of no
+    // Wood or Stone, it builds a farm for it: `with_nothing_else_short_builds_a_farm_...`).
+    let cap = csp_shared::balance::NPC_SURPLUS_CAP.get("food").unwrap_or(0.0);
+    let first = reserve[&Good::Food] + csp_shared::balance::NPC_FOUND_FOOD_SURPLUS_SHARE * cap;
+    set_stock(&mut v, &[(Good::Food, first + 1.0), (Good::Wood, 400.0)]);
     assert!(!matches!(project(&v), Some(CityProject::Build { building: BuildingKind::Farm, .. })));
 }
 
@@ -688,4 +691,26 @@ fn a_builder_of_a_far_site_takes_their_food_from_the_storage_before_setting_out(
         "{:?}",
         r.order
     );
+}
+
+#[test]
+fn a_full_city_keeps_the_farmers_who_win_the_food_its_founding_waits_on() {
+    // #1379: on its reserve alone a full city's Food never held what founding waits on, so it
+    // gathered nothing for its party.
+    use csp_shared::balance::{
+        NPC_FOOD_REFILL_DAYS, NPC_FOUND_FOOD_SURPLUS_SHARE, NPC_SURPLUS_CAP, WORK_OUTPUT_PER_DAY,
+    };
+    let mut v = village(None);
+    fill_houses(&mut v.world, &v.city, &v.home);
+    plan(&mut v);
+    let city = v.city().clone();
+    let reserve = crate::queries::npc_trade::npc_reserve(&v.world, &city)[&Good::Food];
+    set_stock(&mut v, &[(Good::Food, reserve)]);
+    v.world.city_plans.get_mut(&v.city).unwrap().full_since = None;
+    let fed = farmers_wanted(&v.world, &city);
+    v.world.city_plans.get_mut(&v.city).unwrap().full_since = Some(0.0);
+    let scale = crate::queries::npc_trade::npc_needs_scale(&v.world, &city);
+    let first = NPC_FOUND_FOOD_SURPLUS_SHARE * NPC_SURPLUS_CAP.get("food").unwrap() * scale;
+    let per = WORK_OUTPUT_PER_DAY.get("food").unwrap() * NPC_FOOD_REFILL_DAYS;
+    assert_eq!(farmers_wanted(&v.world, &city), fed + (first / per).ceil());
 }

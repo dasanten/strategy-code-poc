@@ -18,14 +18,16 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    NPC_NODE_GUARD_RANGE, NPC_SITE_ESCORTS, NPC_TAKE_OUTWEIGH_TIMES, NPC_TAKE_PARTY_MIN,
+    road_crew_food, NPC_NODE_GUARD_RANGE, NPC_SITE_ESCORTS, NPC_TAKE_OUTWEIGH_TIMES,
+    NPC_TAKE_PARTY_MIN, WALK_TICKS_PER_TILE,
 };
 use csp_shared::terrain::{wrap_distance, TerrainMap};
 use csp_shared::world::{
-    Building, City, CityProject, NodeTaking, Resident, ResidentOrder, Stance, Temperament,
+    Building, City, CityProject, Good, NodeTaking, Resident, ResidentOrder, Stance, Temperament,
     WorldState,
 };
 
+use crate::npc_acting_first::take_way_food;
 use crate::npc_behaviour::npc_home;
 use crate::npc_chain::{makes, short_goods};
 use crate::npc_demands::sheltered;
@@ -38,6 +40,7 @@ use crate::npc_stance::stance_of;
 use crate::queries::building::{max_workers, node_good, workplace_node};
 use crate::queries::city::for_sale;
 use crate::queries::city_area::in_city_area;
+use crate::queries::names::held;
 use crate::queries::persuasion::fighter_strength;
 use crate::queries::residents::{can_work, is_armed, is_down};
 use crate::sight::InvariantViolation;
@@ -285,7 +288,14 @@ fn start_escort(world: &mut WorldState, city: &City, size: i32) {
         return;
     }
     let Some(site) = far_node_site(world, city, size) else { return };
-    let mut spare = spare_soldiers(world, city);
+    // Not one on their way home for Food from an escort before (#1414).
+    let mut spare: Vec<usize> = spare_soldiers(world, city)
+        .into_iter()
+        .filter(|&i| {
+            let home = npc_home(world, &city.id).map(|h| (h.x as i32, h.y as i32));
+            home.is_none_or(|h| !walking_to(&world.residents[i], h))
+        })
+        .collect();
     let mut ids = Vec::new();
     for _ in 0..NPC_SITE_ESCORTS as usize {
         let Some(i) = spare.pop() else { break };
@@ -322,14 +332,40 @@ fn keep_escort(world: &mut WorldState, city: &City, size: i32) {
         return;
     }
     let site = site.expect("checked");
+    let home = npc_home(world, &city.id).map(|h| (h.x as i32, h.y as i32));
+    let mut fed_out: Vec<String> = Vec::new();
     for id in &ids {
-        let Some(r) = world.residents.iter_mut().find(|r| &r.id == id) else { continue };
+        let Some(i) = world.residents.iter().position(|r| &r.id == id) else { continue };
+        let r = &world.residents[i];
         let away = wrap_distance(size, tile_of(r), site) > 2.0;
         let fighting = matches!(r.order, Some(ResidentOrder::Attack(_)));
-        if r.script.is_none() && away && !fighting && !walking_to(r, site) {
+        if r.script.is_some() || fighting {
+            continue;
+        }
+        // Down to what the walk home eats, they go home for Food and leave the escort; the city
+        // sends others (#1414: escorts stood at a stalled far site until they starved, and the
+        // next ones after them).
+        if let Some(home) = home {
+            let walk_home = wrap_distance(size, tile_of(r), home) * WALK_TICKS_PER_TILE;
+            let out = !in_city_area(world, &city.id, r.x, r.y, size);
+            if out && held(&r.carried, Good::Food) < road_crew_food(walk_home) {
+                fed_out.push(id.clone());
+                world.residents[i].order = Some(walk(home));
+                continue;
+            }
+        }
+        // Setting out, they take the Food for the way there and back first.
+        let r = &world.residents[i];
+        let (x, y) = (f64::from(site.0), f64::from(site.1));
+        if (r.order.is_none() || walking_to(r, site)) && take_way_food(world, i, (x, y), size) {
+            continue;
+        }
+        let r = &mut world.residents[i];
+        if away && !walking_to(r, site) && r.order.is_none() {
             r.order = Some(walk(site));
         }
     }
+    ids.retain(|id| !fed_out.contains(id));
     if let Some(plan) = world.city_plans.get_mut(&city.id) {
         plan.site_escort = Some(ids);
     }

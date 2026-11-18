@@ -17,7 +17,7 @@ use csp_shared::balance::{
 use csp_shared::footprint::is_at;
 use csp_shared::terrain::{wrap_delta, wrap_distance};
 use csp_shared::world::{
-    City, CityTrader, Good, GoodsSpot, PickUpOrder, ResidentOrder, Stock, WorldState,
+    BuildingKind, City, CityTrader, Good, GoodsSpot, PickUpOrder, ResidentOrder, Stock, WorldState,
 };
 
 use crate::combat::attack_order;
@@ -302,6 +302,18 @@ pub fn run_escort(
             return true;
         }
     }
+    // Not at the storage as the trader sets out, they go there for it first; the trader waits for
+    // them (#1414: escorts walked out with what they had on them and starved on the way).
+    let to = run.warehouse_id.as_deref().and_then(|id| world.buildings.iter().find(|b| b.id == id));
+    if let (true, None, Some(to)) = (outbound, &world.residents[i].order, to.map(|b| (b.x, b.y))) {
+        if crate::npc_acting_first::take_way_food(world, i, to, size) {
+            return true;
+        }
+    }
+    // On their way to a storage of their city for it, they go on.
+    if outbound && for_food(world, i, city_id) {
+        return true;
+    }
     // Where the trader walks, or where they stand.
     let tr = &world.residents[t];
     let target = match &tr.order {
@@ -324,6 +336,15 @@ pub fn run_escort(
     true
 }
 
+/// Whether escort `i` walks to a storage of their city `city_id` (`take_way_food` sends them).
+fn for_food(world: &WorldState, i: usize, city_id: &str) -> bool {
+    let Some(ResidentOrder::WalkTo(o)) = &world.residents[i].order else { return false };
+    world.buildings.iter().any(|b| {
+        b.city_id.as_deref() == Some(city_id)
+            && matches!(b.kind, BuildingKind::Storage | BuildingKind::Warehouse)
+            && (b.x, b.y) == (o.target.x, o.target.y)
+    })
+}
 /// The pick-up of the Food escort `i` at storage `s` lacks for the way to `to` and back, if they
 /// stand at it and it has some.
 fn way_food(
