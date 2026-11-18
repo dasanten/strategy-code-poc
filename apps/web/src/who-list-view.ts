@@ -3,6 +3,8 @@ import { wrapDelta } from './shared/terrain.js'
 import { roadLine } from './shared/building.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { groupSkip, type GroupOrder, type GroupSeen } from './group-orders.js'
+import { boundToTile, type BuildingGroupOrder } from './building-orders.js'
+import { subjectLabel } from './Residents.js'
 
 /**
  * The who-list (`CONTEXT.md`: Who-list): the last step of a realm order, listing the realm's
@@ -13,21 +15,31 @@ import { groupSkip, type GroupOrder, type GroupSeen } from './group-orders.js'
 /** A resident as the who-list needs them: what a group order checks, and what they do. */
 export type WhoResident = Parameters<typeof groupSkip>[1]
 
-/** A realm order that reaches the who-list. */
-export type WhoOrder = Extract<GroupOrder, { kind: 'build' | 'line' }>
+/**
+ * A realm order that reaches the who-list: Build, those a building's card starts, and a road or
+ * wall line.
+ */
+export type WhoOrder = BuildingGroupOrder | WhoLine
 
 /** A road or wall line given as a realm order. */
-export type WhoLine = Extract<WhoOrder, { kind: 'line' }>
+export type WhoLine = Extract<GroupOrder, { kind: 'line' }>
 
 /** A tile of the map. */
 type Tile = { x: number; y: number }
 
 /**
  * How many of the nearest idle residents the who-list ticks for an order (`CONTEXT.md`:
- * Who-list, suggests): two builders get a house up in good time without emptying the city.
+ * Who-list, suggests): two builders get a house up (or one down) in good time without emptying
+ * the city; one for the rest, a workplace's other places being the Player's call.
  */
 export const WHO_SUGGESTS: Record<WhoOrder['kind'], number> = {
   build: 2,
+  tearDown: 2,
+  work: 1,
+  feedStable: 1,
+  breed: 1,
+  teach: 1,
+  train: 1,
   // A road or wall line is shared tile by tile (`CONTEXT.md`: Build line): a third hand helps.
   line: 3,
 }
@@ -45,6 +57,16 @@ export interface WhoRow {
   name: string
   /** With neither an order nor a script (`isIdle`). */
   idle: boolean
+  /**
+   * Running a queue, a haul route or a script, which the order would cut short: their Now /
+   * After switch starts on After (`startsWhen`).
+   */
+  keeps?: true
+  /**
+   * Busy, but After would end what they do (`afterOffered`): their row offers Now only, saying
+   * there is no queue to add to.
+   */
+  noAfter?: true
   /** How far their way is, in tiles: the way's own length, else as the crow flies. */
   tiles: number
   /** About how many ticks their way takes, if that can be told. */
@@ -55,16 +77,34 @@ export interface WhoRow {
 
 /**
  * What the who-list is for, its title: "Build a house", "Build an inn" (stone: "a stone wall"),
- * "Build a road line of 7 tiles" on a map `size` tiles across.
+ * "Work at the farm", "Tear down the house", "Teach Strength", "Build a road line of 7 tiles" on
+ * a map `size` tiles across.
  */
 export function whoTitle(order: WhoOrder, size = Infinity): string {
-  if (order.kind === 'line') {
-    const tiles = lineTiles(order, size).length
-    const name = `${order.material === 'stone' ? 'stone ' : ''}${order.building}`
-    return `Build a ${name} line of ${tiles} ${tiles === 1 ? 'tile' : 'tiles'}`
+  switch (order.kind) {
+    case 'line': {
+      const tiles = lineTiles(order, size).length
+      const name = `${order.material === 'stone' ? 'stone ' : ''}${order.building}`
+      return `Build a ${name} line of ${tiles} ${tiles === 1 ? 'tile' : 'tiles'}`
+    }
+    case 'build': {
+      const stone = order.material === 'stone' ? 'stone ' : ''
+      const name = `${stone}${BUILDING_NAMES[order.building].toLowerCase()}`
+      return `Build ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name}`
+    }
+    case 'work':
+      return `Work at the ${order.name}`
+    case 'tearDown':
+      return `Tear down the ${order.name}`
+    case 'feedStable':
+      return 'Feed the stable'
+    case 'breed':
+      return 'Breed two horses'
+    case 'teach':
+      return `Teach ${subjectLabel(order.subject)}`
+    case 'train':
+      return 'Train at the training ground'
   }
-  const name = `${order.material === 'stone' ? 'stone ' : ''}${BUILDING_NAMES[order.building].toLowerCase()}`
-  return `Build ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name}`
 }
 
 /** The reason a resident with no way to the target can't take the order. */
@@ -73,23 +113,35 @@ export const NO_WAY_THERE = 'no way there'
 /**
  * Why a resident can't take a realm order, if they can't (`CONTEXT.md`: Who-list): what the
  * group card would skip them for (a child, a partner carrying a child), or no way there. Those
- * elsewhere are not skipped: a realm order walks them there first.
+ * elsewhere are not skipped: a realm order walks them there first, so an order bound to the
+ * target's tile is judged as if they stood `at` it.
  */
 export function whyNot(
   order: WhoOrder,
   r: WhoResident,
   way: WhoWay,
-  { tick, size, seen }: { tick: number; size: number; seen?: GroupSeen },
+  {
+    tick,
+    size,
+    seen,
+    at,
+  }: { tick: number; size: number; seen?: GroupSeen; at?: { x: number; y: number } },
 ): string | undefined {
+  const there = at && boundToTile(order) ? { ...r, x: at.x, y: at.y } : r
   // Queued, a group order skips nobody for standing elsewhere: they walk there first.
-  return groupSkip(order, r, tick, size, true, seen) ?? (way === 'none' ? NO_WAY_THERE : undefined)
+  return (
+    groupSkip(order, there, tick, size, true, seen) ?? (way === 'none' ? NO_WAY_THERE : undefined)
+  )
 }
 
-/** Where a realm order is, as the who-list says it: "at 4, 5", "from 4, 5 to 9, 5". */
-export function whoWhere(order: WhoOrder): string {
+/**
+ * Where a realm order is, as the who-list says it: "at 4, 5" (`at`, its place), or for a line
+ * "from 4, 5 to 9, 5".
+ */
+export function whoWhere(order: WhoOrder, at: Tile): string {
   if (order.kind === 'line')
     return `from ${order.from.x}, ${order.from.y} to ${order.to.x}, ${order.to.y}`
-  return `at ${order.at.x}, ${order.at.y}`
+  return `at ${at.x}, ${at.y}`
 }
 
 /** The tiles of a line from its start to its end (`roadLine`), on a map `size` tiles across. */
@@ -115,17 +167,39 @@ export function lineProblem(
 }
 
 /**
- * The tile a resident's way to a realm order goes to: its place, or for a line the line's tile
- * nearest them in steps, as the crow flies; of those as near, the one straightest across.
+ * The tile a resident's way to a realm order goes to: its place `at`, or for a line the line's
+ * tile nearest them in steps, as the crow flies; of those as near, the one straightest across.
  */
-export function wayTarget(order: WhoOrder, r: Tile, size: number): Tile {
-  if (order.kind !== 'line') return order.at
+export function wayTarget(order: WhoOrder, at: Tile, r: Tile, size: number): Tile {
+  if (order.kind !== 'line') return at
   const far = (t: Tile) => {
     const across = Math.abs(wrapDelta(r.x, t.x, size)) + Math.abs(wrapDelta(r.y, t.y, size))
     return crowTiles(r, t, size) * 4 * size + across
   }
   return lineTiles(order, size).reduce((best, t) => (far(t) < far(best) ? t : best))
 }
+
+/** Running a queue, a haul route or a script: something of their own that goes on and on. */
+function keepsGoing(r: WhoResident): boolean {
+  const kind = r.order?.kind
+  return !!r.queue || !!r.script || kind === 'haul' || kind === 'haulByWater'
+}
+
+/**
+ * Whether a busy resident can take an order After what they do, finishing nothing early: only
+ * when appending (`appendRequest`) keeps it, that is when they run a queue, or are on a walk of
+ * their own, which becomes the queue's first step. For anyone else (a script or a task such as
+ * Work or a haul route, or another order) the queue it would start ends what they do at once,
+ * so After is not offered: "no queue to add to".
+ *
+ * Provisional (the coordinator's call while Daniel is away): the rule is open as #1444.
+ */
+export function afterOffered(r: Pick<WhoResident, 'order' | 'script' | 'queue'>): boolean {
+  return !!r.queue || (r.order?.kind === 'walkTo' && !r.script)
+}
+
+/** Why a row offers no After, beside its Now. */
+export const NO_QUEUE = 'no queue to add to'
 
 /** How many tiles apart two tiles are as the crow flies, the short way round, diagonals one step. */
 function crowTiles(a: { x: number; y: number }, b: { x: number; y: number }, size: number) {
@@ -146,13 +220,17 @@ export function whoRows(
 ): WhoRow[] {
   const rows = residents.map((r): WhoRow => {
     const way = wayOf(r)
-    const why = whyNot(order, r, way, ctx)
+    const target = typeof at === 'function' ? at(r) : at
+    const why = whyNot(order, r, way, { ...ctx, at: target })
     const known = typeof way === 'object' ? way : undefined
+    const idle = !r.order && !r.script
     return {
       id: r.id,
       name: r.name,
-      idle: !r.order && !r.script,
-      tiles: known ? known.tiles : crowTiles(r, typeof at === 'function' ? at(r) : at, ctx.size),
+      idle,
+      ...(keepsGoing(r) ? { keeps: true as const } : {}),
+      ...(!idle && !afterOffered(r) ? { noAfter: true as const } : {}),
+      tiles: known ? known.tiles : crowTiles(r, target, ctx.size),
       ...(known?.ticks !== undefined ? { ticks: known.ticks } : {}),
       ...(why ? { why } : {}),
     }
@@ -183,12 +261,17 @@ export function searched(rows: readonly WhoRow[], search: string): WhoRow[] {
 }
 
 /**
- * What the who-list says over its rows: who is ticked, or that nobody is idle and so nobody
- * was ticked, or that nobody can take the order at all.
+ * What the who-list says over its rows: how many are ticked, and of them how many take the order
+ * now and how many after ("3 ticked: 2 now, 1 after"), or that nobody is idle and so nobody was
+ * ticked, or that nobody can take the order at all.
  */
-export function whoNote(rows: readonly WhoRow[], ticked: number): string {
+export function whoNote(rows: readonly WhoRow[], ticked: number, after = 0): string {
   if (!rows.some((r) => r.why === undefined)) return 'Nobody can take this order.'
-  if (ticked > 0) return `${ticked} ticked.`
+  if (ticked > 0) {
+    const now = ticked - after
+    const parts = [...(now > 0 ? [`${now} now`] : []), ...(after > 0 ? [`${after} after`] : [])]
+    return `${ticked} ticked: ${parts.join(', ')}.`
+  }
   if (!rows.some((r) => r.idle && r.why === undefined))
     return 'Nobody is idle, so nobody is ticked: tick who should do it.'
   return 'Nobody ticked: tick who should do it.'
@@ -201,4 +284,55 @@ export const tickable = (row: WhoRow) => row.why === undefined
 export function keptTicks(ticked: readonly string[], rows: readonly WhoRow[]): string[] {
   const ok = new Set(rows.filter(tickable).map((r) => r.id))
   return ticked.filter((id) => ok.has(id))
+}
+
+/**
+ * When a ticked resident takes the order (`CONTEXT.md`: Who-list): **now**, replacing what they
+ * are doing, or **after**, appended to their queue as Shift does on a card.
+ */
+export type WhoWhen = 'now' | 'after'
+
+/**
+ * Where a row's Now / After switch starts: After for someone running a queue, a haul route or a
+ * script, Now for anyone else busy, and always Now where After isn't offered (`noAfter`). An
+ * idle resident has no switch: undefined.
+ */
+export function startsWhen(row: Pick<WhoRow, 'idle' | 'keeps' | 'noAfter'>): WhoWhen | undefined {
+  if (row.idle) return undefined
+  return row.keeps && !row.noAfter ? 'after' : 'now'
+}
+
+/**
+ * A row's Now / After as the Player set it, else where it starts; Now where After isn't
+ * offered; undefined for the idle.
+ */
+export function whenOf(
+  row: Pick<WhoRow, 'id' | 'idle' | 'keeps' | 'noAfter'>,
+  set: Readonly<Record<string, WhoWhen>>,
+): WhoWhen | undefined {
+  if (row.idle) return undefined
+  if (row.noAfter) return 'now'
+  return set[row.id] ?? startsWhen(row)
+}
+
+/** Those of the ticked who take the order after what they do (`whenOf`), in the rows' order. */
+export function tickedAfter(
+  rows: readonly WhoRow[],
+  ticked: readonly string[],
+  set: Readonly<Record<string, WhoWhen>>,
+): string[] {
+  const on = new Set(ticked)
+  return rows.filter((r) => on.has(r.id) && whenOf(r, set) === 'after').map((r) => r.id)
+}
+
+/**
+ * How many rows the who-list draws at first, and how many more each Show more adds: the nearest
+ * come first, so a big realm's list stays quick without drawing everyone.
+ */
+export const WHO_PAGE = 40
+
+/** How many of the ticked the search and the filters hide. */
+export function tickedHidden(ticked: readonly string[], shown: readonly Pick<WhoRow, 'id'>[]) {
+  const listed = new Set(shown.map((r) => r.id))
+  return ticked.filter((id) => !listed.has(id)).length
 }
