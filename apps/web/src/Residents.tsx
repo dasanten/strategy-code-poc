@@ -4089,7 +4089,7 @@ function BreedBlock({
  * Breeding for a group (`CONTEXT.md`: Breeding, Group): pick two of the Player's horses in a
  * stable some of them stand in; one of them there tends the pair.
  */
-function GroupBreed({
+export function GroupBreed({
   stable,
   horses,
   tick,
