@@ -179,10 +179,14 @@ export function realmRequests(
       residents.filter((r) => !after.has(r.id)),
       ctx,
     )
+    // The tiles those walking now were sent to are not free for those walking there after.
+    const taken = new Set(
+      now.requests.flatMap(({ order: o }) => (o.kind === 'walkTo' ? [`${o.x},${o.y}`] : [])),
+    )
     const later = groupRequests(
       order,
       residents.filter((r) => after.has(r.id)),
-      { ...ctx, queued: true },
+      { ...ctx, queued: true, free: (x, y) => !taken.has(`${x},${y}`) && free(x, y) },
     )
     const byId = new Map([...now.requests, ...later.requests].map((q) => [q.residentId, q]))
     return {

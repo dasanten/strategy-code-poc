@@ -44,6 +44,16 @@ export interface WhoRow {
   name: string
   /** With neither an order nor a script (`isIdle`). */
   idle: boolean
+  /**
+   * Running a queue, a haul route or a script, which the order would cut short: their Now /
+   * After switch starts on After (`startsWhen`).
+   */
+  keeps?: true
+  /**
+   * Busy, but After would end what they do (`afterOffered`): their row offers Now only, saying
+   * there is no queue to add to.
+   */
+  noAfter?: true
   /** How far their way is, in tiles: the way's own length, else as the crow flies. */
   tiles: number
   /** About how many ticks their way takes, if that can be told. */
@@ -105,6 +115,28 @@ export function whyNot(
   )
 }
 
+/** Running a queue, a haul route or a script: something of their own that goes on and on. */
+function keepsGoing(r: WhoResident): boolean {
+  const kind = r.order?.kind
+  return !!r.queue || !!r.script || kind === 'haul' || kind === 'haulByWater'
+}
+
+/**
+ * Whether a busy resident can take an order After what they do, finishing nothing early: only
+ * when appending (`appendRequest`) keeps it, that is when they run a queue, or are on a walk of
+ * their own, which becomes the queue's first step. For anyone else (a script or a task such as
+ * Work or a haul route, or another order) the queue it would start ends what they do at once,
+ * so After is not offered: "no queue to add to".
+ *
+ * Provisional (the coordinator's call while Daniel is away): the rule is open as #1444.
+ */
+export function afterOffered(r: Pick<WhoResident, 'order' | 'script' | 'queue'>): boolean {
+  return !!r.queue || (r.order?.kind === 'walkTo' && !r.script)
+}
+
+/** Why a row offers no After, beside its Now. */
+export const NO_QUEUE = 'no queue to add to'
+
 /** How many tiles apart two tiles are as the crow flies, the short way round, diagonals one step. */
 function crowTiles(a: { x: number; y: number }, b: { x: number; y: number }, size: number) {
   return Math.max(Math.abs(wrapDelta(a.x, b.x, size)), Math.abs(wrapDelta(a.y, b.y, size)))
@@ -125,10 +157,13 @@ export function whoRows(
     const way = wayOf(r)
     const why = whyNot(order, r, way, { ...ctx, at })
     const known = typeof way === 'object' ? way : undefined
+    const idle = !r.order && !r.script
     return {
       id: r.id,
       name: r.name,
-      idle: !r.order && !r.script,
+      idle,
+      ...(keepsGoing(r) ? { keeps: true as const } : {}),
+      ...(!idle && !afterOffered(r) ? { noAfter: true as const } : {}),
       tiles: known ? known.tiles : crowTiles(r, at, ctx.size),
       ...(known?.ticks !== undefined ? { ticks: known.ticks } : {}),
       ...(why ? { why } : {}),
@@ -160,12 +195,17 @@ export function searched(rows: readonly WhoRow[], search: string): WhoRow[] {
 }
 
 /**
- * What the who-list says over its rows: who is ticked, or that nobody is idle and so nobody
- * was ticked, or that nobody can take the order at all.
+ * What the who-list says over its rows: how many are ticked, and of them how many take the order
+ * now and how many after ("3 ticked: 2 now, 1 after"), or that nobody is idle and so nobody was
+ * ticked, or that nobody can take the order at all.
  */
-export function whoNote(rows: readonly WhoRow[], ticked: number): string {
+export function whoNote(rows: readonly WhoRow[], ticked: number, after = 0): string {
   if (!rows.some((r) => r.why === undefined)) return 'Nobody can take this order.'
-  if (ticked > 0) return `${ticked} ticked.`
+  if (ticked > 0) {
+    const now = ticked - after
+    const parts = [...(now > 0 ? [`${now} now`] : []), ...(after > 0 ? [`${after} after`] : [])]
+    return `${ticked} ticked: ${parts.join(', ')}.`
+  }
   if (!rows.some((r) => r.idle && r.why === undefined))
     return 'Nobody is idle, so nobody is ticked: tick who should do it.'
   return 'Nobody ticked: tick who should do it.'
@@ -178,4 +218,55 @@ export const tickable = (row: WhoRow) => row.why === undefined
 export function keptTicks(ticked: readonly string[], rows: readonly WhoRow[]): string[] {
   const ok = new Set(rows.filter(tickable).map((r) => r.id))
   return ticked.filter((id) => ok.has(id))
+}
+
+/**
+ * When a ticked resident takes the order (`CONTEXT.md`: Who-list): **now**, replacing what they
+ * are doing, or **after**, appended to their queue as Shift does on a card.
+ */
+export type WhoWhen = 'now' | 'after'
+
+/**
+ * Where a row's Now / After switch starts: After for someone running a queue, a haul route or a
+ * script, Now for anyone else busy, and always Now where After isn't offered (`noAfter`). An
+ * idle resident has no switch: undefined.
+ */
+export function startsWhen(row: Pick<WhoRow, 'idle' | 'keeps' | 'noAfter'>): WhoWhen | undefined {
+  if (row.idle) return undefined
+  return row.keeps && !row.noAfter ? 'after' : 'now'
+}
+
+/**
+ * A row's Now / After as the Player set it, else where it starts; Now where After isn't
+ * offered; undefined for the idle.
+ */
+export function whenOf(
+  row: Pick<WhoRow, 'id' | 'idle' | 'keeps' | 'noAfter'>,
+  set: Readonly<Record<string, WhoWhen>>,
+): WhoWhen | undefined {
+  if (row.idle) return undefined
+  if (row.noAfter) return 'now'
+  return set[row.id] ?? startsWhen(row)
+}
+
+/** Those of the ticked who take the order after what they do (`whenOf`), in the rows' order. */
+export function tickedAfter(
+  rows: readonly WhoRow[],
+  ticked: readonly string[],
+  set: Readonly<Record<string, WhoWhen>>,
+): string[] {
+  const on = new Set(ticked)
+  return rows.filter((r) => on.has(r.id) && whenOf(r, set) === 'after').map((r) => r.id)
+}
+
+/**
+ * How many rows the who-list draws at first, and how many more each Show more adds: the nearest
+ * come first, so a big realm's list stays quick without drawing everyone.
+ */
+export const WHO_PAGE = 40
+
+/** How many of the ticked the search and the filters hide. */
+export function tickedHidden(ticked: readonly string[], shown: readonly Pick<WhoRow, 'id'>[]) {
+  const listed = new Set(shown.map((r) => r.id))
+  return ticked.filter((id) => !listed.has(id)).length
 }

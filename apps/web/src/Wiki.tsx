@@ -407,7 +407,7 @@ import {
   repairWork,
 } from './shared/decay.js'
 import { fighterStrength } from './shared/persuasion.js'
-import { WHO_SUGGESTS } from './who-list-view.js'
+import { WHO_PAGE, WHO_SUGGESTS } from './who-list-view.js'
 import type {
   BuildingKind,
   CrimeKind,
@@ -751,11 +751,27 @@ export function Wiki() {
           doesn’t fit, and a tile it can’t go on says why and sends nobody. Then the <b>who-list</b>{' '}
           opens: your residents nearest the place first, each with what they are doing and how long
           their way there is. The nearest {num(WHO_SUGGESTS.build)} idle ones are already ticked;
-          change the ticks or just Confirm. With nobody idle, nobody is ticked and the list says so;
-          a busy resident you tick drops what they were doing. Those who can’t build (children, a
-          partner carrying a child, or with no way there) come last, greyed out, saying why. Those
-          ticked walk there and build as a group sent with Build would; hold Shift while confirming
-          to pick the next place for another of the same kind.
+          change the ticks or just Confirm. With nobody idle, nobody is ticked and the list says so.
+          Those who can’t build (children, a partner carrying a child, or with no way there) come
+          last, greyed out, saying why. Those ticked walk there and build as a group sent with Build
+          would; hold Shift while confirming to pick the next place for another of the same kind.
+        </p>
+        <p>
+          A busy resident you tick gets a <b>Now / After</b> switch on their row. <b>Now</b> drops
+          what they are doing and sends them at once. <b>After</b> adds the order to the end of
+          their queue, as Shift does on their card: they finish the steps they have first. Someone
+          walking with no queue yet gets one, the walk first. After is offered only to those two:
+          someone running a script or a task (Work, a haul route, …) or another order without a
+          queue has nothing to add to, as a new queue would end what they do, so their row offers
+          Now only and says “no queue to add to”. The switch starts on After for someone running a
+          queue and on Now for anyone else busy; an idle resident has no switch. The line at the top
+          sums it up: “3 ticked: 2 now, 1 after”.
+        </p>
+        <p>
+          A long who-list can be searched by name and filtered as the Residents list can (idle, by
+          city, has weapons, …); this browser remembers the filters. Ticks stay on those a search or
+          filter hides, and the list says how many are ticked but not shown. Only the nearest{' '}
+          {num(WHO_PAGE)} are drawn at first; Show more draws more.
         </p>
         <p>
           A building’s card starts the orders about it, each ending in the same who-list:{' '}

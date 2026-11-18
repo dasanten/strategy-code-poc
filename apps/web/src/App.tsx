@@ -1226,18 +1226,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
   /**
    * Confirm on the who-list: those ticked get what the group card's Build sends them, the first
-   * there laying out the site and the others joining it, replacing what they do. With Shift held
-   * the same kind stays armed for the next place; else the realm bar is back.
+   * there laying out the site and the others joining it, replacing what they do, or appended to
+   * their queue for those set to After. With Shift held the same kind stays armed for the next
+   * place; else the realm bar is back.
    */
   async function confirmRealmOrder(
     order: Extract<WhoOrder, { kind: 'build' }>,
     ids: readonly string[],
+    after: readonly string[],
     again: boolean,
   ) {
     const to = ids.flatMap((id) => own.filter((r) => r.id === id))
     const material = order.material ? { material: order.material } : {}
     setRealmOrder(again ? { step: 'where', building: order.building, ...material } : undefined)
-    await sendGroup(order, false, to)
+    await sendGroup(order, false, to, undefined, new Set(after))
   }
   /**
    * A realm order from a building's card (`CONTEXT.md`: Realm order): its form first when it
@@ -1257,12 +1259,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
   /**
    * Confirm on the who-list of an order about a building: those ticked get what the group card
-   * sends, those far off walking there first (`realmRequests`); then the realm bar is back.
+   * sends, those far off walking there first (`realmRequests`), and those set to After get it
+   * appended to their queue; then the realm bar is back.
    */
-  async function confirmAbout(order: BuildingGroupOrder, target: Building, ids: readonly string[]) {
+  async function confirmAbout(
+    order: BuildingGroupOrder,
+    target: Building,
+    ids: readonly string[],
+    after: readonly string[],
+  ) {
     const to = ids.flatMap((id) => own.filter((r) => r.id === id))
     setRealmOrder(undefined)
-    await sendGroup(order, false, to, target)
+    await sendGroup(order, false, to, target, new Set(after))
   }
   /** The queue planner's Add step, on the resident card and the group card. */
   function addStep(w: NonNullable<typeof world>) {
@@ -1423,6 +1431,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     to: readonly Resident[] = group,
     /** A realm order's building: those far from it walk there first (`realmRequests`). */
     target?: Building,
+    /** Those of a who-list set to After, who get it appended to their queue (`realmRequests`). */
+    after?: ReadonlySet<string>,
   ) {
     if (!world) return
     const given = 'params' in order && order.params !== undefined
@@ -1431,7 +1441,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       opensForm(
         groupOrderStart(order) ?? { kind: order.kind },
         to.map((r) => r.scriptParams),
-        (params) => sendGroup({ ...order, params } as GroupOrder, queued, to, target),
+        (params) => sendGroup({ ...order, params } as GroupOrder, queued, to, target, after),
       )
     if (asked) return
     const size = world.map.size
@@ -1443,11 +1453,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       if (world.buildings.some((b) => isWallOrGate(b) && covers(b, x, y, size))) return false
       return !world.residents.some((r) => r.x === x && r.y === y && !inGroup.has(r.id))
     }
-    // With Shift held, each one's queue gets the order appended (`CONTEXT.md`: Queue).
+    // With Shift held, each one's queue gets the order appended (`CONTEXT.md`: Queue); from a
+    // who-list, only the queues of those set to After.
     const ctx = { tick: world.tick, size, free, seen: groupSeen }
-    const { requests, skipped } = target
-      ? realmRequests(order, to, { ...ctx, target })
-      : groupRequests(order, to, { ...ctx, queued })
+    const { requests, skipped } =
+      target || after
+        ? realmRequests(order, to, {
+            ...ctx,
+            ...(target ? { target } : {}),
+            ...(after ? { after } : {}),
+          })
+        : groupRequests(order, to, { ...ctx, queued })
     if (order.kind === 'build') setGroupBuildAt(undefined)
     await sendToGroup(
       requests.map((q) => q.order),
@@ -3082,10 +3098,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   })
                 : ''
             }}
-            onConfirm={(ids, again) =>
+            groups={residentsPanel ? residentsPanel.groups : []}
+            tick={world.tick}
+            onConfirm={(ids, after, again) =>
               void (realmOrder.step === 'about'
-                ? confirmAbout(realmOrder.order, realmOrder.target, ids)
-                : who.order.kind === 'build' && confirmRealmOrder(who.order, ids, again))
+                ? confirmAbout(realmOrder.order, realmOrder.target, ids, after)
+                : who.order.kind === 'build' && confirmRealmOrder(who.order, ids, after, again))
             }
             onClose={() => setRealmOrder(undefined)}
           />

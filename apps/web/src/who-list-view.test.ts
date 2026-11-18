@@ -4,9 +4,14 @@ import type { Stock } from '@csp/shared-types'
 import {
   NO_WAY_THERE,
   WHO_SUGGESTS,
+  afterOffered,
   keptTicks,
   searched,
+  startsWhen,
   suggested,
+  tickedAfter,
+  tickedHidden,
+  whenOf,
   whoNote,
   whoRows,
   whoTitle,
@@ -16,6 +21,7 @@ import {
   type WhoRow,
   type WhoWay,
 } from './who-list-view.js'
+import { realmRequests } from './building-orders.js'
 
 const TICK = 100 * TICKS_PER_GAME_YEAR
 const SIZE = 64
@@ -125,7 +131,7 @@ describe('the suggestion', () => {
     const list = [row('a', { idle: false }), row('b', { idle: false })]
     expect(suggested(list, 2)).toEqual([])
     expect(whoNote(list, 0)).toBe('Nobody is idle, so nobody is ticked: tick who should do it.')
-    expect(whoNote(list, 1)).toBe('1 ticked.')
+    expect(whoNote(list, 1)).toBe('1 ticked: 1 now.')
   })
 
   it('says when nobody can take the order at all', () => {
@@ -150,5 +156,136 @@ describe('the who-list’s search and title', () => {
     expect(whoTitle(house)).toBe('Build a house')
     expect(whoTitle({ ...house, building: 'haven' })).toBe('Build a haven')
     expect(whoTitle({ ...house, building: 'wall', material: 'stone' })).toBe('Build a stone wall')
+  })
+})
+
+describe('Now or After', () => {
+  const row = (id: string, more: Partial<WhoRow> = {}): WhoRow => ({
+    id,
+    name: id,
+    idle: false,
+    tiles: 1,
+    ...more,
+  })
+  // On the queue's work step: a queue's step is their order.
+  const working = {
+    ...busy,
+    queue: {
+      realmId: 'r1',
+      items: [{ id: 1, order: { kind: 'task', task: 'work', workplaceId: 'f1' } }],
+      current: 1,
+      startedAt: 0,
+      loop: false,
+      nextStepId: 2,
+    },
+  } as Partial<WhoResident>
+  const scripted = { script: { scriptId: 3 } } as Partial<WhoResident>
+
+  const hauling = { order: { kind: 'haul' } } as unknown as Partial<WhoResident>
+  const storing = { order: { kind: 'store' } } as unknown as Partial<WhoResident>
+
+  it('offers After only where appending keeps what they do: a queue, or a walk of their own', () => {
+    expect(afterOffered(resident('q', 0, 0, working))).toBe(true)
+    expect(afterOffered(resident('w', 0, 0, busy))).toBe(true)
+    // A queue order would end the script, the haul or the order at once (#1444).
+    expect(afterOffered(resident('s', 0, 0, scripted))).toBe(false)
+    expect(afterOffered(resident('s', 0, 0, { ...busy, ...scripted }))).toBe(false)
+    expect(afterOffered(resident('h', 0, 0, hauling))).toBe(false)
+    expect(afterOffered(resident('o', 0, 0, storing))).toBe(false)
+  })
+
+  it('starts on After for those running a queue, else on Now; Now only where After isn’t offered', () => {
+    const list = rows([
+      resident('idle', 10, 10),
+      resident('walking', 10, 11, busy),
+      resident('queued', 10, 12, working),
+      resident('scripted', 10, 13, scripted),
+      resident('hauling', 10, 14, hauling),
+    ])
+    expect(Object.fromEntries(list.map((r) => [r.id, startsWhen(r)]))).toEqual({
+      idle: undefined,
+      walking: 'now',
+      queued: 'after',
+      scripted: 'now',
+      hauling: 'now',
+    })
+    expect(list.filter((r) => r.noAfter).map((r) => r.id)).toEqual(['scripted', 'hauling'])
+    expect(
+      whenOf(
+        list.find((r) => r.id === 'scripted')!,
+        { scripted: 'after' },
+      ),
+    ).toBe('now')
+  })
+
+  it('takes the Player’s choice over where it starts, and none for the idle', () => {
+    expect(whenOf(row('a', { keeps: true }), { a: 'now' })).toBe('now')
+    expect(whenOf(row('a'), {})).toBe('now')
+    expect(whenOf(row('a', { idle: true }), { a: 'after' })).toBeUndefined()
+    const list = [
+      row('q', { keeps: true }),
+      row('w'),
+      row('i', { idle: true }),
+      row('n', { keeps: true }),
+    ]
+    expect(tickedAfter(list, ['w', 'q', 'i', 'n'], { n: 'now', w: 'after' })).toEqual(['q', 'w'])
+  })
+
+  it('sums up who is ticked now and after', () => {
+    const list = [row('a', { idle: true }), row('b')]
+    expect(whoNote(list, 3, 1)).toBe('3 ticked: 2 now, 1 after.')
+    expect(whoNote(list, 2, 2)).toBe('2 ticked: 2 after.')
+    expect(whoNote(list, 1)).toBe('1 ticked: 1 now.')
+  })
+
+  const sendCtx = { ...ctx, free: () => true }
+
+  it('Now replaces what they do: a working resident drops it and goes to build', () => {
+    const worker = resident('w', 3, 3, working)
+    const { requests, skipped } = realmRequests(house, [worker], { ...sendCtx, after: new Set() })
+    expect(skipped).toEqual([])
+    expect(requests).toEqual([
+      {
+        residentId: 'w',
+        order: { kind: 'task', task: 'build', building: 'house', at: house.at, residentId: 'w' },
+      },
+    ])
+  })
+
+  it('After appends the build to the end of their queue, finishing nothing early', () => {
+    const worker = resident('w', 3, 3, working)
+    const { requests } = realmRequests(house, [worker], { ...sendCtx, after: new Set(['w']) })
+    const order = requests[0]!.order as { kind: string; steps: { id?: number; order: object }[] }
+    expect(order.kind).toBe('editQueue')
+    // The work they are on stays first, by its id; the build comes last.
+    expect(order.steps[0]).toMatchObject({ id: 1, order: { task: 'work' } })
+    expect(order.steps.at(-1)!.order).toMatchObject({ kind: 'task', task: 'build', at: house.at })
+  })
+
+  it('sends each ticked one theirs, in the list’s order, now and after mixed', () => {
+    const to = [resident('a', 1, 1), resident('b', 2, 2, working), resident('c', 3, 3, busy)]
+    const { requests } = realmRequests(house, to, { ...sendCtx, after: new Set(['b']) })
+    expect(requests.map((q) => [q.residentId, q.order.kind])).toEqual([
+      ['a', 'task'],
+      ['b', 'editQueue'],
+      ['c', 'task'],
+    ])
+  })
+
+  it('gives those walking now and after different tiles', () => {
+    const to = [resident('a', 1, 1), resident('b', 2, 2, working)]
+    const walk = { kind: 'walkTo', x: 10, y: 10 } as const
+    const { requests } = realmRequests(walk, to, { ...sendCtx, after: new Set(['b']) })
+    const now = requests[0]!.order as unknown as { x: number; y: number }
+    const after = requests[1]!.order as unknown as { steps: { order: { x: number; y: number } }[] }
+    const last = after.steps.at(-1)!.order
+    expect([now.x, now.y]).not.toEqual([last.x, last.y])
+  })
+})
+
+describe('the who-list’s filters', () => {
+  it('counts the ticked the search and filters hide', () => {
+    expect(tickedHidden(['a', 'b', 'c'], [{ id: 'b' }])).toBe(2)
+    expect(tickedHidden(['a'], [{ id: 'a' }, { id: 'b' }])).toBe(0)
   })
 })
