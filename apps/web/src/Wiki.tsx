@@ -3289,7 +3289,8 @@ export function Wiki() {
           gather them, it builds a workplace for one it has none of, and they are still spare hands
           while they do. Food, Wood and Stone come first, Food its surplus too: only once it holds {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus
           cap past its reserve, and while full its farmers work to win that back as they do its
-          reserve. Its workplaces come first as well: its spare hands go on a road
+          reserve. While it saves for its party, its walls and repairs spend only the Stone above its
+          reserve and the party's Stone. Its workplaces come first as well: its spare hands go on a road
           crew, scout and work at its workplaces for surplus, and only those left over gather for
           the party. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less for
           each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}. A

@@ -408,6 +408,10 @@ pub fn world_invariants() -> Vec<Invariant> {
         },
         Invariant { name: "npc-farmers-kept", check: |w, _t| crate::npc_plan::npc_farmers_kept(w) },
         Invariant {
+            name: "npc-founding-stone-kept",
+            check: |w, _t| crate::npc_plan::npc_founding_stone_kept(w),
+        },
+        Invariant {
             name: "npc-surplus-capped",
             check: |w, _t| crate::npc_plan::npc_surplus_capped(w),
         },

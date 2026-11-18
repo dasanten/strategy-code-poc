@@ -533,7 +533,8 @@ The shared language of the game. Domain terms only — no implementation details
     one stands, and can be defended, until the stone one is finished and replaces it. A Build line
     of wall is of wood or stone; a stone line also upgrades the wooden tiles on its way. Starting
     cities' walls are wooden. An NPC city upgrades its wall to stone once it is a town and holds
-    Stone beyond its reserve, gate first.
+    Stone beyond its reserve (and its founding party's while it saves for one: Full city), gate
+    first.
 - **Tower:** a 2×2 building, of wood or stone, standing in a wall's line or alone. It closes the
   way like a wall, and its top is part of the wall walk wherever a wall tile touches it. Up on it
   a resident sees further than up on a wall, which grows the Player's Sight, and archers reach
@@ -720,7 +721,9 @@ The shared language of the game. Domain terms only — no implementation details
   materials count; Food
   its surplus too (Daniel, 2026-11-15): only once it holds a share of its Food surplus cap past its
   reserve (a balance number); while full, its farmers work to win that back as they do its
-  reserve (Daniel, 2026-11-18, #1379). Its workplaces come first too (Daniel, 2026-11-16): its spare hands'
+  reserve (Daniel, 2026-11-18, #1379). While it saves for its party (its full wait running, no party of its out),
+  its walls and repairs spend only the Stone above its reserve and the party's Stone (Daniel,
+  2026-11-18, #1379): they kept spending it, so no city held it. Its workplaces come first too (Daniel, 2026-11-16): its spare hands'
   work (Spare hands' work: road crew, scouting, its workplaces for surplus) comes before gathering
   for the party, and only the hands left over gather. Those gathering them are still spare hands
   for its full wait. A dip below the reserve only restarts that time if it lasts longer than a game

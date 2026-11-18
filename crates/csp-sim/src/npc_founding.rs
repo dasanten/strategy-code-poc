@@ -154,6 +154,38 @@ pub fn holds_food_first(world: &WorldState, city: &City) -> bool {
     past >= NPC_FOUND_FOOD_SURPLUS_SHARE * cap
 }
 
+/// Whether an NPC city is saving for its founding party (`CONTEXT.md`: Full city): its full wait
+/// runs and no party of its is out. Never a Trade Org city.
+pub fn saving_to_found(world: &WorldState, city: &City) -> bool {
+    city.trade_org.is_none()
+        && world
+            .city_plans
+            .get(&city.id)
+            .is_some_and(|p| p.full_since.is_some() && founding_party(Some(p)).is_empty())
+}
+
+/// What an NPC city's walls and repairs leave in its storages (`CONTEXT.md`: Full city): its
+/// reserve and, while it saves for its founding party (`saving_to_found`), the party's Stone on
+/// top (Daniel, 2026-11-18, #1379: walls and repairs kept spending it, so no city held it).
+pub fn kept_from_walls(world: &WorldState, city: &City) -> Stock {
+    let mut kept = npc_reserve(world, city);
+    if saving_to_found(world, city) {
+        let party = founding_materials(Some(npc_founding_party_size(
+            city_residents(world, &city.id).len() as f64,
+        )));
+        *kept.entry(Good::Stone).or_insert(0.0) += held(&party, Good::Stone);
+    }
+    kept
+}
+
+/// Whether the city's storages hold `goods` above what its walls and repairs leave there
+/// (`kept_from_walls`).
+pub fn holds_for_walls(world: &WorldState, city: &City, goods: &Stock) -> bool {
+    let stock = npc_city_stock(world, city);
+    let kept = kept_from_walls(world, city);
+    goods.iter().all(|(good, n)| held(&stock, *good) - held(&kept, *good) >= *n)
+}
+
 /// Whether the city's last pass had hands at a workplace of one of `materials` (`founding_lacks`
 /// asks only once nothing else is short, so they were gathering them for its founding party).
 fn gathering(world: &WorldState, city: &City, materials: &Stock) -> bool {

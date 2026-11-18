@@ -268,3 +268,67 @@ fn an_upgrade_project_makes_the_town_short_of_nothing() {
     let short = short_goods(&t.world, t.city(), t.terrain.size, Some(&project));
     assert!(!short.contains(&Good::Stone), "{short:?}");
 }
+
+#[test]
+fn a_town_saving_for_its_founding_party_upgrades_only_from_stone_beyond_the_partys() {
+    // #1379 (Daniel, 2026-11-18): its walls and repairs kept spending the party's Stone, so no
+    // city held it and none founded a daughter.
+    use crate::npc_founding::founding_materials;
+    use crate::npc_plan::{npc_founding_stone_kept, plan_city};
+    use crate::queries::city::city_residents;
+    use crate::queries::names::held;
+    use crate::queries::npc_trade::npc_founding_party_size;
+    let mut t = Town::new();
+    let city = t.city.clone();
+    plan_city(&mut t.world, &city, Some(&t.terrain), None, None);
+    let i = t
+        .world
+        .buildings
+        .iter()
+        .position(|b| b.city_id.as_ref() == Some(&city) && b.kind == BuildingKind::Storage)
+        .unwrap();
+    let mut stock = npc_reserve(&t.world, t.city());
+    let reserve = held(&stock, Good::Stone);
+    stock.insert(Good::Stone, reserve + trip());
+    t.world.buildings[i].stock = Some(stock.clone());
+    let gate = t.gate();
+    assert_eq!(at(&t.upgrade()).0, BuildingKind::Gate);
+    // Saving for its founding party, a trip beyond its reserve is the party's: it waits.
+    t.world.city_plans.get_mut(&city).unwrap().full_since = Some(0.0);
+    assert_eq!(t.upgrade(), None);
+    // The invariant catches a plan that starts the gate from the party's Stone.
+    let plan = t.world.city_plans.get_mut(&city).unwrap();
+    plan.planned_at = t.world.tick as f64;
+    plan.project = Some(CityProject::Build {
+        building: BuildingKind::Gate,
+        x: gate.x,
+        y: gate.y,
+        material: STONE,
+    });
+    assert_eq!(npc_founding_stone_kept(&t.world).len(), 1);
+    // A trip beyond the party's Stone too: it goes on, and the invariant holds.
+    let party = founding_materials(Some(npc_founding_party_size(
+        city_residents(&t.world, &city).len() as f64,
+    )));
+    stock.insert(Good::Stone, reserve + held(&party, Good::Stone) + trip());
+    t.world.buildings[i].stock = Some(stock);
+    assert_eq!(at(&t.upgrade()).0, BuildingKind::Gate);
+    assert_eq!(npc_founding_stone_kept(&t.world), []);
+    // Once its party sets out it saves no more: back to its reserve alone.
+    let stock = t.world.buildings[i].stock.as_mut().unwrap();
+    stock.insert(Good::Stone, reserve + trip());
+    let member = city_residents(&t.world, &city)[0].id.clone();
+    let plan = t.world.city_plans.get_mut(&city).unwrap();
+    plan.jobs.insert(
+        member,
+        csp_shared::world::CityJob {
+            kind: csp_shared::world::CityJobKind::Found,
+            target_id: None,
+            stable_id: None,
+            building_id: None,
+            ground_id: None,
+            subject: None,
+        },
+    );
+    assert_eq!(at(&t.upgrade()).0, BuildingKind::Gate);
+}

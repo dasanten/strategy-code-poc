@@ -3,7 +3,8 @@
 //! first, then that wall tile by tile, nearest the gate first; its inner ring follows once the
 //! outer one is stone. Villages, starting cities and the Trade Organization's stay as they are.
 //! The upgrade takes Stone beyond its reserve only, last of a town's projects and while its road
-//! crew is in: with no quarry it builds one, and its spare hands work it for the Stone.
+//! crew is in: with no quarry it builds one, and its spare hands work it for the Stone. While it
+//! saves for its founding party, beyond that party's Stone as well (#1379).
 
 use csp_shared::balance::{NPC_STONE_WALL_RESIDENTS, NPC_WALL_TILES_PER_TRIP};
 use csp_shared::terrain::wrap_delta;
@@ -11,7 +12,8 @@ use csp_shared::world::{
     Building, BuildingKind, City, CityJobKind, CityProject, Stock, WallMaterial, WorldState,
 };
 
-use crate::npc_inner_wall::{holds_above_reserve, outer_walls};
+use crate::npc_founding::{holds_for_walls, saving_to_found};
+use crate::npc_inner_wall::outer_walls;
 use crate::queries::building::{build_materials_of, is_stone};
 use crate::queries::city::city_residents;
 
@@ -91,11 +93,13 @@ pub fn outer_ring_of_stone(world: &WorldState, city: &City, home: &Building, siz
 
 /// The Stone of one upgrade trip: `NPC_WALL_TILES_PER_TRIP` tiles of stone wall's worth, as a
 /// builder fetches for a wall; it covers a gate too.
-fn trip() -> Stock {
+pub fn trip() -> Stock {
+    one_tile().into_iter().map(|(g, n)| (g, n * NPC_WALL_TILES_PER_TRIP)).collect()
+}
+
+/// The Stone of one tile of stone wall.
+fn one_tile() -> Stock {
     build_materials_of(BuildingKind::Wall, Some(WallMaterial::Stone))
-        .into_iter()
-        .map(|(g, n)| (g, n * NPC_WALL_TILES_PER_TRIP))
-        .collect()
 }
 
 /// Whether a town has a wooden wall or gate left to upgrade, so wants Stone for it: a quarry
@@ -152,14 +156,20 @@ pub fn stone_upgrade_project(
     if !is_npc_town(world, city) {
         return None;
     }
+    // While it saves for its founding party, the party's Stone stays put too, a site begun or not
+    // (Daniel, 2026-11-18, #1379: its walls kept spending it, so no city held it).
+    let saving = saving_to_found(world, city);
     if let Some(site) = begun_upgrade(world, city) {
+        if saving && !holds_for_walls(world, city, &trip()) {
+            return None;
+        }
         return Some(stone_project(site.kind, site.x, site.y));
     }
     if expanding || road_crew_out(world, city) {
         return None;
     }
     let next = *upgrade_order(world, city, home, size).first()?;
-    if !holds_above_reserve(world, city, &trip()) {
+    if !holds_for_walls(world, city, &trip()) {
         return None;
     }
     Some(stone_project(next.kind, next.x, next.y))
