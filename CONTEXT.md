@@ -2070,7 +2070,11 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   **suggests** by ticking the nearest idle ones; the Player changes the ticks or just confirms.
   With nobody ticked, Confirm is off; with nobody idle, nobody is ticked and the list says so.
   A busy resident can be ticked too: a Now / After switch on their row says whether the order
-  replaces what they are doing or is appended to their queue (as Shift does on a card). Those who
+  replaces what they are doing or is appended to their queue (as Shift does on a card). After is
+  offered only where there is something to append to: a queue, or a walk of their own, which
+  becomes the queue's first step. A resident on a task or script without a queue (Work, a haul
+  route given directly, another order) shows Now only, with the note "no queue to add to",
+  because a new queue would end what they do at once. Those who
   can't take the order (children, a partner carrying a child, no way there) are listed last,
   greyed out, saying why. The list can be searched and filtered as the Residents list can, and it
   fits a phone screen.
