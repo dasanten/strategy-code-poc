@@ -2666,3 +2666,66 @@ button.residents-row.selected:hover {
 .admin-land-legend .swatch.mark {
   transform: rotate(45deg);
 }
+
+/* The Unit | Realm switch at the start of the top bar (`CONTEXT.md`: Control mode). */
+.hud-control {
+  flex: none;
+  display: inline-flex;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.hud-control button {
+  padding: 2px 9px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ui-muted);
+  font: inherit;
+  line-height: 20px;
+}
+.hud-control button + button {
+  border-left: 1px solid var(--ui-line-strong);
+}
+.hud-control button:hover {
+  background: var(--ui-raised-hover);
+}
+.hud-control button.on {
+  background: var(--rel-own);
+  color: var(--ui-ink);
+  font-weight: 600;
+}
+.game.phone .hud-control button {
+  padding: 4px 8px;
+}
+/* The realm bar along the bottom of the map in realm control mode (`CONTEXT.md`: Realm order). */
+.hud-realm-bar {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  max-width: min(560px, calc(100vw - var(--rail-w) - 220px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  background: var(--ui-bar);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--ui-line);
+  border-radius: 10px;
+}
+.hud-realm-bar-empty {
+  color: var(--ui-muted);
+  white-space: normal;
+}
+.game.phone .hud-realm-bar {
+  top: calc(var(--top-h) + 6px);
+  bottom: auto;
+  left: 8px;
+  right: 8px;
+  transform: none;
+  max-width: none;
+  padding: 5px 10px;
+  font-size: 12px;
+}

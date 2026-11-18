@@ -155,8 +155,11 @@ function busyHorses(world: PickWorld): Set<string | null | undefined> {
   ])
 }
 
-/** A tile's card, with what on it the click stands for. */
-function tilePick(tx: number, ty: number, world: PickWorld): MapPick {
+/**
+ * A tile's card, with what on it the click stands for: a building, else a carriage or loose
+ * horse of the Player's, else the bare tile. Realm control mode picks only this (`control-mode.ts`).
+ */
+export function tilePick(tx: number, ty: number, world: PickWorld): MapPick {
   const { size, realmId } = world
   const [x, y] = [wrap(tx, size), wrap(ty, size)]
   const at = (e: { x: number; y: number }) => wrap(e.x, size) === x && wrap(e.y, size) === y

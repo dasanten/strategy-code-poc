@@ -144,7 +144,7 @@ describe('the first-day card’s lines', () => {
     const view = firstDayView({ done: [], dismissed: false })
     expect(view.lines.map((l) => l.label)).toEqual([
       'Claim the Horse offer',
-      'Pick a resident',
+      'Pick a resident (with the switch on Unit)',
       'Give them an order',
       'Open the Wiki',
     ])
