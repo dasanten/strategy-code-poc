@@ -755,6 +755,8 @@ export function Wiki() {
           Those who can’t build (children, a partner carrying a child, or with no way there) come
           last, greyed out, saying why. Those ticked walk there and build as a group sent with Build
           would; hold Shift while confirming to pick the next place for another of the same kind.
+          <b>Road</b> and <b>Wall</b> beside it lay out a line the same way (see{' '}
+          <a href="#building">Building</a>).
         </p>
         <p>
           A busy resident you tick gets a <b>Now / After</b> switch on their row. <b>Now</b> drops
@@ -2140,6 +2142,14 @@ export function Wiki() {
           given it one by one, each take the nearest tile still to build that no other of them has
           taken, so several tiles go up at once; each fetches their own materials. With every tile
           left taken by the others, a builder waits, and they all stop once the line is finished.
+        </p>
+        <p>
+          In <a href="#controls">realm control mode</a> a line starts from the realm bar instead:{' '}
+          <strong>Road</strong> or <strong>Wall</strong> (wood or stone, on the banner), then where
+          the line starts and where it ends, with the same preview. A line too long, or with no tile
+          left to build, says why and you pick its end again. Then the who-list shows your residents
+          with their way to the line’s tile nearest them, the nearest {num(WHO_SUGGESTS.line)} idle
+          ones ticked; those you confirm get Build line as a crew.
         </p>
         <p>
           A storage in a city's area is that city's storage. One outside any city is an{' '}

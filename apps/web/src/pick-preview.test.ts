@@ -187,3 +187,18 @@ describe('the preview of a kind picked before its place (realm control mode)', (
     expect(not.label).toBe('No room for a house: it overlaps a building')
   })
 })
+
+describe('the preview of a realm order’s line', () => {
+  it('previews where the line starts, then the line to the pointer', () => {
+    expect(previewPickOf({ kind: 'realmLine', building: 'road' }, {})).toEqual({
+      kind: 'lineStart',
+      building: 'road',
+    })
+    const from = { x: 1, y: 1 }
+    expect(previewPickOf({ kind: 'realmLine', building: 'wall', from }, {})).toEqual({
+      kind: 'line',
+      building: 'wall',
+      from,
+    })
+  })
+})

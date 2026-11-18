@@ -58,7 +58,7 @@ function wayLine(row: WhoRow): string {
  */
 export function WhoList({
   title,
-  at,
+  where,
   rows,
   suggest,
   doing,
@@ -69,7 +69,8 @@ export function WhoList({
 }: {
   /** What is to be done: "Build a house". */
   title: string
-  at: { x: number; y: number }
+  /** Where it is to be done (`whoWhere`): "at 4, 5", "from 4, 5 to 9, 5". */
+  where: string
   rows: readonly WhoRow[]
   /** How many of the nearest idle residents are ticked when it opens (`WHO_SUGGESTS`). */
   suggest: number
@@ -126,7 +127,7 @@ export function WhoList({
       rel="own"
       title={title}
       lines={[
-        `at ${at.x}, ${at.y} · who does it?`,
+        `${where} · who does it?`,
         <strong key="note">{whoNote(rows, ticked.length, after.length)}</strong>,
       ]}
       onClose={onClose}

@@ -1,21 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { TICKS_PER_GAME_YEAR } from '@csp/balance'
+import { ROAD_LINE_MAX_TILES, TICKS_PER_GAME_YEAR } from '@csp/balance'
 import type { Stock } from '@csp/shared-types'
 import {
   NO_WAY_THERE,
   WHO_SUGGESTS,
   afterOffered,
   keptTicks,
+  lineProblem,
   searched,
   startsWhen,
   suggested,
+  wayTarget,
   tickedAfter,
   tickedHidden,
   whenOf,
   whoNote,
   whoRows,
   whoTitle,
+  whoWhere,
   whyNot,
+  type WhoLine,
   type WhoOrder,
   type WhoResident,
   type WhoRow,
@@ -156,6 +160,60 @@ describe('the who-list’s search and title', () => {
     expect(whoTitle(house)).toBe('Build a house')
     expect(whoTitle({ ...house, building: 'haven' })).toBe('Build a haven')
     expect(whoTitle({ ...house, building: 'wall', material: 'stone' })).toBe('Build a stone wall')
+  })
+})
+
+describe('a road or wall line on the who-list', () => {
+  const line: WhoLine = {
+    kind: 'line',
+    building: 'road',
+    from: { x: 10, y: 10 },
+    to: { x: 16, y: 10 },
+  }
+
+  it('says what is to be built and where', () => {
+    expect(whoTitle(line, SIZE)).toBe('Build a road line of 7 tiles')
+    expect(whoTitle({ ...line, building: 'wall', material: 'stone', to: line.from }, SIZE)).toBe(
+      'Build a stone wall line of 1 tile',
+    )
+    expect(whoWhere(line, line.from)).toBe('from 10, 10 to 16, 10')
+    expect(whoWhere(house, { x: 10, y: 10 })).toBe('at 10, 10')
+  })
+
+  it('shows each resident the way to the line’s tile nearest them', () => {
+    expect(wayTarget(line, line.from, { x: 20, y: 9 }, SIZE)).toEqual({ x: 16, y: 10 })
+    expect(wayTarget(line, line.from, { x: 13, y: 12 }, SIZE)).toEqual({ x: 13, y: 10 })
+    expect(wayTarget(house, { x: 10, y: 10 }, { x: 40, y: 40 }, SIZE)).toEqual({ x: 10, y: 10 })
+    const list = whoRows(
+      line,
+      [resident('a', 20, 10), resident('b', 13, 12)],
+      (r) => wayTarget(line, line.from, r, SIZE),
+      ways(),
+      ctx,
+    )
+    expect(list.map((r) => [r.id, r.tiles])).toEqual([
+      ['b', 2],
+      ['a', 4],
+    ])
+  })
+
+  it('ticks a few more for a line, which they share', () => {
+    expect(WHO_SUGGESTS.line).toBeGreaterThan(WHO_SUGGESTS.build)
+  })
+
+  it('says why a line can’t be built before the who-list', () => {
+    const anywhere = () => true
+    expect(lineProblem(line, SIZE, anywhere)).toBeUndefined()
+    const long = { ...line, to: { x: 10 + ROAD_LINE_MAX_TILES, y: 10 } }
+    expect(lineProblem(long, 1024, anywhere)).toBe(
+      `a line covers at most ${ROAD_LINE_MAX_TILES} tiles`,
+    )
+    expect(lineProblem(line, SIZE, () => false)).toBe('no road to build on that line')
+    expect(lineProblem(line, SIZE, (x) => x === 16)).toBeUndefined()
+  })
+
+  it('turns down children for a line too', () => {
+    expect(whyNot(line, resident('a', 0, 0, child), undefined, ctx)).toBe('a child')
   })
 })
 

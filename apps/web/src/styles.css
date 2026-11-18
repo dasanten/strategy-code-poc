@@ -135,8 +135,21 @@ body {
 }
 /* The picker's room: without it Log out would run off the bar on a small laptop or tablet. */
 @media (max-width: 1150px) {
-  .hud-top .hud-muted {
+  .hud-top .hud-muted,
+  .hud-top .hud-sep {
     display: none;
+  }
+  /* With the Unit | Realm switch too, the bar fits a 1024 px screen only packed closer, the
+     realm's name giving way last with an ellipsis; else focusing a card scrolls the game aside. */
+  .hud-top,
+  .hud-top .hud-goods {
+    gap: 8px;
+  }
+  .hud-top > b {
+    flex: 0 1 auto;
+    min-width: 3em;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 .hud-good,
