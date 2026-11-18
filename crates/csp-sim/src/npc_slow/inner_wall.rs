@@ -109,13 +109,13 @@ fn finishes_its_ring(layout: CityLayout) {
 }
 
 #[test]
-#[ignore = "8.6 s alone; see #1132"]
+#[ignore = "19.8 s alone; see #1132"]
 fn finishes_its_ring_in_a_grid_city_from_what_it_has_above_its_reserve_its_gate_last() {
     finishes_its_ring(CityLayout::Grid);
 }
 
 #[test]
-#[ignore = "8.9 s alone; see #1132"]
+#[ignore = "25.4 s alone; see #1132"]
 fn finishes_its_ring_in_a_rings_city_from_what_it_has_above_its_reserve_its_gate_last() {
     finishes_its_ring(CityLayout::Rings);
 }

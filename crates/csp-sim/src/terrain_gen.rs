@@ -935,7 +935,7 @@ mod tests {
     /// The full-size map: its time in release and the rules of the land on it. Run with
     /// `cargo test --release -- --ignored`.
     #[test]
-    #[ignore = "several seconds alone: generates the full-size map; see #1132"]
+    #[ignore = "7.2 s alone: generates the full-size map; see #1132"]
     fn generates_the_full_size_map_as_the_rules_say() {
         let from = Instant::now();
         let mut stages = Vec::new();

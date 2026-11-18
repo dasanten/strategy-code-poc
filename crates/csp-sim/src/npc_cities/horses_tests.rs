@@ -281,7 +281,7 @@ mod the_stable_of_an_npc_city_with_horses {
     }
 
     #[test]
-    #[ignore = "7.0 s alone; see #1132"]
+    #[ignore = "9.3 s alone; see #1132"]
     fn takes_its_time_from_a_village_with_no_wood_at_all_and_the_food_by_them_lasts() {
         let mut v = village(None);
         let city = v.city.clone();
@@ -357,7 +357,7 @@ mod an_npc_city_breeding_its_horses {
     }
 
     #[test]
-    #[ignore = "6.8 s alone; see #1132"]
+    #[ignore = "10.7 s alone; see #1132"]
     fn stops_at_the_number_it_wants() {
         let (mut v, stable) = stabled();
         let city = v.city.clone();

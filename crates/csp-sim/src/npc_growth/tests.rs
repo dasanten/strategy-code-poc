@@ -106,7 +106,7 @@ fn truthy(v: &Value) -> bool {
 }
 
 #[test]
-#[ignore = "13.1 s alone; see #1132"]
+#[ignore = "15.5 s alone; see #1132"]
 fn tears_the_old_wall_down_only_after_the_new_one_is_finished() {
     let mut v = village(None);
     let size = v.terrain.size;
@@ -433,7 +433,7 @@ fn an_npc_citys_residents_get_up_on_its_walls_others_dont() {
 // npc-growth-village.test.ts
 
 #[test]
-#[ignore = "24.2 s alone; see #1132"]
+#[ignore = "28.7 s alone; see #1132"]
 fn a_village_grows_in_residents_and_area_over_game_weeks() {
     let mut v = village(None);
     let size = v.terrain.size;

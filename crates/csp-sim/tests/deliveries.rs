@@ -322,7 +322,7 @@ mod caravans_carrying_out_deliveries {
     }
 
     #[test]
-    #[ignore = "6.1 s alone; see #1132"]
+    #[ignore = "6.8 s alone; see #1132"]
     fn pick_up_goods_sold_from_the_citys_storage_pay_there_and_bring_them_to_the_warehouse() {
         let mut s = setup();
         let si = s.world.buildings.iter().position(|b| b.id == s.storage().id).unwrap();
