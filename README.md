@@ -79,6 +79,29 @@ file makes a rebuild after a change to `csp-sim` about three times faster on Win
 with `rust-lld` on Windows (`.cargo/config.toml`), so it works from Git Bash too, where
 `/usr/bin/link` used to shadow the MSVC linker.
 
+### The year run and its checkpoints
+
+`npc_slow::game_year::the_new_world_runs_a_game_year_on_its_own` runs a generated world for a game
+year (about 50 min in release; ignored for time). It fails on the game day an NPC city starves out
+or the Trade Organization loses anyone to hunger, naming the city and the day. Every 30 game days it
+writes a checkpoint to `target/game-year/` (or `GAME_YEAR_CHECKPOINTS=<dir>`): `day-NNN.world.json.gz`,
+the world as the server saves it, and `day-NNN.watch.json`, what the run counted so far. Resuming
+from one is the same run tick for tick (a test in the default suite holds it), so to look at a late
+failure, or check a fix for it, start from the last checkpoint before the failing day:
+
+```sh
+# the whole year, writing checkpoints
+cargo test --release -p csp-sim --lib game_year::the_new_world -- --ignored --nocapture
+# failed on day 214: copy the day-210 checkpoint out of the way, then go on from it to day 220
+cp target/game-year/day-210.* /tmp/
+GAME_YEAR_FROM=/tmp/day-210.world.json.gz GAME_YEAR_DAYS=220 GAME_YEAR_TRACE=/tmp/trace.txt \
+  cargo test --release -p csp-sim --lib game_year::the_new_world -- --ignored --nocapture
+```
+
+`GAME_YEAR_DAYS` is the game day to stop at (what is judged only at the end of the year is then
+skipped), and `GAME_YEAR_TRACE` writes a line a day for each NPC city. A resumed run writes its own
+checkpoints into the same directory, over the old ones of the same days.
+
 The server stores everything in `data/world.db` (override with `DB_PATH`). The world lives in
 memory and is saved as a gzipped snapshot every 30 ticks and on shutdown; old saves are pruned
 (ADR 0006). A dev world the TypeScript server made sits in `apps/server/data/world.db` of an older
