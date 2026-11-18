@@ -2719,9 +2719,9 @@ button.residents-row.selected:hover {
   color: var(--ui-muted);
   white-space: normal;
 }
+/* On a phone above the map buttons and the minimap button, clear of the notices up top. */
 .game.phone .hud-realm-bar {
-  top: calc(var(--top-h) + 6px);
-  bottom: auto;
+  bottom: calc(var(--sheet-h, 0px) + 12px + 44px + 6px + 36px + 8px);
   left: 8px;
   right: 8px;
   transform: none;
