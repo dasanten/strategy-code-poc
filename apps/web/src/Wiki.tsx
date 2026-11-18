@@ -407,6 +407,7 @@ import {
   repairWork,
 } from './shared/decay.js'
 import { fighterStrength } from './shared/persuasion.js'
+import { WHO_SUGGESTS } from './who-list-view.js'
 import type {
   BuildingKind,
   CrimeKind,
@@ -741,8 +742,20 @@ export function Wiki() {
           and where, then who does it. There a click or tap on the map picks a building (a carriage,
           or a horse nobody rides, counts as one), else the bare tile: your residents are drawn but
           never picked, so a crowded tile is still easy to click, and a drag or the Select button
-          picks no group. The realm bar along the bottom of the map (at the top on a phone) is where
-          those orders start.
+          picks no group. The realm bar along the bottom of the map (above the map buttons on a
+          phone) is where those orders start.
+        </p>
+        <p>
+          <b>Build</b> on the realm bar opens the Build menu. Pick a kind (and Customise, if you
+          like), then tap where it goes: the footprint shows under the pointer, marked where it
+          doesn’t fit, and a tile it can’t go on says why and sends nobody. Then the <b>who-list</b>{' '}
+          opens: your residents nearest the place first, each with what they are doing and how long
+          their way there is. The nearest {num(WHO_SUGGESTS.build)} idle ones are already ticked;
+          change the ticks or just Confirm. With nobody idle, nobody is ticked and the list says so;
+          a busy resident you tick drops what they were doing. Those who can’t build (children, a
+          partner carrying a child, or with no way there) come last, greyed out, saying why. Those
+          ticked walk there and build as a group sent with Build would; hold Shift while confirming
+          to pick the next place for another of the same kind.
         </p>
         <p>
           Switching to realm control mode lets go of the resident, group or army you had picked.
@@ -1920,6 +1933,11 @@ export function Wiki() {
           building's materials on the tile (all of an unfinished site's). A road over a mountain
           can't be torn down while a carriage or a ridden horse stands on it: the work waits until
           they leave. A horse left there unridden can't be ridden off a road.
+        </p>
+        <p>
+          Building is given from a resident’s card or a group card (where to build, then what), or
+          in realm control mode from Build on the realm bar: what, then where, then who builds it,
+          picked from the who-list (see Controls, Control modes).
         </p>
         <p>
           Tear down can be run directly too, with Run script or as a queue step: they tear down the

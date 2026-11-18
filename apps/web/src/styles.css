@@ -2715,9 +2715,68 @@ button.residents-row.selected:hover {
   border: 1px solid var(--ui-line);
   border-radius: 10px;
 }
-.hud-realm-bar-empty {
+.hud-realm-bar-hint {
   color: var(--ui-muted);
   white-space: normal;
+}
+.hud-realm-bar button {
+  flex: none;
+  padding: 4px 12px;
+  font-weight: 600;
+}
+.hud-realm-bar button.on {
+  background: var(--rel-own);
+  color: var(--ui-ink);
+}
+/* The who-list (`CONTEXT.md`: Who-list): one row a resident, nearest first, can't-take greyed. */
+.who-search {
+  width: 100%;
+  margin: 4px 0 6px;
+}
+.who-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.who-row label {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: 'tick name way' 'tick doing doing';
+  column-gap: 8px;
+  align-items: baseline;
+  padding: 5px 2px;
+  border-bottom: 1px solid var(--ui-line);
+  cursor: pointer;
+}
+.who-row input {
+  grid-area: tick;
+  align-self: center;
+}
+.who-name {
+  grid-area: name;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.who-way {
+  grid-area: way;
+  white-space: nowrap;
+}
+.who-doing {
+  grid-area: doing;
+  color: var(--ui-muted);
+  min-width: 0;
+}
+.who-cant label {
+  opacity: 0.5;
+  cursor: default;
+}
+.who-actions {
+  margin-top: 8px;
 }
 /* On a phone above the map buttons and the minimap button, clear of the notices up top. */
 .game.phone .hud-realm-bar {

@@ -32,6 +32,24 @@ export function previewPath(
   goer: Goer = 'foot',
   blocked: (x: number, y: number) => boolean = () => false,
 ): Point[] {
+  const found = searchPath(size, from, to, ground, goer, blocked)
+  return typeof found === 'string' ? roadLine(from, to, size).slice(1) : found
+}
+
+/**
+ * The way as `previewPath` finds it, or why it found none: `'none'` when every tile reachable
+ * from `from` was searched without reaching `to` (no way there: water or walls between),
+ * `'gaveUp'` when the search stopped at `PREVIEW_SEARCH_TILES` or `to` itself can't be stepped
+ * onto, so whether there is a way can't be told.
+ */
+export function searchPath(
+  size: number,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  ground: (x: number, y: number) => Terrain | undefined,
+  goer: Goer = 'foot',
+  blocked: (x: number, y: number) => boolean = () => false,
+): Point[] | 'none' | 'gaveUp' {
   const speeds: Partial<Record<number, number>> =
     goer === 'carriage' ? CARRIAGE_SPEED : TERRAIN_SPEED
   const cost = (x: number, y: number) => {
@@ -42,8 +60,7 @@ export function previewPath(
   const [gx, gy] = [wrap(to.x, size), wrap(to.y, size)]
   const [sx, sy] = [wrap(from.x, size), wrap(from.y, size)]
   if (sx === gx && sy === gy) return []
-  const straight = () => roadLine(from, to, size).slice(1)
-  if (cost(gx, gy) === Infinity) return straight()
+  if (cost(gx, gy) === Infinity) return 'gaveUp'
   // The cheapest a step can cost, for the heuristic: a road's, or else the fastest ground's.
   const cheapest = 1 / Math.max(...Object.values(speeds).filter((s): s is number => !!s))
   const h = (x: number, y: number) => {
@@ -83,7 +100,7 @@ export function previewPath(
       }
     }
   }
-  return straight()
+  return open.size === 0 ? 'none' : 'gaveUp'
 }
 
 /** The tiles from the start to tile `t`, without the start. */

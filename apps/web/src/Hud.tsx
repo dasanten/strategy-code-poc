@@ -10,7 +10,7 @@ import {
 import { formatGameTime } from './shared/time.js'
 import type { FirstDay, TraderVisit } from '@csp/shared-types'
 import { DrawerStatus } from './drawer-head.js'
-import { REALM_BAR_EMPTY, type ControlMode } from './control-mode.js'
+import { REALM_BAR_HINT, type ControlMode } from './control-mode.js'
 import {
   DIPLOMACY_TABS,
   DRAWERS,
@@ -358,12 +358,21 @@ function ControlSwitch({
 
 /**
  * The realm bar over the map in realm control mode (`CONTEXT.md`: Realm order): where the orders
- * that begin with a kind or a place start. Until it has some, it says what the mode is for.
+ * that begin with a kind or a place start, beside a line on what the mode is for.
  */
-export function RealmBar() {
+export function RealmBar({ building, onBuild }: { building: boolean; onBuild: () => void }) {
   return (
     <div className="hud-realm-bar" role="toolbar" aria-label="Realm orders">
-      <span className="hud-realm-bar-empty">{REALM_BAR_EMPTY}</span>
+      <button
+        type="button"
+        className={building ? 'on' : undefined}
+        aria-pressed={building}
+        title="Build: pick what, then where, then who builds it"
+        onClick={onBuild}
+      >
+        Build
+      </button>
+      <span className="hud-realm-bar-hint">{REALM_BAR_HINT}</span>
     </div>
   )
 }

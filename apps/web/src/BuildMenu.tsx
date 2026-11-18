@@ -116,6 +116,7 @@ export function BuildMenu({
   buildProblem,
   blocked = false,
   planning = false,
+  anywhere = false,
   onBuild,
 }: {
   /** The resource node on this tile, if the Player knows one. */
@@ -128,10 +129,12 @@ export function BuildMenu({
   blocked?: boolean
   /** For the planner: the kind is added as a step, whose turn checks it (`canChooseKind`). */
   planning?: boolean
+  /** No tile picked yet (realm control mode): every kind is offered, judged once it is picked. */
+  anywhere?: boolean
   onBuild: (kind: BuildingKind, material?: WallMaterial) => void
 }) {
   const [open, setOpen] = useState<BuildingKind | undefined>()
-  const groups = buildMenuGroups(node, buildProblem)
+  const groups = buildMenuGroups(node, buildProblem, anywhere)
   const item = groups.flatMap((g) => g.kinds).find((k) => k.kind === open)
   return (
     <>
