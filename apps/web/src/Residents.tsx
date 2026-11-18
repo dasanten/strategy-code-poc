@@ -3490,7 +3490,7 @@ export function ResidentCard({
  * come back, and how much Food stays on board for the horse or the rower, then the other stop on
  * the map.
  */
-function HaulBlock({
+export function HaulBlock({
   adult,
   onRoute,
   byWater = false,

@@ -9,6 +9,8 @@ import { BUILDING_NAMES } from './map/palette.js'
 import { groupSkip, type GroupOrder, type GroupSeen } from './group-orders.js'
 import { boundToTile, type BuildingGroupOrder } from './building-orders.js'
 import { subjectLabel } from './Residents.js'
+import { drivenCarriageId } from './shared/carriages.js'
+import type { VehicleGroupOrder } from './vehicle-orders.js'
 
 /**
  * The who-list (`CONTEXT.md`: Who-list): the last step of a realm order, listing the realm's
@@ -21,9 +23,10 @@ export type WhoResident = Parameters<typeof groupSkip>[1] & Partial<Pick<Residen
 
 /**
  * A realm order that reaches the who-list: Build, those a building's card starts, a road or
- * wall line, and those about places and goods (`WhoPlaceOrder`).
+ * wall line, those about places and goods (`WhoPlaceOrder`), and those a carriage's or vessel's
+ * card starts (`VehicleGroupOrder`).
  */
-export type WhoOrder = BuildingGroupOrder | WhoLine | WhoPlaceOrder
+export type WhoOrder = BuildingGroupOrder | WhoLine | WhoPlaceOrder | VehicleGroupOrder
 
 /**
  * A realm order about places and goods: Walk to, Explore, Run script and Relocate from the realm
@@ -63,6 +66,12 @@ export const WHO_SUGGESTS: Record<WhoOrder['kind'], number> = {
   relocate: 1,
   store: 2,
   fetch: 1,
+  // One driver or rower; Board ticks as many as there are seats left (`vehicleSuggests`).
+  haul: 1,
+  drive: 1,
+  row: 1,
+  board: 1,
+  boardBoat: 1,
 }
 
 /**
@@ -156,6 +165,18 @@ export function whoTitle(
       return `Teach ${subjectLabel(order.subject)}`
     case 'train':
       return 'Train at the training ground'
+    case 'haul':
+      return `Haul with the carriage to ${order.x}, ${order.y}`
+    case 'drive':
+      return `Drive the carriage to ${order.x}, ${order.y}`
+    case 'row':
+      return `Row the boat to ${order.x}, ${order.y}`
+    case 'board':
+      return 'Board the carriage'
+    case 'boardBoat': {
+      const name = order.vessel.kind === 'ship' ? 'ship' : 'boat'
+      return order.asCrew ? `Board the ${name} as crew` : `Board the ${name}`
+    }
   }
 }
 
@@ -185,6 +206,13 @@ export function whyNot(
   const why = groupSkip(order, there, tick, size, true, seen)
   if (why) return why
   if (way === 'none') return NO_WAY_THERE
+  // Boarding, queued or not: who is aboard already, and the driver (`CONTEXT.md`: Passenger).
+  if (order.kind === 'board' || order.kind === 'boardBoat') {
+    const id = order.kind === 'board' ? order.carriage.id : order.vessel.id
+    if (r.aboard === id) return 'aboard already'
+    if (r.aboard !== undefined) return 'aboard something else'
+    if (drivenCarriageId({ order: r.order ?? null })) return 'the driver can’t board'
+  }
   // Their own Food stays in their hands (`CONTEXT.md`: Own food).
   if (order.kind === 'store' && !GOODS.some((g) => putAwayUnits(g, r.carried[g] ?? 0) > 0))
     return 'carries nothing to store'
