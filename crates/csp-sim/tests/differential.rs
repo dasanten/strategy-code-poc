@@ -145,7 +145,7 @@ fn the_trade_org_hq_steps_as_the_typescript_did() {
 /// of it the NPC default scripts, so it stays out of the default suite until they are faster.
 /// Run it with `cargo nextest run -p csp-sim --run-ignored only`.
 #[test]
-#[ignore = "8.0 s alone: the HQ's NPC default scripts over a game week, invariants checked on the way; see #1132"]
+#[ignore = "8.9 s alone: the HQ's NPC default scripts over a game week, invariants checked on the way; see #1132"]
 fn the_trade_org_hq_keeps_its_invariants_over_a_game_week() {
     assert_eq!(stepped("hq", &[1440, 10080], false), None);
 }

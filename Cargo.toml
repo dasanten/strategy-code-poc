@@ -27,8 +27,9 @@ rustc-hash = "2"
 [workspace.lints.clippy]
 all = "warn"
 
-# Fast tests are a requirement (ADR 0030): dependencies optimised even in dev, our crates lightly,
-# so a simulation test runs in seconds and an incremental build stays short.
+# Fast tests are a requirement (ADR 0030): dependencies optimised even in dev, and the crates the
+# simulation runs in (`csp-lang`, `csp-sim`, `csp-shared`, below) too, so a simulation test runs in
+# seconds; the rest of ours lightly, so an incremental build stays short.
 [profile.dev]
 opt-level = 1
 debug = "line-tables-only"
@@ -42,6 +43,14 @@ opt-level = 3
 [profile.dev.package.csp-lang]
 opt-level = 3
 
+# The tick itself (ADR 0040, T111.1): the suite runs about a quarter faster at the same incremental
+# build time.
+[profile.dev.package.csp-sim]
+opt-level = 3
+
+[profile.dev.package.csp-shared]
+opt-level = 3
+
 [profile.release]
 lto = "thin"
 codegen-units = 4
@@ -51,6 +60,16 @@ codegen-units = 4
 [profile.profiling]
 inherits = "release"
 debug = true
+
+# The slow simulation runs (`pnpm test:slow`, `test:year`, `test:ignored`; ADR 0040): release
+# optimisation and checks, so results match earlier release runs, but without LTO and with many
+# codegen units, so the build is short. Built incrementally: a gate after a few changes rebuilds
+# only the changed crates.
+[profile.slow]
+inherits = "release"
+lto = false
+codegen-units = 16
+incremental = true
 
 # The editor's WebAssembly checker (`csp-lang-wasm`, T88.3): small over fast, built by
 # `pnpm wasm:build` with `--profile wasm`.

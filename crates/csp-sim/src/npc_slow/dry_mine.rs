@@ -61,7 +61,7 @@ fn idle_share(s: &BigCity) -> Option<f64> {
 }
 
 #[test]
-#[ignore = "324 s alone in release; see #1132"]
+#[ignore = "341.4 s alone; see #1132"]
 fn a_big_city_whose_vein_runs_dry_ends_a_season_working_the_next_node_no_idler_than_before() {
     let mut staged = big_city(None, 1300);
     // Its mine's vein nearly empty, the spare iron ore node beside it gone, another further off.

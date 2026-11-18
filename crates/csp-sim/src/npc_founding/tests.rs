@@ -583,7 +583,7 @@ fn gives_a_wiped_out_party_up_after_the_give_up_days_and_may_found_again() {
 }
 
 #[test]
-#[ignore = "13.9 s alone; see #1132"]
+#[ignore = "15.8 s alone; see #1132"]
 fn founds_a_village_480_tiles_away_within_a_few_game_weeks_which_then_feeds_itself() {
     let mut t = full_town(1300);
     let home = t.home();

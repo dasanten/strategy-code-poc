@@ -61,7 +61,11 @@ Admins can also create invite codes and reset passwords in the client.
 Other scripts:
 
 ```sh
-pnpm check:rust    # cargo fmt --check, clippy with warnings as errors, cargo nextest run
+pnpm check:rust    # cargo fmt --check, clippy with warnings as errors, cargo nextest run (shares the machine)
+pnpm test:slow     # the slow NPC runs (npc_slow without the year runs): an epic's gate, ~8 min
+pnpm test:year     # the year and season runs (about 50 and 15 min): nightly on dev
+pnpm test:ignored  # every test ignored for time but the year runs and measurements, ~7 min: nightly
+pnpm nightly:ignored  # test:ignored, appended to .claude/worktrees/nightly-year-report.md
 pnpm types:rust    # the client's types from the crates (commit packages/shared-types/src/generated)
 pnpm balance:rust  # the client's balance numbers from balance.rs
 pnpm build         # type-check and bundle the client
@@ -72,12 +76,52 @@ pnpm lint          # ESLint
 pnpm format        # Prettier
 ```
 
+While working on a crate, run its tests alone: `cargo nextest run -p csp-sim [filter]` builds in
+about half the time of the whole workspace, since `csp-server` isn't rebuilt. Run
+`pnpm check:rust` once before finishing. It shares the machine with other checks (ADR 0040):
+builds run side by side, and the suite runs one check at a time, so it may say it is waiting for
+another check's suite. A check alone waits for nothing.
+
 A Rust test over 5 s is a regression to fix (nextest flags it); `cargo fmt --all` fixes
 formatting. Each crate's integration tests build into one test binary: `tests/all.rs` lists every
 file in `tests/`, and a test fails when a file is missing from it. One binary instead of one per
 file makes a rebuild after a change to `csp-sim` about three times faster on Windows. Cargo links
 with `rust-lld` on Windows (`.cargo/config.toml`), so it works from Git Bash too, where
 `/usr/bin/link` used to shadow the MSVC linker.
+
+Tests ignored for time run with `pnpm test:slow` and `pnpm test:year` (ADR 0040): the `slow` cargo
+profile (release without LTO, so it builds in about half the time and gives the same results) and
+the `slow` nextest profile (no 5 s warning, each test its own process). Extra arguments go to
+nextest: a test name narrows the run, `--no-capture` shows the output as it runs.
+
+Every test ignored for time runs each night on `dev` (ADR 0040), so none rots: the scheduled task
+`nightly-year-run` runs the year runs, then `pnpm nightly:ignored` in the same worktree. That runs
+`pnpm test:ignored` (the `ignored` nextest profile: everything `#[ignore]`d but the year runs and the
+tests ignored as measurements) and appends pass or fail, the failing tests and the time to the
+nightly report. An ignore reason says how long the test takes alone in the dev profile.
+
+### The year run and its checkpoints
+
+`npc_slow::game_year::the_new_world_runs_a_game_year_on_its_own` runs a generated world for a game
+year (about 50 min in release; ignored for time). It fails on the game day an NPC city starves out
+or the Trade Organization loses anyone to hunger, naming the city and the day. Every 30 game days it
+writes a checkpoint to `target/game-year/` (or `GAME_YEAR_CHECKPOINTS=<dir>`): `day-NNN.world.json.gz`,
+the world as the server saves it, and `day-NNN.watch.json`, what the run counted so far. Resuming
+from one is the same run tick for tick (a test in the default suite holds it), so to look at a late
+failure, or check a fix for it, start from the last checkpoint before the failing day:
+
+```sh
+# the whole year, writing checkpoints (a name narrows `pnpm test:year` to the year run alone)
+pnpm test:year runs_a_game_year --no-capture
+# failed on day 214: copy the day-210 checkpoint out of the way, then go on from it to day 220
+cp target/game-year/day-210.* /tmp/
+GAME_YEAR_FROM=/tmp/day-210.world.json.gz GAME_YEAR_DAYS=220 GAME_YEAR_TRACE=/tmp/trace.txt \
+  pnpm test:year runs_a_game_year --no-capture
+```
+
+`GAME_YEAR_DAYS` is the game day to stop at (what is judged only at the end of the year is then
+skipped), and `GAME_YEAR_TRACE` writes a line a day for each NPC city. A resumed run writes its own
+checkpoints into the same directory, over the old ones of the same days.
 
 The server stores everything in `data/world.db` (override with `DB_PATH`). The world lives in
 memory and is saved as a gzipped snapshot every 30 ticks and on shutdown; old saves are pruned
