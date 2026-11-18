@@ -27,8 +27,9 @@ rustc-hash = "2"
 [workspace.lints.clippy]
 all = "warn"
 
-# Fast tests are a requirement (ADR 0030): dependencies optimised even in dev, our crates lightly,
-# so a simulation test runs in seconds and an incremental build stays short.
+# Fast tests are a requirement (ADR 0030): dependencies optimised even in dev, and the crates the
+# simulation runs in (`csp-lang`, `csp-sim`, `csp-shared`, below) too, so a simulation test runs in
+# seconds; the rest of ours lightly, so an incremental build stays short.
 [profile.dev]
 opt-level = 1
 debug = "line-tables-only"
@@ -40,6 +41,14 @@ opt-level = 3
 # The script interpreter runs every resident's script every tick: the long simulations (T86.14)
 # spend most of their time in it.
 [profile.dev.package.csp-lang]
+opt-level = 3
+
+# The tick itself (ADR 0040, T111.1): the suite runs about a quarter faster at the same incremental
+# build time.
+[profile.dev.package.csp-sim]
+opt-level = 3
+
+[profile.dev.package.csp-shared]
 opt-level = 3
 
 [profile.release]
