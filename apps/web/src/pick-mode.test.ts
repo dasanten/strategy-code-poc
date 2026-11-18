@@ -106,3 +106,12 @@ describe('a realm order picking its place', () => {
     expect(pickHint(missed)).toBe('Not there: it is not in a city.')
   })
 })
+
+describe('a realm order’s Walk to picking its place', () => {
+  it('waits for where to walk to, then who walks there', () => {
+    const target = pickTarget({ ...none, realm: {} })
+    expect(target).toEqual({ kind: 'realm' })
+    expect(pickPrompt(target!, false)).toBe('Click where to walk to')
+    expect(pickHint(target!)).toBe('Then who walks there: the nearest idle resident is ticked.')
+  })
+})

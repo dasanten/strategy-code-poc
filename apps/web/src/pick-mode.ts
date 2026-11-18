@@ -17,8 +17,11 @@ export type PickTarget =
   | { kind: 'army'; mode: ArmyPick['kind'] }
   | { kind: 'param'; param: ScriptParam }
   | { kind: 'plan'; prompt: string; error?: string }
-  /** A realm order picking its place (`CONTEXT.md`: Realm order): where the kind goes. */
-  | { kind: 'realm'; building: BuildingKind; error?: string }
+  /**
+   * A realm order picking its place (`CONTEXT.md`: Realm order): where the kind goes, or with no
+   * kind where to walk to.
+   */
+  | { kind: 'realm'; building?: BuildingKind; error?: string }
 
 /** The target the map waits for, if any; one at a time, the param before the others. */
 export function pickTarget(state: {
@@ -31,7 +34,7 @@ export function pickTarget(state: {
   /** The step being planned with Add step, if it still picks a place. */
   plan?: Plan
   /** The kind a realm order picks a place for, and why the last tile picked would not do. */
-  realm?: { building: BuildingKind; error?: string }
+  realm?: { building?: BuildingKind; error?: string }
 }): PickTarget | undefined {
   if (state.paramPick) return { kind: 'param', param: state.paramPick }
   if (state.realm) return { kind: 'realm', ...state.realm }
@@ -132,7 +135,9 @@ export function pickHint(target: PickTarget): string | undefined {
   if (target.kind === 'realm')
     return target.error
       ? `Not there: ${target.error}.`
-      : 'Then who builds it: the nearest idle residents are ticked.'
+      : target.building
+        ? 'Then who builds it: the nearest idle residents are ticked.'
+        : 'Then who walks there: the nearest idle resident is ticked.'
   return undefined
 }
 
@@ -166,7 +171,9 @@ export function pickPrompt(target: PickTarget, touch: boolean): string {
   if (target.kind === 'army') return `${verb} ${ARMY_PROMPTS[target.mode]}`
   if (target.kind === 'plan') return `${verb} ${target.prompt}`
   if (target.kind === 'realm')
-    return `${verb} where the ${BUILDING_NAMES[target.building].toLowerCase()} goes`
+    return target.building
+      ? `${verb} where the ${BUILDING_NAMES[target.building].toLowerCase()} goes`
+      : `${verb} where to walk to`
   return `${verb} ${PARAM_PROMPTS[target.param.type]} for ${target.param.name}`
 }
 

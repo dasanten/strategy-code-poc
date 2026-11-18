@@ -2707,6 +2707,7 @@ button.residents-row.selected:hover {
   z-index: 3;
   max-width: min(560px, calc(100vw - var(--rail-w) - 220px));
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 7px 12px;
@@ -2715,7 +2716,9 @@ button.residents-row.selected:hover {
   border: 1px solid var(--ui-line);
   border-radius: 10px;
 }
+/* On a line of its own under the orders. */
 .hud-realm-bar-hint {
+  flex: 1 1 100%;
   color: var(--ui-muted);
   white-space: normal;
 }
@@ -2787,4 +2790,9 @@ button.residents-row.selected:hover {
   max-width: none;
   padding: 5px 10px;
   font-size: 12px;
+  gap: 4px 6px;
+}
+/* Five orders in one row on a phone. */
+.game.phone .hud-realm-bar button {
+  padding: 4px 7px;
 }

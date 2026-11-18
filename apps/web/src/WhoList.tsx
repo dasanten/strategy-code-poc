@@ -1,7 +1,16 @@
 import { useState } from 'react'
 import { aboutTime } from './shared/estimates.js'
 import { SelectionCard } from './SelectionCard.js'
-import { keptTicks, searched, suggested, tickable, whoNote, type WhoRow } from './who-list-view.js'
+import {
+  keptTicks,
+  searched,
+  suggested,
+  tickable,
+  whoAtLine,
+  whoNote,
+  type WhoAt,
+  type WhoRow,
+} from './who-list-view.js'
 
 /** From how many rows on the who-list has a search box. */
 const SEARCH_FROM = 6
@@ -31,7 +40,8 @@ export function WhoList({
 }: {
   /** What is to be done: "Build a house". */
   title: string
-  at: { x: number; y: number }
+  /** Where the list measures from: the target, or what it says it sorts by. */
+  at: WhoAt
   rows: readonly WhoRow[]
   /** How many of the nearest idle residents are ticked when it opens (`WHO_SUGGESTS`). */
   suggest: number
@@ -57,10 +67,7 @@ export function WhoList({
     <SelectionCard
       rel="own"
       title={title}
-      lines={[
-        `at ${at.x}, ${at.y} · who does it?`,
-        <strong key="note">{whoNote(rows, ticked.length)}</strong>,
-      ]}
+      lines={[whoAtLine(at), <strong key="note">{whoNote(rows, ticked.length)}</strong>]}
       onClose={onClose}
     >
       {rows.length >= SEARCH_FROM && (

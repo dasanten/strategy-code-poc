@@ -10,7 +10,12 @@ import {
 import { formatGameTime } from './shared/time.js'
 import type { FirstDay, TraderVisit } from '@csp/shared-types'
 import { DrawerStatus } from './drawer-head.js'
-import { REALM_BAR_HINT, type ControlMode } from './control-mode.js'
+import {
+  REALM_BAR_HINT,
+  REALM_BAR_ORDERS,
+  type ControlMode,
+  type RealmBarOrder,
+} from './control-mode.js'
 import {
   DIPLOMACY_TABS,
   DRAWERS,
@@ -360,18 +365,29 @@ function ControlSwitch({
  * The realm bar over the map in realm control mode (`CONTEXT.md`: Realm order): where the orders
  * that begin with a kind or a place start, beside a line on what the mode is for.
  */
-export function RealmBar({ building, onBuild }: { building: boolean; onBuild: () => void }) {
+export function RealmBar({
+  open,
+  onOpen,
+}: {
+  /** The realm bar's order being given, if one is. */
+  open: RealmBarOrder | undefined
+  /** Starts the order, or with it open already, drops it. */
+  onOpen: (order: RealmBarOrder) => void
+}) {
   return (
     <div className="hud-realm-bar" role="toolbar" aria-label="Realm orders">
-      <button
-        type="button"
-        className={building ? 'on' : undefined}
-        aria-pressed={building}
-        title="Build: pick what, then where, then who builds it"
-        onClick={onBuild}
-      >
-        Build
-      </button>
+      {REALM_BAR_ORDERS.map(({ id, label, title }) => (
+        <button
+          key={id}
+          type="button"
+          className={open === id ? 'on' : undefined}
+          aria-pressed={open === id}
+          title={title}
+          onClick={() => onOpen(id)}
+        >
+          {label}
+        </button>
+      ))}
       <span className="hud-realm-bar-hint">{REALM_BAR_HINT}</span>
     </div>
   )

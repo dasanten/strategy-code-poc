@@ -550,6 +550,7 @@ export function TileCard({
   onFeed,
   onPickUp,
   onRepair,
+  realm,
 }: {
   card: TileCardData
   /** The building the card is named after, for its icon. */
@@ -621,6 +622,8 @@ export function TileCard({
   onPickUp: (residentId: string, from: GoodsSpot, goods: Stock) => void
   /** Gives the actor the Repair task for a worn building, wall, gate or road on the tile. */
   onRepair?: (buildingId: string) => void
+  /** The realm orders about the tile in realm control mode (`RealmTileOrders`), if any. */
+  realm?: ReactNode
 }) {
   const actions = tileActions(card, actor, tick, mapSize)
   const [open, setOpen] = useState<string | undefined>()
@@ -728,6 +731,7 @@ export function TileCard({
         />
       )}
       {card.what === 'building' && workSettings}
+      {realm}
       {actions.length > 0 && (
         <ActionRows
           actions={actions}
@@ -834,7 +838,9 @@ export function TileCard({
           ? `Order turned down: ${orderError}`
           : actor
             ? `Close this card to go back to ${actor.name}.`
-            : 'Pick one of your residents to send them here.'}
+            : realm
+              ? 'Each order here goes on to the who-list: who does it.'
+              : 'Pick one of your residents to send them here.'}
       </p>
     </SelectionCard>
   )
