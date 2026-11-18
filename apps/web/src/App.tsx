@@ -219,7 +219,14 @@ import {
 import { BuildMenu } from './BuildMenu.js'
 import { kindProblemOn } from './build-menu-view.js'
 import { WhoList } from './WhoList.js'
-import { WHO_SUGGESTS, whoRows, whoTitle, type WhoOrder, type WhoWay } from './who-list-view.js'
+import {
+  WHO_SUGGESTS,
+  realmRequests,
+  whoRows,
+  whoTitle,
+  type WhoOrder,
+  type WhoWay,
+} from './who-list-view.js'
 import { searchPath } from './map/path-preview.js'
 import {
   pickHint,
@@ -1217,14 +1224,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
   /**
    * Confirm on the who-list: those ticked get what the group card's Build sends them, the first
-   * there laying out the site and the others joining it, replacing what they do. With Shift held
-   * the same kind stays armed for the next place; else the realm bar is back.
+   * there laying out the site and the others joining it, replacing what they do, or appended to
+   * their queue for those set to After. With Shift held the same kind stays armed for the next
+   * place; else the realm bar is back.
    */
-  async function confirmRealmOrder(order: WhoOrder, ids: readonly string[], again: boolean) {
+  async function confirmRealmOrder(
+    order: WhoOrder,
+    ids: readonly string[],
+    after: readonly string[],
+    again: boolean,
+  ) {
     const to = ids.flatMap((id) => own.filter((r) => r.id === id))
     const material = order.material ? { material: order.material } : {}
     setRealmOrder(again ? { step: 'where', building: order.building, ...material } : undefined)
-    await sendGroup(order, false, to)
+    await sendGroup(order, false, to, new Set(after))
   }
   /** The queue planner's Add step, on the resident card and the group card. */
   function addStep(w: NonNullable<typeof world>) {
@@ -1383,6 +1396,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     queued = shift.current,
     /** Who gets it: the picked group, or those ticked on a realm order's who-list. */
     to: readonly Resident[] = group,
+    /** Those of a who-list set to After, who get it appended to their queue (`realmRequests`). */
+    after?: ReadonlySet<string>,
   ) {
     if (!world) return
     const given = 'params' in order && order.params !== undefined
@@ -1391,7 +1406,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       opensForm(
         groupOrderStart(order) ?? { kind: order.kind },
         to.map((r) => r.scriptParams),
-        (params) => sendGroup({ ...order, params } as GroupOrder, queued, to),
+        (params) => sendGroup({ ...order, params } as GroupOrder, queued, to, after),
       )
     if (asked) return
     const size = world.map.size
@@ -1403,14 +1418,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       if (world.buildings.some((b) => isWallOrGate(b) && covers(b, x, y, size))) return false
       return !world.residents.some((r) => r.x === x && r.y === y && !inGroup.has(r.id))
     }
-    // With Shift held, each one's queue gets the order appended (`CONTEXT.md`: Queue).
-    const { requests, skipped } = groupRequests(order, to, {
-      tick: world.tick,
-      size,
-      free,
-      queued,
-      seen: groupSeen,
-    })
+    // With Shift held, each one's queue gets the order appended (`CONTEXT.md`: Queue); from a
+    // who-list, only the queues of those set to After.
+    const ctx = { tick: world.tick, size, free, seen: groupSeen }
+    const { requests, skipped } = after
+      ? realmRequests(order, to, after, ctx)
+      : groupRequests(order, to, { ...ctx, queued })
     if (order.kind === 'build') setGroupBuildAt(undefined)
     await sendToGroup(
       requests.map((q) => q.order),
@@ -3017,7 +3030,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   })
                 : ''
             }}
-            onConfirm={(ids, again) => void confirmRealmOrder(who.order, ids, again)}
+            groups={residentsPanel ? residentsPanel.groups : []}
+            tick={world.tick}
+            onConfirm={(ids, after, again) => void confirmRealmOrder(who.order, ids, after, again)}
             onClose={() => setRealmOrder(undefined)}
           />
         </CardSheet>
