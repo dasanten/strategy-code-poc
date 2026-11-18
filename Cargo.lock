@@ -405,6 +405,7 @@ version = "0.0.0"
 dependencies = [
  "csp-lang",
  "csp-shared",
+ "flate2",
  "indexmap",
  "rustc-hash",
  "serde",
