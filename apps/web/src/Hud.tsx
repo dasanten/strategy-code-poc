@@ -360,7 +360,30 @@ function ControlSwitch({
  * The realm bar over the map in realm control mode (`CONTEXT.md`: Realm order): where the orders
  * that begin with a kind or a place start, beside a line on what the mode is for.
  */
-export function RealmBar({ building, onBuild }: { building: boolean; onBuild: () => void }) {
+export function RealmBar({
+  building,
+  onBuild,
+  line,
+  onLine,
+}: {
+  building: boolean
+  onBuild: () => void
+  /** The road or wall line being given (`CONTEXT.md`: Build line), if one is. */
+  line?: 'road' | 'wall' | undefined
+  onLine?: (building: 'road' | 'wall') => void
+}) {
+  const lineButton = (kind: 'road' | 'wall', label: string) =>
+    onLine && (
+      <button
+        type="button"
+        className={line === kind ? 'on' : undefined}
+        aria-pressed={line === kind}
+        title={`${label}: pick where the line starts and ends, then who builds it`}
+        onClick={() => onLine(kind)}
+      >
+        {label}
+      </button>
+    )
   return (
     <div className="hud-realm-bar" role="toolbar" aria-label="Realm orders">
       <button
@@ -372,6 +395,8 @@ export function RealmBar({ building, onBuild }: { building: boolean; onBuild: ()
       >
         Build
       </button>
+      {lineButton('road', 'Road')}
+      {lineButton('wall', 'Wall')}
       <span className="hud-realm-bar-hint">{REALM_BAR_HINT}</span>
     </div>
   )
