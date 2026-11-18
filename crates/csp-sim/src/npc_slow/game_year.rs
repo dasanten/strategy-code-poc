@@ -8,11 +8,25 @@
 //! nobody of theirs starved, and each has a Trade Org warehouse within its trader's reach.
 //!
 //! `GAME_YEAR_DAYS` runs fewer game days than a year, to look at a shorter stretch by hand; the
-//! assertions are only held to on the whole run.
+//! assertions at the end are only held to on the whole run.
+//!
+//! What can be judged on the day fails the run on that game day, naming the city (ADR 0040): an NPC
+//! city with nobody left, a Trade Organization city (or, in the season, a Player's city) losing a
+//! resident to hunger. Every invariant is held each game day too.
+//!
+//! The year run writes a checkpoint every 30 game days: the world as the server saves it (gzipped
+//! JSON of `WorldState`) and what its `Watch` counted so far, to `GAME_YEAR_CHECKPOINTS` (by
+//! default `target/game-year`). `GAME_YEAR_FROM=<dir>/day-030.world.json.gz` starts from one and
+//! goes on to the end (or to `GAME_YEAR_DAYS`), holding the same things: resuming is the same run
+//! tick for tick (`resuming_from_a_save_is_the_same_run`), so a late failure is looked at from the
+//! last checkpoint before it.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
+
+use serde::{Deserialize, Serialize};
 
 use csp_shared::balance::{MAP_SIZE, NPC_TRADER_REACH};
 use csp_shared::terrain::wrap_distance;
@@ -25,6 +39,7 @@ use crate::npc_test_world::Runner;
 use crate::order_sender::OrderSender;
 use crate::queues::{QueueHost, QueueRunner};
 use crate::script_runner::default_host::DefaultScripts;
+use crate::script_runner::Waiting;
 use crate::starting_city::found_starting_city;
 use crate::terrain_gen::generate_terrain;
 use crate::tick::Scratch;
@@ -72,9 +87,19 @@ fn trade_warehouses(world: &WorldState) -> Vec<(i32, i32)> {
         .collect()
 }
 
-/// What a run saw, kept up tick by tick.
-#[derive(Default)]
+/// What a run saw, kept up tick by tick, and what fails it on the day; saved with each checkpoint.
+#[derive(Default, Serialize, Deserialize)]
 struct Watch {
+    /// Game days run so far.
+    day: usize,
+    /// The NPC cities at the start.
+    npc_at_start: Vec<String>,
+    /// Cities that fail the run on the game day they have nobody left.
+    must_live: Vec<String>,
+    /// Cities that fail the run on the game day they lose a resident to hunger.
+    must_not_starve: Vec<String>,
+    /// Whether a Trade Organization city losing a resident to hunger fails the run on that day.
+    trade_org_fed: bool,
     /// Each caravan's ends reached: how often its heading turned.
     caravan_turns: HashMap<String, usize>,
     caravan_heading: HashMap<String, Heading>,
@@ -89,7 +114,7 @@ struct Watch {
 
 impl Watch {
     fn new(world: &WorldState) -> Self {
-        let mut watch = Watch::default();
+        let mut watch = Watch { npc_at_start: npc_city_ids(world), ..Watch::default() };
         for c in &world.caravans {
             watch.caravan_turns.insert(c.id.clone(), 0);
             watch.caravan_heading.insert(c.id.clone(), c.heading);
@@ -127,6 +152,28 @@ impl Watch {
             let most = self.most.entry(c.id.clone()).or_default();
             *most = (*most).max(n);
         }
+    }
+
+    /// What fails the run today, if anything: a city that must live with nobody left, or one that
+    /// must not starve having lost a resident to hunger.
+    fn failure(&self, world: &WorldState) -> Option<String> {
+        let name = |id: &str| {
+            world.cities.iter().find(|c| c.id == id).map_or("gone", |c| c.name.as_str()).to_string()
+        };
+        if let Some(c) = self.must_live.iter().find(|c| people_of(world, c) == 0) {
+            return Some(format!("{c} ({}) starved out: nobody left", name(c)));
+        }
+        let trade_org = world
+            .cities
+            .iter()
+            .filter(|c| self.trade_org_fed && c.trade_org.is_some())
+            .map(|c| &c.id);
+        for c in self.must_not_starve.iter().chain(trade_org) {
+            if let Some(n) = self.starved.get(c) {
+                return Some(format!("{c} ({}) lost {n} residents to hunger", name(c)));
+            }
+        }
+        None
     }
 
     /// The caravans that have not been to both ends and back: turned at most once.
@@ -189,21 +236,82 @@ impl Players {
     }
 }
 
-/// Runs the world for `days` game days, checking every invariant each game day and saying how it
-/// goes every ten.
+/// Game days between checkpoints.
+const CHECKPOINT_DAYS: usize = 30;
+
+/// The runner the runs step `world` with, as a server that loads it does (`Game::new`): its
+/// pathfinder finishes every search it is given, so a run comes out the same however busy the
+/// machine is, and a run resumed from a checkpoint is the run that wrote it.
+fn runner(world: &WorldState, terrain: &TerrainMap) -> Runner {
+    let scratch = Scratch { waiting: Waiting::of(world), ..Scratch::default() };
+    Runner { walking: super::unhurried_walking(terrain), scratch }
+}
+
+/// A world save as the server writes one (`saves::save_world`): gzipped JSON of the world.
+fn world_save(world: &WorldState) -> Vec<u8> {
+    use std::io::Write;
+    let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    gz.write_all(&serde_json::to_vec(world).expect("the world as JSON")).expect("gzip");
+    gz.finish().expect("gzip")
+}
+
+fn world_from_save(save: &[u8]) -> WorldState {
+    use std::io::Read;
+    let mut json = Vec::new();
+    flate2::read::GzDecoder::new(save).read_to_end(&mut json).expect("a gzipped save");
+    serde_json::from_slice(&json).expect("a world save")
+}
+
+/// Where the year run writes its checkpoints: `GAME_YEAR_CHECKPOINTS`, else `target/game-year`.
+fn checkpoint_dir() -> PathBuf {
+    std::env::var_os("GAME_YEAR_CHECKPOINTS").map_or_else(
+        || Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/game-year"),
+        PathBuf::from,
+    )
+}
+
+/// The watch saved beside a checkpoint's world.
+fn watch_path(world: &Path) -> PathBuf {
+    let name = world.file_name().and_then(|n| n.to_str()).expect("a checkpoint file name");
+    world.with_file_name(name.replace(".world.json.gz", ".watch.json"))
+}
+
+/// Writes the world and the watch to `dir` as `day-NNN.world.json.gz` and `day-NNN.watch.json`.
+fn write_checkpoint(dir: &Path, world: &WorldState, watch: &Watch) -> PathBuf {
+    std::fs::create_dir_all(dir).expect("the checkpoint directory");
+    let path = dir.join(format!("day-{:03}.world.json.gz", watch.day));
+    std::fs::write(&path, world_save(world)).expect("a checkpoint");
+    let json = serde_json::to_vec(watch).expect("the watch as JSON");
+    std::fs::write(watch_path(&path), json).expect("the checkpoint's watch");
+    path
+}
+
+/// A checkpoint's world and the watch beside it.
+fn read_checkpoint(path: &Path) -> (WorldState, Watch) {
+    let world = world_from_save(&std::fs::read(path).expect("a checkpoint"));
+    let watch = std::fs::read(watch_path(path)).expect("the checkpoint's watch");
+    (world, serde_json::from_slice(&watch).expect("a saved watch"))
+}
+
+/// Runs the world on to game day `to`, checking every invariant and what fails the run each game
+/// day and saying how it goes every ten; with `checkpoints`, writes one there every
+/// `CHECKPOINT_DAYS`.
 fn run(
     world: &mut WorldState,
     terrain: &TerrainMap,
-    days: usize,
+    to: usize,
     watch: &mut Watch,
     mut players: Option<&mut Players>,
+    checkpoints: Option<&Path>,
 ) {
-    let mut runner = Runner::new(terrain);
+    let mut runner = runner(world, terrain);
     let started = Instant::now();
     let mut trace = std::env::var("GAME_YEAR_TRACE")
         .ok()
         .map(|p| std::io::BufWriter::new(std::fs::File::create(p).expect("a trace file")));
-    for day in 1..=days {
+    while watch.day < to {
+        watch.day += 1;
+        let day = watch.day;
         for _ in 0..TICKS_PER_GAME_DAY as usize {
             if let Some(p) = players.as_deref_mut() {
                 p.step(world, &mut runner.scratch);
@@ -231,7 +339,14 @@ fn run(
             }
         }
         assert_eq!(broken, [], "day {day}");
-        if day % 10 == 0 || day == days {
+        if let Some(failure) = watch.failure(world) {
+            panic!("day {day}: {failure}");
+        }
+        if let Some(dir) = checkpoints.filter(|_| day.is_multiple_of(CHECKPOINT_DAYS)) {
+            let path = write_checkpoint(dir, world, watch);
+            eprintln!("day {day}: checkpoint {}", path.display());
+        }
+        if day.is_multiple_of(10) || day == to {
             let npc = npc_city_ids(world);
             let people: usize = npc.iter().map(|c| people_of(world, c)).sum();
             eprintln!(
@@ -310,10 +425,26 @@ fn days_to_run(whole: usize) -> usize {
 #[test]
 #[ignore = "about 50 min alone in release; see #1261"]
 fn the_new_world_runs_a_game_year_on_its_own() {
-    let (mut world, terrain) = new_world();
+    let terrain = generate_terrain(SEED, SIZE);
     let terrain = &terrain;
-    let npc_at_start: HashSet<String> = npc_city_ids(&world).into_iter().collect();
-    let mut watch = Watch::new(&world);
+    let (mut world, mut watch) = match std::env::var_os("GAME_YEAR_FROM") {
+        Some(from) => {
+            let (world, watch) = read_checkpoint(Path::new(&from));
+            eprintln!("from day {}: {}", watch.day, Path::new(&from).display());
+            (world, watch)
+        }
+        None => {
+            let world = generate_world(terrain, SEED);
+            let mut watch = Watch::new(&world);
+            // An NPC city starving out, or the Trade Organization losing anyone to hunger, fails
+            // the run on the day. An NPC city may lose one to hunger now and then (it is printed
+            // at the end).
+            watch.must_live = watch.npc_at_start.clone();
+            watch.trade_org_fed = true;
+            (world, watch)
+        }
+    };
+    let npc_at_start: HashSet<String> = watch.npc_at_start.iter().cloned().collect();
     eprintln!(
         "{} NPC cities, {} caravans, {} wandering traders, {} residents",
         npc_at_start.len(),
@@ -323,7 +454,9 @@ fn the_new_world_runs_a_game_year_on_its_own() {
     );
     let whole = (TICKS_PER_GAME_YEAR / TICKS_PER_GAME_DAY) as usize;
     let days = days_to_run(whole);
-    run(&mut world, terrain, days, &mut watch, None);
+    let dir = checkpoint_dir();
+    eprintln!("checkpoints to {}", dir.display());
+    run(&mut world, terrain, days, &mut watch, None, Some(&dir));
 
     let npc_now = npc_city_ids(&world);
     let starved_out: Vec<(&String, usize)> =
@@ -339,7 +472,7 @@ fn the_new_world_runs_a_game_year_on_its_own() {
     }
     assert_eq!(starved_out, [], "NPC cities starved out");
     // The Trade Organization's crews go furthest across the land: none of them starves on the
-    // way. An NPC city may lose one to hunger now and then (it is printed above).
+    // way (held each day too).
     for c in world.cities.iter().filter(|c| c.trade_org.is_some()) {
         assert_eq!(watch.starved.get(&c.id), None, "{} lost residents to hunger", c.id);
     }
@@ -370,9 +503,13 @@ fn two_players_on_the_defaults_last_a_game_season_on_the_new_world() {
     let cities: Vec<String> =
         realms.iter().map(|r| city_of(&world, r).expect("a starting city").id).collect();
     let mut watch = Watch::new(&world);
+    // Both Players' cities live and lose nobody to hunger: either fails the run on the day.
+    watch.must_live = cities.clone();
+    watch.must_not_starve = cities.clone();
     let days = days_to_run(GAME_SEASON_DAYS);
     let mut players = Players::new(terrain, &[1, 2]);
-    run(&mut world, terrain, days, &mut watch, Some(&mut players));
+    // No checkpoints: the Players' queues and scripts (`Players`) are not in the world save.
+    run(&mut world, terrain, days, &mut watch, Some(&mut players), None);
 
     let size = terrain.size;
     let warehouses = trade_warehouses(&world);
@@ -396,4 +533,191 @@ fn two_players_on_the_defaults_last_a_game_season_on_the_new_world() {
         assert_eq!(watch.starved.get(city), None, "{city} lost residents to hunger");
         assert!(nearest <= NPC_TRADER_REACH, "{city}: nearest warehouse {nearest} tiles");
     }
+}
+
+/// A small world for the fast tests below, generated as for a new game: the Trade Organization's
+/// HQ and a trading post, a caravan between them and a wandering trader. A map this small leaves
+/// no room for the NPC cities the generator places on a bigger one, so an NPC village is founded
+/// on a free starting site (as `rare_goods_tests` does).
+fn small_world() -> (WorldState, TerrainMap) {
+    use crate::npc_cities::{found_npc_city, give_npc_horses};
+    use crate::random::Mulberry32;
+    let terrain = generate_terrain(SEED, 1024);
+    let mut world = generate_world(&terrain, SEED);
+    let site = world
+        .starting_sites
+        .iter()
+        .find(|s| s.city_id.is_none())
+        .expect("a free starting site")
+        .clone();
+    let mut m = Mulberry32::new(7.0);
+    let village = found_npc_city(
+        &mut world,
+        &terrain,
+        &csp_shared::balance::NPC_VILLAGE,
+        site.x,
+        site.y,
+        &mut || m.next(),
+        None,
+    );
+    give_npc_horses(&mut world, &terrain, &village);
+    assert!(!world.caravans.is_empty() && !world.traders.is_empty());
+    (world, terrain)
+}
+
+/// Each top-level field of the world, by a hash of its JSON: two worlds are the same where these
+/// are, and where they differ these name what.
+fn fingerprint(world: &WorldState) -> BTreeMap<String, u64> {
+    use std::hash::{Hash, Hasher};
+    let serde_json::Value::Object(fields) = serde_json::to_value(world).expect("JSON") else {
+        panic!("a world is a JSON object");
+    };
+    fields
+        .into_iter()
+        .map(|(k, v)| {
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            v.to_string().hash(&mut h);
+            (k, h.finish())
+        })
+        .collect()
+}
+
+/// The fields of two fingerprints that differ.
+fn differ(a: &BTreeMap<String, u64>, b: &BTreeMap<String, u64>) -> Vec<String> {
+    let keys: HashSet<&String> = a.keys().chain(b.keys()).collect();
+    let mut differ: Vec<String> =
+        keys.into_iter().filter(|k| a.get(*k) != b.get(*k)).cloned().collect();
+    differ.sort();
+    differ
+}
+
+/// The first few residents that differ between two worlds, with their fields that do: (id, field,
+/// in one go, resumed).
+fn residents_differ(a: &WorldState, b: &WorldState) -> Vec<(String, String, String, String)> {
+    let mut out = Vec::new();
+    for ra in &a.residents {
+        let Some(rb) = b.residents.iter().find(|r| r.id == ra.id) else {
+            out.push((ra.id.clone(), "(gone)".into(), String::new(), String::new()));
+            continue;
+        };
+        let (serde_json::Value::Object(fa), serde_json::Value::Object(fb)) =
+            (serde_json::to_value(ra).expect("JSON"), serde_json::to_value(rb).expect("JSON"))
+        else {
+            continue;
+        };
+        let keys: std::collections::BTreeSet<&String> = fa.keys().chain(fb.keys()).collect();
+        for k in keys.into_iter().filter(|k| fa.get(*k) != fb.get(*k)) {
+            let show = |v: Option<&serde_json::Value>| {
+                let s = v.map_or("-".to_string(), |v| v.to_string());
+                s.chars().take(300).collect::<String>()
+            };
+            out.push((ra.id.clone(), k.clone(), show(fa.get(k)), show(fb.get(k))));
+        }
+        if out.len() >= 6 {
+            break;
+        }
+    }
+    out
+}
+
+/// Ticks the resume test runs before the save, and on after it.
+const RESUME_BEFORE: usize = 150;
+const RESUME_AFTER: usize = 150;
+
+#[test]
+fn resuming_from_a_save_is_the_same_run() {
+    let (mut world, terrain) = small_world();
+    let mut r = runner(&world, &terrain);
+    for _ in 0..RESUME_BEFORE {
+        r.step(&mut world, &terrain);
+    }
+    let save = world_save(&world);
+
+    // In one go: the same runner goes on.
+    let mut went = Vec::with_capacity(RESUME_AFTER);
+    for _ in 0..RESUME_AFTER {
+        r.step(&mut world, &terrain);
+        went.push(serde_json::to_vec(&world).expect("JSON"));
+    }
+
+    // From the save, as a server that restarts: a new runner and a world loaded from the save.
+    let mut world = world_from_save(&save);
+    let mut r = runner(&world, &terrain);
+    for (t, then) in went.iter().enumerate() {
+        r.step(&mut world, &terrain);
+        if serde_json::to_vec(&world).expect("JSON") == *then {
+            continue;
+        }
+        let then: WorldState = serde_json::from_slice(then).expect("a world");
+        let differ = differ(&fingerprint(&then), &fingerprint(&world));
+        let residents = residents_differ(&then, &world);
+        panic!(
+            "tick {} after the save (tick {}): {differ:?} differ; residents {residents:#?}",
+            t + 1,
+            world.tick
+        );
+    }
+}
+
+/// Every resident of `city` lies Down, about to die of hunger.
+fn starving(world: &mut WorldState, city: &str) {
+    let soon = world.tick as f64 + 5.0;
+    for r in world.residents.iter_mut().filter(|r| r.city_id.as_deref() == Some(city)) {
+        r.down_until = Some(soon);
+    }
+}
+
+/// What a run of two game days from `world` fails with.
+fn fails_with(mut world: WorldState, terrain: &TerrainMap, mut watch: Watch) -> String {
+    let failed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        run(&mut world, terrain, 2, &mut watch, None, None);
+    }));
+    let payload = failed.expect_err("the run fails");
+    payload
+        .downcast_ref::<String>()
+        .cloned()
+        .or_else(|| payload.downcast_ref::<&str>().map(|s| s.to_string()))
+        .expect("a message")
+}
+
+#[test]
+fn an_npc_city_starving_out_fails_the_run_that_day() {
+    let crate::npc_test_world::Village { mut world, terrain, city, .. } =
+        crate::npc_test_world::village(None);
+    let mut watch = Watch::new(&world);
+    watch.must_live = watch.npc_at_start.clone();
+    assert_eq!(watch.must_live, std::slice::from_ref(&city));
+    starving(&mut world, &city);
+    let failure = fails_with(world, &terrain, watch);
+    assert!(failure.starts_with(&format!("day 1: {city} (")), "{failure}");
+    assert!(failure.ends_with("starved out: nobody left"), "{failure}");
+}
+
+#[test]
+fn the_trade_organization_losing_a_resident_to_hunger_fails_the_run_that_day() {
+    let (mut world, terrain) = small_world();
+    let mut watch = Watch::new(&world);
+    watch.trade_org_fed = true;
+    let hq = world.cities.iter().find(|c| c.trade_org.is_some()).expect("the HQ").id.clone();
+    starving(&mut world, &hq);
+    let failure = fails_with(world, &terrain, watch);
+    assert!(failure.starts_with(&format!("day 1: {hq} (")), "{failure}");
+    assert!(failure.ends_with("residents to hunger"), "{failure}");
+}
+
+#[test]
+fn a_checkpoint_holds_the_world_and_what_the_run_counted() {
+    let (world, _) = small_world();
+    let mut watch = Watch::new(&world);
+    watch.day = 30;
+    watch.starved.insert("c1".into(), 2);
+    let dir = std::env::temp_dir().join(format!("csp-checkpoint-{}", std::process::id()));
+    let path = write_checkpoint(&dir, &world, &watch);
+    assert!(path.ends_with("day-030.world.json.gz"), "{}", path.display());
+    let (w, back) = read_checkpoint(&path);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(differ(&fingerprint(&world), &fingerprint(&w)), Vec::<String>::new());
+    assert_eq!(back.day, 30);
+    assert_eq!(back.starved.get("c1"), Some(&2));
+    assert_eq!(back.npc_at_start, watch.npc_at_start);
 }
