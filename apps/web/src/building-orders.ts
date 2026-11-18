@@ -125,7 +125,8 @@ export function buildingOrder(
 
 /**
  * Orders bound to the target's tile (`CONTEXT.md`: Realm order): given only to those standing
- * there, so a realm order walks the others there first. Build walks there itself.
+ * there, so a realm order walks the others there first. Build walks there itself. Those about a
+ * carriage or vessel are taken on its tile or beside it (`vehicleRequests`).
  */
 const BOUND: readonly GroupOrder['kind'][] = [
   'work',
@@ -134,6 +135,11 @@ const BOUND: readonly GroupOrder['kind'][] = [
   'breed',
   'teach',
   'train',
+  'drive',
+  'haul',
+  'board',
+  'boardBoat',
+  'row',
 ]
 
 /** Whether an order is bound to its target's tile, so those elsewhere walk there first. */
