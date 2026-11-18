@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pickHint, pickPrompt, pickTap, pickTarget } from './pick-mode.js'
+import { pickHint, pickPrompt, pickTap, pickTarget, picksWallLine } from './pick-mode.js'
 import type { Plan } from './plan-step.js'
 
 const none = {
@@ -104,5 +104,32 @@ describe('a realm order picking its place', () => {
     expect(pickHint(target!)).toBe('Then who builds it: the nearest idle residents are ticked.')
     const missed = { kind: 'realm', building: 'house', error: 'it is not in a city' } as const
     expect(pickHint(missed)).toBe('Not there: it is not in a city.')
+  })
+})
+
+describe('a realm order picking a road or wall line', () => {
+  it('waits for where the line starts, then where it ends', () => {
+    const start = pickTarget({ ...none, realmLine: { building: 'road' } })
+    expect(start).toEqual({ kind: 'realmLine', building: 'road' })
+    expect(pickPrompt(start!, false)).toBe('Click where the road starts')
+    expect(pickHint(start!)).toBe('Then where it ends, then who builds it.')
+    const end = { kind: 'realmLine', building: 'wall', from: { x: 1, y: 2 } } as const
+    expect(pickPrompt(end, true)).toBe('Tap where the wall ends')
+    expect(pickHint(end)).toMatch(/^Straight or diagonal, at most \d+ tiles; then who builds it/)
+  })
+
+  it('says why the last line would not do', () => {
+    const missed = {
+      kind: 'realmLine',
+      building: 'road',
+      from: { x: 1, y: 2 },
+      error: 'no road to build on that line',
+    } as const
+    expect(pickHint(missed)).toBe('No line there: no road to build on that line.')
+  })
+
+  it('offers the wall’s material, not the road’s', () => {
+    expect(picksWallLine({ kind: 'realmLine', building: 'wall' })).toBe(true)
+    expect(picksWallLine({ kind: 'realmLine', building: 'road' })).toBe(false)
   })
 })

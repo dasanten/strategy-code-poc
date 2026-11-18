@@ -1,4 +1,6 @@
+import { ROAD_LINE_MAX_TILES } from '@csp/balance'
 import { wrapDelta } from './shared/terrain.js'
+import { roadLine } from './shared/building.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { groupSkip, type GroupOrder, type GroupSeen } from './group-orders.js'
 
@@ -12,7 +14,13 @@ import { groupSkip, type GroupOrder, type GroupSeen } from './group-orders.js'
 export type WhoResident = Parameters<typeof groupSkip>[1]
 
 /** A realm order that reaches the who-list. */
-export type WhoOrder = Extract<GroupOrder, { kind: 'build' }>
+export type WhoOrder = Extract<GroupOrder, { kind: 'build' | 'line' }>
+
+/** A road or wall line given as a realm order. */
+export type WhoLine = Extract<WhoOrder, { kind: 'line' }>
+
+/** A tile of the map. */
+type Tile = { x: number; y: number }
 
 /**
  * How many of the nearest idle residents the who-list ticks for an order (`CONTEXT.md`:
@@ -20,6 +28,8 @@ export type WhoOrder = Extract<GroupOrder, { kind: 'build' }>
  */
 export const WHO_SUGGESTS: Record<WhoOrder['kind'], number> = {
   build: 2,
+  // A road or wall line is shared tile by tile (`CONTEXT.md`: Build line): a third hand helps.
+  line: 3,
 }
 
 /**
@@ -43,8 +53,16 @@ export interface WhoRow {
   why?: string
 }
 
-/** What the who-list is for, its title: "Build a house", "Build an inn" (stone: "a stone wall"). */
-export function whoTitle(order: WhoOrder): string {
+/**
+ * What the who-list is for, its title: "Build a house", "Build an inn" (stone: "a stone wall"),
+ * "Build a road line of 7 tiles" on a map `size` tiles across.
+ */
+export function whoTitle(order: WhoOrder, size = Infinity): string {
+  if (order.kind === 'line') {
+    const tiles = lineTiles(order, size).length
+    const name = `${order.material === 'stone' ? 'stone ' : ''}${order.building}`
+    return `Build a ${name} line of ${tiles} ${tiles === 1 ? 'tile' : 'tiles'}`
+  }
   const name = `${order.material === 'stone' ? 'stone ' : ''}${BUILDING_NAMES[order.building].toLowerCase()}`
   return `Build ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name}`
 }
@@ -67,6 +85,47 @@ export function whyNot(
   return groupSkip(order, r, tick, size, true, seen) ?? (way === 'none' ? NO_WAY_THERE : undefined)
 }
 
+/** Where a realm order is, as the who-list says it: "at 4, 5", "from 4, 5 to 9, 5". */
+export function whoWhere(order: WhoOrder): string {
+  if (order.kind === 'line')
+    return `from ${order.from.x}, ${order.from.y} to ${order.to.x}, ${order.to.y}`
+  return `at ${order.at.x}, ${order.at.y}`
+}
+
+/** The tiles of a line from its start to its end (`roadLine`), on a map `size` tiles across. */
+export function lineTiles(line: Pick<WhoLine, 'from' | 'to'>, size: number): Tile[] {
+  return roadLine(line.from, line.to, size).map(([x, y]) => ({ x, y }))
+}
+
+/**
+ * Why a road or wall line can't be built, said before the who-list (`CONTEXT.md`: Realm order),
+ * as the Build line task would turn it down: longer than a line may be, or no tile on it to build.
+ * `builds` says whether a tile takes the line's building or has a site of it to join.
+ */
+export function lineProblem(
+  line: Pick<WhoLine, 'building' | 'from' | 'to'>,
+  size: number,
+  builds: (x: number, y: number) => boolean,
+): string | undefined {
+  const tiles = lineTiles(line, size)
+  if (tiles.length > ROAD_LINE_MAX_TILES) return `a line covers at most ${ROAD_LINE_MAX_TILES} tiles`
+  if (!tiles.some((t) => builds(t.x, t.y))) return `no ${line.building} to build on that line`
+  return undefined
+}
+
+/**
+ * The tile a resident's way to a realm order goes to: its place, or for a line the line's tile
+ * nearest them in steps, as the crow flies; of those as near, the one straightest across.
+ */
+export function wayTarget(order: WhoOrder, r: Tile, size: number): Tile {
+  if (order.kind !== 'line') return order.at
+  const far = (t: Tile) => {
+    const across = Math.abs(wrapDelta(r.x, t.x, size)) + Math.abs(wrapDelta(r.y, t.y, size))
+    return crowTiles(r, t, size) * 4 * size + across
+  }
+  return lineTiles(order, size).reduce((best, t) => (far(t) < far(best) ? t : best))
+}
+
 /** How many tiles apart two tiles are as the crow flies, the short way round, diagonals one step. */
 function crowTiles(a: { x: number; y: number }, b: { x: number; y: number }, size: number) {
   return Math.max(Math.abs(wrapDelta(a.x, b.x, size)), Math.abs(wrapDelta(a.y, b.y, size)))
@@ -79,7 +138,8 @@ function crowTiles(a: { x: number; y: number }, b: { x: number; y: number }, siz
 export function whoRows(
   order: WhoOrder,
   residents: readonly WhoResident[],
-  at: { x: number; y: number },
+  /** The target, or each resident's own (`wayTarget`). */
+  at: Tile | ((r: WhoResident) => Tile),
   wayOf: (r: WhoResident) => WhoWay,
   ctx: { tick: number; size: number; seen?: GroupSeen },
 ): WhoRow[] {
@@ -91,7 +151,7 @@ export function whoRows(
       id: r.id,
       name: r.name,
       idle: !r.order && !r.script,
-      tiles: known ? known.tiles : crowTiles(r, at, ctx.size),
+      tiles: known ? known.tiles : crowTiles(r, typeof at === 'function' ? at(r) : at, ctx.size),
       ...(known?.ticks !== undefined ? { ticks: known.ticks } : {}),
       ...(why ? { why } : {}),
     }
