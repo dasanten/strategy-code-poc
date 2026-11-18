@@ -61,6 +61,16 @@ codegen-units = 4
 inherits = "release"
 debug = true
 
+# The slow simulation runs (`pnpm test:slow`, `test:year`, `test:ignored`; ADR 0040): release
+# optimisation and checks, so results match earlier release runs, but without LTO and with many
+# codegen units, so the build is short. Built incrementally: a gate after a few changes rebuilds
+# only the changed crates.
+[profile.slow]
+inherits = "release"
+lto = false
+codegen-units = 16
+incremental = true
+
 # The editor's WebAssembly checker (`csp-lang-wasm`, T88.3): small over fast, built by
 # `pnpm wasm:build` with `--profile wasm`.
 [profile.wasm]
