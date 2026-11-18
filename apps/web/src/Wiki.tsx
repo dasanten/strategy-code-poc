@@ -3281,15 +3281,15 @@ export function Wiki() {
         </p>
         <p>
           A city is full once it has had spare hands, idle, on a road crew, scouting or working for
-          surplus, and nothing short of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus
-          and its founding party's materials above its reserve; Coins it has no way to earn don't
-          count as short, and nor do weapons it can't make, nor the Iron it keeps to forge them (it
-          can make them with a smithy, or with nodes it knows of for all they are made from), though
-          it still buys them. Once it lacks nothing but its founding party's materials, those count
-          as short: its spare hands gather them, it builds a workplace for one it has none of, and
-          they are still spare hands while they do. Food, Coins and weapons come first, Food its
-          surplus too: only once it holds {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus
-          cap past its reserve. Its workplaces come first as well: its spare hands go on a road
+          surplus, and none of Food, Wood and Stone short of its reserve for {days(NPC_FULL_DAYS)},
+          with a food surplus and its founding party's materials above its reserve. Its war chest
+          and its soldiers' gear and what that is made from (weapons, armour, bows, arrows, Steel,
+          Iron, Iron ore, Coal) don't keep it from being full: it still works and buys them. Once it
+          lacks nothing but its founding party's materials, those count as short: its spare hands
+          gather them, it builds a workplace for one it has none of, and they are still spare hands
+          while they do. Food, Wood and Stone come first, Food its surplus too: only once it holds {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus
+          cap past its reserve, and while full its farmers work to win that back as they do its
+          reserve. Its workplaces come first as well: its spare hands go on a road
           crew, scout and work at its workplaces for surplus, and only those left over gather for
           the party. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less for
           each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}. A

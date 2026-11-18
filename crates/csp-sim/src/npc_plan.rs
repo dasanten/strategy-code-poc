@@ -402,8 +402,19 @@ fn refill_farmers(world: &WorldState, city: &City) -> f64 {
     if city.trade_org.is_some() || food_short(world, city) {
         return 0.0;
     }
-    use crate::queries::npc_trade::{npc_city_stock, npc_reserve};
-    let lacks = held(&npc_reserve(world, city), Good::Food)
+    use crate::queries::npc_trade::{npc_city_stock, npc_needs_scale, npc_reserve};
+    use csp_shared::balance::{NPC_FOUND_FOOD_SURPLUS_SHARE, NPC_SURPLUS_CAP};
+    // A full city's farmers win back the Food its founding waits on too (`CONTEXT.md`: Full city,
+    // #1379: on the reserve alone its Food never held that, so it gathered nothing for its party).
+    let full = world.city_plans.get(&city.id).is_some_and(|p| p.full_since.is_some());
+    let first = if full {
+        NPC_FOUND_FOOD_SURPLUS_SHARE
+            * NPC_SURPLUS_CAP.get("food").unwrap_or(0.0)
+            * npc_needs_scale(world, city)
+    } else {
+        0.0
+    };
+    let lacks = held(&npc_reserve(world, city), Good::Food) + first
         - held(&npc_city_stock(world, city), Good::Food);
     let per = WORK_OUTPUT_PER_DAY.get("food").unwrap_or(1.0) * NPC_FOOD_REFILL_DAYS;
     (lacks / per - 1e-9).ceil().max(0.0)

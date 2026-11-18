@@ -709,17 +709,18 @@ The shared language of the game. Domain terms only — no implementation details
   hall; those on a round, escorting, training or on alarm stay soldiers until they are free
   (decided overnight, Daniel to confirm).
 - **Full city:** an NPC city that for a whole game week, less the bigger it is (a balance number), has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
-  short of its reserve, holds a food surplus, and holds its founding party's materials
-  above its reserve. Coins it has no way to earn are not short (NPC reserve), so a city that can't
-  earn them isn't held back by its war chest. Likewise weapons it can't make, and the Iron its
-  reserve keeps to forge them, don't keep it from being full (Daniel, 2026-11-14, T100.8): it can
-  make a good it has the workplace for, or nodes it knows of for everything the good is made from.
-  They stay short for all else it does, so it still buys them. A city that lacks nothing but its
-  founding party's materials counts those as short (Daniel, 2026-11-15, T100.8): its spare hands
-  gather them like any shortage, and it builds the workplace for one it has none of. Food, Coins
-  and weapons still come first, since only once nothing else is short do the materials count; Food
+  short of what founding needs, holds a food surplus, and holds its founding party's materials
+  above its reserve. What founding needs is Food, Wood and Stone (Daniel, 2026-11-18, #1379):
+  its war chest (Coins), and its soldiers' gear and what it is made from (weapons, armour, bows,
+  arrows, Steel, Iron, Iron ore, Coal), don't keep it from being full; they kept every city short
+  all year. They stay short for all else it does, so it still works and buys them. A city that
+  lacks nothing but its founding party's materials counts those as short (Daniel, 2026-11-15,
+  T100.8): its spare hands gather them like any shortage, and it builds the workplace for one it
+  has none of. Food, Wood and Stone still come first, since only once none of them is short do the
+  materials count; Food
   its surplus too (Daniel, 2026-11-15): only once it holds a share of its Food surplus cap past its
-  reserve (a balance number). Its workplaces come first too (Daniel, 2026-11-16): its spare hands'
+  reserve (a balance number); while full, its farmers work to win that back as they do its
+  reserve (Daniel, 2026-11-18, #1379). Its workplaces come first too (Daniel, 2026-11-16): its spare hands'
   work (Spare hands' work: road crew, scouting, its workplaces for surplus) comes before gathering
   for the party, and only the hands left over gather. Those gathering them are still spare hands
   for its full wait. A dip below the reserve only restarts that time if it lasts longer than a game
