@@ -1,5 +1,9 @@
 import { ROAD_LINE_MAX_TILES } from '@csp/balance'
+import { CARRYING_A_CHILD, GOODS } from './shared/world.js'
+import { putAwayUnits, unitsThatFit } from './shared/goods.js'
 import { wrapDelta } from './shared/terrain.js'
+import type { Resident } from '@csp/shared-types'
+import { GOOD_LABELS } from './goods-grid.js'
 import { roadLine } from './shared/building.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { groupSkip, type GroupOrder, type GroupSeen } from './group-orders.js'
@@ -13,13 +17,22 @@ import { subjectLabel } from './Residents.js'
  */
 
 /** A resident as the who-list needs them: what a group order checks, and what they do. */
-export type WhoResident = Parameters<typeof groupSkip>[1]
+export type WhoResident = Parameters<typeof groupSkip>[1] & Partial<Pick<Resident, 'stats'>>
 
 /**
- * A realm order that reaches the who-list: Build, those a building's card starts, and a road or
- * wall line.
+ * A realm order that reaches the who-list: Build, those a building's card starts, a road or
+ * wall line, and those about places and goods (`WhoPlaceOrder`).
  */
-export type WhoOrder = BuildingGroupOrder | WhoLine
+export type WhoOrder = BuildingGroupOrder | WhoLine | WhoPlaceOrder
+
+/**
+ * A realm order about places and goods: Walk to, Explore, Run script and Relocate from the realm
+ * bar, Store and Fetch from a storage's card.
+ */
+export type WhoPlaceOrder = Extract<
+  GroupOrder,
+  { kind: 'walkTo' | 'explore' | 'runScript' | 'relocate' | 'store' | 'fetch' }
+>
 
 /** A road or wall line given as a realm order. */
 export type WhoLine = Extract<GroupOrder, { kind: 'line' }>
@@ -42,6 +55,25 @@ export const WHO_SUGGESTS: Record<WhoOrder['kind'], number> = {
   train: 1,
   // A road or wall line is shared tile by tile (`CONTEXT.md`: Build line): a third hand helps.
   line: 3,
+  // One goes to look, explores, runs a script, moves or fetches; two of those carrying
+  // something take it to the storage.
+  walkTo: 1,
+  explore: 1,
+  runScript: 1,
+  relocate: 1,
+  store: 2,
+  fetch: 1,
+}
+
+/**
+ * Where the who-list measures from: the order's target tile, or for an order with none (Explore,
+ * Run script without a place) a place it names instead, `near`, which the list says it sorts by.
+ */
+export interface WhoAt {
+  x: number
+  y: number
+  /** What the list sorts by distance to, when it isn't the order's target: "the town hall". */
+  near?: string
 }
 
 /**
@@ -54,6 +86,8 @@ export type WhoWay = { tiles: number; ticks?: number } | 'none' | undefined
 /** One row of the who-list. */
 export interface WhoRow {
   id: string
+  /** Listed ahead of the others who can take it: for Fetch, has room for the good. */
+  first?: true
   name: string
   /** With neither an order nor a script (`isIdle`). */
   idle: boolean
@@ -78,10 +112,28 @@ export interface WhoRow {
 /**
  * What the who-list is for, its title: "Build a house", "Build an inn" (stone: "a stone wall"),
  * "Work at the farm", "Tear down the house", "Teach Strength", "Build a road line of 7 tiles" on
- * a map `size` tiles across.
+ * a map `size` tiles across, "Walk there", "Explore", "Run Woodcutter", "Relocate to Ashford",
+ * "Store at the storage", "Fetch Wood from the stable". `names` names the script run or the city
+ * moved to.
  */
-export function whoTitle(order: WhoOrder, size = Infinity): string {
+export function whoTitle(
+  order: WhoOrder,
+  size = Infinity,
+  names: { script?: string; city?: string } = {},
+): string {
   switch (order.kind) {
+    case 'walkTo':
+      return 'Walk there'
+    case 'explore':
+      return 'Explore'
+    case 'runScript':
+      return `Run ${names.script ?? 'a script'}`
+    case 'relocate':
+      return `Relocate to ${names.city ?? 'another city'}`
+    case 'store':
+      return `Store at the ${order.to?.name ?? 'nearest storage'}`
+    case 'fetch':
+      return `Fetch ${GOOD_LABELS[order.good]} from the ${order.from?.name ?? 'nearest storage'}`
     case 'line': {
       const tiles = lineTiles(order, size).length
       const name = `${order.material === 'stone' ? 'stone ' : ''}${order.building}`
@@ -112,9 +164,10 @@ export const NO_WAY_THERE = 'no way there'
 
 /**
  * Why a resident can't take a realm order, if they can't (`CONTEXT.md`: Who-list): what the
- * group card would skip them for (a child, a partner carrying a child), or no way there. Those
- * elsewhere are not skipped: a realm order walks them there first, so an order bound to the
- * target's tile is judged as if they stood `at` it.
+ * group card would skip them for (a child, a partner carrying a child), or no way there; for
+ * Store carrying nothing but their own Food, for Relocate living in that city already or carrying
+ * a child (`CONTEXT.md`: Relocate). Those elsewhere are not skipped: a realm order walks them there
+ * first, so an order bound to the target's tile is judged as if they stood `at` it.
  */
 export function whyNot(
   order: WhoOrder,
@@ -129,16 +182,39 @@ export function whyNot(
 ): string | undefined {
   const there = at && boundToTile(order) ? { ...r, x: at.x, y: at.y } : r
   // Queued, a group order skips nobody for standing elsewhere: they walk there first.
+  const why = groupSkip(order, there, tick, size, true, seen)
+  if (why) return why
+  if (way === 'none') return NO_WAY_THERE
+  // Their own Food stays in their hands (`CONTEXT.md`: Own food).
+  if (order.kind === 'store' && !GOODS.some((g) => putAwayUnits(g, r.carried[g] ?? 0) > 0))
+    return 'carries nothing to store'
+  if (order.kind === 'relocate') {
+    if (r.carrying) return CARRYING_A_CHILD
+    if (r.cityId === order.cityId) return 'lives there already'
+  }
+  return undefined
+}
+
+/**
+ * Whether the who-list lists a resident who can take the order before the rest (`CONTEXT.md`:
+ * Who-list): for Fetch, one with room for the good. For other orders anyone is as good.
+ */
+function first(order: WhoOrder, r: WhoResident, tick: number): boolean {
+  // Room is told by strength, which the Player knows of their own.
   return (
-    groupSkip(order, there, tick, size, true, seen) ?? (way === 'none' ? NO_WAY_THERE : undefined)
+    order.kind === 'fetch' &&
+    r.stats !== undefined &&
+    unitsThatFit(r as Resident, order.good, tick) > 0
   )
 }
 
 /**
- * Where a realm order is, as the who-list says it: "at 4, 5" (`at`, its place), or for a line
- * "from 4, 5 to 9, 5".
+ * Where a realm order is, as the who-list says it: "at 4, 5" (`at`, its place), for a line
+ * "from 4, 5 to 9, 5", or for one with no target tile what the list sorts by, "nearest the town
+ * hall first".
  */
-export function whoWhere(order: WhoOrder, at: Tile): string {
+export function whoWhere(order: WhoOrder, at: WhoAt): string {
+  if (at.near) return `nearest ${at.near} first`
   if (order.kind === 'line')
     return `from ${order.from.x}, ${order.from.y} to ${order.to.x}, ${order.to.y}`
   return `at ${at.x}, ${at.y}`
@@ -208,7 +284,8 @@ function crowTiles(a: { x: number; y: number }, b: { x: number; y: number }, siz
 
 /**
  * The who-list's rows (`CONTEXT.md`: Who-list): those who can take the order first, nearest to
- * `at` first, then those who can't, greyed out with why, nearest first too. As near, by name.
+ * `at` first (for Fetch, those with room ahead of those without), then those who can't, greyed
+ * out with why, nearest first too. As near, by name.
  */
 export function whoRows(
   order: WhoOrder,
@@ -225,6 +302,7 @@ export function whoRows(
     const known = typeof way === 'object' ? way : undefined
     const idle = !r.order && !r.script
     return {
+      ...(!why && first(order, r, ctx.tick) ? { first: true as const } : {}),
       id: r.id,
       name: r.name,
       idle,
@@ -238,6 +316,7 @@ export function whoRows(
   return rows.sort(
     (a, b) =>
       Number(a.why !== undefined) - Number(b.why !== undefined) ||
+      Number(!a.first) - Number(!b.first) ||
       a.tiles - b.tiles ||
       a.name.localeCompare(b.name),
   )

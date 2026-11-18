@@ -77,7 +77,8 @@ export function previewPickOf(
   }
   if (target.kind === 'group') return line(target.mode) ?? GROUP_PREVIEWS[target.mode] ?? TILE
   if (target.kind === 'param') return { kind: 'param', type: target.param.type }
-  if (target.kind === 'realm') return { kind: 'build', building: target.building }
+  if (target.kind === 'realm')
+    return target.building ? { kind: 'build', building: target.building } : TILE
   if (target.kind === 'realmLine') {
     const { building, from } = target
     return from ? { kind: 'line', building, from } : { kind: 'lineStart', building }

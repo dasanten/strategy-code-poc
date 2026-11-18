@@ -107,6 +107,15 @@ describe('a realm order picking its place', () => {
   })
 })
 
+describe('a realm order’s Walk to picking its place', () => {
+  it('waits for where to walk to, then who walks there', () => {
+    const target = pickTarget({ ...none, realm: {} })
+    expect(target).toEqual({ kind: 'realm' })
+    expect(pickPrompt(target!, false)).toBe('Click where to walk to')
+    expect(pickHint(target!)).toBe('Then who walks there: the nearest idle resident is ticked.')
+  })
+})
+
 describe('a realm order picking a road or wall line', () => {
   it('waits for where the line starts, then where it ends', () => {
     const start = pickTarget({ ...none, realmLine: { building: 'road' } })

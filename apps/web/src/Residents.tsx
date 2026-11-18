@@ -4288,7 +4288,7 @@ function GroupRelocateBlock({
 }
 
 /** The realm's cities to relocate to, each with its free housing or why it can't be picked. */
-function CityPicker({
+export function CityPicker({
   choices,
   onRelocate,
 }: {
