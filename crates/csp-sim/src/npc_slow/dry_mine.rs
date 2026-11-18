@@ -38,8 +38,8 @@ const MOVING_ON_DAYS: f64 = 15.0;
 const IDLE_SLACK: f64 = 0.01;
 
 /// The share of its plans after moving on that put someone to work at the new mine, at least (81%
-/// when measured).
-const MOST_WORKED: f64 = 0.75;
+/// when measured, 75% since #1379: a full city's farmers win the Food its founding waits on too).
+const MOST_WORKED: f64 = 0.7;
 
 /// The share of its adults the city's plan leaves idle, of those who could work: one carrying a
 /// child gets no work (`CONTEXT.md`: Standing idle). Since its spare hands work past their caps
@@ -61,7 +61,7 @@ fn idle_share(s: &BigCity) -> Option<f64> {
 }
 
 #[test]
-#[ignore = "324 s alone in release; see #1132"]
+#[ignore = "341.4 s alone; see #1132"]
 fn a_big_city_whose_vein_runs_dry_ends_a_season_working_the_next_node_no_idler_than_before() {
     let mut staged = big_city(None, 1300);
     // Its mine's vein nearly empty, the spare iron ore node beside it gone, another further off.

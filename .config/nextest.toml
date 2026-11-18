@@ -2,3 +2,31 @@
 [profile.default]
 slow-timeout = { period = "5s", terminate-after = 12 }
 fail-fast = false
+
+# The slow simulation runs (ADR 0040), built with the `slow` cargo profile: `pnpm test:slow`,
+# `test:year`, `test:ignored`. They are slow on purpose, so no 5 s warning; one that hangs is still
+# killed, after 2 hours (the year run takes about 50 minutes alone). Each test is its own process,
+# which runs them faster than one `cargo test` process (T111.3).
+[profile.slow]
+slow-timeout = { period = "10m", terminate-after = 12 }
+fail-fast = false
+
+# `pnpm test:ignored` (ADR 0040, T111.4): every test ignored for time, nightly on `dev`. Not the
+# year and season runs (`pnpm test:year`, their own nightly step) and not the tests ignored as
+# measurements, which print a timing to read and hold nothing.
+[profile.ignored]
+inherits = "slow"
+default-filter = """
+not test(/npc_slow::game_year::/)
+and not test(/::bench_npc_runs$/)
+and not test(/::bench_bindings$/)
+and not test(/::keeps_a_full_maps_planning_inside_its_budget$/)
+and not test(/::the_walls_fingerprint_is_cheaper_than_the_key$/)
+"""
+
+# This test holds a time of its own (the full-size map generates in under 10 s), which a run beside
+# 23 others breaks (13.6 s; 6.5 s alone): it runs first, alone.
+[[profile.ignored.overrides]]
+filter = "test(/::generates_the_full_size_map_as_the_rules_say$/)"
+threads-required = "num-test-threads"
+priority = 100

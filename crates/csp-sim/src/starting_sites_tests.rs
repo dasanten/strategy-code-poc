@@ -98,7 +98,7 @@ fn every_heartland_has_its_starting_sites_seed_4_2048() {
 /// On full-size maps, with the balance file's numbers as they are: the walk between neighbouring
 /// sites takes 20 to 40 real minutes. Run with `cargo test --release -- --ignored`.
 #[test]
-#[ignore = "about 15 s a map: generates full-size maps"]
+#[ignore = "25.1 s alone: generates full-size maps"]
 fn starting_sites_are_a_20_to_40_minute_walk_apart_on_full_size_maps() {
     let rules = SiteRules::for_size(MAP_SIZE);
     assert_eq!(rules.min_seconds, STARTING_SITE_WALK.min_minutes * 60.0);

@@ -402,7 +402,7 @@ mod caravans_carrying_out_transfers {
     }
 
     #[test]
-    #[ignore = "7.0 s alone; see #1132"]
+    #[ignore = "7.5 s alone; see #1132"]
     fn take_what_the_senders_storage_holds_with_a_fee_for_what_it_takes() {
         let mut s = setup();
         let (st, to) = (s.storage_of(7), s.storage_of(8));
@@ -417,7 +417,7 @@ mod caravans_carrying_out_transfers {
     }
 
     #[test]
-    #[ignore = "7.8 s alone; see #1132"]
+    #[ignore = "7.6 s alone; see #1132"]
     fn drop_a_transfer_the_senders_storage_holds_none_of() {
         let mut s = setup();
         let st = s.storage_of(7);

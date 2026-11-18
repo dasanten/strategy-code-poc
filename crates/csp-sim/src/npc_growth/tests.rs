@@ -106,7 +106,7 @@ fn truthy(v: &Value) -> bool {
 }
 
 #[test]
-#[ignore = "13.1 s alone; see #1132"]
+#[ignore = "15.5 s alone; see #1132"]
 fn tears_the_old_wall_down_only_after_the_new_one_is_finished() {
     let mut v = village(None);
     let size = v.terrain.size;
@@ -433,7 +433,7 @@ fn an_npc_citys_residents_get_up_on_its_walls_others_dont() {
 // npc-growth-village.test.ts
 
 #[test]
-#[ignore = "24.2 s alone; see #1132"]
+#[ignore = "28.7 s alone; see #1132"]
 fn a_village_grows_in_residents_and_area_over_game_weeks() {
     let mut v = village(None);
     let size = v.terrain.size;
@@ -691,4 +691,26 @@ fn a_builder_of_a_far_site_takes_their_food_from_the_storage_before_setting_out(
         "{:?}",
         r.order
     );
+}
+
+#[test]
+fn a_full_city_keeps_the_farmers_who_win_the_food_its_founding_waits_on() {
+    // #1379: on its reserve alone a full city's Food never held what founding waits on, so it
+    // gathered nothing for its party.
+    use csp_shared::balance::{
+        NPC_FOOD_REFILL_DAYS, NPC_FOUND_FOOD_SURPLUS_SHARE, NPC_SURPLUS_CAP, WORK_OUTPUT_PER_DAY,
+    };
+    let mut v = village(None);
+    fill_houses(&mut v.world, &v.city, &v.home);
+    plan(&mut v);
+    let city = v.city().clone();
+    let reserve = crate::queries::npc_trade::npc_reserve(&v.world, &city)[&Good::Food];
+    set_stock(&mut v, &[(Good::Food, reserve)]);
+    v.world.city_plans.get_mut(&v.city).unwrap().full_since = None;
+    let fed = farmers_wanted(&v.world, &city);
+    v.world.city_plans.get_mut(&v.city).unwrap().full_since = Some(0.0);
+    let scale = crate::queries::npc_trade::npc_needs_scale(&v.world, &city);
+    let first = NPC_FOUND_FOOD_SURPLUS_SHARE * NPC_SURPLUS_CAP.get("food").unwrap() * scale;
+    let per = WORK_OUTPUT_PER_DAY.get("food").unwrap() * NPC_FOOD_REFILL_DAYS;
+    assert_eq!(farmers_wanted(&v.world, &city), fed + (first / per).ceil());
 }

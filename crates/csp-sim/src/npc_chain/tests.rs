@@ -233,7 +233,7 @@ fn a_smith_takes_the_iron_and_wood_for_spears_from_the_storage_before_setting_ou
 }
 
 #[test]
-#[ignore = "13.9 s alone; see #1132"]
+#[ignore = "15.3 s alone; see #1132"]
 fn a_town_with_forest_stone_and_iron_in_reach_builds_the_chain_and_arms_its_soldiers() {
     use ResourceKind::{Forest, IronOre, Stone};
     let (mut world, terrain, city) = city_with(&NPC_TOWN, &[Forest, Stone, IronOre]);
@@ -264,7 +264,7 @@ fn a_town_with_forest_stone_and_iron_in_reach_builds_the_chain_and_arms_its_sold
 }
 
 #[test]
-#[ignore = "6.7 s alone; see #1132"]
+#[ignore = "7.5 s alone; see #1132"]
 fn a_village_with_no_iron_in_reach_stays_short_of_weapons_and_is_still_fed() {
     let (mut world, terrain, city) = city_with(&NPC_VILLAGE, &[ResourceKind::Forest]);
     let people = city_residents(&world, &city).len();
@@ -461,7 +461,7 @@ fn a_heartland_villages_soldiers_keep_their_spears_by_steel_in_its_storage() {
 /// A frontier town with a coal node, its forest, ore and coal in reach and Stone in store, runs until
 /// its soldiers carry steel swords: it builds mines, smelters and a smithy on the way.
 #[test]
-#[ignore = "a long chain run, like the iron one above; see #1132"]
+#[ignore = "23.9 s alone: a long chain run, like the iron one above; see #1132"]
 fn a_frontier_town_with_a_coal_node_builds_the_chain_and_arms_its_soldiers_in_steel() {
     use ResourceKind::{Coal, Forest, IronOre};
     let (mut world, terrain, city) = city_with(&NPC_TOWN, &[Forest, IronOre, Coal]);

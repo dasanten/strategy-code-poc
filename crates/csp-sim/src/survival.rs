@@ -13,6 +13,7 @@ use std::collections::{HashMap, HashSet};
 use csp_shared::balance::{
     DOWN_DAYS, FOOD_PER_DAY, HEAL_DAYS, HOME_FOOD_LOW, HUNGER_DAYS, MAP_SIZE, MAX_HEALTH,
     MAX_HUNGER, MEAL_UNITS, OUTPOST_REFILL_REACH, OWN_FOOD, STARVE_DAYS, WAKE_HEALTH,
+    WALK_TICKS_PER_TILE,
 };
 use csp_shared::footprint::{covers, is_at, near_footprint};
 use csp_shared::terrain::{ground_at, wrap_distance, TerrainMap};
@@ -663,19 +664,26 @@ pub fn home_storage(world: &WorldState, r: &Resident, size: i32) -> Option<usize
     None
 }
 
-/// For a mercenary the Trade Organization hired, standing in the Trade Org HQ's area, the HQ's
-/// finished storage with Food (`hirersStorage`, `CONTEXT.md`: Trade Org army).
+/// For a mercenary standing in their hirer's city area, its finished storage with Food
+/// (`hirersStorage`): one the Trade Organization hired, the HQ's (`CONTEXT.md`: Trade Org army);
+/// one an NPC city hired, that city's (NPC acting first; #1414: the Trade Org soldiers NPC cities
+/// hired starved at their town halls).
 fn hirers_storage(world: &WorldState, r: &Resident, size: i32) -> Option<usize> {
-    if contract_of(world, &r.id).is_none_or(|c| c.hirer_id != TRADE_ORG) {
-        return None;
-    }
-    let hq = trade_org_hq(world)?;
+    let contract = contract_of(world, &r.id)?;
+    let city = if contract.hirer_id == TRADE_ORG {
+        trade_org_hq(world)?
+    } else {
+        world
+            .cities
+            .iter()
+            .find(|c| c.id == contract.hirer_id && c.realm_id.is_none() && c.trade_org.is_none())?
+    };
     let (x, y) = tile_of(r);
-    if !in_city_area(world, &hq.id, x, y, size) {
+    if !in_city_area(world, &city.id, x, y, size) {
         return None;
     }
     world.buildings.iter().position(|b| {
-        b.city_id.as_ref() == Some(&hq.id)
+        b.city_id.as_ref() == Some(&city.id)
             && b.kind == BuildingKind::Storage
             && b.site.is_none()
             && held_in(b.stock.as_ref(), Good::Food) > 0.0
@@ -819,10 +827,34 @@ pub fn refill_source(world: &WorldState, r: &Resident, size: i32) -> Option<Refi
 /// anywhere else, until they no longer run low (`HOME_FOOD_LOW`).
 pub fn refill_target(world: &WorldState, r: &Resident, size: i32) -> f64 {
     if !can_work(r.born_at, world.tick as f64) && home_storage(world, r, size).is_some() {
-        OWN_FOOD
-    } else {
-        HOME_FOOD_LOW
+        return OWN_FOOD;
     }
+    // An NPC city's mercenary at its storage tops up to the Food for the walk home, there and back
+    // as a trader reckons it, so whenever their contract ends they go home fed (#1414).
+    if let Some(home) = npc_hirers_home(world, r, size) {
+        let walk = wrap_distance(size, tile_of(r), home) * WALK_TICKS_PER_TILE;
+        return HOME_FOOD_LOW.max(csp_shared::balance::set_out_food(walk));
+    }
+    HOME_FOOD_LOW
+}
+
+/// For a mercenary an NPC city hired, standing in its area, their own city's town hall.
+fn npc_hirers_home(world: &WorldState, r: &Resident, size: i32) -> Option<(i32, i32)> {
+    let contract = contract_of(world, &r.id)?;
+    if contract.hirer_id == TRADE_ORG {
+        return None;
+    }
+    let hirer = world
+        .cities
+        .iter()
+        .find(|c| c.id == contract.hirer_id && c.realm_id.is_none() && c.trade_org.is_none())?;
+    let (x, y) = tile_of(r);
+    if !in_city_area(world, &hirer.id, x, y, size) {
+        return None;
+    }
+    let own = world.cities.iter().find(|c| r.city_id.as_ref() == Some(&c.id))?;
+    let hall = world.buildings.iter().find(|b| b.id == own.town_hall_id)?;
+    Some((hall.x as i32, hall.y as i32))
 }
 
 /// Refilling (`stepRefill`, `CONTEXT.md`: Refilling at home, Refilling at an outpost storage,

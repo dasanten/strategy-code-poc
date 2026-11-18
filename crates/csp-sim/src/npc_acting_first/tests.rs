@@ -199,3 +199,58 @@ fn a_threatened_city_without_the_coins_hires_nobody() {
     p.next_day(&n1);
     assert!(p.world.contracts.is_empty());
 }
+
+#[test]
+fn its_mercenaries_take_food_for_the_way_and_eat_from_its_storage_at_its_town_hall() {
+    // #1414: the Trade Org soldiers an NPC city hired walked out with no Food, and nothing fed them
+    // at its town hall: they starved.
+    let mut p = place();
+    let n1 = p.n1.clone();
+    p.threatened(&n1, NPC_ACTING_FIRST.hire_threat);
+    p.coins(&n1, 1000.0);
+    p.next_day(&n1);
+    crate::trade_org_army::step_trade_org_army(&mut p.world, p.terrain.size);
+    let c = p.world.contracts.iter().find(|c| c.hirer_id == n1).expect("a contract").clone();
+    let id = c.resident_ids[0].clone();
+    let i = p.world.residents.iter().position(|r| r.id == id).unwrap();
+    p.world.residents[i].carried.shift_remove(&Good::Food);
+    p.world.residents[i].order = None;
+    step_npc_acting_first(&mut p.world, p.terrain.size);
+    // Setting out, they go for the Food at a storage of the HQ, not straight to its hall.
+    let city = p.world.cities.iter().find(|c| c.id == n1).unwrap().clone();
+    let hall = town_hall_of(&p.world, &city).map(|h| (h.x, h.y)).unwrap();
+    let r = &p.world.residents[i];
+    let to_hall =
+        matches!(&r.order, Some(ResidentOrder::WalkTo(o)) if (o.target.x, o.target.y) == hall);
+    assert!(r.order.is_some() && !to_hall, "{:?}", r.order);
+    // At its town hall, its storage feeds them.
+    let r = &mut p.world.residents[i];
+    (r.x, r.y, r.order) = (hall.0, hall.1, None);
+    let size = p.terrain.size;
+    let source = crate::survival::refill_source(&p.world, &p.world.residents[i], size);
+    let storage = source.map(|s| s.holder);
+    let theirs =
+        p.world.buildings.iter().position(|b| {
+            b.city_id.as_deref() == Some(n1.as_str()) && b.kind == BuildingKind::Storage
+        });
+    assert_eq!(storage, theirs.map(crate::survival::Holder::Building));
+    // There they top up to the Food for the walk home, so they go home fed when it ends.
+    let target = crate::survival::refill_target(&p.world, &p.world.residents[i], size);
+    assert!(target > csp_shared::balance::HOME_FOOD_LOW, "{target}");
+}
+
+#[test]
+fn hires_only_trade_org_soldiers_at_the_hq() {
+    // #1414: soldiers hired again on their way back from another city walked on with no Food.
+    let mut p = place();
+    let n1 = p.n1.clone();
+    p.threatened(&n1, NPC_ACTING_FIRST.hire_threat);
+    p.coins(&n1, 1000.0);
+    let spare: Vec<String> =
+        crate::trade_org_army::spare_soldiers(&p.world).iter().map(|r| r.id.clone()).collect();
+    for r in p.world.residents.iter_mut().filter(|r| spare.contains(&r.id)) {
+        (r.x, r.y) = (600.0, 600.0);
+    }
+    p.next_day(&n1);
+    assert!(p.world.contracts.iter().all(|c| c.hirer_id != n1));
+}

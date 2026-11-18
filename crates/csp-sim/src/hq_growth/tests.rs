@@ -219,7 +219,7 @@ fn wants_a_multiple_of_the_strongest_sides_armed_residents_an_alliance_counted_t
 }
 
 #[test]
-#[ignore = "5.4 s alone; see #1132"]
+#[ignore = "5.2 s alone; see #1132"]
 fn trains_more_soldiers_than_its_armys_size_when_a_player_grows_strong() {
     let mut s = setup();
     let goods = s

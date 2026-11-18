@@ -301,3 +301,33 @@ fn npc_takings_sound_catches_a_taking_of_a_sheltered_realm_or_by_someone_else() 
     let found = npc_takings_sound(&p.world);
     assert!(found.iter().any(|v| v.message.contains("none of its own")), "{found:?}");
 }
+
+#[test]
+fn an_escort_down_to_the_food_for_the_walk_home_goes_home_and_leaves_the_escort() {
+    // #1414: escorts stood at a stalled far site with no Food until they starved, and the next
+    // ones after them.
+    let mut p = Place::town(Temperament::Settler);
+    let (x, y) = node_corner(&p.world, &p.terrain, &p.node).expect("room on the node");
+    let kind = node_workplace(p.node.kind);
+    let project = CityProject::Build { building: kind, x: x as f64, y: y as f64, material: None };
+    p.world.city_plans.get_mut(&p.city).unwrap().project = Some(project);
+    p.run_to_next_pass();
+    let escort = p.world.city_plans[&p.city].site_escort.clone().expect("an escort");
+    let id = escort[0].clone();
+    let i = p.world.residents.iter().position(|r| r.id == id).unwrap();
+    let r = &mut p.world.residents[i];
+    (r.x, r.y, r.order) = (x as f64, y as f64, None);
+    r.carried.shift_remove(&Good::Food);
+    p.world.tick += 1;
+    step_npc_take_nodes(&mut p.world, &p.terrain);
+    let left = p.world.city_plans[&p.city].site_escort.clone().unwrap_or_default();
+    assert!(!left.contains(&id), "{left:?}");
+    let home = crate::npc_behaviour::npc_home(&p.world, &p.city).map(|h| (h.x, h.y)).unwrap();
+    let r = &p.world.residents[i];
+    assert!(
+        matches!(&r.order, Some(ResidentOrder::WalkTo(o)) if (o.target.x, o.target.y) == home),
+        "{:?}",
+        r.order
+    );
+    assert_eq!(npc_takings_sound(&p.world), vec![]);
+}

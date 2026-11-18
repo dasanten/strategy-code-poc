@@ -272,7 +272,7 @@ fn run(
 }
 
 #[test]
-#[ignore = "26.8 s alone; see #1132"]
+#[ignore = "30.0 s alone; see #1132"]
 fn on_the_map_stands_down_for_the_founding_with_a_further_road_unfinished_and_then_founds() {
     let mut s = big_city(None, 1300);
     let city = s.city.clone();
@@ -411,7 +411,7 @@ fn on_the_map_stands_down_for_the_founding_with_a_further_road_unfinished_and_th
 }
 
 #[test]
-#[ignore = "33.4 s alone; see #1132"]
+#[ignore = "36.4 s alone; see #1132"]
 fn a_big_city_lays_a_road_to_its_second_neighbour_on_the_map() {
     let (mut world, terrain, city, _) = town(&[(Good::Stone, 400.0)], 500, &BIG);
     let near = neighbour(&mut world, &terrain, 100, &[(Good::Stone, 400.0)]);
@@ -516,7 +516,7 @@ fn one_of_the_crew_out_on_a_way_lays_the_tiles_near_them_before_a_street_back_ho
 }
 
 #[test]
-#[ignore = "18.9 s alone; see #1132"]
+#[ignore = "20.0 s alone; see #1132"]
 fn on_the_map_joins_two_cities_with_one_road_and_reaches_a_post_on_the_way() {
     // Past what they keep from their crews once they would be full (`CONTEXT.md`: NPC road).
     let (mut world, terrain, city, _) = town(&[(Good::Stone, 500.0)], 500, &NPC_TOWN);
@@ -549,7 +549,7 @@ fn on_the_map_joins_two_cities_with_one_road_and_reaches_a_post_on_the_way() {
 }
 
 #[test]
-#[ignore = "7.8 s alone; see #1132"]
+#[ignore = "2.7 s alone; see #1132"]
 fn on_the_map_does_not_starve_its_crew_on_a_long_road() {
     let far = 700.0;
     let mut terrain = plains(1600);

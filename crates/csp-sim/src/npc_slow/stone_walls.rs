@@ -35,7 +35,7 @@ const GATE_BY_DAY: usize = 45;
 const SHARE_BY_SEASON: f64 = 0.3;
 
 #[test]
-#[ignore = "slow: runs a town for a game season"]
+#[ignore = "57.8 s alone: runs a town for a game season"]
 fn a_town_upgrades_its_outer_wall_to_stone_gate_first_through_a_season() {
     let mut terrain = plains(700);
     let mut world = create_world(&terrain, 1);

@@ -87,7 +87,7 @@ fn season(coal: bool) -> Season {
 }
 
 #[test]
-#[ignore = "two game seasons of the big city, side by side; minutes in release"]
+#[ignore = "369.1 s alone: two game seasons of the big city, side by side"]
 fn with_a_coal_node_in_reach_ends_a_season_steel_armed_and_no_more_idle() {
     let (iron, steel) = std::thread::scope(|s| {
         let iron = s.spawn(|| season(false));

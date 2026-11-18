@@ -3288,7 +3288,8 @@ export function Wiki() {
           lacks nothing but its founding party's materials, those count as short: its spare hands
           gather them, it builds a workplace for one it has none of, and they are still spare hands
           while they do. Food, Wood and Stone come first, Food its surplus too: only once it holds {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus
-          cap past its reserve. Its workplaces come first as well: its spare hands go on a road
+          cap past its reserve, and while full its farmers work to win that back as they do its
+          reserve. Its workplaces come first as well: its spare hands go on a road
           crew, scout and work at its workplaces for surplus, and only those left over gather for
           the party. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less for
           each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}. A
@@ -3417,7 +3418,9 @@ export function Wiki() {
           {num(NPC_ACTING_FIRST.hireThreat)} from one Organization, it asks the Trade Organization
           for up to {num(NPC_ACTING_FIRST.hireSoldiers)} soldiers for{' '}
           {days(NPC_ACTING_FIRST.hireDays)}, if its storages hold the whole price, and pays each week
-          from them. They stand at its town hall and fight attackers in its City area.
+          from them. They stand at its town hall and fight attackers in its City area. They set out
+          with the Food for the walk there and back from a storage of their own city, and in its
+          City area they eat from its storage as at home.
         </p>
         <p>
           An NPC city shuts its gates while anyone armed who isn't of the city or its alliance

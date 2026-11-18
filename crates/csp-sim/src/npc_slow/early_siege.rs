@@ -290,13 +290,13 @@ fn holds(outcome: &Outcome) {
 }
 
 #[test]
-#[ignore = "5.1 s alone; see #1132"]
+#[ignore = "4.6 s alone; see #1132"]
 fn a_starting_city_takes_no_tile_of_anothers_wall_at_equal_numbers() {
     holds(&siege(1, false));
 }
 
 #[test]
-#[ignore = "6.4 s alone; see #1132"]
+#[ignore = "6.0 s alone; see #1132"]
 fn nor_at_twice_their_numbers() {
     holds(&siege(2, false));
 }
@@ -304,7 +304,7 @@ fn nor_at_twice_their_numbers() {
 /// With archers on both sides (T108.3): every other defender and every third attacker has a Bow,
 /// the attackers' archers shooting up at the wall's defenders from their posts.
 #[test]
-#[ignore = "slow, as the others; see #1132"]
+#[ignore = "4.5 s alone, as slow as the others; see #1132"]
 fn nor_with_archers_on_both_sides() {
     holds(&siege(1, true));
 }

@@ -117,6 +117,11 @@ ADR 0038: weapon, shield and armour slots others see) run side by side first; th
 Siege machines (110, ADR 0037, after 106), each waiting for the epics it builds on to reach `dev`.
 All ahead of Goods get used (97), NPC cities with intent (98) and Bandits.
 
+**Agreed with Daniel on 2026-11-18,** from measuring where checks spend their time: Faster checks
+and simulation tests (Epic 111, ADR 0040: checks share the machine, a profile and commands for the
+slow runs, every ignored test nightly, year-run checkpoints). No game rule changes; it runs beside
+the game epics.
+
 **Agreed with Daniel on 2026-11-18:** Realm control mode (Epic 112, ADR 0041: a Unit | Realm
 switch; in realm control mode the Player says what and where, then picks who from a who-list with
 the nearest idle residents suggested; only the UI) is planned now and starts once Faster checks
@@ -233,6 +238,7 @@ I sleep.
 | 108 | [Bows and crossbows](https://github.com/dasanten/strategy-code-poc/issues/1318) | ticketed |
 | 109 | [Towers](https://github.com/dasanten/strategy-code-poc/issues/1324) | ticketed |
 | 110 | [Siege machines](https://github.com/dasanten/strategy-code-poc/issues/1328) | ticketed |
+| 111 | [Faster checks and simulation tests](https://github.com/dasanten/strategy-code-poc/issues/1417) | ticketed |
 | 112 | [Realm control mode](https://github.com/dasanten/strategy-code-poc/issues/1426) | ticketed |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
