@@ -238,3 +238,19 @@ fn its_mercenaries_take_food_for_the_way_and_eat_from_its_storage_at_its_town_ha
     let target = crate::survival::refill_target(&p.world, &p.world.residents[i], size);
     assert!(target > csp_shared::balance::HOME_FOOD_LOW, "{target}");
 }
+
+#[test]
+fn hires_only_trade_org_soldiers_at_the_hq() {
+    // #1414: soldiers hired again on their way back from another city walked on with no Food.
+    let mut p = place();
+    let n1 = p.n1.clone();
+    p.threatened(&n1, NPC_ACTING_FIRST.hire_threat);
+    p.coins(&n1, 1000.0);
+    let spare: Vec<String> =
+        crate::trade_org_army::spare_soldiers(&p.world).iter().map(|r| r.id.clone()).collect();
+    for r in p.world.residents.iter_mut().filter(|r| spare.contains(&r.id)) {
+        (r.x, r.y) = (600.0, 600.0);
+    }
+    p.next_day(&n1);
+    assert!(p.world.contracts.iter().all(|c| c.hirer_id != n1));
+}

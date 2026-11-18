@@ -16,8 +16,8 @@
 //!   otherwise walk to its town hall and stand there.
 
 use csp_shared::balance::{
-    set_out_food, NPC_ACTING_FIRST, NPC_ALLIANCE_JOIN_STANDING, NPC_NODE_REACH, TRADE_ORG_ARMY,
-    WALK_TICKS_PER_TILE,
+    set_out_food, NPC_ACTING_FIRST, NPC_ALLIANCE_JOIN_STANDING, NPC_NODE_REACH, NPC_TRADER_REACH,
+    TRADE_ORG_ARMY, WALK_TICKS_PER_TILE,
 };
 use csp_shared::footprint::is_at;
 use csp_shared::terrain::wrap_distance;
@@ -160,8 +160,17 @@ fn hire_mercenaries(world: &mut WorldState, city_id: &str, size: i32) {
             d(a).total_cmp(&d(b))
         });
     let Some(warehouse) = warehouse.map(|b| b.id.clone()) else { return };
+    // Its soldiers come from the HQ: only within its trader's reach of it can they get there fed
+    // and in time, and only those at the HQ, not on their way back from another city (#1414: hired
+    // across the map and again on the road, they spent their contracts walking and starved).
+    let Some(hq) = crate::queries::trade_org::trade_org_hq(world) else { return };
+    let Some(hq_hall) = town_hall_of(world, hq).map(|h| (h.x as i32, h.y as i32)) else { return };
+    if wrap_distance(size, at, hq_hall) > NPC_TRADER_REACH {
+        return;
+    }
     let soldiers: Vec<String> = crate::trade_org_army::spare_soldiers(world)
         .into_iter()
+        .filter(|r| wrap_distance(size, (r.x as i32, r.y as i32), hq_hall) <= NPC_NODE_REACH)
         .take(NPC_ACTING_FIRST.hire_soldiers as usize)
         .map(|r| r.id.clone())
         .collect();

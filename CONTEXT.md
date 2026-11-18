@@ -806,6 +806,8 @@ The shared language of the game. Domain terms only — no implementation details
   in high standing and feel threatened by the same Organization, into an alliance it leads,
   founding one (named after itself) if it has none; an NPC city that founded an alliance leads
   it, and the role passes to a realm first when it leaves. It hires from the Trade Org army only,
+  only soldiers standing at the HQ and only while its town hall lies within its trader's reach of
+  the HQ (#1414, decided overnight, Daniel to confirm),
   as many as a balance number for a balance number of days, with the whole price in its
   storages, paying each week from them like a transfer; its mercenaries stand at its town hall
   and fight attackers in its City area. They set out with the Food for the walk there and back
