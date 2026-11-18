@@ -64,6 +64,8 @@ Other scripts:
 pnpm check:rust    # cargo fmt --check, clippy with warnings as errors, cargo nextest run (shares the machine)
 pnpm test:slow     # the slow NPC runs (npc_slow without the year runs): an epic's gate, ~8 min
 pnpm test:year     # the year and season runs (about 50 and 15 min): nightly on dev
+pnpm test:ignored  # every test ignored for time but the year runs and measurements, ~7 min: nightly
+pnpm nightly:ignored  # test:ignored, appended to .claude/worktrees/nightly-year-report.md
 pnpm types:rust    # the client's types from the crates (commit packages/shared-types/src/generated)
 pnpm balance:rust  # the client's balance numbers from balance.rs
 pnpm build         # type-check and bundle the client
@@ -91,6 +93,12 @@ Tests ignored for time run with `pnpm test:slow` and `pnpm test:year` (ADR 0040)
 profile (release without LTO, so it builds in about half the time and gives the same results) and
 the `slow` nextest profile (no 5 s warning, each test its own process). Extra arguments go to
 nextest: a test name narrows the run, `--no-capture` shows the output as it runs.
+
+Every test ignored for time runs each night on `dev` (ADR 0040), so none rots: the scheduled task
+`nightly-year-run` runs the year runs, then `pnpm nightly:ignored` in the same worktree. That runs
+`pnpm test:ignored` (the `ignored` nextest profile: everything `#[ignore]`d but the year runs and the
+tests ignored as measurements) and appends pass or fail, the failing tests and the time to the
+nightly report. An ignore reason says how long the test takes alone in the dev profile.
 
 ### The year run and its checkpoints
 

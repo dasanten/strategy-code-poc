@@ -97,7 +97,7 @@ impl World {
 }
 
 #[test]
-#[ignore = "slow: game days of two towns (T98.9)"]
+#[ignore = "3.0 s alone: game days of two towns (T98.9)"]
 fn npc_slow_cities_with_intent_fortify_demand_and_grow_again() {
     let mut s = staged();
     let (merchant, militarist) = (s.merchant.clone(), s.militarist.clone());

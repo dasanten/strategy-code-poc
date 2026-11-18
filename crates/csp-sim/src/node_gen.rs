@@ -343,7 +343,7 @@ mod tests {
     /// The tests of `node-gen.test.ts` on a full-size map. Run with `cargo test --release --
     /// --ignored`.
     #[test]
-    #[ignore = "5.2 s alone: generates the full-size map; see #1132"]
+    #[ignore = "5.1 s alone: generates the full-size map; see #1132"]
     fn places_nodes_on_a_full_size_map_as_the_rules_say() {
         let terrain = crate::terrain_gen::generate_full_terrain(1);
         let from = std::time::Instant::now();

@@ -193,7 +193,7 @@ impl Running {
 }
 
 #[test]
-#[ignore = "22.7 s alone; see #1132"]
+#[ignore = "17.8 s alone; see #1132"]
 fn goes_up_on_a_run_of_the_staged_city_one_only_with_no_invariant_broken() {
     let mut s = big_city(None, 240);
     let mut runner = Runner { walking: unhurried_walking(&s.terrain), scratch: Scratch::default() };
@@ -367,7 +367,7 @@ fn are_kept_at_it_by_the_citys_defence_which_clears_any_other_script_from_its_so
 }
 
 #[test]
-#[ignore = "23.2 s alone; see #1132"]
+#[ignore = "17.6 s alone; see #1132"]
 fn leave_the_ground_at_the_end_of_their_turn_for_the_next_lot() {
     let mut run = Running::new();
     run.step(DAY / 2);
@@ -440,7 +440,7 @@ fn run_both(s: &mut BigCity, days: usize) -> Seen {
 }
 
 #[test]
-#[ignore = "72.3 s alone; see #1132"]
+#[ignore = "52.6 s alone; see #1132"]
 fn a_city_of_110_does_both_at_once_with_invariants_checked_and_the_hall_held() {
     let mut s = big_city(None, 240);
     without_smithy(&mut s);
@@ -453,7 +453,7 @@ fn a_city_of_110_does_both_at_once_with_invariants_checked_and_the_hall_held() {
 }
 
 #[test]
-#[ignore = "39.7 s alone; see #1132"]
+#[ignore = "27.8 s alone; see #1132"]
 fn a_city_just_big_enough_keeps_its_hall_and_gates_with_its_wall_left_to_training() {
     let mut s = big_city(None, 240);
     without_smithy(&mut s);
