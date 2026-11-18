@@ -555,8 +555,11 @@ fn food_short_of_its_reserve_with_every_farm_full_builds_a_farm_before_a_begun_m
         }
     }
     build_at(&project(&v), BuildingKind::Farm);
-    // Its Food back at its reserve, the mine comes first again.
-    set_stock(&mut v, &[(Good::Food, reserve[&Good::Food] + 1.0), (Good::Wood, 400.0)]);
+    // Holding the Food its founding waits on, the mine comes first again (short of that and of no
+    // Wood or Stone, it builds a farm for it: `with_nothing_else_short_builds_a_farm_...`).
+    let cap = csp_shared::balance::NPC_SURPLUS_CAP.get("food").unwrap_or(0.0);
+    let first = reserve[&Good::Food] + csp_shared::balance::NPC_FOUND_FOOD_SURPLUS_SHARE * cap;
+    set_stock(&mut v, &[(Good::Food, first + 1.0), (Good::Wood, 400.0)]);
     assert!(!matches!(project(&v), Some(CityProject::Build { building: BuildingKind::Farm, .. })));
 }
 
