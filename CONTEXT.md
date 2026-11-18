@@ -808,7 +808,9 @@ The shared language of the game. Domain terms only — no implementation details
   it, and the role passes to a realm first when it leaves. It hires from the Trade Org army only,
   as many as a balance number for a balance number of days, with the whole price in its
   storages, paying each week from them like a transfer; its mercenaries stand at its town hall
-  and fight attackers in its City area.
+  and fight attackers in its City area. They set out with the Food for the walk there and back
+  from a storage of their own city, as a trader does, and in its City area they eat from its
+  storage as at home (#1414: they starved without; decided overnight, Daniel to confirm).
   - **Hunting a thief:** for a theft it knows of (seen by one of its residents, or the news
     brought home), a few soldiers (a balance number per thief) go after the thief while they stay
     within its reach of its home (a balance number, its set reach); only soldiers beyond its hall

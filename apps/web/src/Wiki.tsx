@@ -3418,7 +3418,9 @@ export function Wiki() {
           {num(NPC_ACTING_FIRST.hireThreat)} from one Organization, it asks the Trade Organization
           for up to {num(NPC_ACTING_FIRST.hireSoldiers)} soldiers for{' '}
           {days(NPC_ACTING_FIRST.hireDays)}, if its storages hold the whole price, and pays each week
-          from them. They stand at its town hall and fight attackers in its City area.
+          from them. They stand at its town hall and fight attackers in its City area. They set out
+          with the Food for the walk there and back from a storage of their own city, and in its
+          City area they eat from its storage as at home.
         </p>
         <p>
           An NPC city shuts its gates while anyone armed who isn't of the city or its alliance

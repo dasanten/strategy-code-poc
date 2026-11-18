@@ -663,19 +663,26 @@ pub fn home_storage(world: &WorldState, r: &Resident, size: i32) -> Option<usize
     None
 }
 
-/// For a mercenary the Trade Organization hired, standing in the Trade Org HQ's area, the HQ's
-/// finished storage with Food (`hirersStorage`, `CONTEXT.md`: Trade Org army).
+/// For a mercenary standing in their hirer's city area, its finished storage with Food
+/// (`hirersStorage`): one the Trade Organization hired, the HQ's (`CONTEXT.md`: Trade Org army);
+/// one an NPC city hired, that city's (NPC acting first; #1414: the Trade Org soldiers NPC cities
+/// hired starved at their town halls).
 fn hirers_storage(world: &WorldState, r: &Resident, size: i32) -> Option<usize> {
-    if contract_of(world, &r.id).is_none_or(|c| c.hirer_id != TRADE_ORG) {
-        return None;
-    }
-    let hq = trade_org_hq(world)?;
+    let contract = contract_of(world, &r.id)?;
+    let city = if contract.hirer_id == TRADE_ORG {
+        trade_org_hq(world)?
+    } else {
+        world
+            .cities
+            .iter()
+            .find(|c| c.id == contract.hirer_id && c.realm_id.is_none() && c.trade_org.is_none())?
+    };
     let (x, y) = tile_of(r);
-    if !in_city_area(world, &hq.id, x, y, size) {
+    if !in_city_area(world, &city.id, x, y, size) {
         return None;
     }
     world.buildings.iter().position(|b| {
-        b.city_id.as_ref() == Some(&hq.id)
+        b.city_id.as_ref() == Some(&city.id)
             && b.kind == BuildingKind::Storage
             && b.site.is_none()
             && held_in(b.stock.as_ref(), Good::Food) > 0.0
