@@ -4,6 +4,7 @@ import type { Stock } from '@csp/shared-types'
 import {
   NO_WAY_THERE,
   WHO_SUGGESTS,
+  afterOffered,
   keptTicks,
   realmRequests,
   searched,
@@ -180,23 +181,41 @@ describe('Now or After', () => {
   } as Partial<WhoResident>
   const scripted = { script: { scriptId: 3 } } as Partial<WhoResident>
 
-  it('starts on After for those running a queue, a haul route or a script, on Now for others busy', () => {
+  const hauling = { order: { kind: 'haul' } } as unknown as Partial<WhoResident>
+  const storing = { order: { kind: 'store' } } as unknown as Partial<WhoResident>
+
+  it('offers After only where appending keeps what they do: a queue, or a walk of their own', () => {
+    expect(afterOffered(resident('q', 0, 0, working))).toBe(true)
+    expect(afterOffered(resident('w', 0, 0, busy))).toBe(true)
+    // A queue order would end the script, the haul or the order at once (#1444).
+    expect(afterOffered(resident('s', 0, 0, scripted))).toBe(false)
+    expect(afterOffered(resident('s', 0, 0, { ...busy, ...scripted }))).toBe(false)
+    expect(afterOffered(resident('h', 0, 0, hauling))).toBe(false)
+    expect(afterOffered(resident('o', 0, 0, storing))).toBe(false)
+  })
+
+  it('starts on After for those running a queue, else on Now; Now only where After isn’t offered', () => {
     const list = rows([
       resident('idle', 10, 10),
       resident('walking', 10, 11, busy),
       resident('queued', 10, 12, working),
       resident('scripted', 10, 13, scripted),
-      resident('hauling', 10, 14, {
-        order: { kind: 'haul' },
-      } as unknown as Partial<WhoResident>),
+      resident('hauling', 10, 14, hauling),
     ])
     expect(Object.fromEntries(list.map((r) => [r.id, startsWhen(r)]))).toEqual({
       idle: undefined,
       walking: 'now',
       queued: 'after',
-      scripted: 'after',
-      hauling: 'after',
+      scripted: 'now',
+      hauling: 'now',
     })
+    expect(list.filter((r) => r.noAfter).map((r) => r.id)).toEqual(['scripted', 'hauling'])
+    expect(
+      whenOf(
+        list.find((r) => r.id === 'scripted')!,
+        { scripted: 'after' },
+      ),
+    ).toBe('now')
   })
 
   it('takes the Player’s choice over where it starts, and none for the idle', () => {

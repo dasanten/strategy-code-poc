@@ -46,6 +46,11 @@ export interface WhoRow {
    * After switch starts on After (`startsWhen`).
    */
   keeps?: true
+  /**
+   * Busy, but After would end what they do (`afterOffered`): their row offers Now only, saying
+   * there is no queue to add to.
+   */
+  noAfter?: true
   /** How far their way is, in tiles: the way's own length, else as the crow flies. */
   tiles: number
   /** About how many ticks their way takes, if that can be told. */
@@ -84,6 +89,22 @@ function keepsGoing(r: WhoResident): boolean {
   return !!r.queue || !!r.script || kind === 'haul' || kind === 'haulByWater'
 }
 
+/**
+ * Whether a busy resident can take an order After what they do, finishing nothing early: only
+ * when appending (`appendRequest`) keeps it, that is when they run a queue, or are on a walk of
+ * their own, which becomes the queue's first step. For anyone else (a script or a task such as
+ * Work or a haul route, or another order) the queue it would start ends what they do at once,
+ * so After is not offered: "no queue to add to".
+ *
+ * Provisional (the coordinator's call while Daniel is away): the rule is open as #1444.
+ */
+export function afterOffered(r: Pick<WhoResident, 'order' | 'script' | 'queue'>): boolean {
+  return !!r.queue || (r.order?.kind === 'walkTo' && !r.script)
+}
+
+/** Why a row offers no After, beside its Now. */
+export const NO_QUEUE = 'no queue to add to'
+
 /** How many tiles apart two tiles are as the crow flies, the short way round, diagonals one step. */
 function crowTiles(a: { x: number; y: number }, b: { x: number; y: number }, size: number) {
   return Math.max(Math.abs(wrapDelta(a.x, b.x, size)), Math.abs(wrapDelta(a.y, b.y, size)))
@@ -104,11 +125,13 @@ export function whoRows(
     const way = wayOf(r)
     const why = whyNot(order, r, way, ctx)
     const known = typeof way === 'object' ? way : undefined
+    const idle = !r.order && !r.script
     return {
       id: r.id,
       name: r.name,
-      idle: !r.order && !r.script,
+      idle,
       ...(keepsGoing(r) ? { keeps: true as const } : {}),
+      ...(!idle && !afterOffered(r) ? { noAfter: true as const } : {}),
       tiles: known ? known.tiles : crowTiles(r, at, ctx.size),
       ...(known?.ticks !== undefined ? { ticks: known.ticks } : {}),
       ...(why ? { why } : {}),
@@ -173,19 +196,24 @@ export type WhoWhen = 'now' | 'after'
 
 /**
  * Where a row's Now / After switch starts: After for someone running a queue, a haul route or a
- * script, Now for anyone else busy. An idle resident has no switch: undefined.
+ * script, Now for anyone else busy, and always Now where After isn't offered (`noAfter`). An
+ * idle resident has no switch: undefined.
  */
-export function startsWhen(row: Pick<WhoRow, 'idle' | 'keeps'>): WhoWhen | undefined {
+export function startsWhen(row: Pick<WhoRow, 'idle' | 'keeps' | 'noAfter'>): WhoWhen | undefined {
   if (row.idle) return undefined
-  return row.keeps ? 'after' : 'now'
+  return row.keeps && !row.noAfter ? 'after' : 'now'
 }
 
-/** A row's Now / After as the Player set it, else where it starts; undefined for the idle. */
+/**
+ * A row's Now / After as the Player set it, else where it starts; Now where After isn't
+ * offered; undefined for the idle.
+ */
 export function whenOf(
-  row: Pick<WhoRow, 'id' | 'idle' | 'keeps'>,
+  row: Pick<WhoRow, 'id' | 'idle' | 'keeps' | 'noAfter'>,
   set: Readonly<Record<string, WhoWhen>>,
 ): WhoWhen | undefined {
   if (row.idle) return undefined
+  if (row.noAfter) return 'now'
   return set[row.id] ?? startsWhen(row)
 }
 

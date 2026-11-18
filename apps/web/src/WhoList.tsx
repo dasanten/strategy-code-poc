@@ -19,6 +19,7 @@ import { listedResidents } from './residents-list-view.js'
 import type { ResidentGroup } from './residents-view.js'
 import { browserStorage } from './saved-groups.js'
 import {
+  NO_QUEUE,
   WHO_PAGE,
   keptTicks,
   searched,
@@ -229,14 +230,18 @@ export function WhoList({
                   >
                     Now
                   </button>
-                  <button
-                    type="button"
-                    aria-pressed={rowWhen === 'after'}
-                    title="Add it to the end of their queue"
-                    onClick={() => setWhen({ ...when, [row.id]: 'after' })}
-                  >
-                    After
-                  </button>
+                  {row.noAfter ? (
+                    <span className="small muted">After: {NO_QUEUE}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      aria-pressed={rowWhen === 'after'}
+                      title="Add it to the end of their queue"
+                      onClick={() => setWhen({ ...when, [row.id]: 'after' })}
+                    >
+                      After
+                    </button>
+                  )}
                 </div>
               )}
             </li>

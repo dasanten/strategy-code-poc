@@ -759,10 +759,13 @@ export function Wiki() {
         <p>
           A busy resident you tick gets a <b>Now / After</b> switch on their row. <b>Now</b> drops
           what they are doing and sends them at once. <b>After</b> adds the order to the end of
-          their queue, as Shift does on their card: they finish what they have first, and someone
-          with no queue yet starts one. The switch starts on After for someone running a queue, a
-          haul route or a script, and on Now for anyone else busy; an idle resident has no switch.
-          The line at the top sums it up: “3 ticked: 2 now, 1 after”.
+          their queue, as Shift does on their card: they finish the steps they have first. Someone
+          walking with no queue yet gets one, the walk first. After is offered only to those two:
+          someone running a script or a task (Work, a haul route, …) or another order without a
+          queue has nothing to add to, as a new queue would end what they do, so their row offers
+          Now only and says “no queue to add to”. The switch starts on After for someone running a
+          queue and on Now for anyone else busy; an idle resident has no switch. The line at the top
+          sums it up: “3 ticked: 2 now, 1 after”.
         </p>
         <p>
           A long who-list can be searched by name and filtered as the Residents list can (idle, by
