@@ -774,6 +774,19 @@ export function Wiki() {
           {num(WHO_PAGE)} are drawn at first; Show more draws more.
         </p>
         <p>
+          A building’s card starts the orders about it, each ending in the same who-list:{' '}
+          <b>Work here</b> at a workplace (or a site of one), <b>Build this site</b> at a site of
+          yours, <b>Feed the stable</b> and <b>Breed horses</b> (pick the two first) at a stable,{' '}
+          <b>Teach</b> (pick the subject) and <b>Train</b> at a training ground, and{' '}
+          <b>Tear down</b> at any building of yours or a workplace. Only those that fit the building
+          show, greyed with why while they can’t be given. Customise, or a workplace’s Work
+          settings, come before the who-list, as on a resident’s card. The who-list ticks the
+          nearest {num(WHO_SUGGESTS.work)} idle resident for Work, Feed the stable, Breed, Teach and
+          Train, and {num(WHO_SUGGESTS.tearDown)} for Tear down. A resident you tick who stands
+          elsewhere walks there first and then does it, with no second order from you; one already
+          there just starts.
+        </p>
+        <p>
           Switching to realm control mode lets go of the resident, group or army you had picked.
           Picking one some other way (a row or Pick these in the Residents list, a saved group’s
           number key, the Armies drawer, a notice that opens a resident) switches back to unit

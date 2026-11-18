@@ -6,7 +6,6 @@ import {
   WHO_SUGGESTS,
   afterOffered,
   keptTicks,
-  realmRequests,
   searched,
   startsWhen,
   suggested,
@@ -22,6 +21,7 @@ import {
   type WhoRow,
   type WhoWay,
 } from './who-list-view.js'
+import { realmRequests } from './building-orders.js'
 
 const TICK = 100 * TICKS_PER_GAME_YEAR
 const SIZE = 64
@@ -242,7 +242,7 @@ describe('Now or After', () => {
 
   it('Now replaces what they do: a working resident drops it and goes to build', () => {
     const worker = resident('w', 3, 3, working)
-    const { requests, skipped } = realmRequests(house, [worker], new Set(), sendCtx)
+    const { requests, skipped } = realmRequests(house, [worker], { ...sendCtx, after: new Set() })
     expect(skipped).toEqual([])
     expect(requests).toEqual([
       {
@@ -254,7 +254,7 @@ describe('Now or After', () => {
 
   it('After appends the build to the end of their queue, finishing nothing early', () => {
     const worker = resident('w', 3, 3, working)
-    const { requests } = realmRequests(house, [worker], new Set(['w']), sendCtx)
+    const { requests } = realmRequests(house, [worker], { ...sendCtx, after: new Set(['w']) })
     const order = requests[0]!.order as { kind: string; steps: { id?: number; order: object }[] }
     expect(order.kind).toBe('editQueue')
     // The work they are on stays first, by its id; the build comes last.
@@ -264,7 +264,7 @@ describe('Now or After', () => {
 
   it('sends each ticked one theirs, in the list’s order, now and after mixed', () => {
     const to = [resident('a', 1, 1), resident('b', 2, 2, working), resident('c', 3, 3, busy)]
-    const { requests } = realmRequests(house, to, new Set(['b']), sendCtx)
+    const { requests } = realmRequests(house, to, { ...sendCtx, after: new Set(['b']) })
     expect(requests.map((q) => [q.residentId, q.order.kind])).toEqual([
       ['a', 'task'],
       ['b', 'editQueue'],
@@ -275,7 +275,7 @@ describe('Now or After', () => {
   it('gives those walking now and after different tiles', () => {
     const to = [resident('a', 1, 1), resident('b', 2, 2, working)]
     const walk = { kind: 'walkTo', x: 10, y: 10 } as const
-    const { requests } = realmRequests(walk, to, new Set(['b']), sendCtx)
+    const { requests } = realmRequests(walk, to, { ...sendCtx, after: new Set(['b']) })
     const now = requests[0]!.order as unknown as { x: number; y: number }
     const after = requests[1]!.order as unknown as { steps: { order: { x: number; y: number } }[] }
     const last = after.steps.at(-1)!.order
