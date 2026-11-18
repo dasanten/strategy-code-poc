@@ -87,7 +87,7 @@ export function skippedByWhy(skipped: readonly { name: string; why: string }[]):
 /** What each line of the first-day card says (`CONTEXT.md`: First day). */
 export const FIRST_DAY_LABELS: Record<FirstDayLine, string> = {
   claimHorses: 'Claim the Horse offer',
-  pickResident: 'Pick a resident',
+  pickResident: 'Pick a resident (with the switch on Unit)',
   giveOrder: 'Give them an order',
   openWiki: 'Open the Wiki',
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ROAD_LINE_MAX_TILES } from '@csp/balance'
-import type { ScriptParam } from '@csp/shared-types'
+import type { BuildingKind, ScriptParam } from '@csp/shared-types'
+import { BUILDING_NAMES } from './map/palette.js'
 import type { ArmyPick } from './Armies.js'
 import type { GroupPicking, Picking } from './Residents.js'
 import { nextPick, type Plan } from './plan-step.js'
@@ -16,6 +17,38 @@ export type PickTarget =
   | { kind: 'army'; mode: ArmyPick['kind'] }
   | { kind: 'param'; param: ScriptParam }
   | { kind: 'plan'; prompt: string; error?: string }
+  /**
+   * A realm order picking its place (`CONTEXT.md`: Realm order): where the kind goes, or with no
+   * kind where to walk to; with `vehicle`, where to drive or row a carriage or boat, or a haul
+   * route's other stop.
+   */
+  | { kind: 'realm'; building?: BuildingKind; vehicle?: RealmVehiclePick; error?: string }
+  /**
+   * A realm order's road or wall line picking its ends (`CONTEXT.md`: Realm order, Build line):
+   * where it starts, then, with `from`, where it ends; `error` is why the last line would not do.
+   */
+  | { kind: 'realmLine'; building: 'road' | 'wall'; from?: Tile; error?: string }
+
+/** A tile of the map. */
+type Tile = { x: number; y: number }
+
+/** What a carriage's or boat's realm order picks on the map: where to haul, drive or row to. */
+export type RealmVehiclePick = 'haul' | 'drive' | 'row'
+
+/** The banner while a carriage's or boat's realm order picks its tile, after "Click"/"Tap". */
+const VEHICLE_PROMPTS: Record<RealmVehiclePick, string> = {
+  haul: 'the haul route’s other stop',
+  drive: 'where to drive the carriage',
+  row: 'where to row the boat',
+}
+
+/** What comes after the tile, under the banner. */
+const VEHICLE_HINTS: Record<RealmVehiclePick, string> = {
+  haul: 'Then who drives it: the nearest idle resident is ticked, and walks to the carriage first.',
+  drive:
+    'Then who drives it: the nearest idle resident is ticked, and walks to the carriage first.',
+  row: 'Then who rows it: the nearest idle resident is ticked, and walks to the boat first.',
+}
 
 /** The target the map waits for, if any; one at a time, the param before the others. */
 export function pickTarget(state: {
@@ -27,8 +60,14 @@ export function pickTarget(state: {
   paramPick: ScriptParam | undefined
   /** The step being planned with Add step, if it still picks a place. */
   plan?: Plan
+  /** The kind a realm order picks a place for, and why the last tile picked would not do. */
+  realm?: { building?: BuildingKind; vehicle?: RealmVehiclePick; error?: string }
+  /** The line a realm order picks the ends of, and why the last line picked would not do. */
+  realmLine?: { building: 'road' | 'wall'; from?: Tile; error?: string }
 }): PickTarget | undefined {
   if (state.paramPick) return { kind: 'param', param: state.paramPick }
+  if (state.realm) return { kind: 'realm', ...state.realm }
+  if (state.realmLine) return { kind: 'realmLine', ...state.realmLine }
   if (state.armyPick) return { kind: 'army', mode: state.armyPick.kind }
   const planned = state.plan && nextPick(state.plan)
   if (planned) {
@@ -123,6 +162,20 @@ export function pickHint(target: PickTarget): string | undefined {
   if (target.kind === 'resident') return RESIDENT_HINTS[target.mode]
   if (target.kind === 'group') return GROUP_HINTS[target.mode]
   if (target.kind === 'plan') return target.error && `Nothing picked: ${target.error}.`
+  if (target.kind === 'realm')
+    return target.error
+      ? `Not there: ${target.error}.`
+      : target.vehicle
+        ? VEHICLE_HINTS[target.vehicle]
+        : target.building
+          ? 'Then who builds it: the nearest idle residents are ticked.'
+          : 'Then who walks there: the nearest idle resident is ticked.'
+  if (target.kind === 'realmLine') {
+    if (target.error) return `No line there: ${target.error}.`
+    return target.from
+      ? `Straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles; then who builds it, sharing the line.`
+      : 'Then where it ends, then who builds it.'
+  }
   return undefined
 }
 
@@ -155,6 +208,14 @@ export function pickPrompt(target: PickTarget, touch: boolean): string {
   if (target.kind === 'group') return `${verb} ${GROUP_PROMPTS[target.mode]}`
   if (target.kind === 'army') return `${verb} ${ARMY_PROMPTS[target.mode]}`
   if (target.kind === 'plan') return `${verb} ${target.prompt}`
+  if (target.kind === 'realm')
+    return target.vehicle
+      ? `${verb} ${VEHICLE_PROMPTS[target.vehicle]}`
+      : target.building
+        ? `${verb} where the ${BUILDING_NAMES[target.building].toLowerCase()} goes`
+        : `${verb} where to walk to`
+  if (target.kind === 'realmLine')
+    return `${verb} where the ${target.building} ${target.from ? 'ends' : 'starts'}`
   return `${verb} ${PARAM_PROMPTS[target.param.type]} for ${target.param.name}`
 }
 
@@ -176,6 +237,7 @@ export function pickTap(
 
 /** Whether the target waits for a wall line's end, whose material the banner picks. */
 export function picksWallLine(target: PickTarget | undefined): boolean {
+  if (target?.kind === 'realmLine') return target.building === 'wall'
   return (
     (target?.kind === 'resident' || target?.kind === 'group') &&
     (target.mode === 'wallFrom' || target.mode === 'wallTo')

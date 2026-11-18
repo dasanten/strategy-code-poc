@@ -26,7 +26,8 @@ export type PreviewPick =
   | { kind: 'way'; goer: Goer }
   | { kind: 'lineStart'; building: 'road' | 'wall' }
   | { kind: 'line'; building: 'road' | 'wall'; from: Tile }
-  | { kind: 'build' }
+  /** Where to build: with `building`, that kind's footprint (realm control mode picks it first). */
+  | { kind: 'build'; building?: BuildingKind }
   | { kind: 'place'; pick: PlanPick }
   | { kind: 'param'; type: ScriptParamType }
   | { kind: 'tile' }
@@ -76,6 +77,12 @@ export function previewPickOf(
   }
   if (target.kind === 'group') return line(target.mode) ?? GROUP_PREVIEWS[target.mode] ?? TILE
   if (target.kind === 'param') return { kind: 'param', type: target.param.type }
+  if (target.kind === 'realm')
+    return target.building ? { kind: 'build', building: target.building } : TILE
+  if (target.kind === 'realmLine') {
+    const { building, from } = target
+    return from ? { kind: 'line', building, from } : { kind: 'lineStart', building }
+  }
   const pick = plan && nextPick(plan)?.pick
   if (target.kind !== 'plan' || !plan || !pick) return TILE
   if (pick !== 'tile') return pick === 'spot' ? TILE : { kind: 'place', pick }
@@ -170,6 +177,15 @@ export function pickPreview(
       return { ...base, line: { building: pick.building, tiles, tooLong }, label }
     }
     case 'build': {
+      if (pick.building) {
+        const problem = w.buildProblem(pick.building, at.x, at.y)
+        const name = BUILDING_NAMES[pick.building]
+        return {
+          ...base,
+          footprint: { kind: pick.building, ...at, ...(problem ? { problem } : {}) },
+          label: problem ? `No room for a ${name.toLowerCase()}: ${problem}` : `${name} here`,
+        }
+      }
       const site = buildingAt(at, w)
       if (site?.site) {
         const place = { x: site.x, y: site.y, side: FOOTPRINT[site.kind] }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { BUILDABLE, buildMenu } from './shared/building.js'
 import { Terrain } from './shared/terrain.js'
 import type { Building, BuildingKind, City, KnownNode } from '@csp/shared-types'
-import { buildMenuGroups, canChooseKind, workSpan } from './build-menu-view.js'
+import { buildMenuGroups, canChooseKind, kindProblemOn, workSpan } from './build-menu-view.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { buildHereProblem } from './selection-view.js'
 
@@ -111,7 +111,10 @@ describe('the Build menu', () => {
 
   it('offers a ram under Siege anywhere a carriage could stand, one site to a tile', () => {
     const groups = menu()
-    expect(groups.find((g) => g.name === 'Siege')?.kinds.map((k) => k.kind)).toEqual(['ram', 'catapult'])
+    expect(groups.find((g) => g.name === 'Siege')?.kinds.map((k) => k.kind)).toEqual([
+      'ram',
+      'catapult',
+    ])
     expect(entry(groups, 'ram').problem).toBeUndefined()
     const ground = (t: number) => ({ size: 200, at: () => t })
     const ram = (t: number, buildings: Building[] = []) =>
@@ -163,5 +166,33 @@ describe('the Build menu', () => {
 
   it('tells work in game time', () => {
     expect(workSpan(0)).toBe('0 game hours')
+  })
+})
+
+describe('the Build menu with no tile picked yet (realm control mode)', () => {
+  it('offers every kind, a node’s workplace too, to be judged once the tile is picked', () => {
+    const groups = buildMenuGroups(undefined, () => undefined, true)
+    const kinds = groups.flatMap((g) => g.kinds)
+    expect(kinds.every((k) => k.offered && k.problem === undefined)).toBe(true)
+    expect(kinds.map((k) => k.kind)).toContain('lumberCamp')
+  })
+
+  it('judges the kind on the tile picked as the menu there would', () => {
+    const problem = (node?: KnownNode) => (kind: BuildingKind) =>
+      buildHereProblem(
+        kind,
+        50,
+        50,
+        seen,
+        (x, y) => (x === 50 && y === 50 ? node : undefined),
+        plains,
+      )
+    expect(kindProblemOn('road', undefined, problem())).toBeUndefined()
+    expect(kindProblemOn('house', undefined, problem())).toBe('a house goes in a city’s area')
+    expect(kindProblemOn('lumberCamp', undefined, problem())).toBe(
+      'a lumber camp goes with one tile on a fitting resource node',
+    )
+    const forest = forestAt(50, 50)
+    expect(kindProblemOn('lumberCamp', forest, problem(forest))).toBeUndefined()
   })
 })

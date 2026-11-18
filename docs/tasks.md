@@ -122,6 +122,11 @@ and simulation tests (Epic 111, ADR 0040: checks share the machine, a profile an
 slow runs, every ignored test nightly, year-run checkpoints). No game rule changes; it runs beside
 the game epics.
 
+**Agreed with Daniel on 2026-11-18:** Realm control mode (Epic 112, ADR 0041: a Unit | Realm
+switch; in realm control mode the Player says what and where, then picks who from a who-list with
+the nearest idle residents suggested; only the UI) is planned now and starts once Faster checks
+and simulation tests (Epic 111) is on `dev`.
+
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
@@ -234,6 +239,7 @@ I sleep.
 | 109 | [Towers](https://github.com/dasanten/strategy-code-poc/issues/1324) | ticketed |
 | 110 | [Siege machines](https://github.com/dasanten/strategy-code-poc/issues/1328) | ticketed |
 | 111 | [Faster checks and simulation tests](https://github.com/dasanten/strategy-code-poc/issues/1417) | ticketed |
+| 112 | [Realm control mode](https://github.com/dasanten/strategy-code-poc/issues/1426) | ticketed |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

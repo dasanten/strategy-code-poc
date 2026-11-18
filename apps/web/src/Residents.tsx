@@ -3490,7 +3490,7 @@ export function ResidentCard({
  * come back, and how much Food stays on board for the horse or the rower, then the other stop on
  * the map.
  */
-function HaulBlock({
+export function HaulBlock({
   adult,
   onRoute,
   byWater = false,
@@ -4089,7 +4089,7 @@ function BreedBlock({
  * Breeding for a group (`CONTEXT.md`: Breeding, Group): pick two of the Player's horses in a
  * stable some of them stand in; one of them there tends the pair.
  */
-function GroupBreed({
+export function GroupBreed({
   stable,
   horses,
   tick,
@@ -4288,7 +4288,7 @@ function GroupRelocateBlock({
 }
 
 /** The realm's cities to relocate to, each with its free housing or why it can't be picked. */
-function CityPicker({
+export function CityPicker({
   choices,
   onRelocate,
 }: {

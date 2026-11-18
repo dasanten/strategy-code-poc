@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Terrain } from '../shared/terrain.js'
-import { previewPath } from './path-preview.js'
+import { previewPath, searchPath } from './path-preview.js'
 
 const SIZE = 64
 
@@ -88,5 +88,27 @@ describe('the way a pick previews', () => {
       [0, 0],
       [1, 0],
     ])
+  })
+})
+
+describe('whether there is a way at all', () => {
+  it('finds the way where there is one', () => {
+    expect(searchPath(SIZE, { x: 0, y: 0 }, { x: 2, y: 0 }, groundOf([]))).toEqual([
+      [1, 0],
+      [2, 0],
+    ])
+  })
+
+  it('says there is none when a lake shuts the start in', () => {
+    // An island at (2, 2): lake all round it.
+    const ground = groundOf(['LLLLL', 'LLLLL', 'LL.LL', 'LLLLL', 'LLLLL'])
+    expect(searchPath(SIZE, { x: 2, y: 2 }, { x: 10, y: 10 }, ground)).toBe('none')
+    // The preview draws a straight line all the same.
+    expect(previewPath(SIZE, { x: 2, y: 2 }, { x: 10, y: 10 }, ground).at(-1)).toEqual([10, 10])
+  })
+
+  it('can’t tell when the target itself can’t be stepped onto', () => {
+    const ground = groundOf(['...', '.L.'])
+    expect(searchPath(SIZE, { x: 0, y: 0 }, { x: 1, y: 1 }, ground)).toBe('gaveUp')
   })
 })

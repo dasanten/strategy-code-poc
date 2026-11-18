@@ -2040,6 +2040,37 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   their tokens on a tile with another realm's carriage shows the tile card too, where it can be
   driven off (Stealing a carriage or horse). With a pointer, what a click would pick is outlined
   on hover.
+- **Control mode:** how the Player gives orders, picked with a Unit | Realm switch that is always
+  on the HUD (and the Tab key), kept per browser; a new Player starts in unit control mode. Only
+  the UI (ADR 0041): either way the same order requests go to residents, and nothing new is kept
+  in the world. **Unit control mode:** pick a resident, a group or an army, then say what they do,
+  as everything above describes. **Realm control mode:** say what is to be done and where, then
+  who does it. There a click on the map picks a building, else the bare tile; residents are drawn
+  but not picked, and a drag picks no group. Picking a resident, a group or an army some other way
+  (the Residents list, a saved group's key, the Armies drawer) switches to unit control mode.
+  Armies are commanded only in unit control mode.
+- **Realm order:** an order given in realm control mode: every order of the group card that names
+  a place or a building (build, a road or wall line, work, tear down, feed the stable, breed
+  horses, teach, train, walk to, explore, relocate, store at, fetch from, a haul route, drive, row,
+  board, run a script). The **realm bar** on the HUD starts those that begin with a kind or a
+  place (Build with the Build menu, Build line, Walk to, Explore, Run script); the card of a
+  picked building, carriage, vessel or tile starts those about it (Work here, Build this site,
+  Tear down, Store here, Haul with this carriage, …). The target is picked as in Picking a target,
+  with the same previews, and an order's own form (a haul route, Customise) comes before the
+  who-list. Orders without a target (stop, drop, mount, equip, …) and fighting (attack, climb a
+  wall) stay in unit control mode. Once confirmed, the order goes to those ticked exactly as the
+  group card would send it (One command for a group), with one difference: for an order bound to
+  the target's tile (work, board, …), a ticked resident who is elsewhere gets a queue, walk there
+  and then the order, instead of being skipped.
+- **Who-list:** the last step of a realm order: the realm's residents who could take it, the
+  nearest to the target first, each with what they are doing and how long their way is. The game
+  **suggests** by ticking the nearest idle ones; the Player changes the ticks or just confirms.
+  With nobody ticked, Confirm is off; with nobody idle, nobody is ticked and the list says so.
+  A busy resident can be ticked too: a Now / After switch on their row says whether the order
+  replaces what they are doing or is appended to their queue (as Shift does on a card). Those who
+  can't take the order (children, a partner carrying a child, no way there) are listed last,
+  greyed out, saying why. The list can be searched and filtered as the Residents list can, and it
+  fits a phone screen.
 - **Build menu:** every buildable kind as an icon with a short name, under group headings
   (Resources, Food and animals, Industry, City, Defence, Transport), all in sight without reading.
   Tapping one shows what it is for, what it costs and Build. A kind that can't go on this tile is
