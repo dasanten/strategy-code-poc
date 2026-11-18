@@ -234,4 +234,7 @@ fn its_mercenaries_take_food_for_the_way_and_eat_from_its_storage_at_its_town_ha
             b.city_id.as_deref() == Some(n1.as_str()) && b.kind == BuildingKind::Storage
         });
     assert_eq!(storage, theirs.map(crate::survival::Holder::Building));
+    // There they top up to the Food for the walk home, so they go home fed when it ends.
+    let target = crate::survival::refill_target(&p.world, &p.world.residents[i], size);
+    assert!(target > csp_shared::balance::HOME_FOOD_LOW, "{target}");
 }

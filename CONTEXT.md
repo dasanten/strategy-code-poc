@@ -810,7 +810,8 @@ The shared language of the game. Domain terms only — no implementation details
   storages, paying each week from them like a transfer; its mercenaries stand at its town hall
   and fight attackers in its City area. They set out with the Food for the walk there and back
   from a storage of their own city, as a trader does, and in its City area they eat from its
-  storage as at home (#1414: they starved without; decided overnight, Daniel to confirm). Its
+  storage as at home, up to the Food for the walk home, so they go home fed when the contract
+  ends (#1414: they starved without; decided overnight, Daniel to confirm). Its
   soldiers guarding a site likewise set out with the Food for the way, and one down to what the
   walk home eats goes home and leaves the escort, which it fills again with others.
   - **Hunting a thief:** for a theft it knows of (seen by one of its residents, or the news
