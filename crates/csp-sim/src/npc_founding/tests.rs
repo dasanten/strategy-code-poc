@@ -1146,7 +1146,7 @@ fn pick(t: &Town, adults: &[usize], jobs: &crate::npc_behaviour::Jobs) -> Option
 
 #[test]
 fn farmers_beyond_those_who_feed_it_join_its_party_after_its_spare_hands() {
-    let mut t = full_for(60, NPC_FULL_DAYS);
+    let t = full_for(60, NPC_FULL_DAYS);
     let adults = hands(&t);
     let feed = crate::npc_plan::farmers_to_feed(&t.world, t.city()).ceil() as usize;
     let members = npc_founding_party_size(city_residents(&t.world, &t.city).len() as f64) as usize;
