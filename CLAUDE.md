@@ -31,8 +31,11 @@
   on replaces that comparison with a Rust test of the new rule, and says so in the PR.
   The client's types are generated from the crates (`ts-rs`): after changing a type the client
   sees, run `pnpm types:rust` and commit `packages/shared-types/src/generated/` (a Rust test fails
-  when it is stale). Before finishing a change to the crates: `pnpm check:rust` (fmt, clippy with
-  warnings as errors, `cargo nextest run`). A test over 5 s is a regression to fix, not to tag.
+  when it is stale). While working, run the tests of the crate you change
+  (`cargo nextest run -p csp-sim [filter]`: it doesn't rebuild `csp-server`); before finishing a
+  change to the crates, `pnpm check:rust` once (fmt, clippy with warnings as errors,
+  `cargo nextest run`; it shares the machine with other sessions' checks, ADR 0040, and may say
+  it is waiting for one). A test over 5 s is a regression to fix, not to tag.
   Each crate's integration tests build into one binary: a new file in `tests/` goes into that
   crate's `tests/all.rs` (a test fails when one is missing). Cargo links with `rust-lld`
   (`.cargo/config.toml`), so it runs from PowerShell or bash alike.

@@ -13,7 +13,8 @@ numbers.
 
 - **A check does not take the whole machine.** `pnpm check:rust` caps itself or waits its turn
   while another check runs, whichever T111.2 measures as faster for four checks at once. Alone on
-  an idle machine it runs as fast as before. CI is unchanged.
+  an idle machine it runs as fast as before. CI is unchanged. T111.2 measured both: builds run
+  side by side and the suite waits its turn behind a machine-wide lock (#1419 has the numbers).
 - **Iterate on one crate, check everything once.** While working, a session runs the tests of the
   crate it changes (`cargo nextest run -p csp-sim [filter]`); `pnpm check:rust` runs once before
   finishing.
