@@ -225,12 +225,26 @@ fn counts_as_full_short_of_weapons_and_their_iron_when_it_cannot_make_them() {
 }
 
 #[test]
-fn is_not_full_short_of_weapons_it_could_make_from_a_node_it_knows() {
+fn counts_as_full_short_of_weapons_it_could_make_and_of_its_war_chest() {
+    // Only what founding needs keeps a city from being full: Food, Wood and Stone (Daniel,
+    // 2026-11-18, #1379). Its weapons, even with a node to make them from, and Coins below its war
+    // chest stay short for all else it does.
     let mut t = full_town(300);
     t.home_stock().insert(Good::Iron, 0.0);
     t.home_stock().insert(Good::Spear, 0.0);
+    t.home_stock().insert(Good::Coins, 0.0);
     let home = t.home();
     node(&mut t.world, &mut t.terrain, ResourceKind::IronOre, home.x + 30.0, home.y);
+    t.plan_city();
+    assert_eq!(t.plan().full_since, Some(t.world.tick as f64));
+    let short = crate::npc_chain::short_goods(&t.world, t.city(), t.terrain.size, None);
+    assert!(short.contains(&Good::Spear), "{short:?}");
+}
+
+#[test]
+fn is_not_full_short_of_wood() {
+    let mut t = full_town(300);
+    t.home_stock().insert(Good::Wood, 0.0);
     t.plan_city();
     assert_eq!(t.plan().full_since, None);
 }

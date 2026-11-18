@@ -26,13 +26,11 @@ use crate::npc_chain::{short_goods, Shortage};
 use crate::npc_cities::{hall_tile, npc_site_fits_among, taken_ground, SiteWorld, FARM_RING};
 use crate::npc_escort::{founding_escorts_wanted, spare_soldiers};
 use crate::npc_scouts::knows_node;
-use crate::npc_trader::has_node_for;
 use crate::placing::Ground;
 use crate::queries::building::{build_materials, building_at, node_good};
 use crate::queries::city::{city_residents, has_food_surplus};
 use crate::queries::goods::carried_food;
 use crate::queries::js_round;
-use crate::queries::names::good_name;
 use crate::queries::names::{held, held_in, kind_name, placed};
 use crate::queries::npc_trade::{
     npc_city_stock, npc_founding_party_size, npc_full_days, npc_needs_scale, npc_reserve,
@@ -41,7 +39,6 @@ use crate::queries::residents::{carry_capacity, good_weight, is_armed, stock_wei
 use crate::random::{hash_str, Mulberry32};
 use crate::sight::InvariantViolation;
 use crate::standing::raise_standing_both_ways;
-use csp_shared::goods::WEAPONS;
 
 /// The ids of a city's founding party (`foundingParty`): those whose job is `found`.
 pub fn founding_party(plan: Option<&CityPlan>) -> Vec<String> {
@@ -85,24 +82,24 @@ pub fn founding_materials(members: Option<f64>) -> Stock {
     out
 }
 
-/// What keeps an NPC city from being full (`CONTEXT.md`: Full city): what it is short of
-/// (`short_goods`), less the weapons it can't make and the Iron its reserve keeps to forge them,
-/// as with Coins it can't earn (T100.8). It can make a good it has a workplace for, or a node of
-/// everything the good is made from (`has_node_for`). They stay short for all else it does.
+/// The goods whose shortage keeps an NPC city from being full (`CONTEXT.md`: Full city): what
+/// founding needs, Food and the Wood and Stone of houses, walls and the party. Its war chest and its
+/// soldiers' gear and their chain don't (Daniel, 2026-11-18, #1379: they kept every city short all
+/// year); it still works and buys them.
+pub const FULL_CITY_GOODS: [Good; 3] = [Good::Food, Good::Wood, Good::Stone];
+
+/// What keeps an NPC city from being full (`CONTEXT.md`: Full city): of what it is short of
+/// (`short_goods`), the goods founding needs (`FULL_CITY_GOODS`).
 pub fn short_for_founding(
     world: &WorldState,
     city: &City,
-    home: Option<&Building>,
+    _home: Option<&Building>,
     size: i32,
 ) -> Vec<Good> {
-    let short = short_goods(world, city, size, None);
-    let Some(home) = home else { return short };
-    let at = (home.x as i32, home.y as i32);
-    let unmakeable = |g: Good| {
-        (WEAPONS.contains(&good_name(g)) || g == Good::Iron)
-            && !has_node_for(world, city, at, g, size, &mut HashSet::new())
-    };
-    short.into_iter().filter(|g| !unmakeable(*g)).collect()
+    short_goods(world, city, size, None)
+        .into_iter()
+        .filter(|g| FULL_CITY_GOODS.contains(g))
+        .collect()
 }
 
 /// What an NPC city lacks of its founding party's materials above its reserve, the shortest first
