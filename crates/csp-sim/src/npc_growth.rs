@@ -913,13 +913,16 @@ fn wanted(
     None
 }
 
-/// Whether a city's last pass left someone idle who is free to work (`handsIdle`).
+/// Whether a city's last pass left someone idle who is free to work (`handsIdle`); not those it
+/// called home to set out with its founding party (`called_home`, #1379).
 fn hands_idle(world: &WorldState, city: &City) -> bool {
     let jobs = world.city_plans.get(&city.id).map(|p| &p.jobs);
     world.residents.iter().any(|r| {
         r.city_id.as_ref() == Some(&city.id)
             && r.carrying.is_none()
-            && jobs.and_then(|j| j.get(&r.id)).is_some_and(|j| j.kind == CityJobKind::Idle)
+            && jobs.and_then(|j| j.get(&r.id)).is_some_and(|j| {
+                j.kind == CityJobKind::Idle && !crate::npc_founding::called_home(j)
+            })
     })
 }
 

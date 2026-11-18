@@ -328,6 +328,8 @@ pub fn plan_founding(
     let Some(chosen) =
         pick_party(world, city, people.adults, people.unneeded, &near, jobs, (walk, site_at))
     else {
+        // Too few at hand: its workers far out come home to set out (Daniel, 2026-11-18, #1379).
+        call_home(world, people.adults, jobs, home_at, terrain.size);
         return;
     };
     for i in chosen {
@@ -341,6 +343,40 @@ pub fn plan_founding(
     }
     // From now on `fullSince` is when the party set out.
     world.city_plans.get_mut(&city.id).expect("a plan").full_since = Some(tick);
+}
+
+/// Whether a job is that of a hand called home to set out with its city's founding party: idle,
+/// naming the workplace it was called from (`CONTEXT.md`: Founding; Daniel, 2026-11-18, #1379).
+/// They stand at home like the idle, but don't count as idle hands to give work to.
+pub fn called_home(job: &CityJob) -> bool {
+    job.kind == CityJobKind::Idle && job.building_id.is_some()
+}
+
+/// Calls home a full city's workers far out while its founding party can't be picked
+/// (`CONTEXT.md`: Founding; Daniel, 2026-11-18, #1379: Millbrook held all its party took, but
+/// five of its seven workers were at workplaces far out, so it never had a party to send): each
+/// whose workplace or who themself is further from home than `far_out`.
+fn call_home(
+    world: &WorldState,
+    adults: &[usize],
+    jobs: &mut Jobs,
+    home_at: (i32, i32),
+    size: i32,
+) {
+    for &i in adults {
+        let r = &world.residents[i];
+        let Some(planned) = jobs.get(&r.id) else { continue };
+        if planned.kind != CityJobKind::Work {
+            continue;
+        }
+        let Some(at) = planned.building_id.clone() else { continue };
+        let place = world.buildings.iter().find(|b| b.id == at);
+        let far = far_out((r.x as i32, r.y as i32), home_at, size)
+            || place.is_some_and(|b| far_out((b.x as i32, b.y as i32), home_at, size));
+        if far {
+            jobs.insert(r.id.clone(), CityJob { building_id: Some(at), ..job(CityJobKind::Idle) });
+        }
+    }
 }
 
 /// Whether this pass is a city's first of a game day (`dailyPass`).
@@ -363,8 +399,9 @@ pub fn far_out(r: (i32, i32), home: (i32, i32), size: i32) -> bool {
 
 /// The founding party (`pickParty`, `CONTEXT.md`: Founding, Escort): `npc_founding_party_size`
 /// adults, its escort of soldiers (`founding_escorts_wanted`) as far as the city has them beyond
-/// its hall and gates, the rest of its spare hands and its workers off the farms, those with the
-/// most room on them first, and as many more as it takes for their arms to hold the Food for the
+/// its hall and gates, the rest of its spare hands, its workers off the farms and those called
+/// home, those with the most room on them first, then farmers beyond those who feed it
+/// (`farmers_to_feed`), and as many more as it takes for their arms to hold the Food for the
 /// walk and the first weeks and all the materials. None while there aren't enough.
 /// `(walk_ticks, site)` is the way to the site.
 fn pick_party(
@@ -403,16 +440,40 @@ fn pick_party(
     let mut seen = HashSet::new();
     let working =
         |i: usize| jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Work);
+    // Those the last pass called home (`call_home`) come along, whatever this one gave them, but
+    // for the jobs that hold a resident (Daniel, 2026-11-18, #1379).
+    let old = world.city_plans.get(&city.id).map(|p| &p.jobs);
+    let called = |i: usize| {
+        let id = &world.residents[i].id;
+        old.and_then(|j| j.get(id)).is_some_and(called_home)
+            && jobs.get(id).is_none_or(|j| {
+                matches!(
+                    j.kind,
+                    CityJobKind::Idle | CityJobKind::Work | CityJobKind::Road | CityJobKind::Scout
+                )
+            })
+    };
     for &i in unneeded
         .iter()
         .filter(|&&i| !armed_now(i) && free(i))
-        .chain(adults.iter().filter(|&&i| !armed_now(i) && free(i) && working(i)))
+        .chain(adults.iter().filter(|&&i| !armed_now(i) && free(i) && (working(i) || called(i))))
     {
         if seen.insert(i) {
             rest.push(i);
         }
     }
     rest.sort_by(|&a, &b| room(b).total_cmp(&room(a)));
+    // Then farmers beyond those who feed it (`farmers_to_feed`), those with the most room first
+    // (Daniel, 2026-11-18, #1379).
+    let farming =
+        |i: usize| jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Farm);
+    let farmers = adults.iter().filter(|&&i| farming(i)).count();
+    let spare_farmers =
+        farmers.saturating_sub(crate::npc_plan::farmers_to_feed(world, city).ceil() as usize);
+    let mut farm_hands: Vec<usize> =
+        adults.iter().copied().filter(|&i| farming(i) && !armed_now(i) && free(i)).collect();
+    farm_hands.sort_by(|&a, &b| room(b).total_cmp(&room(a)));
+    rest.extend(farm_hands.into_iter().filter(|i| seen.insert(*i)).take(spare_farmers));
     let members = npc_founding_party_size(city_residents(world, &city.id).len() as f64) as usize;
     let escort = founding_escorts_wanted(world, city, members, site);
     let mut candidates = armed.into_iter().take(escort).chain(rest);

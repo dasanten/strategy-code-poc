@@ -464,8 +464,9 @@ fn invariants_for_tick_runs_all_of_them_when_every_tick_is_sampled_none_at_a_rat
     // (T97.9), `tower-room` (T109.1), `siege-machines-in-place` (T110.1), `threat-sound` (T98.2),
     // `trading-posts-have-no-temperament` (T98.1), `npc-hunts-sound` (T98.6),
     // `stances-sound` (T98.4), `npc-demands-sound` (T98.7),
-    // `npc-takings-sound` (T98.10), `marches-sound` (T98.8), `npc-founding-stone-kept` (#1379).
-    assert_eq!(all.len(), 190);
+    // `npc-takings-sound` (T98.10), `marches-sound` (T98.8), `npc-founding-stone-kept` and
+    // `npc-called-home-sound` (#1379).
+    assert_eq!(all.len(), 191);
 }
 
 /// A starting city with everyone idle on the storage's tile, carrying nothing (`atHome` of

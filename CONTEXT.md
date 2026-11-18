@@ -731,7 +731,10 @@ The shared language of the game. Domain terms only — no implementation details
 - **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
   from every city (on a map smaller than the game's but at least half its side, scaled with the
   side: Daniel, 2026-11-15, T100.8), within a set reach of itself and on no realm's territory, nearest a node of
-  the good it is short of and has no node for. A **founding party** of a village's worth of
+  the good it is short of and has no node for. Its party comes from its spare hands and its
+  workers near home first, then from its farmers beyond those who feed it (Daniel, 2026-11-18,
+  #1379); while too few are at hand, its workers far out are called home to set out, and stand
+  there until it goes. A **founding party** of a village's worth of
   adults, more from a big city, one of them armed, each carrying a share of the materials (a town
   hall's and a storage's, and houses for those past a village's worth) and Food for the walk and
   the first weeks, with as many more as it takes to carry it all (Daniel, 2026-11-15, T100.8;

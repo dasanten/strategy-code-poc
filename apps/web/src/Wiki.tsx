@@ -3424,7 +3424,9 @@ export function Wiki() {
           soldiers. The party carries a town hall's and a storage's materials, a house's for each{' '}
           {num(HOUSING_ROOM.house ?? 1)} members past {num(NPC_VILLAGE.residents)}, and Food for
           twice the walk and {days(NPC_FOUND_FOOD_DAYS)} there, with as many more adults as it takes
-          to carry all of it, and builds the town hall, which founds the daughter: an NPC city of
+          to carry all of it. They come from its spare hands and its workers near home first, then
+          from its farmers beyond those who feed it; while too few are at hand, its workers far out
+          come home to set out and wait there. The party builds the town hall, which founds the daughter: an NPC city of
           its own with a name from the game. It then builds its storage, a farm and a house, and
           once its storage holds the Wood of its reserve, its first wall, a ring{' '}
           {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its home. Mother and daughter start at

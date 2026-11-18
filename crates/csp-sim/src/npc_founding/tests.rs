@@ -1110,3 +1110,120 @@ fn keeps_a_daughter_the_usual_distance_away_on_a_full_map_scaled_with_the_side_o
     // A test map under half the side keeps the full distance.
     assert_eq!(super::daughter_min_distance(1300), NPC_CITY_MIN_DISTANCE);
 }
+
+// #1379 (Daniel, 2026-11-18): Millbrook held all its party took, but five of its seven workers
+// were far out and its farmers and soldiers didn't go, so it never had a party to send.
+
+/// The town's grown, unarmed residents, by index.
+fn hands(t: &Town) -> Vec<usize> {
+    (0..t.world.residents.len())
+        .filter(|&i| {
+            let r = &t.world.residents[i];
+            r.city_id.as_deref() == Some(t.city.as_str())
+                && crate::queries::residents::can_work(r.born_at, t.world.tick as f64)
+                && !crate::queries::residents::is_armed(r)
+        })
+        .collect()
+}
+
+fn job_of(kind: CityJobKind, at: Option<&str>) -> CityJob {
+    CityJob { building_id: at.map(String::from), ..super::job(kind) }
+}
+
+fn pick(t: &Town, adults: &[usize], jobs: &crate::npc_behaviour::Jobs) -> Option<Vec<usize>> {
+    let home = t.home();
+    let home_at = (home.x as i32, home.y as i32);
+    let site = t.plan().founding_site.expect("a site");
+    let site_at = (site.x as i32, site.y as i32);
+    let walk = wrap_distance(t.terrain.size, home_at, site_at) * WALK_TICKS_PER_TILE;
+    let size = t.terrain.size;
+    let near = |i: usize| {
+        let r = &t.world.residents[i];
+        !super::far_out((r.x as i32, r.y as i32), home_at, size)
+    };
+    super::pick_party(&t.world, t.city(), adults, &[], &near, jobs, (walk, site_at))
+}
+
+#[test]
+fn farmers_beyond_those_who_feed_it_join_its_party_after_its_spare_hands() {
+    let mut t = full_for(60, NPC_FULL_DAYS);
+    let adults = hands(&t);
+    let feed = crate::npc_plan::farmers_to_feed(&t.world, t.city()).ceil() as usize;
+    let members = npc_founding_party_size(city_residents(&t.world, &t.city).len() as f64) as usize;
+    // Two working, all the rest on the farms: too few without the farmers.
+    let mut jobs = crate::npc_behaviour::Jobs::new();
+    for (n, &i) in adults.iter().enumerate() {
+        let kind = if n < 2 { CityJobKind::Work } else { CityJobKind::Farm };
+        jobs.insert(t.world.residents[i].id.clone(), job_of(kind, None));
+    }
+    let farmers = adults.len() - 2;
+    assert!(farmers > feed + members, "{farmers} farmers, {feed} feed it");
+    let party = pick(&t, &adults, &jobs).expect("a party");
+    let from_farms =
+        party.iter().filter(|&&i| jobs[&t.world.residents[i].id].kind == CityJobKind::Farm).count();
+    assert_eq!(party.len() - from_farms, 2, "its workers first");
+    assert!(farmers - from_farms >= feed, "it keeps those who feed it");
+    // With no more farmers than feed it, none of them go: no party.
+    let keep: Vec<usize> = adults.iter().copied().take(2 + feed).collect();
+    for &i in &adults[2 + feed..] {
+        jobs.shift_remove(&t.world.residents[i].id);
+    }
+    assert_eq!(pick(&t, &keep, &jobs), None);
+}
+
+#[test]
+fn its_workers_far_out_are_called_home_and_then_join_its_party() {
+    let mut t = full_for(30, NPC_FULL_DAYS);
+    let home = t.home();
+    let home_at = (home.x as i32, home.y as i32);
+    let size = t.terrain.size;
+    let far_x = home.x + csp_shared::balance::NPC_NODE_REACH + 40.0;
+    let mut quarry = crate::test_support::building(
+        "farquarry",
+        BuildingKind::Quarry,
+        Some(&t.city),
+        far_x,
+        home.y,
+    );
+    quarry.city_id = None;
+    t.world.buildings.push(quarry);
+    let near_at = t.home().id;
+    let adults = hands(&t);
+    // Half work the far quarry, out there; the others work near home.
+    let mut jobs = crate::npc_behaviour::Jobs::new();
+    let half = adults.len() / 2;
+    for (n, &i) in adults.iter().enumerate() {
+        let (at, x) = if n < half { ("farquarry", far_x) } else { (near_at.as_str(), home.x) };
+        jobs.insert(t.world.residents[i].id.clone(), job_of(CityJobKind::Work, Some(at)));
+        t.world.residents[i].x = x;
+        t.world.residents[i].y = home.y;
+    }
+    super::call_home(&t.world, &adults, &mut jobs, home_at, size);
+    for (n, &i) in adults.iter().enumerate() {
+        let job = &jobs[&t.world.residents[i].id];
+        assert_eq!(super::called_home(job), n < half, "{n}: {job:?}");
+    }
+    // Home again with the last pass's call, they are its party's to pick, even put back to work.
+    t.plan_mut().jobs = jobs.clone();
+    for &i in &adults[..half] {
+        t.world.residents[i].x = home.x;
+        let id = t.world.residents[i].id.clone();
+        jobs.insert(id, job_of(CityJobKind::Scout, None));
+    }
+    let party = pick(&t, &adults[..half], &jobs).expect("a party of those called home");
+    assert!(party.iter().all(|i| adults[..half].contains(i)));
+}
+
+#[test]
+fn calls_nobody_home_without_a_founding_party_to_wait_for() {
+    let mut t = full_for(30, NPC_FULL_DAYS);
+    let id = t.world.residents[hands(&t)[0]].id.clone();
+    let tick = t.world.tick as f64;
+    let at = t.home().id;
+    let plan = t.plan_mut();
+    plan.planned_at = tick;
+    plan.jobs.insert(id, job_of(CityJobKind::Idle, Some(&at)));
+    assert_eq!(crate::npc_plan::npc_called_home_sound(&t.world), []);
+    t.plan_mut().founding_site = None;
+    assert_eq!(crate::npc_plan::npc_called_home_sound(&t.world).len(), 1);
+}
