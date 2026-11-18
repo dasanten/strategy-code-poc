@@ -103,11 +103,22 @@ export const REALM_BAR_HINT =
   'What, where, then who. A click picks a building or a tile, never a resident.'
 
 /** An order the realm bar starts (`CONTEXT.md`: Realm order): one that begins with a kind or a place. */
-export type RealmBarOrder = 'build' | 'walkTo' | 'explore' | 'runScript' | 'relocate'
+export type RealmBarOrder =
+  'build' | 'road' | 'wall' | 'walkTo' | 'explore' | 'runScript' | 'relocate'
 
 /** The realm bar's orders, in its order, each with what its button says on hover. */
 export const REALM_BAR_ORDERS: readonly { id: RealmBarOrder; label: string; title: string }[] = [
   { id: 'build', label: 'Build', title: 'Build: pick what, then where, then who builds it' },
+  {
+    id: 'road',
+    label: 'Road',
+    title: 'Road: pick where the line starts and ends, then who builds it',
+  },
+  {
+    id: 'wall',
+    label: 'Wall',
+    title: 'Wall: pick where the line starts and ends, then who builds it',
+  },
   { id: 'walkTo', label: 'Walk to', title: 'Walk to: pick where, then who walks there' },
   { id: 'explore', label: 'Explore', title: 'Explore: what to look for, then who goes' },
   { id: 'runScript', label: 'Run script', title: 'Run script: pick the script, then who runs it' },

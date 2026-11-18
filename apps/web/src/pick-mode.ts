@@ -22,6 +22,14 @@ export type PickTarget =
    * kind where to walk to.
    */
   | { kind: 'realm'; building?: BuildingKind; error?: string }
+  /**
+   * A realm order's road or wall line picking its ends (`CONTEXT.md`: Realm order, Build line):
+   * where it starts, then, with `from`, where it ends; `error` is why the last line would not do.
+   */
+  | { kind: 'realmLine'; building: 'road' | 'wall'; from?: Tile; error?: string }
+
+/** A tile of the map. */
+type Tile = { x: number; y: number }
 
 /** The target the map waits for, if any; one at a time, the param before the others. */
 export function pickTarget(state: {
@@ -35,9 +43,12 @@ export function pickTarget(state: {
   plan?: Plan
   /** The kind a realm order picks a place for, and why the last tile picked would not do. */
   realm?: { building?: BuildingKind; error?: string }
+  /** The line a realm order picks the ends of, and why the last line picked would not do. */
+  realmLine?: { building: 'road' | 'wall'; from?: Tile; error?: string }
 }): PickTarget | undefined {
   if (state.paramPick) return { kind: 'param', param: state.paramPick }
   if (state.realm) return { kind: 'realm', ...state.realm }
+  if (state.realmLine) return { kind: 'realmLine', ...state.realmLine }
   if (state.armyPick) return { kind: 'army', mode: state.armyPick.kind }
   const planned = state.plan && nextPick(state.plan)
   if (planned) {
@@ -138,6 +149,12 @@ export function pickHint(target: PickTarget): string | undefined {
       : target.building
         ? 'Then who builds it: the nearest idle residents are ticked.'
         : 'Then who walks there: the nearest idle resident is ticked.'
+  if (target.kind === 'realmLine') {
+    if (target.error) return `No line there: ${target.error}.`
+    return target.from
+      ? `Straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles; then who builds it, sharing the line.`
+      : 'Then where it ends, then who builds it.'
+  }
   return undefined
 }
 
@@ -174,6 +191,8 @@ export function pickPrompt(target: PickTarget, touch: boolean): string {
     return target.building
       ? `${verb} where the ${BUILDING_NAMES[target.building].toLowerCase()} goes`
       : `${verb} where to walk to`
+  if (target.kind === 'realmLine')
+    return `${verb} where the ${target.building} ${target.from ? 'ends' : 'starts'}`
   return `${verb} ${PARAM_PROMPTS[target.param.type]} for ${target.param.name}`
 }
 
@@ -195,6 +214,7 @@ export function pickTap(
 
 /** Whether the target waits for a wall line's end, whose material the banner picks. */
 export function picksWallLine(target: PickTarget | undefined): boolean {
+  if (target?.kind === 'realmLine') return target.building === 'wall'
   return (
     (target?.kind === 'resident' || target?.kind === 'group') &&
     (target.mode === 'wallFrom' || target.mode === 'wallTo')

@@ -135,8 +135,21 @@ body {
 }
 /* The picker's room: without it Log out would run off the bar on a small laptop or tablet. */
 @media (max-width: 1150px) {
-  .hud-top .hud-muted {
+  .hud-top .hud-muted,
+  .hud-top .hud-sep {
     display: none;
+  }
+  /* With the Unit | Realm switch too, the bar fits a 1024 px screen only packed closer, the
+     realm's name giving way last with an ellipsis; else focusing a card scrolls the game aside. */
+  .hud-top,
+  .hud-top .hud-goods {
+    gap: 8px;
+  }
+  .hud-top > b {
+    flex: 0 1 auto;
+    min-width: 3em;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 .hud-good,
@@ -2732,9 +2745,54 @@ button.residents-row.selected:hover {
   color: var(--ui-ink);
 }
 /* The who-list (`CONTEXT.md`: Who-list): one row a resident, nearest first, can't-take greyed. */
-.who-search {
-  width: 100%;
+.who-choice {
+  display: flex;
+  gap: 6px;
+  align-items: center;
   margin: 4px 0 6px;
+}
+.who-search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.who-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.who-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.who-shown {
+  margin: 0 0 4px;
+}
+/* Now / After under a ticked busy resident's row, in line with their name. */
+.who-when {
+  display: flex;
+  gap: 4px;
+  padding: 0 2px 5px 28px;
+  border-bottom: 1px solid var(--ui-line);
+}
+.who-row:has(.who-when) label {
+  border-bottom: none;
+}
+.who-when button {
+  padding: 2px 10px;
+  font-size: 12px;
+}
+.who-when button[aria-pressed='true'] {
+  background: var(--rel-own);
+  color: var(--ui-ink);
+  font-weight: 600;
+}
+.who-more {
+  width: 100%;
+  margin-top: 4px;
 }
 .who-list {
   list-style: none;
@@ -2792,7 +2850,7 @@ button.residents-row.selected:hover {
   font-size: 12px;
   gap: 4px 6px;
 }
-/* Five orders in one row on a phone. */
+/* The orders in as few rows as fit on a phone. */
 .game.phone .hud-realm-bar button {
   padding: 4px 7px;
 }

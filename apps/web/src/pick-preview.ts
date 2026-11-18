@@ -79,6 +79,10 @@ export function previewPickOf(
   if (target.kind === 'param') return { kind: 'param', type: target.param.type }
   if (target.kind === 'realm')
     return target.building ? { kind: 'build', building: target.building } : TILE
+  if (target.kind === 'realmLine') {
+    const { building, from } = target
+    return from ? { kind: 'line', building, from } : { kind: 'lineStart', building }
+  }
   const pick = plan && nextPick(plan)?.pick
   if (target.kind !== 'plan' || !plan || !pick) return TILE
   if (pick !== 'tile') return pick === 'spot' ? TILE : { kind: 'place', pick }
