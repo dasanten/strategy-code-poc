@@ -118,6 +118,8 @@ import type {
   Good,
   SeenBuilding,
   SeenCity,
+  DrifterCard,
+  DrifterLine,
   RealmLabel,
   VeinWord,
 } from '@csp/shared-types'
@@ -1205,6 +1207,8 @@ export interface TileThings {
    * (`CONTEXT.md`: Running dry); the server sends no others.
    */
   veins?: Readonly<Record<string, VeinWord>>
+  /** Whether drifters come to the city the Leader lives in, for its town hall (`CONTEXT.md`: Drifters on the city card). */
+  drifters?: DrifterCard | null
   /**
    * About how many ticks until one of the Player's residents arrives where they drive
    * (`arrivalTicks`), for a haul route's leg.
@@ -1791,6 +1795,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         card.occupation = describeOccupation(city, t.tick ?? 0, t.viewer.realmId, t.realms ?? [])
       if (building.kind === 'townHall' && (rel === 'own' || rel === 'alliance') && city) {
         if (live) lines.push(...townHallLines(city.id, t))
+        // Whether drifters come, on the Leader's city only, which only its Player is told.
+        if (rel === 'own' && t.drifters?.cityId === city.id)
+          lines.push(drifterLine(t.drifters.line, t.tick ?? 0))
         if (rel === 'own')
           card.city = { id: city.id, label: `Open ${city.name} in the city inspector` }
         // Renaming a city (`CONTEXT.md`): from its town hall's card, while it is the Player's.
@@ -2035,8 +2042,14 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     }
     if (t.strangers.length === 1) {
       const gear = gearText(r, goodLabels)
+      // One of no realm and no city is a drifter (`CONTEXT.md`: Drifter).
+      const whose = rel
+        ? RELATIONSHIP_NAMES[rel]
+        : r.owner === null && r.cityId === null
+          ? 'Drifter'
+          : ''
       lines.push(
-        `${r.name}${rel ? ` · ${RELATIONSHIP_NAMES[rel]}` : ''}${isDown(r) ? ' · Down' : ''}${gear ? ` · ${gear}` : ''}`,
+        `${r.name}${whose ? ` · ${whose}` : ''}${isDown(r) ? ' · Down' : ''}${gear ? ` · ${gear}` : ''}`,
       )
     } else lines.push(...strangersLines(t.strangers))
   }
@@ -2066,7 +2079,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     const condition = conditionLine(road)
     if (condition) lines.push(condition)
     // The building's repair first; a worn road under it waits for the next.
-    if (!repair && repairable(road)) repair = { buildingId: road.id, name: 'road', ...rebuildOf(road) }
+    if (!repair && repairable(road))
+      repair = { buildingId: road.id, name: 'road', ...rebuildOf(road) }
   }
   if (terrain && !(road && !road.site)) lines.push(terrain)
   // A wandering trader standing at a stop buys and sells on its tile (`CONTEXT.md`: Trader stop).
@@ -2576,6 +2590,27 @@ function townHallLines(cityId: string, t: TileThings): string[] {
     )
   }
   return lines
+}
+
+/**
+ * Whether drifters come to the city the Leader lives in (`CONTEXT.md`: Drifter, Drifters on the
+ * city card): one on the way, about how long until the next (Estimates), or why none comes.
+ */
+export function drifterLine(line: DrifterLine, tick: number): string {
+  switch (line.state) {
+    case 'onTheWay':
+      return 'A drifter is on the way'
+    case 'coming':
+      return `Next drifter in ${aboutTime(Math.max(0, line.at - tick))}`
+    case 'none':
+      return `No drifters come: ${DRIFTER_WHY[line.why]}`
+  }
+}
+
+const DRIFTER_WHY: Record<Extract<DrifterLine, { state: 'none' }>['why'], string> = {
+  noFreeHousing: 'no free housing',
+  noFoodSurplus: 'no food surplus',
+  realmTooBig: 'the realm is too big',
 }
 
 /**

@@ -220,6 +220,11 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "territory-sound", check: checks::territory_sound },
         Invariant { name: "veins-sound", check: |w, _| crate::veins::veins_sound(w) },
         Invariant { name: "veins-counted", check: |w, _| crate::new_veins::veins_counted(w) },
+        Invariant { name: "drifters-sound", check: crate::drifters::drifters_sound },
+        Invariant {
+            name: "drifters-join-with-room",
+            check: crate::drifters::drifters_join_with_room,
+        },
         Invariant { name: "dead-leave-loot", check: checks::dead_leave_loot },
         Invariant { name: "down-do-nothing", check: |w, _| crate::survival::down_do_nothing(w) },
         Invariant { name: "awake-alive", check: |w, _| crate::survival::awake_alive(w) },

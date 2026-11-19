@@ -127,6 +127,15 @@ switch; in realm control mode the Player says what and where, then picks who fro
 the nearest idle residents suggested; only the UI) is planned now and starts once Faster checks
 and simulation tests (Epic 111) is on `dev`.
 
+**Agreed with Daniel on 2026-11-19,** from a review of the early game (rated 4 of 10: little to
+do in the first hour, eight residents for the first days, nothing gained by being online): Quicker
+start (Epic 113: starting Wood, Stone and Tools, a forest node close by, a shorter pairing wait and
+childhood; numbers only), Gathering by hand (114: Wood, Stone and Food from any Forest or Hills
+tile, with patches that are picked over and grow back), Drifters (115: a small realm with free
+housing and a food surplus draws grown newcomers) and Zeal (116, ADR 0042: a pool the Player
+spends by hand, the Leader rallying a crew to three times its pace), in that order. They don't
+depend on each other; 114 and 115 each bump the world format, in that order.
+
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
@@ -240,6 +249,10 @@ I sleep.
 | 110 | [Siege machines](https://github.com/dasanten/strategy-code-poc/issues/1328) | ticketed |
 | 111 | [Faster checks and simulation tests](https://github.com/dasanten/strategy-code-poc/issues/1417) | ticketed |
 | 112 | [Realm control mode](https://github.com/dasanten/strategy-code-poc/issues/1426) | ticketed |
+| 113 | [Quicker start](https://github.com/dasanten/strategy-code-poc/issues/1453) | ticketed |
+| 114 | [Gathering by hand](https://github.com/dasanten/strategy-code-poc/issues/1454) | ticketed |
+| 115 | [Drifters](https://github.com/dasanten/strategy-code-poc/issues/1455) | ticketed |
+| 116 | [Zeal](https://github.com/dasanten/strategy-code-poc/issues/1456) | ticketed |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
