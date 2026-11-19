@@ -3798,7 +3798,9 @@ pub static DEFAULT_SCRIPTS: &[(Task, &str, &str)] = &[
 // params.foodAt units of Food on me, while the pile holds none, I get Food
 // up to params.foodTake at params.food, else params.storage, else the
 // nearest storage of my realm with Food, and come back; storing a load tops
-// my food up to foodTake too. foodAt 0 turns getting food off. At the workplace we stand spread over
+// my food up to foodTake too. foodAt 0 turns getting food off. memory.foodAt
+// and memory.foodTake, set with the task, stand in for those two params (an
+// NPC city sets them for a workplace far from its storage). At the workplace we stand spread over
 // its footprint. A workplace still being built I build first, as Build would,
 // with materials from the nearest storage of my realm holding them, then work
 // it once it is finished. At a mine whose vein ran dry, which makes nothing,
@@ -3850,7 +3852,7 @@ if (ranDry(workplace)) { // it stands, making nothing
 }
 // With Food on the pile my meals come from there; with none anywhere, I work on.
 let food = me.carried.food || 0
-if (food < params.foodAt && !pileHoldsFood(workplace) && getFoodIfLow(params.food || params.storage, workplace)) {
+if (food < (memory.foodAt || params.foodAt) && !pileHoldsFood(workplace) && getFoodIfLow(params.food || params.storage, workplace)) {
   memory.food = {walked: false}
   return
 }
@@ -3972,7 +3974,7 @@ fn storeLoad() {
   if (carry == null) { return false }
   if (carry.stored) { return bringCrewFood(carry) }
   carry.stored = true
-  if (store(carry.goods, carry.storageId, params.foodTake) != null) {
+  if (store(carry.goods, carry.storageId, (memory.foodTake || params.foodTake)) != null) {
     carry.crewFood = 0 // not storing: no crew food either
     return false
   }
@@ -4015,7 +4017,7 @@ fn dropCrewFood() {
   carry.dropped = true
   let food = me.carried.food
   if (food == null) { return false }
-  let units = floor(food - params.foodTake)
+  let units = floor(food - (memory.foodTake || params.foodTake))
   if (units > carry.crewFood) { units = carry.crewFood }
   if (units < 1) { return false }
   if (drop({kind: "ground"}, {food: units}) != null) { return false }
@@ -4284,8 +4286,8 @@ fn goodsOf(missing) {
 fn getFoodIfLow(from, near) {
   let food = me.carried.food
   if (food == null) { food = 0 }
-  if (food >= params.foodAt) { return false }
-  let units = floor(params.foodTake - food) // fetch takes whole units
+  if (food >= (memory.foodAt || params.foodAt)) { return false }
+  let units = floor((memory.foodTake || params.foodTake) - food) // fetch takes whole units
   if (units < 1) { return false }
   let at = from
   if (at == null || !holdsFood(at)) {
@@ -4310,7 +4312,7 @@ fn holdsFood(at) {
 fn foodToTake() {
   let food = me.carried.food
   if (food == null) { food = 0 }
-  let units = floor(params.foodTake - food)
+  let units = floor((memory.foodTake || params.foodTake) - food)
   if (units < 1) { return 0 }
   return units
 }
