@@ -10,6 +10,7 @@ import {
 import { formatGameTime } from './shared/time.js'
 import type { FirstDay, TraderVisit } from '@csp/shared-types'
 import { DrawerStatus } from './drawer-head.js'
+import { zealShown } from './zeal.js'
 import {
   REALM_BAR_HINT,
   REALM_BAR_ORDERS,
@@ -33,7 +34,13 @@ import {
   type OpenDrawer,
 } from './hud-view.js'
 import { groupSentLine, type Skipped } from './group-orders.js'
-import { firstDayView, laneSpot, skippedByWhy, traderVisitLine } from './notices-view.js'
+import {
+  FIRST_DAY_RALLY_TIP,
+  firstDayView,
+  laneSpot,
+  skippedByWhy,
+  traderVisitLine,
+} from './notices-view.js'
 import type { ConnectionStatus } from './useWorld.js'
 import { WIKI_PATH } from './wiki-view.js'
 
@@ -258,6 +265,8 @@ export function TopBar({
   onLogout,
   onWiki,
   control,
+  zeal,
+  zealDraining,
 }: {
   /** The realm's name (`CONTEXT.md`: Realm name), once the world has come. */
   realm?: string
@@ -276,6 +285,10 @@ export function TopBar({
   onWiki?: () => void
   /** The Unit | Realm switch (`CONTEXT.md`: Control mode), once the world has come. */
   control?: { mode: ControlMode; onSwitch: (mode: ControlMode) => void }
+  /** The Player's own Zeal in game hours (`CONTEXT.md`: Zeal), once the world has come. */
+  zeal?: number
+  /** The Zeal went down since the last tick: the crew is rallied (`CONTEXT.md`: Rallying the crew). */
+  zealDraining?: boolean
 }) {
   return (
     <header className="hud-top">
@@ -309,6 +322,12 @@ export function TopBar({
           </span>
         </>
       )}
+      {zeal !== undefined && (
+        <>
+          <span className="hud-sep" />
+          <ZealMeter zeal={zeal} draining={zealDraining} />
+        </>
+      )}
       {heir !== undefined && (
         <>
           <span className="hud-sep" />
@@ -327,6 +346,26 @@ export function TopBar({
         Log out
       </button>
     </header>
+  )
+}
+
+/** The Player's Zeal in the top bar (`CONTEXT.md`: Zeal): how full, and about how long until full. */
+export function ZealMeter({ zeal, draining = false }: { zeal: number; draining?: boolean }) {
+  const shown = zealShown(zeal, draining)
+  return (
+    <span className={`hud-zeal${shown.draining ? ' draining' : ''}`} title={shown.title}>
+      <span
+        className="hud-zeal-bar"
+        role="meter"
+        aria-label="Zeal"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.floor(shown.share * 100)}
+      >
+        <span className="hud-zeal-fill" style={{ width: `${shown.share * 100}%` }} />
+      </span>
+      {shown.label}
+    </span>
   )
 }
 
@@ -1014,6 +1053,7 @@ export function FirstDayCard({
             </li>
           ))}
         </ul>
+        <p className="first-day-tip small">{FIRST_DAY_RALLY_TIP}</p>
       </div>
       <button
         type="button"

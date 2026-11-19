@@ -227,3 +227,56 @@ pub fn npc_soldiers_on_posts(world: &WorldState, terrain: &TerrainMap) -> Vec<In
     }
     out
 }
+
+/// Invariant `npc-far-workers-go-home-fed` (`CONTEXT.md`: Crew food; #1379): a worker of an NPC city
+/// at a workplace further from its storage than `NPC_NODE_REACH` runs the Work default with a
+/// `foodAt` over the default's, so they go home for Food while they still have what the walk home
+/// eats, as its builders of a far site do.
+pub fn npc_far_workers_go_home_fed(
+    world: &WorldState,
+    terrain: &TerrainMap,
+) -> Vec<InvariantViolation> {
+    use csp_shared::balance::{GET_FOOD_AT, NPC_NODE_REACH};
+    use csp_shared::terrain::wrap_distance;
+    use csp_shared::world::Task;
+    let mut out = Vec::new();
+    for r in &world.residents {
+        let Some(city_id) = r.city_id.as_deref() else { continue };
+        let Some(script) = r.script.as_ref().filter(|s| s.task == Some(Task::Work)) else {
+            continue;
+        };
+        if !run_by_npc_city(world, r) {
+            continue;
+        }
+        let Some(place) = script
+            .memory
+            .get("workplaceId")
+            .and_then(|v| v.as_str())
+            .and_then(|id| world.buildings.iter().find(|b| b.id == id))
+        else {
+            continue;
+        };
+        let Some(store) =
+            super::npc_home(world, city_id).filter(|b| b.kind == BuildingKind::Storage)
+        else {
+            continue;
+        };
+        let away = wrap_distance(
+            terrain.size,
+            (store.x as i32, store.y as i32),
+            (place.x as i32, place.y as i32),
+        );
+        if away <= NPC_NODE_REACH {
+            continue;
+        }
+        let food_at = script.memory.get("foodAt").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        if food_at <= GET_FOOD_AT {
+            let message = format!(
+                "NPC resident {} works {} {away:.0} tiles out with foodAt {food_at}",
+                r.id, place.id
+            );
+            out.push(violation("npc-far-workers-go-home-fed", message, vec![r.id.clone()]));
+        }
+    }
+    out
+}

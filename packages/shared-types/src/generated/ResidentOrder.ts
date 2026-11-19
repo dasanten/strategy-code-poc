@@ -12,6 +12,7 @@ import type { DropOrder } from "./DropOrder.js";
 import type { EquipOrder } from "./EquipOrder.js";
 import type { FeedOrder } from "./FeedOrder.js";
 import type { FetchOrder } from "./FetchOrder.js";
+import type { GatherOrder } from "./GatherOrder.js";
 import type { HandInOrder } from "./HandInOrder.js";
 import type { HaulOrder } from "./HaulOrder.js";
 import type { HorseTradeOrder } from "./HorseTradeOrder.js";
@@ -20,6 +21,7 @@ import type { PayDebtOrder } from "./PayDebtOrder.js";
 import type { PayOrder } from "./PayOrder.js";
 import type { PickUpOrder } from "./PickUpOrder.js";
 import type { PushOrder } from "./PushOrder.js";
+import type { RallyOrder } from "./RallyOrder.js";
 import type { RamOrder } from "./RamOrder.js";
 import type { RelocateOrder } from "./RelocateOrder.js";
 import type { RepairOrder } from "./RepairOrder.js";
@@ -38,4 +40,4 @@ import type { WorkOrder } from "./WorkOrder.js";
 /**
  * Any order a resident can hold (`ResidentOrder`), tagged by `kind`.
  */
-export type ResidentOrder = { "kind": "walkTo" } & WalkOrder | { "kind": "drive" } & DriveOrder | { "kind": "haul" } & HaulOrder | { "kind": "pickUp" } & PickUpOrder | { "kind": "drop" } & DropOrder | { "kind": "store" } & StoreOrder | { "kind": "fetch" } & FetchOrder | { "kind": "build" } & BuildOrder | { "kind": "tearDown" } & TearDownOrder | { "kind": "repair" } & RepairOrder | { "kind": "workAt" } & WorkOrder | { "kind": "breed" } & BreedOrder | { "kind": "attack" } & AttackOrder | { "kind": "climb" } & ClimbOrder | { "kind": "teach" } & TeachOrder | { "kind": "train" } & TrainOrder | { "kind": "roadLine" } & LineOrder | { "kind": "wallLine" } & LineOrder | { "kind": "pay" } & PayOrder | { "kind": "buyCity" } & BuyCityOrder | { "kind": "trade" } & TradeOrder | { "kind": "swap" } & SwapOrder | { "kind": "buyHorse" } & HorseTradeOrder | { "kind": "sellHorse" } & HorseTradeOrder | { "kind": "handIn" } & HandInOrder | { "kind": "buyOff" } & BuyOffOrder | { "kind": "payDebt" } & PayDebtOrder | { "kind": "acceptOffer" } & AcceptOfferOrder | { "kind": "relocate" } & RelocateOrder | { "kind": "feed" } & FeedOrder | { "kind": "row" } & RowOrder | { "kind": "haulByWater" } & WaterHaulOrder | { "kind": "sail" } & RowOrder | { "kind": "equip" } & EquipOrder | { "kind": "crew" } & CrewOrder | { "kind": "push" } & PushOrder | { "kind": "ram" } & RamOrder | { "kind": "throw" } & ThrowOrder;
+export type ResidentOrder = { "kind": "walkTo" } & WalkOrder | { "kind": "drive" } & DriveOrder | { "kind": "haul" } & HaulOrder | { "kind": "pickUp" } & PickUpOrder | { "kind": "drop" } & DropOrder | { "kind": "store" } & StoreOrder | { "kind": "fetch" } & FetchOrder | { "kind": "build" } & BuildOrder | { "kind": "tearDown" } & TearDownOrder | { "kind": "repair" } & RepairOrder | { "kind": "workAt" } & WorkOrder | { "kind": "breed" } & BreedOrder | { "kind": "attack" } & AttackOrder | { "kind": "climb" } & ClimbOrder | { "kind": "teach" } & TeachOrder | { "kind": "train" } & TrainOrder | { "kind": "roadLine" } & LineOrder | { "kind": "wallLine" } & LineOrder | { "kind": "pay" } & PayOrder | { "kind": "buyCity" } & BuyCityOrder | { "kind": "trade" } & TradeOrder | { "kind": "swap" } & SwapOrder | { "kind": "buyHorse" } & HorseTradeOrder | { "kind": "sellHorse" } & HorseTradeOrder | { "kind": "handIn" } & HandInOrder | { "kind": "buyOff" } & BuyOffOrder | { "kind": "payDebt" } & PayDebtOrder | { "kind": "acceptOffer" } & AcceptOfferOrder | { "kind": "relocate" } & RelocateOrder | { "kind": "feed" } & FeedOrder | { "kind": "row" } & RowOrder | { "kind": "haulByWater" } & WaterHaulOrder | { "kind": "sail" } & RowOrder | { "kind": "equip" } & EquipOrder | { "kind": "crew" } & CrewOrder | { "kind": "push" } & PushOrder | { "kind": "ram" } & RamOrder | { "kind": "throw" } & ThrowOrder | { "kind": "gather" } & GatherOrder | { "kind": "rally" } & RallyOrder;

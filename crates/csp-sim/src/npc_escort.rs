@@ -153,18 +153,26 @@ pub fn escorting<'w>(world: &'w WorldState, city_id: &str, id: &str) -> Option<&
 /// Whether a trader waits for their escort before their next leg (`CONTEXT.md`: Escort: it keeps
 /// pace with them): one of it who lives and is on their feet is out of contact with them.
 pub fn escort_lags(world: &WorldState, city_id: &str, trader: usize, size: i32) -> bool {
-    escort_beyond(world, city_id, trader, 1, size)
+    escort_beyond(world, city_id, trader, 1, false, size)
 }
 
 /// Tiles an escort may fall behind a walking trader before the trader stops for them.
 const ESCORT_PACE_TILES: i32 = 2;
 
 /// Whether one of the trader's escort who lives and is on their feet is more than `reach` tiles
-/// from them, either way.
-fn escort_beyond(world: &WorldState, city_id: &str, trader: usize, reach: i32, size: i32) -> bool {
+/// from them, either way, and, with `behind`, further than the trader from where the trader walks.
+fn escort_beyond(
+    world: &WorldState,
+    city_id: &str,
+    trader: usize,
+    reach: i32,
+    behind: bool,
+    size: i32,
+) -> bool {
     let t = &world.residents[trader];
     let Some(run) = run_of(world, city_id, &t.id) else { return false };
     let at = (t.x as i32, t.y as i32);
+    let to = walk_target(t);
     run.escort_ids.iter().any(|id| {
         resident_index(world, id).is_some_and(|i| {
             let e = &world.residents[i];
@@ -174,17 +182,31 @@ fn escort_beyond(world: &WorldState, city_id: &str, trader: usize, reach: i32, s
                 && e.city_id.as_deref() == Some(city_id)
                 && (wrap_delta(at.0, ex, size).abs() > reach
                     || wrap_delta(at.1, ey, size).abs() > reach)
+                && (!behind
+                    || to.is_none_or(|to| {
+                        wrap_distance(size, (ex, ey), to) > wrap_distance(size, at, to)
+                    }))
         })
     })
 }
 
+/// Where a resident walks, if they walk.
+fn walk_target(r: &csp_shared::world::Resident) -> Option<(i32, i32)> {
+    match &r.order {
+        Some(ResidentOrder::WalkTo(o)) => Some((o.target.x as i32, o.target.y as i32)),
+        _ => None,
+    }
+}
+
 /// A walking trader whose escort has fallen behind stands where they are, their walk kept, until
-/// it catches up (`CONTEXT.md`: Escort: it keeps pace with them). Returns whether they wait.
+/// it catches up (`CONTEXT.md`: Escort: it keeps pace with them). Returns whether they wait. Not
+/// for one gone ahead: that one holds until the trader comes up (`run_escort`), and a trader
+/// waiting for it as it walked on to where they both went stood until their Food ran out (#1434).
 pub fn wait_for_escort(world: &mut WorldState, city_id: &str, trader: usize, size: i32) -> bool {
     if !matches!(world.residents[trader].order, Some(ResidentOrder::WalkTo(_))) {
         return false;
     }
-    if !escort_beyond(world, city_id, trader, ESCORT_PACE_TILES, size) {
+    if !escort_beyond(world, city_id, trader, ESCORT_PACE_TILES, true, size) {
         return false;
     }
     if let Some(ResidentOrder::WalkTo(o)) = world.residents[trader].order.as_mut() {
@@ -327,6 +349,21 @@ pub fn run_escort(
     if standing && in_contact(size, at_of(e), (tr.x as i32, tr.y as i32)) {
         if e.order.is_some() && !going {
             world.residents[i].order = None;
+        }
+        return true;
+    }
+    // Gone ahead of a walking trader, they hold, their walk kept, until the trader comes up
+    // (`CONTEXT.md`: Escort: it keeps pace with them).
+    let (me, them) = (at_of(e), (tr.x as i32, tr.y as i32));
+    let to = (target.0 as i32, target.1 as i32);
+    let ahead = !standing
+        && going
+        && (wrap_delta(me.0, them.0, size).abs() > ESCORT_PACE_TILES
+            || wrap_delta(me.1, them.1, size).abs() > ESCORT_PACE_TILES)
+        && wrap_distance(size, me, to) < wrap_distance(size, them, to);
+    if ahead {
+        if let Some(ResidentOrder::WalkTo(o)) = world.residents[i].order.as_mut() {
+            o.progress = 0.0;
         }
         return true;
     }

@@ -186,6 +186,8 @@ pub fn world_invariants() -> Vec<Invariant> {
         },
         Invariant { name: "conditions-in-range", check: checks::conditions_in_range },
         Invariant { name: "repair-orders-on-buildings", check: checks::repair_orders_on_buildings },
+        Invariant { name: "patches-sound", check: crate::gathering::patch_problems },
+        Invariant { name: "gather-orders-sound", check: crate::gathering::gather_order_problems },
         Invariant { name: "trade-org-kept-up", check: checks::trade_org_kept_up },
         Invariant { name: "ruins-ruined", check: checks::ruins_ruined },
         Invariant { name: "nodes-on-fitting-terrain", check: checks::nodes_on_fitting_terrain },
@@ -220,6 +222,11 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "territory-sound", check: checks::territory_sound },
         Invariant { name: "veins-sound", check: |w, _| crate::veins::veins_sound(w) },
         Invariant { name: "veins-counted", check: |w, _| crate::new_veins::veins_counted(w) },
+        Invariant { name: "drifters-sound", check: crate::drifters::drifters_sound },
+        Invariant {
+            name: "drifters-join-with-room",
+            check: crate::drifters::drifters_join_with_room,
+        },
         Invariant { name: "dead-leave-loot", check: checks::dead_leave_loot },
         Invariant { name: "down-do-nothing", check: |w, _| crate::survival::down_do_nothing(w) },
         Invariant { name: "awake-alive", check: |w, _| crate::survival::awake_alive(w) },
@@ -446,6 +453,10 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, _t| crate::npc_behaviour::npc_residents_kept_going(w),
         },
         Invariant {
+            name: "npc-far-workers-go-home-fed",
+            check: |w, t| crate::npc_behaviour::npc_far_workers_go_home_fed(w, t),
+        },
+        Invariant {
             name: "npc-idle-off-the-storage",
             check: |w, t| crate::npc_behaviour::npc_idle_off_the_storage(w, t),
         },
@@ -530,6 +541,8 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "script-logs-sound",
             check: |w, _| crate::script_log::script_logs_sound(w),
         },
+        Invariant { name: "zeal-within-cap", check: |w, _| crate::zeal::zeal_within_cap(w) },
+        Invariant { name: "rallies-sound", check: |w, _| crate::rally::rallies_sound(w) },
     ]
 }
 

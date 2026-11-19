@@ -1,3 +1,4 @@
+import { RALLY_PACE } from '@csp/balance'
 import { FIRST_DAY_LINES } from './shared/first-day.js'
 import { aboutTime } from './shared/estimates.js'
 import type { FirstDay, FirstDayLine, TraderVisit } from '@csp/shared-types'
@@ -83,6 +84,12 @@ export function skippedByWhy(skipped: readonly { name: string; why: string }[]):
   for (const s of skipped) byWhy.set(s.why, [...(byWhy.get(s.why) ?? []), s.name])
   return [...byWhy].map(([why, names]) => ({ names, why }))
 }
+
+/**
+ * The first-day card's tip under its lines (`CONTEXT.md`: Zeal, Rallying the crew): being there
+ * pays, through the Leader.
+ */
+export const FIRST_DAY_RALLY_TIP = `Tip: stand your Leader at a farm or a building site and Rally the crew: it works ${RALLY_PACE} times as fast while your Zeal lasts.`
 
 /** What each line of the first-day card says (`CONTEXT.md`: First day). */
 export const FIRST_DAY_LABELS: Record<FirstDayLine, string> = {

@@ -18,7 +18,7 @@ use serde::Serialize;
 use serde_json::{json, to_value, Map, Value};
 
 use crate::terrain::Terrain;
-use crate::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR};
+use crate::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_HOUR, TICKS_PER_GAME_YEAR};
 
 /// A static table from a string key (a good, a building kind, a skill) to a value, in the order
 /// the TypeScript object lists them; serialised as a JSON object.
@@ -1819,6 +1819,26 @@ pub const FOOD_SURPLUS_DAYS: f64 = 10.0;
 /// this much either way (`CONTEXT.md`: Child), and never below 1.
 pub const CHILD_STAT_SPREAD: f64 = 2.0;
 
+/// A Player's realm draws drifters while it has fewer residents than this, the drifter on its way
+/// counted (`CONTEXT.md`: Drifter): twice a starting city's, so a small realm grows a little on
+/// its own and a grown one no longer.
+pub const DRIFTER_REALM_CAP: f64 = 16.0;
+
+/// Game days a realm waits for each drifter (`CONTEXT.md`: Drifter), counted only while one may
+/// come: about 1.2 real hours.
+pub const DRIFTER_WAIT_DAYS: f64 = 3.0;
+
+/// How far from the town hall a drifter comes into being, in tiles (`CONTEXT.md`: Drifter): the
+/// nearest that is out of every Player's sight from here on, so just past the city's own sight
+/// (`SIGHT_RANGE`), seven to ten minutes' walk on plains.
+pub const DRIFTER_DISTANCE_MIN: f64 = 60.0;
+
+/// The farthest from the town hall a drifter comes into being, in tiles (`CONTEXT.md`: Drifter).
+pub const DRIFTER_DISTANCE_MAX: f64 = 80.0;
+
+/// Food a drifter carries for the walk (`CONTEXT.md`: Drifter), and nothing else.
+pub const DRIFTER_FOOD: f64 = 1.0;
+
 /// Ticks (real seconds) an unloaded resident of average Agility takes to walk a plains tile
 /// (`CONTEXT.md`: Tile). Carriages go at a multiple of this (`CARRIAGE_SPEED`).
 pub const WALK_TICKS_PER_TILE: f64 = 7.5;
@@ -2476,6 +2496,33 @@ pub const WORK_OUTPUT_PER_DAY: Table<f64> = Table(&[
     ("goldOre", 1.0),
     ("coal", 2.0),
 ]);
+
+/// Units of each good a resident of average Strength and no skill gathers by hand per game day
+/// (`CONTEXT.md`: Gathering): four fifths of `WORK_OUTPUT_PER_DAY`, so between working a poor node
+/// (`RICHNESS_FACTOR.poor`, three fifths) and a normal one. Strength, skill and Tools count as at a
+/// workplace. Only these goods are gathered.
+pub const GATHER_PER_DAY: Table<f64> = Table(&[("wood", 3.2), ("stone", 2.4), ("food", 1.6)]);
+
+/// Units a full patch holds (`CONTEXT.md`: Patch): about one load of an average resident
+/// (`CARRY_BASE` + 10 Strength × `CARRY_PER_STRENGTH` = 30 kg of 1 kg goods).
+pub const PATCH_SIZE: f64 = 30.0;
+
+/// Game days a picked-over patch takes to grow back to full, steadily (`CONTEXT.md`: Patch): long
+/// enough that the land beside a city empties under a few gatherers, so a camp on a node stays
+/// worth building.
+pub const PATCH_REGROW_DAYS: f64 = 10.0;
+
+/// Game days nobody must gather on a tile before its patch starts growing back (`CONTEXT.md`:
+/// Patch): a tile being gathered doesn't grow while it is worked (a gatherer takes a unit every
+/// few hundred ticks), so it runs out under one gatherer rather than growing about as fast as
+/// they take from it.
+pub const PATCH_REST_DAYS: f64 = 1.0;
+
+/// Tiles from where a resident on the Gather task started that they look for a tile to gather on
+/// (`CONTEXT.md`: Gather): about a city's surroundings and a short walk beyond, so a gatherer
+/// beside a forest works it for many loads and ends once the land around has emptied, rather than
+/// wandering off.
+pub const GATHER_REACH: f64 = 24.0;
 
 /// The Strength at which a worker makes `WORK_OUTPUT_PER_DAY`.
 pub const WORK_STRENGTH_AVERAGE: f64 = 10.0;
@@ -3157,6 +3204,24 @@ pub const DIRECT_OFFER_DAYS: f64 = 60.0;
 /// room to deal in several goods at once, and few enough that it can't flood the other's list.
 pub const DIRECT_OFFERS_TO_ONE_REALM: f64 = 5.0;
 
+/// How much Zeal a Player's pool holds when full, in game hours of rallying (`CONTEXT.md`: Zeal):
+/// two game days, 48 real minutes of a rallied crew.
+pub const ZEAL_CAP_HOURS: f64 = 48.0;
+
+/// Ticks a Player's Zeal takes to fill from empty to full (`CONTEXT.md`: Zeal): two real hours, so
+/// a Player who comes back a few times a day finds it full, and nobody is punished for sleeping.
+pub const ZEAL_FILL_TICKS: f64 = 2.0 * 60.0 * 60.0;
+
+/// The Zeal a pool gains in a tick while it is not full (`ZEAL_CAP_HOURS` over `ZEAL_FILL_TICKS`).
+pub const ZEAL_PER_TICK: f64 = ZEAL_CAP_HOURS / ZEAL_FILL_TICKS;
+
+/// What a rallied crew's work is multiplied by (`CONTEXT.md`: Rallying the crew): with skill,
+/// Strength and Tools, never instead of them.
+pub const RALLY_PACE: f64 = 3.0;
+
+/// The Zeal a Player spends in a tick their crew is rallied: a game hour of rallying per game hour.
+pub const ZEAL_PER_RALLIED_TICK: f64 = 1.0 / TICKS_PER_GAME_HOUR;
+
 /// Every exported constant of the table as JSON, keyed by its TypeScript name: what
 /// `pnpm balance:rust` writes to `packages/balance/balance.json` for the client.
 pub fn balance_json() -> Value {
@@ -3453,6 +3518,11 @@ pub fn balance_json() -> Value {
     m.insert("ENDURANCE_TERRAIN_EFFECT".into(), json!(ENDURANCE_TERRAIN_EFFECT));
     m.insert("FOOD_SURPLUS_DAYS".into(), json!(FOOD_SURPLUS_DAYS));
     m.insert("CHILD_STAT_SPREAD".into(), json!(CHILD_STAT_SPREAD));
+    m.insert("DRIFTER_REALM_CAP".into(), json!(DRIFTER_REALM_CAP));
+    m.insert("DRIFTER_WAIT_DAYS".into(), json!(DRIFTER_WAIT_DAYS));
+    m.insert("DRIFTER_DISTANCE_MIN".into(), json!(DRIFTER_DISTANCE_MIN));
+    m.insert("DRIFTER_DISTANCE_MAX".into(), json!(DRIFTER_DISTANCE_MAX));
+    m.insert("DRIFTER_FOOD".into(), json!(DRIFTER_FOOD));
     m.insert("WALK_TICKS_PER_TILE".into(), json!(WALK_TICKS_PER_TILE));
     m.insert("PATH_DETOUR_LIMIT".into(), json!(PATH_DETOUR_LIMIT));
     m.insert("PATH_DETOUR_SLACK".into(), json!(PATH_DETOUR_SLACK));
@@ -3540,6 +3610,11 @@ pub fn balance_json() -> Value {
     m.insert("RECIPES".into(), to_value(RECIPES).expect("serialisable"));
     m.insert("BATCHES_PER_DAY".into(), to_value(BATCHES_PER_DAY).expect("serialisable"));
     m.insert("WORK_OUTPUT_PER_DAY".into(), to_value(WORK_OUTPUT_PER_DAY).expect("serialisable"));
+    m.insert("GATHER_PER_DAY".into(), to_value(GATHER_PER_DAY).expect("serialisable"));
+    m.insert("PATCH_SIZE".into(), json!(PATCH_SIZE));
+    m.insert("PATCH_REGROW_DAYS".into(), json!(PATCH_REGROW_DAYS));
+    m.insert("PATCH_REST_DAYS".into(), json!(PATCH_REST_DAYS));
+    m.insert("GATHER_REACH".into(), json!(GATHER_REACH));
     m.insert("WORK_STRENGTH_AVERAGE".into(), json!(WORK_STRENGTH_AVERAGE));
     m.insert("WORK_SKILL_EFFECT".into(), json!(WORK_SKILL_EFFECT));
     m.insert("WORK_SKILL_LIMIT".into(), json!(WORK_SKILL_LIMIT));
@@ -3662,6 +3737,9 @@ pub fn balance_json() -> Value {
     m.insert("DEMAND_TRADE_ORG_STANDING_LOSS".into(), json!(DEMAND_TRADE_ORG_STANDING_LOSS));
     m.insert("DIRECT_OFFER_DAYS".into(), json!(DIRECT_OFFER_DAYS));
     m.insert("DIRECT_OFFERS_TO_ONE_REALM".into(), json!(DIRECT_OFFERS_TO_ONE_REALM));
+    m.insert("ZEAL_CAP_HOURS".into(), json!(ZEAL_CAP_HOURS));
+    m.insert("ZEAL_FILL_TICKS".into(), json!(ZEAL_FILL_TICKS));
+    m.insert("RALLY_PACE".into(), json!(RALLY_PACE));
     Value::Object(m)
 }
 

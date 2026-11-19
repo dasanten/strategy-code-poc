@@ -52,6 +52,7 @@ import {
   residentsPerFarmer,
   transport,
   wikiResident,
+  num,
   HOW_TO_TRADE_PATH,
   WIKI_PATH,
 } from './wiki-view.js'
@@ -199,6 +200,16 @@ describe('wiki figures', () => {
 })
 
 describe('wiki page', () => {
+  it('explains Zeal and rallying the crew with the balance numbers', () => {
+    const html = render()
+    expect(html).toContain('id="zeal"')
+    expect(html).toContain(`at ${balance.RALLY_PACE} times their pace`)
+    expect(html).toContain(`holds ${balance.ZEAL_CAP_HOURS} game hours of rallying`)
+    const hours = (balance.ZEAL_FILL_TICKS * balance.TICK_MS) / 3_600_000
+    expect(html).toContain(`about ${hours} real hours`)
+    expect(html).toContain('No script can rally the crew')
+  })
+
   it('has a section with an anchor for every topic', () => {
     const html = render()
     for (const t of WIKI_TOPICS) expect(html).toContain(`id="${t.id}"`)
@@ -295,5 +306,40 @@ describe('the Wiki’s How to trade topic (`CONTEXT.md`: Trade section)', () => 
     }
     expect(section).toContain('Trade here')
     expect(section).toContain(`at most ${DELIVERY_LOAD} kg`)
+  })
+})
+
+describe('the Wiki’s Gathering section (`CONTEXT.md`: Gathering, Patch)', () => {
+  it('renders its numbers from the balance', () => {
+    const html = render()
+    const at = html.indexOf('id="gathering"')
+    expect(at).toBeGreaterThan(-1)
+    const section = html.slice(at, html.indexOf('</section>', at))
+    const pace = balance.GATHER_PER_DAY as Record<string, number>
+    for (const n of [
+      pace.wood!,
+      pace.food!,
+      pace.stone!,
+      balance.PATCH_SIZE,
+      balance.GATHER_REACH,
+    ]) {
+      expect(section).toContain(num(n))
+    }
+    expect(section).toContain('picked over')
+    expect(section).toContain('<code>gather(good)</code>')
+    // The first steps of a new city point to it.
+    expect(html).toContain('href="#gathering"')
+  })
+})
+
+describe('the Wiki’s Drifters part (`CONTEXT.md`: Drifter)', () => {
+  it('gives the cap, the distance and the Food from the balance', () => {
+    const html = render()
+    expect(html).toContain('<b>Drifters.</b>')
+    expect(html).toContain(`fewer than ${balance.DRIFTER_REALM_CAP} residents`)
+    expect(html).toContain(
+      `${balance.DRIFTER_DISTANCE_MIN} to ${balance.DRIFTER_DISTANCE_MAX} tiles from the town hall`,
+    )
+    expect(html).toContain(`${balance.DRIFTER_FOOD} Food for`)
   })
 })

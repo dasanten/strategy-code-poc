@@ -26,6 +26,7 @@ pub mod deliveries;
 pub mod demands;
 pub mod directive;
 pub mod directives;
+pub mod drifters;
 pub mod driving;
 pub mod equipment;
 pub mod equipping;
@@ -37,6 +38,7 @@ pub mod fixture_ages;
 #[cfg(test)]
 mod game_test_world;
 pub mod gates;
+pub mod gathering;
 pub mod goods_deps;
 pub mod goods_made;
 pub mod hauling;
@@ -111,6 +113,7 @@ pub mod queries;
 pub mod queue;
 pub mod queue_tree;
 pub mod queues;
+pub mod rally;
 pub mod random;
 #[cfg(test)]
 mod realm_test_world;
@@ -186,3 +189,4 @@ pub mod work;
 pub mod workplace_settings;
 pub mod world;
 pub mod world_index;
+pub mod zeal;
