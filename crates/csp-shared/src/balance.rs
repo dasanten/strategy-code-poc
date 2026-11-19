@@ -1785,6 +1785,26 @@ pub const FOOD_SURPLUS_DAYS: f64 = 10.0;
 /// this much either way (`CONTEXT.md`: Child), and never below 1.
 pub const CHILD_STAT_SPREAD: f64 = 2.0;
 
+/// A Player's realm draws drifters while it has fewer residents than this, the drifter on its way
+/// counted (`CONTEXT.md`: Drifter): twice a starting city's, so a small realm grows a little on
+/// its own and a grown one no longer.
+pub const DRIFTER_REALM_CAP: f64 = 16.0;
+
+/// Game days a realm waits for each drifter (`CONTEXT.md`: Drifter), counted only while one may
+/// come: about 1.2 real hours.
+pub const DRIFTER_WAIT_DAYS: f64 = 3.0;
+
+/// How far from the town hall a drifter comes into being, in tiles (`CONTEXT.md`: Drifter): the
+/// nearest that is out of every Player's sight from here on, so just past the city's own sight
+/// (`SIGHT_RANGE`), seven to ten minutes' walk on plains.
+pub const DRIFTER_DISTANCE_MIN: f64 = 60.0;
+
+/// The farthest from the town hall a drifter comes into being, in tiles (`CONTEXT.md`: Drifter).
+pub const DRIFTER_DISTANCE_MAX: f64 = 80.0;
+
+/// Food a drifter carries for the walk (`CONTEXT.md`: Drifter), and nothing else.
+pub const DRIFTER_FOOD: f64 = 1.0;
+
 /// Ticks (real seconds) an unloaded resident of average Agility takes to walk a plains tile
 /// (`CONTEXT.md`: Tile). Carriages go at a multiple of this (`CARRIAGE_SPEED`).
 pub const WALK_TICKS_PER_TILE: f64 = 7.5;
@@ -3412,6 +3432,11 @@ pub fn balance_json() -> Value {
     m.insert("ENDURANCE_TERRAIN_EFFECT".into(), json!(ENDURANCE_TERRAIN_EFFECT));
     m.insert("FOOD_SURPLUS_DAYS".into(), json!(FOOD_SURPLUS_DAYS));
     m.insert("CHILD_STAT_SPREAD".into(), json!(CHILD_STAT_SPREAD));
+    m.insert("DRIFTER_REALM_CAP".into(), json!(DRIFTER_REALM_CAP));
+    m.insert("DRIFTER_WAIT_DAYS".into(), json!(DRIFTER_WAIT_DAYS));
+    m.insert("DRIFTER_DISTANCE_MIN".into(), json!(DRIFTER_DISTANCE_MIN));
+    m.insert("DRIFTER_DISTANCE_MAX".into(), json!(DRIFTER_DISTANCE_MAX));
+    m.insert("DRIFTER_FOOD".into(), json!(DRIFTER_FOOD));
     m.insert("WALK_TICKS_PER_TILE".into(), json!(WALK_TICKS_PER_TILE));
     m.insert("PATH_DETOUR_LIMIT".into(), json!(PATH_DETOUR_LIMIT));
     m.insert("PATH_DETOUR_SLACK".into(), json!(PATH_DETOUR_SLACK));

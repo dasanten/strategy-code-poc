@@ -1437,6 +1437,14 @@ describe('the card for a tile', () => {
     expect(tile({ strangers: [r] })).toMatchObject({ title: 'Brann', rel: 'otherRealm' })
   })
 
+  it('shows a resident of no realm and no city as a drifter', () => {
+    const r = { name: 'Ivo', owner: null, cityId: null, carried: { food: 1 } } as Resident
+    const card = tile({ strangers: [r] })
+    expect(card).toMatchObject({ title: 'Ivo' })
+    expect(card.rel).toBeUndefined()
+    expect(card.lines).toContain('Ivo · Drifter')
+  })
+
   it('shows a building only remembered as last seen, apart from what is there now', () => {
     const storage = building({ kind: 'storage', cityId: 'c-npc', stock: { food: 3 } })
     const card = tile({
@@ -1655,10 +1663,21 @@ describe('horses on the tile card', () => {
   it('says a ruin does nothing and offers to rebuild it (`CONTEXT.md`: Ruin)', () => {
     const tick = 100 * TICKS_PER_GAME_YEAR
     const ruin = (more: Partial<Building>) =>
-      ({ id: 'h1', kind: 'house', cityId: 'c-npc', x: 5, y: 5, decay: 1, ruinedAt: 0, ...more }) as Building
+      ({
+        id: 'h1',
+        kind: 'house',
+        cityId: 'c-npc',
+        x: 5,
+        y: 5,
+        decay: 1,
+        ruinedAt: 0,
+        ...more,
+      }) as Building
     const ada = { id: 'r1', name: 'Ada', x: 1, y: 1, bornAt: 0, carried: {} } as unknown as Resident
     const card = tile({ buildings: [ruin({})], tick })
-    expect(card.lines).toContain('A ruin: it does nothing until it is rebuilt, and collapses if left')
+    expect(card.lines).toContain(
+      'A ruin: it does nothing until it is rebuilt, and collapses if left',
+    )
     expect(card.repair).toEqual({ buildingId: 'h1', name: 'house', rebuild: true })
     expect(tileActions(card, ada, tick).find((a) => a.id === 'repair')).toEqual({
       id: 'repair',

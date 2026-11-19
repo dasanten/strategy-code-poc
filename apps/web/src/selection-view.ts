@@ -2035,8 +2035,14 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     }
     if (t.strangers.length === 1) {
       const gear = gearText(r, goodLabels)
+      // One of no realm and no city is a drifter (`CONTEXT.md`: Drifter).
+      const whose = rel
+        ? RELATIONSHIP_NAMES[rel]
+        : r.owner === null && r.cityId === null
+          ? 'Drifter'
+          : ''
       lines.push(
-        `${r.name}${rel ? ` · ${RELATIONSHIP_NAMES[rel]}` : ''}${isDown(r) ? ' · Down' : ''}${gear ? ` · ${gear}` : ''}`,
+        `${r.name}${whose ? ` · ${whose}` : ''}${isDown(r) ? ' · Down' : ''}${gear ? ` · ${gear}` : ''}`,
       )
     } else lines.push(...strangersLines(t.strangers))
   }
@@ -2066,7 +2072,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     const condition = conditionLine(road)
     if (condition) lines.push(condition)
     // The building's repair first; a worn road under it waits for the next.
-    if (!repair && repairable(road)) repair = { buildingId: road.id, name: 'road', ...rebuildOf(road) }
+    if (!repair && repairable(road))
+      repair = { buildingId: road.id, name: 'road', ...rebuildOf(road) }
   }
   if (terrain && !(road && !road.site)) lines.push(terrain)
   // A wandering trader standing at a stop buys and sells on its tile (`CONTEXT.md`: Trader stop).

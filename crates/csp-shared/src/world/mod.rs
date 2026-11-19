@@ -1475,6 +1475,34 @@ pub struct WorldState {
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[ts(optional, as = "Option<IndexMap<String, Wear>>")]
     pub wear: IndexMap<String, Wear>,
+    /// How long each Player's realm has waited for its next drifter (`CONTEXT.md`: Drifter), in
+    /// ticks, by realm id; the wait counts only while a drifter may come. A realm that has not
+    /// waited is in no entry. Left out of a save while none has.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[ts(optional, as = "Option<IndexMap<String, f64>>")]
+    pub drifter_waits: IndexMap<String, f64>,
+    /// The drifters on their way to a city, or turned away from one (`CONTEXT.md`: Drifter).
+    /// Left out of a save while there are none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub drifters: Vec<Drifter>,
+}
+
+/// A drifter (`CONTEXT.md`: Drifter): a resident of no Organization walking to the city the
+/// Leader of `realm_id` lived in when they set out, to join it on stepping into its area; or,
+/// `turned_away`, walking off again until no Player sees them, when they are gone.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Drifter {
+    pub resident_id: String,
+    pub realm_id: String,
+    pub city_id: String,
+    /// Where they came into being, and walk back to when turned away.
+    pub from: Tile,
+    /// The tick they came into being.
+    pub set_out_at: f64,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[ts(as = "Option<bool>", optional)]
+    pub turned_away: bool,
 }
 
 impl WorldState {
@@ -3026,6 +3054,15 @@ pub enum RealmEventWhat {
     GrownUp {
         resident_id: String,
         name: String,
+    },
+    /// A drifter stepped into the city the realm's Leader lives in and joined it (`CONTEXT.md`:
+    /// Drifter).
+    DrifterJoined {
+        resident_id: String,
+        name: String,
+        city: String,
+        x: f64,
+        y: f64,
     },
     HorseDied {
         horse_id: String,
