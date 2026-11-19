@@ -26,6 +26,7 @@ pub mod deliveries;
 pub mod demands;
 pub mod directive;
 pub mod directives;
+pub mod drifters;
 pub mod driving;
 pub mod equipment;
 pub mod equipping;

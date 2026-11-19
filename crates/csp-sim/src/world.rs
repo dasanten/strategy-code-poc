@@ -104,6 +104,8 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
         new_veins: Vec::new(),
         waiting_veins: Vec::new(),
         wear: Default::default(),
+        drifter_waits: Default::default(),
+        drifters: Vec::new(),
     }
 }
 
@@ -373,6 +375,9 @@ fn step_rest(
     // An heir who no longer qualifies lapses, now that cities, contracts and the alliance army
     // have changed hands this tick (`CONTEXT.md`: Heir).
     crate::heir::lapse_heirs(world);
+    // Drifters join, turn away and set out, now that births, captures and ruins changed the
+    // cities (`CONTEXT.md`: Drifter); one who joins is no outsider.
+    crate::drifters::step_drifters(world, terrain, scratch);
     // Who came into a City area, now that everyone has moved and nobody changes sides this tick.
     let outsiders_from = std::time::Instant::now();
     step_outsiders(world, size, scratch);

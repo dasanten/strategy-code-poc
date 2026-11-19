@@ -452,6 +452,10 @@ fn takes_only_what_the_storage_has_and_what_fits() {
 fn keeps_a_city_at_home_fed_from_its_storage() {
     let (mut world, terrain) = at_home();
     average_endurance(&mut world);
+    // No drifter comes in these five days, to eat from the storage too (`drifters`' tests).
+    for realm in &world.realms {
+        world.drifter_waits.insert(realm.id.clone(), -10.0 * TICKS_PER_GAME_DAY);
+    }
     step(&mut world, &terrain, 5 * TICKS_PER_GAME_DAY as u64);
     assert_eq!(world.residents.len(), 8);
     for r in &world.residents {
