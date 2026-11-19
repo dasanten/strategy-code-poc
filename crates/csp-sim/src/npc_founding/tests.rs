@@ -1227,3 +1227,69 @@ fn calls_nobody_home_without_a_founding_party_to_wait_for() {
     t.plan_mut().founding_site = None;
     assert_eq!(crate::npc_plan::npc_called_home_sound(&t.world).len(), 1);
 }
+
+#[test]
+fn a_worker_called_home_leaves_the_workplace_out_there() {
+    // #1379: the call named the workplace they came from, and they went on working out there, so
+    // its party never had them.
+    let mut t = full_for(30, NPC_FULL_DAYS);
+    let home = t.home();
+    let far_x = home.x + csp_shared::balance::NPC_NODE_REACH + 40.0;
+    let mut quarry = crate::test_support::building(
+        "farquarry",
+        BuildingKind::Quarry,
+        Some(&t.city),
+        far_x,
+        home.y,
+    );
+    quarry.city_id = None;
+    t.world.buildings.push(quarry);
+    // Between two planning passes, so this tick's plan is the one set here.
+    let city = t.city.clone();
+    while crate::npc_plan::plan_due(&t.world, &city) {
+        t.world.tick += 1;
+    }
+    let i = hands(&t)[0];
+    let id = t.world.residents[i].id.clone();
+    let memory = json!({ "workplaceId": "farquarry" });
+    t.world.residents[i].script =
+        Some(crate::npc_behaviour::default_script(csp_shared::world::Task::Work, memory));
+    t.world.residents[i].x = far_x;
+    t.world.residents[i].carrying = None;
+    let tick = t.world.tick as f64;
+    let plan = t.plan_mut();
+    plan.planned_at = tick;
+    plan.jobs.insert(id.clone(), job_of(CityJobKind::Idle, Some("farquarry")));
+    let size = t.terrain.size;
+    crate::npc_behaviour::step_npc_cities(&mut t.world, size, Some(&t.terrain), None);
+    let r = t.world.residents.iter().find(|r| r.id == id).unwrap();
+    assert_eq!(crate::npc_behaviour::workplace_of(r), None, "{:?}", r.script);
+}
+
+#[test]
+fn what_its_hands_carry_of_the_materials_counts_toward_the_load_not_against_their_room() {
+    // #1379, #1438: a hand back from the lumber camp with Wood on them brings the party's share of
+    // it (`party_lacks`), so it was wrong to count it as room lost.
+    let mut t = full_for(40, NPC_FULL_DAYS);
+    let adults = hands(&t);
+    let mut jobs = crate::npc_behaviour::Jobs::new();
+    for &i in &adults {
+        jobs.insert(t.world.residents[i].id.clone(), job_of(CityJobKind::Work, None));
+        t.world.residents[i].carried = Stock::new();
+    }
+    let unladen = pick(&t, &adults, &jobs).expect("a party");
+    let members = npc_founding_party_size(city_residents(&t.world, &t.city).len() as f64);
+    let wood = held(&founding_materials(Some(members)), Good::Wood);
+    // Together they carry no more Wood than it needs.
+    let each = (wood / adults.len() as f64).floor().max(1.0);
+    let carrying = |t: &mut Town, good: Good| {
+        for &i in &adults {
+            t.world.residents[i].carried = Stock::from([(good, each)]);
+        }
+    };
+    carrying(&mut t, Good::Wood);
+    assert_eq!(pick(&t, &adults, &jobs), Some(unladen.clone()));
+    // Iron ore is no share of it: as heavy, it is room lost.
+    carrying(&mut t, Good::IronOre);
+    assert!(pick(&t, &adults, &jobs).is_none_or(|p| p.len() > unladen.len()));
+}

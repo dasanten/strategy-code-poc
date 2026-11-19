@@ -427,10 +427,18 @@ fn pick_party(
     // What they carry of their own Food counts as room: they take along what they need of it and
     // put the rest into the storage (`step_founders`).
     let (walk, stay) = founding_food(walk_ticks);
-    let room = |i: usize| {
+    let members = npc_founding_party_size(city_residents(world, &city.id).len() as f64) as usize;
+    let needed = founding_materials(Some(members as f64));
+    // So does what they carry of its materials, as far as it needs them: it is the party's share
+    // already on them (`party_lacks`), not room lost (#1379, #1438).
+    let of_materials = |carried: &Stock| -> f64 {
+        needed.iter().map(|(good, n)| held(carried, *good).min(*n) * good_weight(*good)).sum()
+    };
+    let room_but_materials = |i: usize| {
         let r = &world.residents[i];
         carry_capacity(r, tick) - stock_weight(&r.carried) + carried_food(r) * food_weight
     };
+    let room = |i: usize| room_but_materials(i) + of_materials(&world.residents[i].carried);
     let armed_now = |i: usize| is_armed(&world.residents[i]);
     // Its escort: soldiers beyond those on its hall and at its gates (`CONTEXT.md`: Escort).
     let mut armed: Vec<usize> =
@@ -474,7 +482,6 @@ fn pick_party(
         adults.iter().copied().filter(|&i| farming(i) && !armed_now(i) && free(i)).collect();
     farm_hands.sort_by(|&a, &b| room(b).total_cmp(&room(a)));
     rest.extend(farm_hands.into_iter().filter(|i| seen.insert(*i)).take(spare_farmers));
-    let members = npc_founding_party_size(city_residents(world, &city.id).len() as f64) as usize;
     let escort = founding_escorts_wanted(world, city, members, site);
     let mut candidates = armed.into_iter().take(escort).chain(rest);
     let mut party: Vec<usize> = candidates.by_ref().take(members).collect();
@@ -484,10 +491,20 @@ fn pick_party(
     // Each carries a share of the materials and Food for the walk and the first weeks
     // (`CONTEXT.md`: Founding): as many more go as it takes to carry it all (Daniel, 2026-11-15,
     // T100.8). Those bring no house of their own; the daughter builds it later.
-    let materials = stock_weight(&founding_materials(Some(members as f64)));
+    let materials = stock_weight(&needed);
     let load = |n: usize| materials + n as f64 * (walk + stay) * food_weight;
+    // What the party carries of the materials together counts only up to what it needs.
+    let holds = |party: &[usize]| {
+        let mut carried = Stock::new();
+        for &i in party {
+            for (good, n) in &world.residents[i].carried {
+                *carried.entry(*good).or_insert(0.0) += n;
+            }
+        }
+        party.iter().map(|&i| room_but_materials(i)).sum::<f64>() + of_materials(&carried)
+    };
     loop {
-        if party.iter().map(|&i| room(i)).sum::<f64>() >= load(party.len()) {
+        if holds(&party) >= load(party.len()) {
             return Some(party);
         }
         party.push(candidates.next()?);
