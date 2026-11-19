@@ -363,6 +363,7 @@ export const GATHER_PER_DAY = balance.GATHER_PER_DAY
 export const PATCH_SIZE = balance.PATCH_SIZE
 export const PATCH_REGROW_DAYS = balance.PATCH_REGROW_DAYS
 export const PATCH_REST_DAYS = balance.PATCH_REST_DAYS
+export const GATHER_REACH = balance.GATHER_REACH
 export const WORK_STRENGTH_AVERAGE = balance.WORK_STRENGTH_AVERAGE
 export const WORK_SKILL_EFFECT = balance.WORK_SKILL_EFFECT
 export const WORK_SKILL_LIMIT = balance.WORK_SKILL_LIMIT

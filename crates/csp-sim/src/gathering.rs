@@ -9,8 +9,11 @@
 //! changes from tick to tick; a patch that has grown back full leaves the list at the turn of the
 //! day.
 
-use csp_shared::balance::{PATCH_REGROW_DAYS, PATCH_REST_DAYS, PATCH_SIZE};
-use csp_shared::terrain::{terrain_at, Terrain, TerrainMap};
+use std::collections::HashSet;
+
+use csp_shared::balance::{GATHER_REACH, PATCH_REGROW_DAYS, PATCH_REST_DAYS, PATCH_SIZE};
+use csp_shared::footprint::footprint_tiles;
+use csp_shared::terrain::{terrain_at, wrap, wrap_delta, Terrain, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
     GatherOrder, Good, OrderEnded, OrderEndedKind, OrderRequest, Patch, Resident, ResidentOrder,
@@ -105,6 +108,69 @@ pub fn step_patches(world: &mut WorldState) {
 pub fn tile_taken(world: &WorldState, x: i32, y: i32, size: i32) -> bool {
     world.buildings.iter().any(|b| covers(placed(b), x, y, size))
         || world.nodes.iter().any(|n| n.x as i32 == x && n.y as i32 == y)
+}
+
+/// What a Gather task looks for its next tile with (`gatherTile`).
+pub struct TileSearch<'a> {
+    pub good: Good,
+    /// Where the search is around: where the gatherer started.
+    pub from: (i32, i32),
+    /// Tiles not to pick: those others on the task have taken.
+    pub skip: &'a [(i32, i32)],
+    /// Whether the Player has explored a tile.
+    pub explored: &'a dyn Fn(i32, i32) -> bool,
+    /// Whether the side sees a tile now.
+    pub in_sight: &'a dyn Fn(i32, i32) -> bool,
+}
+
+/// The tile a Gather task goes to next (`CONTEXT.md`: Gather): of the explored tiles within
+/// `GATHER_REACH` of `from` whose terrain gives the good, with nothing standing on them and not
+/// skipped, the nearest to `from` that isn't picked over as far as the side can tell. A tile out
+/// of sight may be picked over all the same: the gatherer finds out there. Ties go to the
+/// northernmost, then the westernmost.
+pub fn gather_tile(
+    world: &WorldState,
+    terrain: &TerrainMap,
+    s: &TileSearch<'_>,
+) -> Option<(i32, i32)> {
+    let (on, _) = gathered_on(s.good)?;
+    let size = terrain.size;
+    let reach = GATHER_REACH as i32;
+    // What stands near, worked out once rather than for every tile.
+    let mut taken: HashSet<(i32, i32)> = HashSet::new();
+    for b in &world.buildings {
+        let (dx, dy) =
+            (wrap_delta(s.from.0, b.x as i32, size), wrap_delta(s.from.1, b.y as i32, size));
+        if dx.abs() <= reach + 8 && dy.abs() <= reach + 8 {
+            taken.extend(footprint_tiles(placed(b), size));
+        }
+    }
+    for n in &world.nodes {
+        let (dx, dy) =
+            (wrap_delta(s.from.0, n.x as i32, size), wrap_delta(s.from.1, n.y as i32, size));
+        if dx.abs() <= reach && dy.abs() <= reach {
+            taken.insert((n.x as i32, n.y as i32));
+        }
+    }
+    let mut best: Option<(i32, i32, i32)> = None; // distance², y, x
+    for dy in -reach..=reach {
+        for dx in -reach..=reach {
+            let d2 = dx * dx + dy * dy;
+            if d2 > reach * reach || best.is_some_and(|(b, _, _)| d2 > b) {
+                continue;
+            }
+            let (x, y) = (wrap(s.from.0 + dx, size), wrap(s.from.1 + dy, size));
+            let fits = terrain_at(terrain, x, y) == on as u8
+                && (s.explored)(x, y)
+                && !taken.contains(&(x, y))
+                && !s.skip.contains(&(x, y))
+                && !((s.in_sight)(x, y) && picked_over(world, x, y));
+            if fits && best.is_none_or(|b| (d2, y, x) < b) {
+                best = Some((d2, y, x));
+            }
+        }
+    }
+    best.map(|(_, y, x)| (x, y))
 }
 
 /// Whether a resident has room in their hands for one more unit of `good`.

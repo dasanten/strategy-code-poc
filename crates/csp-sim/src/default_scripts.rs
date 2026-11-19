@@ -13,7 +13,7 @@ pub use crate::script_tables::DEFAULT_SCRIPTS;
 /// The tasks that run a default script, in the TypeScript's order (`TASKS`). Defend and Alarm
 /// are never given: being struck starts the one (`CONTEXT.md`: Defence script), an alarm the
 /// other (Alarm script).
-pub const TASKS: [Task; 12] = [
+pub const TASKS: [Task; 13] = [
     Task::Work,
     Task::Build,
     Task::Haul,
@@ -26,6 +26,7 @@ pub const TASKS: [Task; 12] = [
     Task::BuildLine,
     Task::Explore,
     Task::Alarm,
+    Task::Gather,
 ];
 
 /// A task's name as the TypeScript writes it (`"tearDown"`).
@@ -43,6 +44,7 @@ pub fn task_name(task: Task) -> &'static str {
         Task::BuildLine => "buildLine",
         Task::Explore => "explore",
         Task::Alarm => "alarm",
+        Task::Gather => "gather",
     }
 }
 

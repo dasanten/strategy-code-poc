@@ -172,7 +172,10 @@ The shared language of the game. Domain terms only — no implementation details
   the usual food params (Getting food). They walk to the nearest tile that fits the good and
   isn't picked over, gather there until their hands are full or the patch is gone, go on to the
   next tile, and with a full load store it and come back. With no such tile within a set reach (a
-  balance number) of where they started, they end and say why. Scripts have `gather(good)` for the
+  balance number) of where they started, they end and say why, first storing what they carry of
+  it. "Nearest" counts from where they started, so they work outward from it; a tile out of
+  sight counts as not picked over until they get there and see it (decided while Daniel was
+  away, Daniel to confirm). Scripts have `gather(good)` for the
   tile they stand on (ADR 0002). Only Players' residents gather: NPC cities, trading posts and
   the HQ keep to their workplaces for now.
 - **Tools** (Epic 97): a good a smithy makes from Iron and Wood. A resident carrying Tools works a
