@@ -26,6 +26,7 @@ pub mod deliveries;
 pub mod demands;
 pub mod directive;
 pub mod directives;
+pub mod drifters;
 pub mod driving;
 pub mod equipment;
 pub mod equipping;
@@ -35,6 +36,7 @@ pub mod explored_edge;
 #[cfg(test)]
 mod game_test_world;
 pub mod gates;
+pub mod gathering;
 pub mod goods_deps;
 pub mod goods_made;
 pub mod hauling;

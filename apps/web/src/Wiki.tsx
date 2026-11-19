@@ -37,6 +37,11 @@ import {
   CARRY_PER_STRENGTH,
   CARRYING_DAYS,
   PAIRING_WAIT_DAYS,
+  DRIFTER_REALM_CAP,
+  DRIFTER_WAIT_DAYS,
+  DRIFTER_DISTANCE_MIN,
+  DRIFTER_DISTANCE_MAX,
+  DRIFTER_FOOD,
   CHILD_STAT_SPREAD,
   CHILD_YEAR_DAYS,
   CITY_AREA_MARGIN,
@@ -369,6 +374,11 @@ import {
   RECIPES,
   BATCHES_PER_DAY,
   WORK_OUTPUT_PER_DAY,
+  GATHER_PER_DAY,
+  GATHER_REACH,
+  PATCH_SIZE,
+  PATCH_REGROW_DAYS,
+  PATCH_REST_DAYS,
   NPC_FOOD_REFILL_DAYS,
   RICHNESS_FACTOR,
   FRONTIER_RICH_NODES,
@@ -517,6 +527,7 @@ export const WIKI_TOPICS = [
   { id: 'training', title: 'Training' },
   { id: 'food', title: 'Food & hunger' },
   { id: 'work', title: 'Workplaces & output' },
+  { id: 'gathering', title: 'Gathering by hand' },
   { id: 'building', title: 'Building & tearing down' },
   { id: 'transport', title: 'Carrying & transport' },
   { id: 'water', title: 'Water & havens' },
@@ -1370,6 +1381,12 @@ export function Wiki() {
           NPC villages keep their own start.
         </p>
         <p>
+          <strong>First steps.</strong> Before any camp or quarry stands, your residents can{' '}
+          <a href="#gathering">gather by hand</a>: give a few of them Gather (Wood) on their card
+          and they bring load after load of Wood from the forest beside the city to its storage,
+          enough for your first houses while you look for nodes.
+        </p>
+        <p>
           One resident of your starting city, never your Leader, is its <strong>stable hand</strong>
           . They start on a looped queue, <strong>Farm and feed</strong>: if the stable holds less
           than {days(STABLE_HAND_FEED_DAYS)} of Food for its {num(START_HORSES)} horses, Feed the
@@ -1614,6 +1631,23 @@ export function Wiki() {
           {num(LIFESPAN_MAX)}. A house holds {num(HOUSING_ROOM.house ?? 0)} residents (a site holds
           nobody yet), and a city's free housing is the room of its houses minus its residents.
           Health runs up to {num(MAX_HEALTH)}.
+        </p>
+        <p>
+          <b>Drifters.</b> A small realm draws newcomers on its own. While your realm has fewer than{' '}
+          {num(DRIFTER_REALM_CAP)} residents, your Leader lives, and the city your Leader lives in
+          has free housing and a food surplus, a grown drifter sets out for that city every{' '}
+          {days(DRIFTER_WAIT_DAYS)}, one at a time; the wait counts only while all of that holds.
+          Founding more cities brings no more drifters, and NPC cities, trading posts and the HQ
+          draw none. A drifter comes into being out of every Player’s sight,{' '}
+          {num(DRIFTER_DISTANCE_MIN)} to {num(DRIFTER_DISTANCE_MAX)} tiles from the town hall, with
+          stats and an age like a starting city’s residents and {num(DRIFTER_FOOD)} Food for the
+          walk, and walks in. On the way they belong to nobody: they take no orders, and whatever is
+          done to them is no crime. Stepping into the city’s area they join it and your realm,
+          standing idle, and your realm log names them. If by then the city has no free housing, is
+          no longer yours, or your realm has reached the cap, they turn round and are gone once
+          nobody sees them. Residents on their way (a drifter, those relocating, children being
+          carried) count toward the free housing and the cap. The town hall of your Leader’s city
+          says when the next drifter comes, or why none does.
         </p>
         <p>
           <b>Names.</b> A name the game gives a resident, in a starting city, at birth or when they
@@ -1980,6 +2014,43 @@ export function Wiki() {
           Example: a miner with Strength {num(strong.stats.strength.base)} and Mining{' '}
           {num(strong.skills.mining ?? 0)} digs {num(outputPerDay('ironOre', 'mining', strong))}{' '}
           iron ore a game day, against {num(outputPerDay('ironOre', 'mining'))} at average.
+        </p>
+      </Section>
+
+      <Section id="gathering">
+        <p>
+          A grown resident takes <strong>Wood</strong> or <strong>Food</strong> from a Forest tile
+          they stand on, or <strong>Stone</strong> from a Hills tile, straight into their hands: no
+          node, no workplace. Not on a tile with a building, a road, a construction site or a
+          resource node on it. Iron ore, Gold ore and Coal are never gathered. An average resident
+          gathers {num(GATHER_PER_DAY.wood ?? 0)} Wood, {num(GATHER_PER_DAY.food ?? 0)} Food or{' '}
+          {num(GATHER_PER_DAY.stone ?? 0)} Stone a game day: more than working a poor node (
+          {num((WORK_OUTPUT_PER_DAY.wood ?? 0) * RICHNESS_FACTOR.poor)} Wood), less than a normal
+          one ({num(WORK_OUTPUT_PER_DAY.wood ?? 0)} Wood). Strength, the good’s skill (Woodcutting,
+          Farming, Mining) and Tools count as they do at a workplace, and gathering teaches that
+          skill.
+        </p>
+        <p>
+          <strong>Patches.</strong> Each Forest and Hills tile holds {num(PATCH_SIZE)} units for
+          gathering, about one load, shared by everyone and by Wood and Food alike. Once it is gone
+          the tile is <strong>picked over</strong> and gives nothing. Once nobody has gathered there
+          for {days(PATCH_REST_DAYS)}, it grows back steadily, from empty to full in{' '}
+          {days(PATCH_REGROW_DAYS)}. So the land beside a city empties under a few gatherers, while
+          a workplace on a node never runs out. The tile card says what a tile gives and, while it
+          is in sight, how much is left or when it is full again; up close the map shows picked-over
+          tiles in sight thinned out.
+        </p>
+        <p>
+          <strong>The Gather task.</strong> Gather on a resident’s card, on the group card, as a
+          queue step or from the realm bar asks what to gather first. The resident walks to the
+          nearest tile within {num(GATHER_REACH)} tiles of where they started that gives it and
+          isn’t picked over as far as they can see, gathers until their hands are full or the patch
+          is gone, and goes on to the next tile; with a full load they store it at their{' '}
+          <code>storage</code>, else the nearest storage of your realm, and come back. Several
+          gatherers take different tiles. With no such tile left in reach they store what they carry
+          and end, saying why. The usual food params work as in Work. In a script,{' '}
+          <code>gather(good)</code> gathers on the tile you stand on, and a tile’s{' '}
+          <code>pickedOver</code> says whether its patch is gone.
         </p>
       </Section>
 

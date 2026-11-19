@@ -104,6 +104,9 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
         new_veins: Vec::new(),
         waiting_veins: Vec::new(),
         wear: Default::default(),
+        patches: Vec::new(),
+        drifter_waits: Default::default(),
+        drifters: Vec::new(),
     }
 }
 
@@ -343,6 +346,11 @@ fn step_rest(
     // A node that ran dry this tick has a new one elsewhere at once (`CONTEXT.md`: Running dry).
     scratch.vein_log.clear();
     crate::new_veins::step_new_veins(world, terrain, scratch);
+    // Gathering by hand, once no node can come up on a gatherer's tile this tick (`CONTEXT.md`:
+    // Gathering).
+    let gathering = crate::gathering::request_gathering(world);
+    let gathering_len = gathering.len();
+    crate::gathering::resolve_gathering(world, &gathering, terrain);
     step_teaching(world, size);
     step_training(world, size);
     let breeding = request_breeding(world);
@@ -355,6 +363,8 @@ fn step_rest(
     // Buildings lose their day's share of condition at the turn of the day (`CONTEXT.md`: Decay).
     crate::repair::step_decay(world);
     crate::repair::trade_org_repairs(world);
+    // Patches grown back full leave the list (`CONTEXT.md`: Patch).
+    crate::gathering::step_patches(world);
     // One that lost all of it is a ruin, and a ruin left long enough collapses (`CONTEXT.md`: Ruin).
     crate::ruins::step_ruins(world, size, scratch);
     let aging = step_aging(world, size);
@@ -373,6 +383,9 @@ fn step_rest(
     // An heir who no longer qualifies lapses, now that cities, contracts and the alliance army
     // have changed hands this tick (`CONTEXT.md`: Heir).
     crate::heir::lapse_heirs(world);
+    // Drifters join, turn away and set out, now that births, captures and ruins changed the
+    // cities (`CONTEXT.md`: Drifter); one who joins is no outsider.
+    crate::drifters::step_drifters(world, terrain, scratch);
     // Who came into a City area, now that everyone has moved and nobody changes sides this tick.
     let outsiders_from = std::time::Instant::now();
     step_outsiders(world, size, scratch);
@@ -400,6 +413,7 @@ fn step_rest(
         + teardowns_len
         + repairs_len
         + work_len
+        + gathering_len
         + breeding_len
         + births_len
         + payments

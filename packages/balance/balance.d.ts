@@ -652,6 +652,11 @@ export interface Balance {
   readonly ENDURANCE_TERRAIN_EFFECT: number
   readonly FOOD_SURPLUS_DAYS: number
   readonly CHILD_STAT_SPREAD: number
+  readonly DRIFTER_REALM_CAP: number
+  readonly DRIFTER_WAIT_DAYS: number
+  readonly DRIFTER_DISTANCE_MIN: number
+  readonly DRIFTER_DISTANCE_MAX: number
+  readonly DRIFTER_FOOD: number
   readonly WALK_TICKS_PER_TILE: number
   readonly PATH_DETOUR_LIMIT: number
   readonly PATH_DETOUR_SLACK: number
@@ -1481,6 +1486,16 @@ export interface Balance {
     coal: number
     [key: string]: number
   }
+  readonly GATHER_PER_DAY: {
+    wood: number
+    stone: number
+    food: number
+    [key: string]: number
+  }
+  readonly PATCH_SIZE: number
+  readonly PATCH_REGROW_DAYS: number
+  readonly PATCH_REST_DAYS: number
+  readonly GATHER_REACH: number
   readonly WORK_STRENGTH_AVERAGE: number
   readonly WORK_SKILL_EFFECT: number
   readonly WORK_SKILL_LIMIT: number

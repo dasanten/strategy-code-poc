@@ -18,6 +18,7 @@ import type {
   SeenTrader,
   SeenVessel,
   SeenMachine,
+  SeenPatch,
   TraderVisit,
   SeenEntity,
   Remembered,
@@ -26,6 +27,7 @@ import type {
   ScriptRunSeen,
   ServerMessage,
   VeinWord,
+  DrifterCard,
   WorkplaceSettings,
   Waypoint,
 } from '@csp/shared-types'
@@ -73,6 +75,8 @@ export interface ClientWorld {
   vessels: SeenVessel[]
   /** Siege machines in sight (`CONTEXT.md`: Siege machine). */
   machines: SeenMachine[]
+  /** The tiles in sight that aren't full for gathering (`CONTEXT.md`: Patch). */
+  patches: SeenPatch[]
   /**
    * What the Player remembers out of their sight (`CONTEXT.md`: Last seen), kept apart from what
    * is in sight: never both at once.
@@ -101,6 +105,8 @@ export interface ClientWorld {
    * Running dry): words, never a number.
    */
   veins: Readonly<Record<string, VeinWord>>
+  /** Whether drifters come to the city the Leader lives in (`CONTEXT.md`: Drifters on the city card). */
+  drifters: DrifterCard | null
 }
 
 /** Sorts what is in sight by kind, dropping the tag. */
@@ -117,6 +123,7 @@ function byKind(entities: Iterable<SeenEntity>) {
     traders: [] as SeenTrader[],
     vessels: [] as SeenVessel[],
     machines: [] as SeenMachine[],
+    patches: [] as SeenPatch[],
   }
   for (const { is, ...e } of entities) {
     if (is === 'resident') out.residents.push(e as SeenResident)
@@ -129,6 +136,7 @@ function byKind(entities: Iterable<SeenEntity>) {
     else if (is === 'trader') out.traders.push(e as SeenTrader)
     else if (is === 'vessel') out.vessels.push(e as SeenVessel)
     else if (is === 'machine') out.machines.push(e as SeenMachine)
+    else if (is === 'patch') out.patches.push(e as SeenPatch)
     else out.piles.push(e as Pile)
   }
   return out
@@ -224,6 +232,7 @@ export function useWorld(onLoggedOut: () => void) {
             firstDay: msg.firstDay,
             workSettings: msg.workSettings,
             veins: msg.veins,
+            drifters: msg.drifters,
             ...byKind(entities.values()),
             lastSeen: lastSeenByKind(remembered.values()),
           })
@@ -285,6 +294,7 @@ export function useWorld(onLoggedOut: () => void) {
               traderVisits: msg.traderVisits ?? w.traderVisits,
               workSettings: msg.workSettings ?? w.workSettings,
               veins: msg.veins ?? w.veins,
+              drifters: msg.drifters !== undefined ? msg.drifters : w.drifters,
               waypoints: msg.waypoints ?? w.waypoints,
             }
           })

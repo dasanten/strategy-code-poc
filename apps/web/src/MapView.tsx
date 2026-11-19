@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Application, Container, Graphics, Sprite, Texture, TilingSprite } from 'pixi.js'
 import { CHUNK_SIZE, Terrain, UNEXPLORED, chunksAcross, wrap } from './shared/terrain.js'
-import { TERRAIN_SPEED } from '@csp/balance'
+import { PATCH_SIZE, TERRAIN_SPEED } from '@csp/balance'
+import { patchLeft } from './shared/patch.js'
 import { structuresOf } from './map/structures.js'
 import type { Building, KnownNode, SeenResident, ResourceKind } from '@csp/shared-types'
 import { FOOTPRINT } from './shared/footprint.js'
@@ -68,6 +69,7 @@ import {
   NODE_COLORS,
   NODE_NAMES,
   CARAVAN_COLOR,
+  PICKED_OVER_COLOR,
   PILE_COLOR,
   LEADER_COLOR,
   CITY_AREA_COLOR,
@@ -931,6 +933,7 @@ export function MapView({
           under.moveTo(0, sy).lineTo(view.width, sy)
         }
         under.stroke({ width: 1, color: 0x000000, alpha: 0.12 })
+        drawPatches(under, cam, view, worldRef.current)
       }
 
       // A node under a building's footprint shows as the building.
@@ -1709,6 +1712,28 @@ const lastSeenEmblemsOf = (world: MapWorld): readonly CityEmblem[] =>
 function drawNode(tokens: TokenLayer, kind: ResourceKind, x: number, y: number, r: number) {
   tokens.place(BASE_ART.diamond, x, y, (r * 24) / 11)
   tokens.place(NODE_ART[kind], x, y, r * 1.15, NODE_GLYPH_COLORS[kind])
+}
+
+/**
+ * The tiles in sight gathered bare, up close (`CONTEXT.md`: Patch): a wash of bare soil over the
+ * tile, the stronger the emptier its patch, so a picked-over tile looks thinned out and one
+ * growing back fills in again.
+ */
+function drawPatches(under: Graphics, cam: Camera, view: Size, world: MapWorld) {
+  const { patches, tick } = world
+  if (!patches || patches.length === 0 || tick === undefined) return
+  const size = world.map.size
+  const tile = cam.scale
+  let any = false
+  for (const p of patches) {
+    const empty = 1 - patchLeft(p, tick) / PATCH_SIZE
+    if (empty <= 0) continue
+    const [sx, sy] = tileToScreen(cam, view, size, p.x, p.y)
+    if (sx < -tile || sy < -tile || sx > view.width || sy > view.height) continue
+    under.rect(sx, sy, tile, tile).fill({ color: PICKED_OVER_COLOR, alpha: 0.55 * empty })
+    any = true
+  }
+  if (any) under.stroke({ width: 0, alpha: 0 })
 }
 
 /**

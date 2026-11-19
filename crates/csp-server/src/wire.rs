@@ -5,7 +5,7 @@
 //! are not what it serialises through, so a change to a message there needs the matching change
 //! here (the generated package is checked against these, not against `realtime.rs`).
 
-use csp_shared::protocol::SeenEntity;
+use csp_shared::protocol::{DrifterCard, SeenEntity};
 use csp_shared::views::{MapInfo, ScriptRunSeen, TraderVisit};
 use csp_shared::world::{
     OrderRequest, RealmEvent, Remembered, ScriptLogLine, ScriptMemory, VeinWord, Waypoint,
@@ -87,6 +87,9 @@ pub enum ServerMessage {
         /// How the veins of the workplaces its realm or an ally works stand, by building id
         /// (`CONTEXT.md`: Running dry): words, never a number.
         veins: IndexMap<String, VeinWord>,
+        /// Whether drifters come to the city the Leader lives in, for this Player only; null while
+        /// the Leader lives in none (`CONTEXT.md`: Drifters on the city card).
+        drifters: Option<DrifterCard>,
     },
     /// Every tick: what changed in sight, and what else changed for the Player.
     Tick {
@@ -122,6 +125,10 @@ pub enum ServerMessage {
         /// All of `veins` again, once a word changed.
         #[ts(optional)]
         veins: Option<IndexMap<String, VeinWord>>,
+        /// What the Player is told of drifters, once it changed: null once their Leader lives in
+        /// no city (`CONTEXT.md`: Drifters on the city card).
+        #[ts(optional)]
+        drifters: Option<Option<DrifterCard>>,
         #[ts(optional)]
         waypoints: Option<Vec<Waypoint>>,
         #[ts(optional)]

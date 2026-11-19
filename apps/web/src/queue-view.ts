@@ -332,8 +332,10 @@ function actsHere(order: OrderRequest): boolean {
     )
   )
     return true
-  // A Build line walks to its line itself (`CONTEXT.md`: Build line); Explore acts on no place.
-  if (order.kind !== 'task' || order.task === 'buildLine' || order.task === 'explore') return false
+  // A Build line walks to its line itself (`CONTEXT.md`: Build line); Explore and Gather act on no
+  // place.
+  const anywhere = ['buildLine', 'explore', 'gather']
+  if (order.kind !== 'task' || anywhere.includes(order.task as string)) return false
   // A Build task laid out somewhere else (`at`) walks there itself.
   return order.task !== 'build' || order.at === undefined
 }
@@ -603,6 +605,10 @@ export function stepLabel(
       if (order.task === 'breed') return `Breed horses at ${building(order.stableId)}`
       if (order.task === 'train') return `Train at ${building(order.groundId)}`
       if (order.task === 'explore') return 'Explore'
+      if (order.task === 'gather') {
+        const good = (order.params as Record<string, unknown> | undefined)?.good
+        return typeof good === 'string' ? `Gather ${good}` : 'Gather'
+      }
       if (order.task === 'buildLine') {
         const line = stepLine(order)
         if (!line) return 'Build a line'

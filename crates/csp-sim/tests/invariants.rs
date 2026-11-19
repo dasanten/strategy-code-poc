@@ -465,8 +465,9 @@ fn invariants_for_tick_runs_all_of_them_when_every_tick_is_sampled_none_at_a_rat
     // `trading-posts-have-no-temperament` (T98.1), `npc-hunts-sound` (T98.6),
     // `stances-sound` (T98.4), `npc-demands-sound` (T98.7),
     // `npc-takings-sound` (T98.10), `marches-sound` (T98.8), `npc-founding-stone-kept` (#1379),
-    // `npc-far-workers-go-home-fed` (#1379).
-    assert_eq!(all.len(), 191);
+    // `npc-far-workers-go-home-fed` (#1379), `patches-sound` and `gather-orders-sound` (T114.1),
+    // `drifters-sound` and `drifters-join-with-room` (T115.1).
+    assert_eq!(all.len(), 195);
 }
 
 /// A starting city with everyone idle on the storage's tile, carrying nothing (`atHome` of
