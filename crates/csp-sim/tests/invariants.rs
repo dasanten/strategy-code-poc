@@ -467,8 +467,9 @@ fn invariants_for_tick_runs_all_of_them_when_every_tick_is_sampled_none_at_a_rat
     // `npc-takings-sound` (T98.10), `marches-sound` (T98.8), `npc-founding-stone-kept` (#1379),
     // `npc-far-workers-go-home-fed` (#1379), `patches-sound` and `gather-orders-sound` (T114.1),
     // `drifters-sound` and `drifters-join-with-room` (T115.1), `zeal-within-cap` (T116.1),
-    // `rallies-sound` (T116.2).
-    assert_eq!(all.len(), 197);
+    // `rallies-sound` (T116.2), `npc-called-home-sound` (#1379), `founding-party-sets-out-loaded`
+    // and `founding-wave-sound` (#1438).
+    assert_eq!(all.len(), 200);
 }
 
 /// A starting city with everyone idle on the storage's tile, carrying nothing (`atHome` of

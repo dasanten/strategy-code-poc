@@ -254,6 +254,46 @@ pub fn plan_founding(
     let tick = world.tick as f64;
     let party = founding_party(world.city_plans.get(&city.id));
     let plan = world.city_plans.get(&city.id).expect("a plan");
+    // Its daughter founded, it sends the rest of the party's load after it while the daughter
+    // lacks it and has no storage (Daniel, 2026-11-19, #1438): as many as it takes to carry it, as
+    // far as it has them. They become the daughter's once loaded (`step_founders`).
+    if let Some(daughter) = daughter_supplied(world, plan, &city.id).map(|d| d.id.clone()) {
+        let lacks = daughter_lacks(world, &daughter).filter(|l| !l.is_empty());
+        let (Some(lacks), Some(terrain), Some(home), Some(site)) =
+            (lacks, terrain, home, plan.founding_site)
+        else {
+            // Nothing more to send: any still loading go as they are, and it is done.
+            for &i in people.members {
+                join_daughter(world, i, &daughter);
+            }
+            world.city_plans.get_mut(&city.id).expect("a plan").founding_site = None;
+            return;
+        };
+        for id in &party {
+            jobs.insert(id.clone(), job(CityJobKind::Found));
+        }
+        let home_at = (home.x as i32, home.y as i32);
+        let walk = wrap_distance(terrain.size, home_at, (site.x as i32, site.y as i32))
+            * WALK_TICKS_PER_TILE;
+        let near = |i: usize| {
+            let r = &world.residents[i];
+            !far_out((r.x as i32, r.y as i32), home_at, terrain.size)
+        };
+        let load = PartyLoad::of(world, lacks, walk);
+        let (_, rest) =
+            party_candidates(world, city, people.adults, people.unneeded, &near, jobs, &load);
+        let mut carriers = people.members.to_vec();
+        let mut wave = Vec::new();
+        for i in rest {
+            if load.holds(&carriers) >= load.all(carriers.len()) {
+                break;
+            }
+            carriers.push(i);
+            wave.push(i);
+        }
+        send_with_party(world, jobs, wave);
+        return;
+    }
     if !party.is_empty() {
         for id in &party {
             jobs.insert(id.clone(), job(CityJobKind::Found));
@@ -263,6 +303,21 @@ pub fn plan_founding(
             return;
         }
         if tick - since < NPC_FOUND_GIVE_UP_DAYS * TICKS_PER_GAME_DAY {
+            // Its town hall not yet standing, the second wave brings what the party couldn't
+            // carry (Daniel, 2026-11-19, #1438).
+            let (Some(terrain), Some(home), Some(site)) = (terrain, home, plan.founding_site)
+            else {
+                return;
+            };
+            let home_at = (home.x as i32, home.y as i32);
+            let site_at = (site.x as i32, site.y as i32);
+            let walk = wrap_distance(terrain.size, home_at, site_at) * WALK_TICKS_PER_TILE;
+            let near = |i: usize| {
+                let r = &world.residents[i];
+                !far_out((r.x as i32, r.y as i32), home_at, terrain.size)
+            };
+            let wave = second_wave(world, city, &people, &near, jobs, walk);
+            send_with_party(world, jobs, wave);
             return;
         }
         for id in &party {
@@ -328,19 +383,47 @@ pub fn plan_founding(
     let Some(chosen) =
         pick_party(world, city, people.adults, people.unneeded, &near, jobs, (walk, site_at))
     else {
+        // Too few at hand: its workers far out come home to set out (Daniel, 2026-11-18, #1379).
+        call_home(world, people.adults, jobs, home_at, terrain.size);
         return;
     };
-    for i in chosen {
-        let r = &mut world.residents[i];
-        r.order = None;
-        r.script = None;
-        r.interrupted = None;
-        let id = r.id.clone();
-        end_pair(world, i);
-        jobs.insert(id, job(CityJobKind::Found));
-    }
+    send_with_party(world, jobs, chosen);
     // From now on `fullSince` is when the party set out.
     world.city_plans.get_mut(&city.id).expect("a plan").full_since = Some(tick);
+}
+
+/// Whether a job is that of a hand called home to set out with its city's founding party: idle,
+/// naming the workplace it was called from (`CONTEXT.md`: Founding; Daniel, 2026-11-18, #1379).
+/// They stand at home like the idle, but don't count as idle hands to give work to.
+pub fn called_home(job: &CityJob) -> bool {
+    job.kind == CityJobKind::Idle && job.building_id.is_some()
+}
+
+/// Calls home a full city's workers far out while its founding party can't be picked
+/// (`CONTEXT.md`: Founding; Daniel, 2026-11-18, #1379: Millbrook held all its party took, but
+/// five of its seven workers were at workplaces far out, so it never had a party to send): each
+/// whose workplace or who themself is further from home than `far_out`.
+fn call_home(
+    world: &WorldState,
+    adults: &[usize],
+    jobs: &mut Jobs,
+    home_at: (i32, i32),
+    size: i32,
+) {
+    for &i in adults {
+        let r = &world.residents[i];
+        let Some(planned) = jobs.get(&r.id) else { continue };
+        if planned.kind != CityJobKind::Work {
+            continue;
+        }
+        let Some(at) = planned.building_id.clone() else { continue };
+        let place = world.buildings.iter().find(|b| b.id == at);
+        let far = far_out((r.x as i32, r.y as i32), home_at, size)
+            || place.is_some_and(|b| far_out((b.x as i32, b.y as i32), home_at, size));
+        if far {
+            jobs.insert(r.id.clone(), CityJob { building_id: Some(at), ..job(CityJobKind::Idle) });
+        }
+    }
 }
 
 /// Whether this pass is a city's first of a game day (`dailyPass`).
@@ -355,17 +438,225 @@ fn hall_stands(world: &WorldState, plan: &CityPlan) -> bool {
         .is_some_and(|h| h.kind == BuildingKind::TownHall && h.site.is_none())
 }
 
+/// The daughter a city sends the rest of its founding party's load after (`CONTEXT.md`: Founding;
+/// Daniel, 2026-11-19, #1438): once founded (`found_daughter` clears `full_since`, keeping the
+/// site), the city of no realm whose town hall stands on the site, another than `mother`.
+pub fn daughter_supplied<'w>(
+    world: &'w WorldState,
+    plan: &CityPlan,
+    mother: &str,
+) -> Option<&'w City> {
+    if plan.full_since.is_some() || !hall_stands(world, plan) {
+        return None;
+    }
+    let site = plan.founding_site?;
+    let hall = building_at(world, site.x as i32, site.y as i32, MAP_SIZE)?;
+    world
+        .cities
+        .iter()
+        .find(|c| Some(&c.id) == hall.city_id.as_ref() && c.id != mother && c.realm_id.is_none())
+}
+
+/// What a daughter still lacks of the rest of its founding party's load (`CONTEXT.md`: Founding;
+/// Daniel, 2026-11-19, #1438): the party's materials (`founding_materials`, for its residents) but
+/// its town hall's, beyond what its residents carry, its sites have and its storages hold. None
+/// once its storage stands: from then on it gathers what it lacks like any city.
+pub fn daughter_lacks(world: &WorldState, daughter: &str) -> Option<Stock> {
+    let mine = |b: &&Building| b.city_id.as_deref() == Some(daughter);
+    if world
+        .buildings
+        .iter()
+        .filter(mine)
+        .any(|b| b.kind == BuildingKind::Storage && b.site.is_none())
+    {
+        return None;
+    }
+    let residents = city_residents(world, daughter);
+    let mut has = Stock::new();
+    let mut add = |stock: &Stock| {
+        for (good, n) in stock {
+            *has.entry(*good).or_insert(0.0) += n;
+        }
+    };
+    for r in world.residents.iter().filter(|r| r.city_id.as_deref() == Some(daughter)) {
+        add(&r.carried);
+    }
+    for b in world.buildings.iter().filter(mine) {
+        if let Some(s) = &b.site {
+            add(&s.delivered);
+        }
+        if let Some(stock) = &b.stock {
+            add(stock);
+        }
+    }
+    let hall = build_materials(BuildingKind::TownHall);
+    let mut lacks = Stock::new();
+    for (good, n) in founding_materials(Some(residents.len() as f64)) {
+        let short = n - held(&hall, good) - held(&has, good);
+        if short > 1e-9 {
+            lacks.insert(good, short.ceil());
+        }
+    }
+    Some(lacks)
+}
+
 /// Whether a resident is too far from home to fetch their share of a founding party's load
 /// (`farOut`).
 pub fn far_out(r: (i32, i32), home: (i32, i32), size: i32) -> bool {
     wrap_distance(size, r, home) > NPC_NODE_REACH
 }
 
+/// What a founding party carries and has room for (`CONTEXT.md`: Founding): the materials of a
+/// party of `npc_founding_party_size` (`founding_materials`), and Food for the walk and the first
+/// weeks for each who goes.
+struct PartyLoad<'a> {
+    world: &'a WorldState,
+    tick: f64,
+    needed: Stock,
+    food_each: f64,
+    food_weight: f64,
+}
+
+impl<'a> PartyLoad<'a> {
+    fn new(world: &'a WorldState, city: &City, walk_ticks: f64) -> Self {
+        let members = npc_founding_party_size(city_residents(world, &city.id).len() as f64);
+        Self::of(world, founding_materials(Some(members)), walk_ticks)
+    }
+
+    /// The load of carrying `needed` and Food for the walk and the first weeks.
+    fn of(world: &'a WorldState, needed: Stock, walk_ticks: f64) -> Self {
+        let (walk, stay) = founding_food(walk_ticks);
+        PartyLoad {
+            world,
+            tick: world.tick as f64,
+            needed,
+            food_each: walk + stay,
+            food_weight: GOOD_WEIGHT.get("food").expect("a weight"),
+        }
+    }
+
+    /// What of `carried` is the party's materials, by weight, as far as it needs them: the party's
+    /// share already on them (`party_lacks`), not room lost (#1379, #1438).
+    fn of_materials(&self, carried: &Stock) -> f64 {
+        self.needed.iter().map(|(good, n)| held(carried, *good).min(*n) * good_weight(*good)).sum()
+    }
+
+    /// A resident's room, what they carry of their own Food counting as room: they take along
+    /// what they need of it and put the rest into the storage (`step_founders`).
+    fn room_but_materials(&self, i: usize) -> f64 {
+        let r = &self.world.residents[i];
+        carry_capacity(r, self.tick) - stock_weight(&r.carried) + carried_food(r) * self.food_weight
+    }
+
+    /// A resident's room, with what they carry of the materials.
+    fn room(&self, i: usize) -> f64 {
+        self.room_but_materials(i) + self.of_materials(&self.world.residents[i].carried)
+    }
+
+    /// What `party` holds together: its rooms, and what it carries of the materials only up to
+    /// what it needs.
+    fn holds(&self, party: &[usize]) -> f64 {
+        let mut carried = Stock::new();
+        for &i in party {
+            for (good, n) in &self.world.residents[i].carried {
+                *carried.entry(*good).or_insert(0.0) += n;
+            }
+        }
+        party.iter().map(|&i| self.room_but_materials(i)).sum::<f64>() + self.of_materials(&carried)
+    }
+
+    /// The whole load of a party of `n`.
+    fn all(&self, n: usize) -> f64 {
+        stock_weight(&self.needed) + self.food(n)
+    }
+
+    /// What a party of `n` takes along at the least to set out: the town hall's materials and
+    /// their Food (Daniel, 2026-11-19, #1438: a second wave brings the rest).
+    fn to_set_out(&self, n: usize) -> f64 {
+        stock_weight(&build_materials(BuildingKind::TownHall)) + self.food(n)
+    }
+
+    fn food(&self, n: usize) -> f64 {
+        n as f64 * self.food_each * self.food_weight
+    }
+}
+
+/// Who may go with a founding party (`CONTEXT.md`: Founding, Escort): its soldiers beyond those
+/// on its hall and at its gates; and its spare hands, its workers off the farms and those called
+/// home, then farmers beyond those who feed it (`farmers_to_feed`); each lot those with the most
+/// room on them first. Only those near home and free: neither they nor their partner carrying a
+/// child. `(soldiers, the rest)`.
+fn party_candidates(
+    world: &WorldState,
+    city: &City,
+    adults: &[usize],
+    unneeded: &[usize],
+    near: &dyn Fn(usize) -> bool,
+    jobs: &Jobs,
+    load: &PartyLoad,
+) -> (Vec<usize>, Vec<usize>) {
+    let free = |i: usize| {
+        let r = &world.residents[i];
+        if r.carrying.is_some() || !near(i) {
+            return false;
+        }
+        let partner =
+            r.pair.as_ref().and_then(|p| world.residents.iter().find(|x| x.id == p.partner_id));
+        partner.is_none_or(|p| p.carrying.is_none())
+    };
+    let by_room =
+        |list: &mut Vec<usize>| list.sort_by(|&a, &b| load.room(b).total_cmp(&load.room(a)));
+    let armed_now = |i: usize| is_armed(&world.residents[i]);
+    // Its escort: soldiers beyond those on its hall and at its gates (`CONTEXT.md`: Escort).
+    let mut armed: Vec<usize> =
+        spare_soldiers(world, city, adults).into_iter().filter(|&i| free(i)).collect();
+    by_room(&mut armed);
+    let mut rest: Vec<usize> = Vec::new();
+    let mut seen = HashSet::new();
+    let working =
+        |i: usize| jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Work);
+    // Those the last pass called home (`call_home`) come along, whatever this one gave them, but
+    // for the jobs that hold a resident (Daniel, 2026-11-18, #1379).
+    let old = world.city_plans.get(&city.id).map(|p| &p.jobs);
+    let called = |i: usize| {
+        let id = &world.residents[i].id;
+        old.and_then(|j| j.get(id)).is_some_and(called_home)
+            && jobs.get(id).is_none_or(|j| {
+                matches!(
+                    j.kind,
+                    CityJobKind::Idle | CityJobKind::Work | CityJobKind::Road | CityJobKind::Scout
+                )
+            })
+    };
+    for &i in unneeded
+        .iter()
+        .filter(|&&i| !armed_now(i) && free(i))
+        .chain(adults.iter().filter(|&&i| !armed_now(i) && free(i) && (working(i) || called(i))))
+    {
+        if seen.insert(i) {
+            rest.push(i);
+        }
+    }
+    by_room(&mut rest);
+    // Then farmers beyond those who feed it (Daniel, 2026-11-18, #1379).
+    let farming =
+        |i: usize| jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Farm);
+    let farmers = adults.iter().filter(|&&i| farming(i)).count();
+    let spare_farmers =
+        farmers.saturating_sub(crate::npc_plan::farmers_to_feed(world, city).ceil() as usize);
+    let mut farm_hands: Vec<usize> =
+        adults.iter().copied().filter(|&i| farming(i) && !armed_now(i) && free(i)).collect();
+    by_room(&mut farm_hands);
+    rest.extend(farm_hands.into_iter().filter(|i| seen.insert(*i)).take(spare_farmers));
+    (armed, rest)
+}
+
 /// The founding party (`pickParty`, `CONTEXT.md`: Founding, Escort): `npc_founding_party_size`
-/// adults, its escort of soldiers (`founding_escorts_wanted`) as far as the city has them beyond
-/// its hall and gates, the rest of its spare hands and its workers off the farms, those with the
-/// most room on them first, and as many more as it takes for their arms to hold the Food for the
-/// walk and the first weeks and all the materials. None while there aren't enough.
+/// adults of those who may go (`party_candidates`), its escort first as far as it has them
+/// (`founding_escorts_wanted`), and as many more as it takes for their arms to hold the Food for
+/// the walk and the first weeks and all the materials. With too few for all of it, they set out
+/// once they hold the town hall's materials and their Food, and a second wave brings the rest
+/// (`second_wave`; Daniel, 2026-11-19, #1438). None while there aren't enough.
 /// `(walk_ticks, site)` is the way to the site.
 fn pick_party(
     world: &WorldState,
@@ -376,43 +667,8 @@ fn pick_party(
     jobs: &Jobs,
     (walk_ticks, site): (f64, (i32, i32)),
 ) -> Option<Vec<usize>> {
-    let tick = world.tick as f64;
-    let free = |i: usize| {
-        let r = &world.residents[i];
-        if r.carrying.is_some() || !near(i) {
-            return false;
-        }
-        let partner =
-            r.pair.as_ref().and_then(|p| world.residents.iter().find(|x| x.id == p.partner_id));
-        partner.is_none_or(|p| p.carrying.is_none())
-    };
-    let food_weight = GOOD_WEIGHT.get("food").expect("a weight");
-    // What they carry of their own Food counts as room: they take along what they need of it and
-    // put the rest into the storage (`step_founders`).
-    let (walk, stay) = founding_food(walk_ticks);
-    let room = |i: usize| {
-        let r = &world.residents[i];
-        carry_capacity(r, tick) - stock_weight(&r.carried) + carried_food(r) * food_weight
-    };
-    let armed_now = |i: usize| is_armed(&world.residents[i]);
-    // Its escort: soldiers beyond those on its hall and at its gates (`CONTEXT.md`: Escort).
-    let mut armed: Vec<usize> =
-        spare_soldiers(world, city, adults).into_iter().filter(|&i| free(i)).collect();
-    armed.sort_by(|&a, &b| room(b).total_cmp(&room(a)));
-    let mut rest: Vec<usize> = Vec::new();
-    let mut seen = HashSet::new();
-    let working =
-        |i: usize| jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Work);
-    for &i in unneeded
-        .iter()
-        .filter(|&&i| !armed_now(i) && free(i))
-        .chain(adults.iter().filter(|&&i| !armed_now(i) && free(i) && working(i)))
-    {
-        if seen.insert(i) {
-            rest.push(i);
-        }
-    }
-    rest.sort_by(|&a, &b| room(b).total_cmp(&room(a)));
+    let load = PartyLoad::new(world, city, walk_ticks);
+    let (armed, rest) = party_candidates(world, city, adults, unneeded, near, jobs, &load);
     let members = npc_founding_party_size(city_residents(world, &city.id).len() as f64) as usize;
     let escort = founding_escorts_wanted(world, city, members, site);
     let mut candidates = armed.into_iter().take(escort).chain(rest);
@@ -423,13 +679,57 @@ fn pick_party(
     // Each carries a share of the materials and Food for the walk and the first weeks
     // (`CONTEXT.md`: Founding): as many more go as it takes to carry it all (Daniel, 2026-11-15,
     // T100.8). Those bring no house of their own; the daughter builds it later.
-    let materials = stock_weight(&founding_materials(Some(members as f64)));
-    let load = |n: usize| materials + n as f64 * (walk + stay) * food_weight;
-    loop {
-        if party.iter().map(|&i| room(i)).sum::<f64>() >= load(party.len()) {
-            return Some(party);
+    while load.holds(&party) < load.all(party.len()) {
+        match candidates.next() {
+            Some(i) => party.push(i),
+            None => return (load.holds(&party) >= load.to_set_out(party.len())).then_some(party),
         }
-        party.push(candidates.next()?);
+    }
+    Some(party)
+}
+
+/// The second wave of a founding party out (`CONTEXT.md`: Founding; Daniel, 2026-11-19, #1438):
+/// while its town hall doesn't stand, as many more of those who may go (`party_candidates`, no
+/// more escort) as it takes for the party's arms to hold its whole load, as far as it has them.
+/// None once no member of the party lives. They take what the party lacks from the storage and go
+/// to the site like the rest, and are the daughter's once it stands.
+fn second_wave(
+    world: &WorldState,
+    city: &City,
+    people: &FoundingPeople,
+    near: &dyn Fn(usize) -> bool,
+    jobs: &Jobs,
+    walk_ticks: f64,
+) -> Vec<usize> {
+    // It follows a party out: none left alive, it gives up instead (`NPC_FOUND_GIVE_UP_DAYS`).
+    if people.members.is_empty() {
+        return Vec::new();
+    }
+    let load = PartyLoad::new(world, city, walk_ticks);
+    let mut party = people.members.to_vec();
+    let (_, rest) =
+        party_candidates(world, city, people.adults, people.unneeded, near, jobs, &load);
+    let mut wave = Vec::new();
+    for i in rest {
+        if load.holds(&party) >= load.all(party.len()) {
+            break;
+        }
+        party.push(i);
+        wave.push(i);
+    }
+    wave
+}
+
+/// Sends `chosen` with the city's founding party.
+fn send_with_party(world: &mut WorldState, jobs: &mut Jobs, chosen: Vec<usize>) {
+    for i in chosen {
+        let r = &mut world.residents[i];
+        r.order = None;
+        r.script = None;
+        r.interrupted = None;
+        let id = r.id.clone();
+        end_pair(world, i);
+        jobs.insert(id, job(CityJobKind::Found));
     }
 }
 
@@ -593,9 +893,11 @@ pub fn founding_food(walk_ticks: f64) -> (f64, f64) {
 }
 
 /// What a founding party still lacks of its materials beyond what its members who live carry
-/// (`partyLacks`), as two parts: the town hall's, then the rest.
-fn party_lacks(world: &WorldState, members: &[usize], size: f64) -> [Stock; 2] {
-    let mut carried = Stock::new();
+/// and what they have taken to its town hall's site already, `delivered` (`partyLacks`; #1438:
+/// counted short again once taken there, a second wave fetched the hall's materials twice), as
+/// two parts: the town hall's, then the rest.
+fn party_lacks(world: &WorldState, members: &[usize], size: f64, delivered: &Stock) -> [Stock; 2] {
+    let mut carried = delivered.clone();
     for &i in members {
         let r = &world.residents[i];
         let picking = match &r.order {
@@ -624,7 +926,8 @@ fn party_lacks(world: &WorldState, members: &[usize], size: f64) -> [Stock; 2] {
 /// What the founding party does each tick (`stepFounders`), for its members that are idle: near
 /// the storage, they first take from it, as much as fits: Food for the walk and their first weeks,
 /// then what the party still lacks of its materials; then they build the town hall on the site by
-/// the Build default.
+/// the Build default. Those sent after a daughter founded (`daughter_supplied`) take what it still
+/// lacks instead, and then are the daughter's and walk to it (`join_daughter`).
 pub fn step_founders(
     world: &mut WorldState,
     city_id: &str,
@@ -638,6 +941,23 @@ pub fn step_founders(
     let party_size = npc_founding_party_size(city_residents(world, city_id).len() as f64)
         .min(founding_party(plan).len() as f64);
     let site_at = (site.x as i32, site.y as i32);
+    // What they have taken to its town hall's site already.
+    let delivered = building_at(world, site.x as i32, site.y as i32, MAP_SIZE)
+        .filter(|b| b.kind == BuildingKind::TownHall)
+        .and_then(|b| b.site.as_ref())
+        .map_or_else(Stock::new, |s| s.delivered.clone());
+    // Its daughter founded, what it still lacks beyond what those sent after it carry.
+    let later = plan.and_then(|p| daughter_supplied(world, p, city_id)).map(|d| {
+        let mut lacks = daughter_lacks(world, &d.id).unwrap_or_default();
+        for &i in members {
+            for (good, n) in &world.residents[i].carried {
+                if let Some(l) = lacks.get_mut(good) {
+                    *l = (*l - n).max(0.0);
+                }
+            }
+        }
+        (d.id.clone(), lacks)
+    });
     for &i in members {
         let r = &world.residents[i];
         if r.order.is_some() || r.script.is_some() {
@@ -651,7 +971,10 @@ pub fn step_founders(
                 let (food_walk, food_stay) = founding_food(walk);
                 let on_way = (food_walk - carried_food(r)).max(0.0);
                 let stay = (food_walk + food_stay - carried_food(r) - on_way).max(0.0);
-                let [hall, rest] = party_lacks(world, members, party_size);
+                let [hall, rest] = match &later {
+                    Some((_, lacks)) => [Stock::new(), lacks.clone()],
+                    None => party_lacks(world, members, party_size, &delivered),
+                };
                 // Their own Food first, the walk's and the first weeks', so one full of
                 // materials doesn't go without (T100.8); the party has the room for all of it.
                 let parts = [
@@ -663,14 +986,23 @@ pub fn step_founders(
                 // Food of their own past that goes into the storage first, to make room for the
                 // materials (T100.8).
                 let spare = (carried_food(r) - food_walk - food_stay).floor();
+                // One too full for their own Food puts down what crowds it out first (#1379: a
+                // hand from the quarry set out with 27 Stone and no Food, and starved).
+                let food_there = held_in(store.stock.as_ref(), Good::Food).floor();
+                let crowd = crowded_out(world, i, (on_way + stay).min(food_there));
                 let load = load_for(world, i, &parts, store);
-                if spare >= 1.0 || load.is_some() {
+                if spare >= 1.0 || !crowd.is_empty() || load.is_some() {
                     let (sid, sx, sy) = (store.id.clone(), store.x, store.y);
                     let here = is_at(at, placed(store), size);
                     let order = if here && spare >= 1.0 {
                         ResidentOrder::Drop(DropOrder {
                             to: GoodsSpot::Storage { storage_id: sid },
                             goods: Stock::from([(Good::Food, spare)]),
+                        })
+                    } else if here && !crowd.is_empty() {
+                        ResidentOrder::Drop(DropOrder {
+                            to: GoodsSpot::Storage { storage_id: sid },
+                            goods: crowd,
                         })
                     } else if let (true, Some(load)) = (here, load) {
                         ResidentOrder::PickUp(PickUpOrder {
@@ -690,27 +1022,98 @@ pub fn step_founders(
                 }
             }
         }
+        if let Some((daughter, _)) = &later {
+            let id = world.residents[i].id.clone();
+            if let Some(plan) = world.city_plans.get_mut(city_id) {
+                plan.jobs.shift_remove(&id);
+            }
+            join_daughter(world, i, daughter);
+            continue;
+        }
         let memory = json!({ "building": kind_name(BuildingKind::TownHall), "at": { "x": site.x, "y": site.y } });
         world.residents[i].script = Some(default_script(Task::Build, memory));
     }
 }
 
+/// One sent after a founded daughter with what it lacks joins it (`CONTEXT.md`: Founding; Daniel,
+/// 2026-11-19, #1438): theirs from now, like the party's members, they walk to its town hall, and
+/// it puts what they carry to use.
+fn join_daughter(world: &mut WorldState, i: usize, daughter: &str) {
+    let hall = world
+        .cities
+        .iter()
+        .find(|c| c.id == daughter)
+        .and_then(|c| crate::queries::city::town_hall_of(world, c))
+        .map(|h| Tile { x: h.x, y: h.y });
+    let r = &mut world.residents[i];
+    r.city_id = Some(daughter.to_string());
+    r.script = None;
+    r.order = hall.map(|target| {
+        ResidentOrder::WalkTo(WalkOrder { target, path: None, progress: 0.0, army: None })
+    });
+}
+
 /// What a member takes from the storage of `wanted` (`loadFor`): part by part in its order, as far
 /// as the storage holds it and it fits; none if nothing.
+/// What a founding party's member puts down at the storage to make room for `food` of their own
+/// (`CONTEXT.md`: Founding, their own Food first): of what they carry but Food, Coins and what
+/// they have equipped, as little as frees the room, in the order they carry it.
+fn crowded_out(world: &WorldState, i: usize, food: f64) -> Stock {
+    let r = &world.residents[i];
+    if food < 1.0 {
+        return Stock::new();
+    }
+    let room = (carry_capacity(r, world.tick as f64) - stock_weight(&r.carried)).max(0.0);
+    let mut need = food.floor() * good_weight(Good::Food) - room;
+    let gear = [r.equipped.weapon, r.equipped.shield, r.equipped.armour];
+    let mut out = Stock::new();
+    for (good, units) in &r.carried {
+        if need <= 1e-9 {
+            break;
+        }
+        if matches!(good, Good::Food | Good::Coins) {
+            continue;
+        }
+        let worn = gear.iter().filter(|g| **g == Some(*good)).count() as f64;
+        let w = good_weight(*good);
+        let n = (need / w).ceil().min((units - worn).floor());
+        if w <= 0.0 || n <= 0.0 {
+            continue;
+        }
+        out.insert(*good, n);
+        need -= n * w;
+    }
+    out
+}
+
 fn load_for(world: &WorldState, i: usize, wanted: &[Stock], storage: &Building) -> Option<Stock> {
     let r = &world.residents[i];
     let mut room = carry_capacity(r, world.tick as f64) - stock_weight(&r.carried);
     let mut load = Stock::new();
+    let left =
+        |load: &Stock, good: Good| held_in(storage.stock.as_ref(), good).floor() - held(load, good);
     for part in wanted {
-        for (good, units) in part {
-            let left = held_in(storage.stock.as_ref(), *good).floor() - held(&load, *good);
-            let w = good_weight(*good);
-            let n = units.min((room / w + 1e-9).floor()).min(left);
-            if n <= 0.0 {
-                continue;
+        // With no room for all of a part, a share of each of its goods, so one short of room
+        // doesn't bring the first and none of the rest (#1438: a storage's Wood and no Stone);
+        // then what room is left, in order.
+        let weight: f64 = part
+            .iter()
+            .map(|(good, units)| units.min(left(&load, *good)).max(0.0) * good_weight(*good))
+            .sum();
+        let share = if weight > room { room / weight } else { 1.0 };
+        let mut taken = Stock::new();
+        for pass in [share, 1.0] {
+            for (good, units) in part {
+                let w = good_weight(*good);
+                let want = (units * pass + 1e-9).floor() - held(&taken, *good);
+                let n = want.min((room / w + 1e-9).floor()).min(left(&load, *good));
+                if n <= 0.0 {
+                    continue;
+                }
+                *load.entry(*good).or_insert(0.0) += n;
+                *taken.entry(*good).or_insert(0.0) += n;
+                room -= n * w;
             }
-            *load.entry(*good).or_insert(0.0) += n;
-            room -= n * w;
         }
     }
     (!load.is_empty()).then_some(load)
@@ -724,7 +1127,8 @@ pub fn found_daughter(world: &mut WorldState, city_id: &str) -> Option<String> {
     let plan = world.city_plans.get(city_id)?;
     let party = founding_party(Some(plan));
     let site = plan.founding_site?;
-    if party.is_empty() || !hall_stands(world, plan) {
+    // Founded already, those it sends after it go one by one (`join_daughter`).
+    if party.is_empty() || plan.full_since.is_none() || !hall_stands(world, plan) {
         return None;
     }
     let hall = building_at(world, site.x as i32, site.y as i32, MAP_SIZE).expect("the hall stands");
@@ -762,8 +1166,9 @@ pub fn found_daughter(world: &mut WorldState, city_id: &str) -> Option<String> {
     for id in &party {
         plan.jobs.shift_remove(id);
     }
+    // It keeps the site: while the daughter lacks the rest of the party's load, it sends it after
+    // it (`daughter_supplied`; Daniel, 2026-11-19, #1438).
     plan.full_since = None;
-    plan.founding_site = None;
     crate::temperament::inherit_temperament(world, city_id, &daughter);
     raise_standing_both_ways(world, city_id, &daughter, NPC_FOUND_STANDING);
     Some(daughter)
@@ -792,6 +1197,9 @@ pub fn npc_cities_have_halls(world: &WorldState) -> Vec<InvariantViolation> {
 }
 
 mod invariants;
-pub use invariants::{founding_parties_sound, founding_site_clear, full_wait_sound};
+pub use invariants::{
+    founding_parties_sound, founding_party_sets_out_loaded, founding_site_clear,
+    founding_wave_sound, full_wait_sound,
+};
 #[cfg(test)]
 mod tests;

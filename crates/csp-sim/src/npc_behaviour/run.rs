@@ -238,9 +238,15 @@ fn run_city(
             world.residents[i].order = None;
         }
         let at = workplace_of(&world.residents[i]);
+        // Called home to set out with a founding party, they leave the workplace their job still
+        // names (`called_home`, #1379: they worked on out there and the party never went).
+        let kept = job
+            .as_ref()
+            .filter(|j| !crate::npc_founding::called_home(j))
+            .and_then(|j| j.building_id.clone());
         let moved = job.as_ref().is_some_and(|j| j.kind != CityJobKind::Soldier)
             && at.is_some()
-            && at != job.as_ref().and_then(|j| j.building_id.clone());
+            && at != kept;
         if moved && world.residents[i].carrying.is_none() && passed {
             stop_work(&mut world.residents[i]);
         }
@@ -518,7 +524,12 @@ fn run_city(
                     continue;
                 }
             }
-            if let Some(bid) = job.as_ref().and_then(|j| j.building_id.clone()) {
+            // Called home, the workplace their job names is the one they left (`called_home`).
+            let workplace = job
+                .as_ref()
+                .filter(|j| !crate::npc_founding::called_home(j))
+                .and_then(|j| j.building_id.clone());
+            if let Some(bid) = workplace {
                 if let Some(place) = building_index(world, &bid) {
                     if world.buildings[place].site.is_none()
                         && places.room(&world.buildings[place]) > 0.0

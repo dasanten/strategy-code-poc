@@ -546,11 +546,11 @@ fn the_new_world_runs_a_game_year_on_its_own() {
     }
     assert_eq!(watch.caravans_short(), Vec::<(&String, &usize)>::new());
     assert_eq!(watch.traders_short(&world), []);
-    // Whether an NPC city founds a daughter in the year is printed above, not held to: since #1379
-    // its cities stay fed and grow, but their Food still sits at their reserve, dipping below it
-    // every few days, and their war chests grow with them, so none stays full long enough (#1379,
-    // its open item). Founding is covered by
-    // `big_city::on_a_map_with_room_founds_a_daughter_unaided_and_goes_on_feeding_itself`.
+    // Whether an NPC city founds a daughter in the year is printed above, not held to (#1379, its
+    // open item): a party that sets out now gets there and founds one (#1438), but on this world
+    // Larkspur, full but for its Stone from day 32, never gets a quarry (its project waits on a
+    // smelter nobody builds), and the other cities stay short of Food or Wood. Founding is covered
+    // by `big_city::on_a_map_with_room_founds_a_daughter_unaided_and_goes_on_feeding_itself`.
 }
 
 #[test]

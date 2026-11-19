@@ -88,3 +88,67 @@ pub fn founding_site_clear(world: &WorldState, size: i32) -> Vec<InvariantViolat
     }
     out
 }
+
+/// Invariant `founding-party-sets-out-loaded` (`CONTEXT.md`: Founding; Daniel, 2026-11-19,
+/// #1438): a founding party that set out this tick has the room for at least its town hall's
+/// materials and its Food for the walk and the first weeks; a second wave brings the rest.
+pub fn founding_party_sets_out_loaded(world: &WorldState, size: i32) -> Vec<InvariantViolation> {
+    use csp_shared::balance::WALK_TICKS_PER_TILE;
+    use csp_shared::terrain::wrap_distance;
+    let mut out = Vec::new();
+    let tick = world.tick as f64;
+    for (city_id, plan) in &world.city_plans {
+        if plan.planned_at != tick || plan.full_since != Some(tick) {
+            continue;
+        }
+        let party: Vec<usize> = {
+            let ids = founding_party(Some(plan));
+            if ids.is_empty() {
+                continue;
+            }
+            (0..world.residents.len()).filter(|&i| ids.contains(&world.residents[i].id)).collect()
+        };
+        let (Some(city), Some(home), Some(site)) = (
+            world.cities.iter().find(|c| &c.id == city_id),
+            crate::npc_behaviour::npc_home(world, city_id),
+            plan.founding_site,
+        ) else {
+            continue;
+        };
+        let walk =
+            wrap_distance(size, (home.x as i32, home.y as i32), (site.x as i32, site.y as i32))
+                * WALK_TICKS_PER_TILE;
+        let load = super::PartyLoad::new(world, city, walk);
+        let (holds, least) = (load.holds(&party), load.to_set_out(party.len()));
+        if holds < least - 1e-9 {
+            let message = format!(
+                "{city_id}'s party of {} set out holding {holds:.1}, under its hall and Food's {least:.1}",
+                party.len()
+            );
+            out.push(violation("founding-party-sets-out-loaded", message, vec![city_id.clone()]));
+        }
+    }
+    out
+}
+
+/// Invariant `founding-wave-sound` (`CONTEXT.md`: Founding; Daniel, 2026-11-19, #1438): a plan
+/// made this tick that keeps its founding site with no full wait under way does so only to send
+/// the rest of its party's load after the daughter it founded there: a finished town hall stands
+/// on the site.
+pub fn founding_wave_sound(world: &WorldState) -> Vec<InvariantViolation> {
+    let mut out = Vec::new();
+    let tick = world.tick as f64;
+    for (city_id, plan) in &world.city_plans {
+        if plan.planned_at != tick || plan.full_since.is_some() || plan.founding_site.is_none() {
+            continue;
+        }
+        if !super::hall_stands(world, plan) {
+            let message = format!(
+                "{city_id} keeps its founding site {:?} with no wait and no hall there",
+                plan.founding_site
+            );
+            out.push(violation("founding-wave-sound", message, vec![city_id.clone()]));
+        }
+    }
+    out
+}
