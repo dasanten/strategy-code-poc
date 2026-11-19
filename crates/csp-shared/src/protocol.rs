@@ -245,20 +245,25 @@ pub struct SeenCity {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub horses_to_sell: Option<Vec<NpcHorseOffer>>,
-    /// For the city the viewer's Leader lives in, and only for the viewer: whether drifters come
-    /// (`CONTEXT.md`: Drifters on the city card).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub drifters: Option<DrifterLine>,
+}
+
+/// What the realm's Player is told of drifters (`CONTEXT.md`: Drifters on the city card): for the
+/// city its Leader lives in, and only for that Player, in `welcome` and in a tick once it changed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct DrifterCard {
+    pub city_id: String,
+    pub line: DrifterLine,
 }
 
 /// Whether drifters come to the city the Leader lives in (`CONTEXT.md`: Drifters on the city
-/// card): one is on the way, the next sets out in about `ticks`, or why none comes.
+/// card): one is on the way, the next sets out at tick `at` while the wait goes on, or why none
+/// comes. A tick, not the time left, so it changes only when something does.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TS)]
 #[serde(tag = "state", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum DrifterLine {
     OnTheWay,
-    Coming { ticks: f64 },
+    Coming { at: f64 },
     None { why: NoDrifterWhy },
 }
 

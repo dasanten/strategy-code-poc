@@ -839,9 +839,6 @@ fn places(
             trade,
             horses: (!horses.is_empty()).then_some(horses),
             horses_to_sell: (!to_sell.is_empty()).then_some(to_sell),
-            // Whether drifters come, for the viewer's own Leader's city only (`CONTEXT.md`:
-            // Drifters on the city card).
-            drifters: crate::drifters::drifter_line(world, side, c),
         })));
     }
     out

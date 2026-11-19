@@ -537,14 +537,17 @@ describe('buildings on a tile’s card', () => {
   it('says on the Leader’s town hall whether drifters come, and why not', () => {
     const viewer = { realmId: 'me', allies: new Set(['ally']) }
     const hall = (cityId: string) => [building({ id: `th-${cityId}`, kind: 'townHall', cityId })]
-    const at = (drifters: DrifterLine | undefined, realmId = 'me') =>
+    const tick = 1000
+    const at = (line: DrifterLine | undefined, realmId = 'me', cityId = 'c1') =>
       linesOf({
         buildings: hall('c1'),
-        cities: [{ id: 'c1', name: 'Eastmere', realmId, ...(drifters ? { drifters } : {}) }],
+        cities: [{ id: 'c1', name: 'Eastmere', realmId }],
         viewer,
+        tick,
+        drifters: line ? { cityId, line } : null,
       })
     const day = TICKS_PER_GAME_DAY
-    expect(at({ state: 'coming', ticks: 3 * day })).toContain(
+    expect(at({ state: 'coming', at: tick + 3 * day })).toContain(
       `Next drifter in ${aboutTime(3 * day)}`,
     )
     expect(at({ state: 'onTheWay' })).toContain('A drifter is on the way')
@@ -557,9 +560,12 @@ describe('buildings on a tile’s card', () => {
     expect(at({ state: 'none', why: 'realmTooBig' })).toContain(
       'No drifters come: the realm is too big',
     )
-    // A city whose card carries no line (another of the realm's, or anyone else's) says nothing.
-    expect(at(undefined).some((l) => l.includes('drifter'))).toBe(false)
-    expect(at({ state: 'onTheWay' }, 'ally').some((l) => l.includes('drifter'))).toBe(false)
+    // Nothing when the Player is told nothing, on another city of the realm, or on anyone
+    // else's town hall.
+    const says = (lines: string[]) => lines.some((l) => l.includes('drifter'))
+    expect(says(at(undefined))).toBe(false)
+    expect(says(at({ state: 'onTheWay' }, 'me', 'c2'))).toBe(false)
+    expect(says(at({ state: 'onTheWay' }, 'ally'))).toBe(false)
   })
 
   it('says a house’s room, and how its city is housed where the Player may know', () => {

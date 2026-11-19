@@ -3,6 +3,7 @@ import type { NoDrifterWhy } from "./NoDrifterWhy.js";
 
 /**
  * Whether drifters come to the city the Leader lives in (`CONTEXT.md`: Drifters on the city
- * card): one is on the way, the next sets out in about `ticks`, or why none comes.
+ * card): one is on the way, the next sets out at tick `at` while the wait goes on, or why none
+ * comes. A tick, not the time left, so it changes only when something does.
  */
-export type DrifterLine = { "state": "onTheWay" } | { "state": "coming", ticks: number, } | { "state": "none", why: NoDrifterWhy, };
+export type DrifterLine = { "state": "onTheWay" } | { "state": "coming", at: number, } | { "state": "none", why: NoDrifterWhy, };

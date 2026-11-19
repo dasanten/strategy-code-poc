@@ -118,6 +118,7 @@ import type {
   Good,
   SeenBuilding,
   SeenCity,
+  DrifterCard,
   DrifterLine,
   RealmLabel,
   VeinWord,
@@ -1194,7 +1195,7 @@ export interface TileThings {
     SeenCity,
     'id' | 'name' | 'realmId' | 'tradeOrg' | 'trade' | 'refuses' | 'horses' | 'horsesToSell'
   > &
-    Partial<Pick<SeenCity, 'occupation' | 'drifters'>>)[]
+    Partial<Pick<SeenCity, 'occupation'>>)[]
   /** The realms the Player knows by name, for who occupies a town hall. */
   realms?: RealmLabel[]
   viewer: Viewer
@@ -1206,6 +1207,8 @@ export interface TileThings {
    * (`CONTEXT.md`: Running dry); the server sends no others.
    */
   veins?: Readonly<Record<string, VeinWord>>
+  /** Whether drifters come to the city the Leader lives in, for its town hall (`CONTEXT.md`: Drifters on the city card). */
+  drifters?: DrifterCard | null
   /**
    * About how many ticks until one of the Player's residents arrives where they drive
    * (`arrivalTicks`), for a haul route's leg.
@@ -1793,7 +1796,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       if (building.kind === 'townHall' && (rel === 'own' || rel === 'alliance') && city) {
         if (live) lines.push(...townHallLines(city.id, t))
         // Whether drifters come, on the Leader's city only, which only its Player is told.
-        if (rel === 'own' && city.drifters) lines.push(drifterLine(city.drifters))
+        if (rel === 'own' && t.drifters?.cityId === city.id)
+          lines.push(drifterLine(t.drifters.line, t.tick ?? 0))
         if (rel === 'own')
           card.city = { id: city.id, label: `Open ${city.name} in the city inspector` }
         // Renaming a city (`CONTEXT.md`): from its town hall's card, while it is the Player's.
@@ -2592,12 +2596,12 @@ function townHallLines(cityId: string, t: TileThings): string[] {
  * Whether drifters come to the city the Leader lives in (`CONTEXT.md`: Drifter, Drifters on the
  * city card): one on the way, about how long until the next (Estimates), or why none comes.
  */
-export function drifterLine(line: DrifterLine): string {
+export function drifterLine(line: DrifterLine, tick: number): string {
   switch (line.state) {
     case 'onTheWay':
       return 'A drifter is on the way'
     case 'coming':
-      return `Next drifter in ${aboutTime(line.ticks)}`
+      return `Next drifter in ${aboutTime(Math.max(0, line.at - tick))}`
     case 'none':
       return `No drifters come: ${DRIFTER_WHY[line.why]}`
   }
