@@ -206,13 +206,18 @@ pub fn gather_problem(
     None
 }
 
-/// Checks a gather order: one of the sender's grown residents gathers `good` on their tile.
+/// Checks a gather order: one of the sender's grown residents gathers `good` on their tile. Only
+/// Players' residents gather (`CONTEXT.md`: Gather): an NPC city's, also one still running the
+/// Gather default after their realm's Leader died, can't.
 pub fn validate_gather(
     world: &WorldState,
     sender: &OrderSender,
     order: &OrderRequest,
     terrain: Option<&TerrainMap>,
 ) -> Option<String> {
+    if sender.npc_city_id.is_some() {
+        return Some("only Players’ residents gather".into());
+    }
     let Some(ri) = ordered_resident(world, sender, str_field(order, "residentId")) else {
         return Some("not one of your residents".into());
     };
