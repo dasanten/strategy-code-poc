@@ -216,7 +216,7 @@ fn stores_what_it_carries_and_ends_once_the_land_in_reach_is_picked_over() {
 #[test]
 fn gets_food_below_food_at_as_work_does() {
     let mut s = setup(terrain(), &["w1"], 50.0);
-    s.world.residents[0].carried.remove(&Good::Food);
+    s.world.residents[0].carried.shift_remove(&Good::Food);
     assert!(acked(&give(&mut s, "w1", json!({ "good": "wood", "foodAt": 2, "foodTake": 6 }))));
     run(&mut s, 400, |s| matches!(resident(s, "w1").order, Some(ResidentOrder::Gather(_))));
     assert_eq!(resident(&s, "w1").carried.get(&Good::Food).copied(), Some(6.0));
@@ -228,7 +228,7 @@ fn gets_food_below_food_at_as_work_does() {
     assert_eq!(stored(&s, Good::Food), 44.0);
     // foodAt 0 never fetches.
     let mut s = setup(terrain(), &["w1"], 50.0);
-    s.world.residents[0].carried.remove(&Good::Food);
+    s.world.residents[0].carried.shift_remove(&Good::Food);
     assert!(acked(&give(&mut s, "w1", json!({ "good": "wood", "foodAt": 0 }))));
     run(&mut s, 400, |s| matches!(resident(s, "w1").order, Some(ResidentOrder::Gather(_))));
     // (A meal taken at the storage on the way out is survival's, not a fetch.)
