@@ -254,3 +254,30 @@ fn the_patch_invariant_catches_a_bad_patch() {
     assert!(broken.iter().any(|m| m.contains("no Forest or Hills")), "{broken:?}");
     assert!(broken.iter().any(|m| m.contains("out of order")), "{broken:?}");
 }
+
+#[test]
+fn a_player_sees_the_patches_in_sight_that_arent_full_and_none_out_of_it() {
+    use csp_shared::protocol::SeenEntity;
+    use csp_sim::sight::{entities_in_sight, sent_out_of_sight};
+    use csp_sim::world_index::WorldIndex;
+    let mut t = plains(256);
+    for (x, y) in [(3, 3), (120, 120)] {
+        t.tiles[(y * 256 + x) as usize] = Terrain::Forest as u8;
+    }
+    let mut world = empty_world(&t);
+    world.realms.push(realm("r1", 7, "g1"));
+    resident(&mut world, "g1", 3.0, 3.0);
+    world.patches.push(Patch { x: 3, y: 3, left: 4.0, at: 2 });
+    world.patches.push(Patch { x: 120, y: 120, left: 0.0, at: 2 });
+    let index = WorldIndex::new(&world, t.size);
+    let seen = entities_in_sight(&world, &index, Some("r1"), None);
+    let patches: Vec<_> = seen
+        .iter()
+        .filter_map(|e| match e {
+            SeenEntity::Patch(p) => Some((p.id.clone(), p.x, p.y, p.left, p.at)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(patches, [("patch:3,3".to_string(), 3, 3, 4.0, 2)]);
+    assert_eq!(sent_out_of_sight(&world, &index, "r1", &seen), []);
+}

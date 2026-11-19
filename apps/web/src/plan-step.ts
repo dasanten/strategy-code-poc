@@ -98,6 +98,7 @@ export type PlanStepId =
   | 'equip'
   | 'takeOff'
   | 'explore'
+  | 'gather'
   | 'runScript'
   | 'waitUntil'
   | 'if'
@@ -301,6 +302,8 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     picks: [{ pick: 'city', prompt: 'the city of yours to relocate to' }],
   },
   { id: 'explore', label: 'Explore', picks: [] },
+  // Gathers by hand from where the step starts; the good is its Customise (`CONTEXT.md`: Gather).
+  { id: 'gather', label: 'Gather', picks: [] },
   { id: 'runScript', label: 'Run script', picks: [], ask: 'script' },
   // Flow: its condition is set on the card, a place it asks about picked on the map (`nextPick`).
   { id: 'waitUntil', label: 'Wait until', picks: [], ask: 'condition' },
@@ -322,6 +325,7 @@ export const PLAN_TASKS: Partial<Readonly<Record<PlanStepId, Task>>> = {
   haul: 'haul',
   haulBoat: 'haul',
   explore: 'explore',
+  gather: 'gather',
 }
 
 export function planKind(id: PlanStepId): PlanKind {
@@ -632,6 +636,8 @@ export function planOrder(
       return { order: { kind: 'getOff' } }
     case 'explore':
       return { order: { kind: 'task', task: 'explore' } }
+    case 'gather':
+      return { order: { kind: 'task', task: 'gather' } }
     case 'unhitch':
       return { order: { kind: 'unhitch', carriageId: p.id }, at }
     case 'hitch':

@@ -476,3 +476,27 @@ describe('defending (`CONTEXT.md`: Defence script)', () => {
     expect(interruptedLine(fighting, {})).toMatch(/^Then: /)
   })
 })
+
+describe('the Gather task’s Doing line (`CONTEXT.md`: Gather)', () => {
+  const gatherer = { scriptId: 20, task: 'gather' as const, params: { good: 'wood' } }
+  const gathering: ResidentOrder = { kind: 'gather', good: 'wood', at, progress: 0 }
+
+  it('says what they gather at a tile, and where they walk with the usual estimate', () => {
+    expect(line({ order: gathering, script: gatherer })).toBe('Gathering wood')
+    expect(doingLine({ order: walk, script: gatherer }, { scripts, buildings, arrives: 1 })).toMatch(
+      /^Gathering wood: walking to the forest · /,
+    )
+    const stone = { ...gatherer, params: { good: 'stone' } }
+    expect(line({ order: walk, script: stone })).toBe(
+      'Gathering stone: walking to the hills · 1 tiles to go',
+    )
+    expect(line({ order: store, script: gatherer })).toBe(
+      'Gathering wood: carrying iron to the storage',
+    )
+    expect(line({ order: null, script: gatherer })).toBe('Gathering wood: waiting')
+  })
+
+  it('names a bare gather order', () => {
+    expect(line({ order: gathering })).toBe('Gathering wood')
+  })
+})

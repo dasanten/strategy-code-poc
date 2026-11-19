@@ -641,6 +641,19 @@ fn everything_seen(
             }));
         }
     }
+    // A tile in sight that isn't full shows what its patch held when last gathered (`CONTEXT.md`:
+    // Patch); a full one sends nothing.
+    for p in &world.patches {
+        if in_sight(f64::from(p.x), f64::from(p.y)) {
+            out.push(SeenEntity::Patch(csp_shared::protocol::SeenPatch {
+                id: format!("patch:{},{}", p.x, p.y),
+                x: p.x,
+                y: p.y,
+                left: p.left,
+                at: p.at,
+            }));
+        }
+    }
     for p in &world.piles {
         if in_sight(p.x, p.y) {
             out.push(SeenEntity::Pile(p.clone()));
@@ -1127,6 +1140,7 @@ fn spot_of(e: &SeenEntity) -> Option<Spot> {
         SeenEntity::Vessel(v) => Some(Spot { x: v.x, y: v.y }),
         SeenEntity::Machine(m) => Some(Spot { x: m.x, y: m.y }),
         SeenEntity::Pile(p) => Some(Spot { x: p.x, y: p.y }),
+        SeenEntity::Patch(p) => Some(Spot { x: f64::from(p.x), y: f64::from(p.y) }),
         SeenEntity::Building(b) => Some(Spot { x: b.building.x, y: b.building.y }),
         _ => None,
     }
