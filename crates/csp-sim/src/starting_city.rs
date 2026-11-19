@@ -8,7 +8,8 @@ use csp_shared::balance::{
     ADULT_AGE, CITY_AREA_MARGIN, CITY_BUILDING_REACH, CITY_MIN_DISTANCE, HORSE_FOOD_PER_DAY,
     HOUSING_ROOM, NPC_CITY_MIN_DISTANCE, STABLE_HAND_FEED_DAYS, STABLE_HAND_WORK_MINUTES,
     START_CARRIED_FOOD, START_CITY_SIZE, START_COINS, START_FOOD, START_HORSES, START_RESIDENTS,
-    START_SPARE_HOUSES, START_SPEARS, START_STABLE_FOOD, TRADE_ORG_HQ, TRADE_ORG_HQ_MIN_DISTANCE,
+    START_SPARE_HOUSES, START_SPEARS, START_STABLE_FOOD, START_STONE, START_TOOLS, START_WOOD,
+    TRADE_ORG_HQ, TRADE_ORG_HQ_MIN_DISTANCE,
 };
 use csp_shared::footprint::{footprint_tiles, Placed, FOOTPRINT};
 use csp_shared::terrain::{terrain_at, Terrain, TerrainMap};
@@ -324,6 +325,21 @@ pub(crate) fn starting_carry(grown: bool) -> Stock {
     carried
 }
 
+/// What a starting city's storage holds from the start (`CONTEXT.md`: Starting city): a small food
+/// stock, a few Coins for a first trade, some Wood and Stone for a first building and two sets of
+/// Tools. NPC villages keep their own start.
+pub(crate) fn starting_storage() -> Stock {
+    [
+        (Good::Food, START_FOOD),
+        (Good::Coins, START_COINS),
+        (Good::Wood, START_WOOD),
+        (Good::Stone, START_STONE),
+        (Good::Tools, START_TOOLS),
+    ]
+    .into_iter()
+    .collect()
+}
+
 fn found_at(
     world: &mut WorldState,
     terrain: &TerrainMap,
@@ -393,8 +409,7 @@ fn found_at(
         + START_SPARE_HOUSES;
     let mut buildings = vec![hall];
     let mut storage = building(world, BuildingKind::Storage, (x + mid, y + mid));
-    storage.stock =
-        Some([(Good::Food, START_FOOD), (Good::Coins, START_COINS)].into_iter().collect());
+    storage.stock = Some(starting_storage());
     buildings.push(storage);
     for i in 0..houses as i32 {
         buildings.push(building(world, BuildingKind::House, house_tile(x, y, size, i)));
