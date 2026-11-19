@@ -18,7 +18,7 @@ use serde::Serialize;
 use serde_json::{json, to_value, Map, Value};
 
 use crate::terrain::Terrain;
-use crate::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR};
+use crate::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_HOUR, TICKS_PER_GAME_YEAR};
 
 /// A static table from a string key (a good, a building kind, a skill) to a value, in the order
 /// the TypeScript object lists them; serialised as a JSON object.
@@ -3134,6 +3134,13 @@ pub const ZEAL_FILL_TICKS: f64 = 2.0 * 60.0 * 60.0;
 /// The Zeal a pool gains in a tick while it is not full (`ZEAL_CAP_HOURS` over `ZEAL_FILL_TICKS`).
 pub const ZEAL_PER_TICK: f64 = ZEAL_CAP_HOURS / ZEAL_FILL_TICKS;
 
+/// What a rallied crew's work is multiplied by (`CONTEXT.md`: Rallying the crew): with skill,
+/// Strength and Tools, never instead of them.
+pub const RALLY_PACE: f64 = 3.0;
+
+/// The Zeal a Player spends in a tick their crew is rallied: a game hour of rallying per game hour.
+pub const ZEAL_PER_RALLIED_TICK: f64 = 1.0 / TICKS_PER_GAME_HOUR;
+
 /// Every exported constant of the table as JSON, keyed by its TypeScript name: what
 /// `pnpm balance:rust` writes to `packages/balance/balance.json` for the client.
 pub fn balance_json() -> Value {
@@ -3634,6 +3641,7 @@ pub fn balance_json() -> Value {
     m.insert("DIRECT_OFFERS_TO_ONE_REALM".into(), json!(DIRECT_OFFERS_TO_ONE_REALM));
     m.insert("ZEAL_CAP_HOURS".into(), json!(ZEAL_CAP_HOURS));
     m.insert("ZEAL_FILL_TICKS".into(), json!(ZEAL_FILL_TICKS));
+    m.insert("RALLY_PACE".into(), json!(RALLY_PACE));
     Value::Object(m)
 }
 

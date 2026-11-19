@@ -330,6 +330,9 @@ fn step_rest(
     let accepted = resolve_offers(world, scratch);
     let (buy_offs, buy_off_records) = resolve_buy_offs(world);
     let debts_paid = resolve_debt_payments(world, scratch);
+    // The Leader's rally ends before anyone works if they left, went Down or ran out of Zeal
+    // (`CONTEXT.md`: Rallying the crew).
+    crate::rally::end_rallies(world);
     let builds = request_building(world);
     let builds_len = builds.len();
     resolve_building(world, &builds, Some(terrain));
@@ -343,6 +346,8 @@ fn step_rest(
     let work = request_work(world);
     let work_len = work.len();
     resolve_work(world, &work, scratch);
+    // The Zeal of each crew rallied this tick drains (`CONTEXT.md`: Zeal).
+    crate::rally::drain_rallies(world);
     // A node that ran dry this tick has a new one elsewhere at once (`CONTEXT.md`: Running dry).
     scratch.vein_log.clear();
     crate::new_veins::step_new_veins(world, terrain, scratch);

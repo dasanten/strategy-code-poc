@@ -47,6 +47,7 @@ import {
   RAM_STRENGTH,
   CATAPULT_CREW,
   CATAPULT_STRENGTH,
+  RALLY_PACE,
 } from '@csp/balance'
 import {
   carriageCapacity,
@@ -2451,7 +2452,8 @@ function nodeUnder(b: Building, t: TileThings): KnownNode | undefined {
  * the Player's realm working there, with what they make and how much a game day at their Strength
  * and skill, then a row for the total of each good. Undefined with none of them there. It is the
  * pace while they have what they need; other realms' workers aren't counted, as their stats aren't
- * known.
+ * known. While the realm's Leader rallies the crew there it is the rallied pace (`CONTEXT.md`:
+ * Rallying the crew).
  */
 function amountsList(
   b: Building,
@@ -2459,12 +2461,15 @@ function amountsList(
   labels: Record<string, string>,
 ): CardList | undefined {
   if (MAX_WORKERS[b.kind] === undefined || !WORKPLACE_SKILL[b.kind]) return undefined
+  const rallied = (t.residents ?? []).some(
+    (r) => r.owner === t.viewer.realmId && r.order?.kind === 'rally' && r.order.buildingId === b.id,
+  )
   const made = (t.residents ?? []).flatMap((r) => {
     const o = r.order
     if (r.owner !== t.viewer.realmId || o?.kind !== 'workAt' || o.buildingId !== b.id) return []
     const good = goodMadeAt(b, t, o.makes)
     if (!good) return []
-    const factor = richnessFactor(nodeUnder(b, t)?.richness)
+    const factor = richnessFactor(nodeUnder(b, t)?.richness) * (rallied ? RALLY_PACE : 1)
     return [{ r, good, perDay: madePerDay(r as Resident, b.kind, good, t.tick ?? 0) * factor }]
   })
   if (made.length === 0) return undefined
