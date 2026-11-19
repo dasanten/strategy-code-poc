@@ -1020,8 +1020,9 @@ pub fn trade_org_sends_no_one(world: &WorldState) -> Vec<InvariantViolation> {
 mod invariants;
 pub(crate) use invariants::violation;
 pub use invariants::{
-    city_plans_sound, npc_called_home_sound, npc_farmers_kept, npc_founding_stone_kept,
-    npc_leaves_dry_workplaces, npc_spare_hands_work, npc_surplus_capped, npc_workplaces_bounded,
+    city_plans_sound, npc_called_home_sound, npc_farmers_kept, npc_founding_materials_kept,
+    npc_founding_stone_kept, npc_leaves_dry_workplaces, npc_spare_hands_work, npc_surplus_capped,
+    npc_workplaces_bounded,
 };
 
 #[cfg(test)]

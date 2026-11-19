@@ -450,3 +450,41 @@ fn build_takes_food_at_and_food_take_from_its_memory_over_the_params() {
     assert_eq!(stock_of(&world, "s1", Good::Food), Some(50.0 - 9.0));
     assert_sound(&world, &t);
 }
+
+#[test]
+fn fetching_materials_for_a_far_site_fetches_what_the_walk_there_eats_too() {
+    // #1379: Brackenholt's builder of a far quarry fetched Food up to foodTake as reckoned at the
+    // site, ate some of it on the walk to the storage, set out again short and went Down. Far out
+    // (memory.foodAt set by their city: about what the walk home eats), they fetch that too.
+    let (mut world, t, _) = camp_world();
+    storage(
+        &mut world,
+        "s1",
+        HOUSE_AT.0 as f64 + 6.0,
+        HOUSE_AT.1 as f64,
+        Stock::from([(Good::Food, 50.0), (Good::Wood, 100.0), (Good::Stone, 100.0)]),
+    );
+    add_builder(&mut world, 4.0, json!({}), Stock::new());
+    let script = world.residents[0].script.as_mut().unwrap();
+    script.memory.insert("foodAt".into(), json!(3));
+    script.memory.insert("foodTake".into(), json!(12));
+    run(&mut world, &t, |w| truthy(memory(w, "fetch")), 50, Task::Build);
+    let fetch = memory(&world, "fetch").expect("fetching");
+    assert_eq!(fetch["goods"]["food"], json!(12 - 4 + 3));
+    // The walk to the storage eats about that much.
+    world.residents[0].carried.insert(Good::Food, 1.0);
+    let mut went = false;
+    run(
+        &mut world,
+        &t,
+        |w| {
+            went |= w1(w).x != HOUSE_AT.0 as f64;
+            went && building_at_site(w) && !truthy(memory(w, "fetch"))
+        },
+        400,
+        Task::Build,
+    );
+    assert!(building_at_site(&world));
+    assert!(carried(&world, Good::Food) >= 12.0, "{}", carried(&world, Good::Food));
+    assert_sound(&world, &t);
+}

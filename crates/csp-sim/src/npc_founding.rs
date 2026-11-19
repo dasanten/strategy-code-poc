@@ -15,8 +15,8 @@ use csp_shared::footprint::is_at;
 use csp_shared::terrain::{wrap, wrap_distance, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    Building, BuildingKind, City, CityJob, CityJobKind, CityPlan, DropOrder, Good, GoodsSpot,
-    PickUpOrder, ResidentOrder, Stock, Task, Tile, WalkOrder, WorldState,
+    Building, BuildingKind, City, CityJob, CityJobKind, CityPlan, CityProject, DropOrder, Good,
+    GoodsSpot, PickUpOrder, ResidentOrder, Stock, Task, Tile, WalkOrder, WorldState,
 };
 use serde_json::json;
 
@@ -164,18 +164,56 @@ pub fn saving_to_found(world: &WorldState, city: &City) -> bool {
             .is_some_and(|p| p.full_since.is_some() && founding_party(Some(p)).is_empty())
 }
 
-/// What an NPC city's walls and repairs leave in its storages (`CONTEXT.md`: Full city): its
-/// reserve and, while it saves for its founding party (`saving_to_found`), the party's Stone on
-/// top (Daniel, 2026-11-18, #1379: walls and repairs kept spending it, so no city held it).
+/// The founding party's materials that an NPC city's building leaves alone while it saves for the
+/// party (`CONTEXT.md`: Full city; Daniel, 2026-11-19, #1379).
+pub const PARTY_BUILD_GOODS: [Good; 2] = [Good::Wood, Good::Stone];
+
+/// What an NPC city's building and repairs leave in its storages (`CONTEXT.md`: Full city): its
+/// reserve and, while it saves for its founding party (`saving_to_found`), the party's Wood and
+/// Stone on top (Daniel, 2026-11-18 and 2026-11-19, #1379: walls, repairs and its workshops kept
+/// spending them, so no city held them).
 pub fn kept_from_walls(world: &WorldState, city: &City) -> Stock {
     let mut kept = npc_reserve(world, city);
     if saving_to_found(world, city) {
         let party = founding_materials(Some(npc_founding_party_size(
             city_residents(world, &city.id).len() as f64,
         )));
-        *kept.entry(Good::Stone).or_insert(0.0) += held(&party, Good::Stone);
+        for good in PARTY_BUILD_GOODS {
+            *kept.entry(good).or_insert(0.0) += held(&party, good);
+        }
     }
     kept
+}
+
+/// Whether a project of an NPC city waits for its founding party (`CONTEXT.md`: Full city; Daniel,
+/// 2026-11-19, #1379): while the city saves for the party, a building that needs Wood or Stone it
+/// doesn't hold above its reserve and the party's (`kept_from_walls`) waits. Farms, lumber camps and
+/// quarries go ahead. A wall or gate counts a builder's trip, a few tiles' worth. Before this,
+/// Larkspur's quarry brought its Stone home load by load, and a begun smelter, mine, smithy and mint
+/// took each one, so it never held its party's.
+pub fn waits_for_party(world: &WorldState, city: &City, project: &CityProject) -> bool {
+    use crate::queries::building::{build_materials_of, materials_needed};
+    use csp_shared::balance::NPC_WALL_TILES_PER_TRIP;
+    let CityProject::Build { building, x, y, material } = project else { return false };
+    if matches!(building, BuildingKind::Farm | BuildingKind::LumberCamp | BuildingKind::Quarry)
+        || !saving_to_found(world, city)
+    {
+        return false;
+    }
+    let wall = matches!(building, BuildingKind::Wall | BuildingKind::Gate);
+    let need = if wall {
+        build_materials_of(*building, *material)
+            .into_iter()
+            .map(|(g, n)| (g, n * NPC_WALL_TILES_PER_TRIP))
+            .collect()
+    } else {
+        match crate::npc_growth::project_site(world, *building, *material, *x, *y) {
+            Some(site) => materials_needed(site),
+            None => build_materials_of(*building, *material),
+        }
+    };
+    let need: Stock = need.into_iter().filter(|(g, _)| PARTY_BUILD_GOODS.contains(g)).collect();
+    !need.is_empty() && !holds_for_walls(world, city, &need)
 }
 
 /// Whether the city's storages hold `goods` above what its walls and repairs leave there

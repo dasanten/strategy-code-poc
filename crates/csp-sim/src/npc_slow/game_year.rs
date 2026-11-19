@@ -4,7 +4,7 @@
 //!
 //! The year holds: no NPC city starved out, nobody of the Trade Organization starved, every
 //! caravan made a round trip, every wandering trader went round its loop, and every invariant held
-//! each game day; whether a daughter was founded is printed. The season holds: both Players' cities live,
+//! each game day, and at least one NPC city founded a daughter. The season holds: both Players' cities live,
 //! nobody of theirs starved, and each has a Trade Org warehouse within its trader's reach.
 //!
 //! `GAME_YEAR_DAYS` runs fewer game days than a year, to look at a shorter stretch by hand; the
@@ -385,10 +385,16 @@ fn trace_who(out: &mut impl std::io::Write, world: &WorldState, who: &[String]) 
         let Some(r) = world.residents.iter().find(|r| &r.id == id) else { continue };
         let job = r.city_id.as_ref().and_then(|c| world.city_plans.get(c)?.jobs.get(id));
         let short = |s: String| s.chars().take(200).collect::<String>();
+        // The trade run they are on, as its trader or one of its escort.
+        let run = r
+            .city_id
+            .as_ref()
+            .and_then(|c| world.city_plans.get(c)?.traders.as_ref())
+            .and_then(|t| t.iter().find(|t| &t.resident_id == id || t.escort_ids.contains(id)));
         let _ = writeln!(
             out,
             "t{} {id} at=({:.0},{:.0}) hunger={:.1} health={:.0} down={:?} carried={:?} \
-             job={job:?} order={} script={}",
+             job={job:?} run={run:?} order={} script={}",
             world.tick,
             r.x,
             r.y,
@@ -546,11 +552,10 @@ fn the_new_world_runs_a_game_year_on_its_own() {
     }
     assert_eq!(watch.caravans_short(), Vec::<(&String, &usize)>::new());
     assert_eq!(watch.traders_short(&world), []);
-    // Whether an NPC city founds a daughter in the year is printed above, not held to (#1379, its
-    // open item): a party that sets out now gets there and founds one (#1438), but on this world
-    // Larkspur, full but for its Stone from day 32, never gets a quarry (its project waits on a
-    // smelter nobody builds), and the other cities stay short of Food or Wood. Founding is covered
-    // by `big_city::on_a_map_with_room_founds_a_daughter_unaided_and_goes_on_feeding_itself`.
+    // At least one NPC city founds a daughter in the year (#1379, #1438: once its workers far out
+    // came home, a second wave carried what its party couldn't, and its building waited for the
+    // party's Wood and Stone, Larkspur founded one).
+    assert!(!daughters.is_empty(), "no NPC city founded a daughter");
 }
 
 #[test]

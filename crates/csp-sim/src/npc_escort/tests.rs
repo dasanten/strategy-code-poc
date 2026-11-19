@@ -331,3 +331,35 @@ fn an_escort_gone_ahead_holds_for_the_trader_who_walks_on() {
     // The trader walked on to the warehouse rather than standing for the escort ahead (#1434).
     assert!(reached, "trader at {:?}, escort at {:?}", f.at(&trader), f.at(&escort));
 }
+
+#[test]
+fn an_escort_out_with_the_trader_is_not_sent_home_for_gear() {
+    // #1379: Thornbury's escort, just at the warehouse 495 tiles out, walked home for a new shield,
+    // and its trader stood waiting for it until they starved.
+    use csp_shared::world::ResidentOrder;
+    let mut f = city_with_soldiers(20.0, 0);
+    let hold = posts_to_hold(&f.world, f.city()) as usize;
+    f = city_with_soldiers(20.0, hold + 1);
+    f.plan();
+    let run = f.runs().into_iter().next().expect("a trader out");
+    let escort = run.escort_ids[0].clone();
+    let storage = f.world.buildings.iter().find(|b| b.id == f.storage).unwrap().clone();
+    // It knows of a coal node, so it wants the steel kit for its soldiers (`upgrade_soldiers`).
+    f.world.nodes.push(
+        serde_json::from_value(serde_json::json!({
+            "id": "coal-near", "kind": "coal", "x": storage.x - 20.0, "y": storage.y,
+        }))
+        .unwrap(),
+    );
+    // The escort stands 30 tiles out with nothing to do and a spare load (Steel) its city would
+    // have a soldier at home put away.
+    let e = f.index(&escort);
+    let r = &mut f.world.residents[e];
+    (r.x, r.y, r.order, r.script) = (storage.x + 30.0, storage.y, None, None);
+    r.carried.insert(Good::Steel, 10.0);
+    crate::npc_defence::step_npc_defence(&mut f.world, f.terrain.size);
+    assert!(f.runs().iter().any(|r| r.escort_ids.contains(&escort)), "still on the run");
+    let r = &f.world.residents[f.index(&escort)];
+    let home = |o: &Option<ResidentOrder>| matches!(o, Some(ResidentOrder::WalkTo(w)) if (w.target.x, w.target.y) == (storage.x, storage.y));
+    assert!(!home(&r.order), "{:?}", r.order);
+}

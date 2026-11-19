@@ -4578,7 +4578,10 @@ fn fetchMissing(site, source) {
   if (from == null) { return } // none in storage: we just build
   if (pickFetcher(site, missing) != me.id) { return }
   let load = {}
-  let topUp = foodToTake()
+  // Far from the storage (memory.foodAt set, an NPC city's far site), the walk
+  // there eats about what the walk back does: that too, so I set out again with
+  // foodTake (#1379: a builder of a far quarry set out short and went Down).
+  let topUp = foodToTake() + floor(memory.foodAt || 0)
   if (topUp > 0) { load.food = topUp }
   for (m of missing) { load[m.good] = m.units }
   if (fetch(load, from.id) == null) {

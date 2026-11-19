@@ -485,7 +485,28 @@ pub fn next_project(
         }
     }
     let want = wanted(world, city, home, terrain, rings.as_ref())?;
-    Some(materials_first(world, city, home, terrain, rings.as_ref(), want, &mut HashSet::new()))
+    let first =
+        materials_first(world, city, home, terrain, rings.as_ref(), want, &mut HashSet::new());
+    if !crate::npc_founding::waits_for_party(world, city, &first) {
+        return Some(first);
+    }
+    // While it saves for its founding party, a building that would spend the party's Wood or Stone
+    // waits (`CONTEXT.md`: Full city; Daniel, 2026-11-19, #1379): the workplace for a material the
+    // party lacks instead, if it has none, else nothing, so its hands gather them.
+    crate::npc_founding::founding_lacks(world, city, Some(home), terrain.size)
+        .into_iter()
+        .filter_map(|short| {
+            chain_project(
+                world,
+                city,
+                home,
+                terrain,
+                rings.as_ref(),
+                short.good,
+                &mut HashSet::new(),
+            )
+        })
+        .find(|p| !crate::npc_founding::waits_for_party(world, city, p))
 }
 
 /// What the residents of a city carry, all together (`carriedBy`).
