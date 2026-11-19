@@ -2,6 +2,7 @@
 //! sight; they walk in and join, or turn away and are gone once unseen.
 
 use csp_shared::balance::{DRIFTER_FOOD, DRIFTER_REALM_CAP, MAX_HEALTH};
+use csp_shared::protocol::{DrifterLine, NoDrifterWhy};
 use csp_shared::world::{BuildingKind, Good, RealmEventWhat, WorldState};
 use serde_json::json;
 
@@ -322,4 +323,72 @@ fn the_invariant_catches_a_drifter_who_joined_a_full_city() {
     crate::events::record_event(&mut g.world, Some(&realm), what);
     let found = drifters_join_with_room(&g.world, &g.terrain);
     assert_eq!(found.len(), 1, "{found:?}");
+}
+
+/// The drifter line `side` sees on the realm's city, if it sees one there at all.
+fn line_seen_by(world: &WorldState, size: i32, side: &str) -> Option<DrifterLine> {
+    let index = WorldIndex::new(world, size);
+    let city = world.cities[0].id.clone();
+    crate::sight::entities_in_sight(world, &index, Some(side), None).iter().find_map(|e| match e {
+        csp_shared::protocol::SeenEntity::City(c) if c.city.id == city => c.drifters,
+        _ => None,
+    })
+}
+
+#[test]
+fn the_leaders_city_shows_its_player_whether_drifters_come_and_nobody_else() {
+    let mut g = game();
+    let size = g.terrain.size;
+    let realm = realm_id(&g.world);
+    assert_eq!(
+        line_seen_by(&g.world, size, &realm),
+        Some(DrifterLine::Coming { ticks: DRIFTER_WAIT_TICKS })
+    );
+    g.tick();
+    assert_eq!(
+        line_seen_by(&g.world, size, &realm),
+        Some(DrifterLine::Coming { ticks: DRIFTER_WAIT_TICKS - 1.0 })
+    );
+    drifter_sets_out(&mut g);
+    assert_eq!(line_seen_by(&g.world, size, &realm), Some(DrifterLine::OnTheWay));
+
+    // Each reason none comes.
+    let mut g = game();
+    fill_housing(&mut g);
+    let why = |why| Some(DrifterLine::None { why });
+    assert_eq!(line_seen_by(&g.world, size, &realm), why(NoDrifterWhy::NoFreeHousing));
+    let mut g = game();
+    for b in g.world.buildings.iter_mut().filter(|b| b.kind == BuildingKind::Storage) {
+        b.stock = None;
+    }
+    assert_eq!(line_seen_by(&g.world, size, &realm), why(NoDrifterWhy::NoFoodSurplus));
+    let mut g = game();
+    let template = g.world.residents[0].clone();
+    for n in 0..DRIFTER_REALM_CAP as usize {
+        let mut r = template.clone();
+        r.id = format!("extra{n}");
+        r.city_id = None;
+        g.world.residents.push(r);
+    }
+    assert_eq!(line_seen_by(&g.world, size, &realm), why(NoDrifterWhy::RealmTooBig));
+
+    // Another Player standing in the city sees no line; nor does the realm on a city its Leader
+    // doesn't live in.
+    let mut g = game();
+    found_starting_city(&mut g.world, &g.terrain, 8, None);
+    let other = g.world.realms.iter().find(|r| r.user_id == 8).unwrap().id.clone();
+    let hall = town_hall_of(&g.world, &g.world.cities[0]).unwrap().clone();
+    let theirs =
+        g.world.residents.iter().position(|r| r.owner.as_deref() == Some(other.as_str())).unwrap();
+    g.world.residents[theirs].x = hall.x;
+    g.world.residents[theirs].y = hall.y;
+    let index = WorldIndex::new(&g.world, size);
+    let sees_city = crate::sight::entities_in_sight(&g.world, &index, Some(&other), None)
+        .iter()
+        .any(|e| matches!(e, csp_shared::protocol::SeenEntity::City(c) if c.city.id == g.world.cities[0].id));
+    assert!(sees_city);
+    assert_eq!(line_seen_by(&g.world, size, &other), None);
+    let leader = g.world.realms[0].leader_id.clone();
+    g.world.residents.iter_mut().find(|r| r.id == leader).unwrap().city_id = None;
+    assert_eq!(line_seen_by(&g.world, size, &realm), None);
 }

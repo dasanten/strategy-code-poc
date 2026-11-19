@@ -18,10 +18,12 @@ use std::sync::Arc;
 use csp_shared::balance::{
     DRIFTER_DISTANCE_MAX, DRIFTER_DISTANCE_MIN, DRIFTER_FOOD, DRIFTER_REALM_CAP, DRIFTER_WAIT_DAYS,
 };
+use csp_shared::protocol::{DrifterLine, NoDrifterWhy};
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, wrap_distance, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    Drifter, Good, Realm, RealmEventWhat, Resident, ResidentOrder, Tile, WalkOrder, WorldState,
+    City, Drifter, Good, Realm, RealmEventWhat, Resident, ResidentOrder, Tile, WalkOrder,
+    WorldState,
 };
 
 use crate::events::record_event;
@@ -386,6 +388,32 @@ fn come_into_being(
         set_out_at: world.tick as f64,
         turned_away: false,
     });
+}
+
+/// The drifter line of a city's card for the side seeing it (`CONTEXT.md`: Drifters on the city
+/// card): only for a realm's own city its Leader lives in; None for anyone else's city, and when
+/// the Leader lives in none.
+pub fn drifter_line(world: &WorldState, side: &str, city: &City) -> Option<DrifterLine> {
+    if city.realm_id.as_deref() != Some(side) {
+        return None;
+    }
+    let realm = world.realms.iter().find(|r| r.id == side)?;
+    let ci = leader_city(world, realm)?;
+    if world.cities[ci].id != city.id {
+        return None;
+    }
+    Some(match drifter_outlook(world, realm) {
+        DrifterOutlook::OnTheWay => DrifterLine::OnTheWay,
+        DrifterOutlook::Next { ticks } => DrifterLine::Coming { ticks },
+        DrifterOutlook::None(why) => DrifterLine::None {
+            why: match why {
+                NoDrifter::NoFreeHousing => NoDrifterWhy::NoFreeHousing,
+                NoDrifter::NoFoodSurplus => NoDrifterWhy::NoFoodSurplus,
+                NoDrifter::RealmTooBig => NoDrifterWhy::RealmTooBig,
+                NoDrifter::NoLeaderCity => return None,
+            },
+        },
+    })
 }
 
 /// Invariant `drifters-sound` (ADR 0004; `CONTEXT.md`: Drifter): every drifter is a living

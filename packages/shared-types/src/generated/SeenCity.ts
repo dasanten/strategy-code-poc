@@ -2,6 +2,7 @@
 import type { CityLayout } from "./CityLayout.js";
 import type { CityScouted } from "./CityScouted.js";
 import type { DangerPlace } from "./DangerPlace.js";
+import type { DrifterLine } from "./DrifterLine.js";
 import type { FormerPlayer } from "./FormerPlayer.js";
 import type { Hire } from "./Hire.js";
 import type { NpcHorseOffer } from "./NpcHorseOffer.js";
@@ -31,7 +32,12 @@ wontSell?: true,
 /**
  * Always `true` when present.
  */
-refuses?: true, hire?: Hire, trade?: Array<ShownNpcCityPrice>, horses?: Array<NpcHorseOffer>, horsesToSell?: Array<NpcHorseOffer>, id: string, name: string, gameName?: true, realmId: string | null, townHallId: string, tradeOrg?: TradeOrgCity, workplaceIds?: Array<string>, scouted?: CityScouted, formerPlayer?: FormerPlayer, occupation: Occupation | null, outsiders?: Array<string>, alarmedAttackers?: { [key in string]: number }, layout?: CityLayout, 
+refuses?: true, hire?: Hire, trade?: Array<ShownNpcCityPrice>, horses?: Array<NpcHorseOffer>, horsesToSell?: Array<NpcHorseOffer>, 
+/**
+ * For the city the viewer's Leader lives in, and only for the viewer: whether drifters come
+ * (`CONTEXT.md`: Drifters on the city card).
+ */
+drifters?: DrifterLine, id: string, name: string, gameName?: true, realmId: string | null, townHallId: string, tradeOrg?: TradeOrgCity, workplaceIds?: Array<string>, scouted?: CityScouted, formerPlayer?: FormerPlayer, occupation: Occupation | null, outsiders?: Array<string>, alarmedAttackers?: { [key in string]: number }, layout?: CityLayout, 
 /**
  * For an NPC city, the realms whose fighters near it have outweighed it without a break, and
  * since when (`CONTEXT.md`: Respect; ADR 0033), as of its last planning pass. Left out while

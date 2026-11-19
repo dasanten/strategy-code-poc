@@ -245,6 +245,30 @@ pub struct SeenCity {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub horses_to_sell: Option<Vec<NpcHorseOffer>>,
+    /// For the city the viewer's Leader lives in, and only for the viewer: whether drifters come
+    /// (`CONTEXT.md`: Drifters on the city card).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub drifters: Option<DrifterLine>,
+}
+
+/// Whether drifters come to the city the Leader lives in (`CONTEXT.md`: Drifters on the city
+/// card): one is on the way, the next sets out in about `ticks`, or why none comes.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TS)]
+#[serde(tag = "state", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum DrifterLine {
+    OnTheWay,
+    Coming { ticks: f64 },
+    None { why: NoDrifterWhy },
+}
+
+/// Why no drifter comes to the Leader's city (`CONTEXT.md`: Drifters on the city card).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum NoDrifterWhy {
+    NoFreeHousing,
+    NoFoodSurplus,
+    RealmTooBig,
 }
 
 /// A horse as Players see it (`SeenHorse`): its hunger and health, and when its Down ends, only for
