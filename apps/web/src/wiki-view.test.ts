@@ -52,6 +52,7 @@ import {
   residentsPerFarmer,
   transport,
   wikiResident,
+  num,
   HOW_TO_TRADE_PATH,
   WIKI_PATH,
 } from './wiki-view.js'
@@ -295,6 +296,29 @@ describe('the Wiki’s How to trade topic (`CONTEXT.md`: Trade section)', () => 
     }
     expect(section).toContain('Trade here')
     expect(section).toContain(`at most ${DELIVERY_LOAD} kg`)
+  })
+})
+
+describe('the Wiki’s Gathering section (`CONTEXT.md`: Gathering, Patch)', () => {
+  it('renders its numbers from the balance', () => {
+    const html = render()
+    const at = html.indexOf('id="gathering"')
+    expect(at).toBeGreaterThan(-1)
+    const section = html.slice(at, html.indexOf('</section>', at))
+    const pace = balance.GATHER_PER_DAY as Record<string, number>
+    for (const n of [
+      pace.wood!,
+      pace.food!,
+      pace.stone!,
+      balance.PATCH_SIZE,
+      balance.GATHER_REACH,
+    ]) {
+      expect(section).toContain(num(n))
+    }
+    expect(section).toContain('picked over')
+    expect(section).toContain('<code>gather(good)</code>')
+    // The first steps of a new city point to it.
+    expect(html).toContain('href="#gathering"')
   })
 })
 

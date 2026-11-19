@@ -26,11 +26,12 @@ pub enum BirthAction {
 }
 
 /// Orders a carrying resident can't hold (`CARRYING_BLOCKS`): working, building, tearing down,
-/// breeding horses, hauling and relocating.
+/// gathering, breeding horses, hauling and relocating.
 pub fn carrying_blocks(o: &ResidentOrder) -> bool {
     matches!(
         o,
         ResidentOrder::WorkAt(_)
+            | ResidentOrder::Gather(_)
             | ResidentOrder::Breed(_)
             | ResidentOrder::Build(_)
             | ResidentOrder::RoadLine(_)

@@ -3,4 +3,4 @@
 /**
  * Which kind of order ended (`OrderEnded.kind`).
  */
-export type OrderEndedKind = "store" | "fetch" | "relocate";
+export type OrderEndedKind = "store" | "fetch" | "relocate" | "gather";

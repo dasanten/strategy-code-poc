@@ -2463,6 +2463,33 @@ pub const WORK_OUTPUT_PER_DAY: Table<f64> = Table(&[
     ("coal", 2.0),
 ]);
 
+/// Units of each good a resident of average Strength and no skill gathers by hand per game day
+/// (`CONTEXT.md`: Gathering): four fifths of `WORK_OUTPUT_PER_DAY`, so between working a poor node
+/// (`RICHNESS_FACTOR.poor`, three fifths) and a normal one. Strength, skill and Tools count as at a
+/// workplace. Only these goods are gathered.
+pub const GATHER_PER_DAY: Table<f64> = Table(&[("wood", 3.2), ("stone", 2.4), ("food", 1.6)]);
+
+/// Units a full patch holds (`CONTEXT.md`: Patch): about one load of an average resident
+/// (`CARRY_BASE` + 10 Strength × `CARRY_PER_STRENGTH` = 30 kg of 1 kg goods).
+pub const PATCH_SIZE: f64 = 30.0;
+
+/// Game days a picked-over patch takes to grow back to full, steadily (`CONTEXT.md`: Patch): long
+/// enough that the land beside a city empties under a few gatherers, so a camp on a node stays
+/// worth building.
+pub const PATCH_REGROW_DAYS: f64 = 10.0;
+
+/// Game days nobody must gather on a tile before its patch starts growing back (`CONTEXT.md`:
+/// Patch): a tile being gathered doesn't grow while it is worked (a gatherer takes a unit every
+/// few hundred ticks), so it runs out under one gatherer rather than growing about as fast as
+/// they take from it.
+pub const PATCH_REST_DAYS: f64 = 1.0;
+
+/// Tiles from where a resident on the Gather task started that they look for a tile to gather on
+/// (`CONTEXT.md`: Gather): about a city's surroundings and a short walk beyond, so a gatherer
+/// beside a forest works it for many loads and ends once the land around has emptied, rather than
+/// wandering off.
+pub const GATHER_REACH: f64 = 24.0;
+
 /// The Strength at which a worker makes `WORK_OUTPUT_PER_DAY`.
 pub const WORK_STRENGTH_AVERAGE: f64 = 10.0;
 
@@ -3524,6 +3551,11 @@ pub fn balance_json() -> Value {
     m.insert("RECIPES".into(), to_value(RECIPES).expect("serialisable"));
     m.insert("BATCHES_PER_DAY".into(), to_value(BATCHES_PER_DAY).expect("serialisable"));
     m.insert("WORK_OUTPUT_PER_DAY".into(), to_value(WORK_OUTPUT_PER_DAY).expect("serialisable"));
+    m.insert("GATHER_PER_DAY".into(), to_value(GATHER_PER_DAY).expect("serialisable"));
+    m.insert("PATCH_SIZE".into(), json!(PATCH_SIZE));
+    m.insert("PATCH_REGROW_DAYS".into(), json!(PATCH_REGROW_DAYS));
+    m.insert("PATCH_REST_DAYS".into(), json!(PATCH_REST_DAYS));
+    m.insert("GATHER_REACH".into(), json!(GATHER_REACH));
     m.insert("WORK_STRENGTH_AVERAGE".into(), json!(WORK_STRENGTH_AVERAGE));
     m.insert("WORK_SKILL_EFFECT".into(), json!(WORK_SKILL_EFFECT));
     m.insert("WORK_SKILL_LIMIT".into(), json!(WORK_SKILL_LIMIT));

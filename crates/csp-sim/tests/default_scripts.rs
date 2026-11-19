@@ -290,7 +290,7 @@ fn work_from_the_ui_plays_as_the_work_at_order_did_the_same_food_on_the_farms_pi
     assert!(food + progress.last().unwrap().0 > progress[0].0);
     assert_eq!(
         serde_json::to_value(&g.world.residents[0].script.as_ref().unwrap().memory).unwrap(),
-        json!({ "workplaceId": "farm", "at": { "x": 3, "y": 3, "region": null, "regionKind": null } })
+        json!({ "workplaceId": "farm", "at": { "x": 3, "y": 3, "region": null, "regionKind": null, "pickedOver": false } })
     );
 }
 
@@ -1080,6 +1080,22 @@ fn keeps_every_default_at_most_a_quarter_of_a_residents_budget() {
                 Some(south_half),
             ),
             explore(json!({ "out": true, "skip": [] }), stocked, None),
+        ],
+    ));
+    let gathering = json!({ "start": { "x": 3, "y": 3 }, "gathers": "wood" });
+    cases.push((
+        Task::Gather,
+        vec![
+            // Starting, with no forest in reach: ending.
+            case(json!({}), |_| {}),
+            // Hands full: storing the load.
+            case(gathering.clone(), |world| {
+                w1(world).carried = Stock::from([(Good::Wood, 40.0)]);
+            }),
+            // Back from storing with nothing left in reach, carrying some: storing it, then ending.
+            case(with(&gathering, "storing", json!(true)), |world| {
+                w1(world).carried = Stock::from([(Good::Wood, 5.0)]);
+            }),
         ],
     ));
     cases.push((
