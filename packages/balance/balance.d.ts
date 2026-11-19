@@ -1481,6 +1481,15 @@ export interface Balance {
     coal: number
     [key: string]: number
   }
+  readonly GATHER_PER_DAY: {
+    wood: number
+    stone: number
+    food: number
+    [key: string]: number
+  }
+  readonly PATCH_SIZE: number
+  readonly PATCH_REGROW_DAYS: number
+  readonly PATCH_REST_DAYS: number
   readonly WORK_STRENGTH_AVERAGE: number
   readonly WORK_SKILL_EFFECT: number
   readonly WORK_SKILL_LIMIT: number

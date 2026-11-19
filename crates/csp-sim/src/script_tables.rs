@@ -3047,6 +3047,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::String,
     },
     ScriptBinding {
+        name: "gather",
+        is: Is::Action,
+        params: &["good"],
+        cost: 10.0,
+        description: "Gather \"wood\" or \"food\" by hand on the Forest tile I stand on, or \"stone\" on a Hills tile, with nothing built on it and no node: a little slower than working a node, and it teaches the skill. Each tile's patch holds about one load for everyone and grows back over some game days once picked over. My order is \"gather\" until my hands are full or the patch is gone; then `me.orderEnded` says which (\"hands full\" or \"picked over\"). Children can't.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
         name: "teach",
         is: Is::Action,
         params: &["subject"],

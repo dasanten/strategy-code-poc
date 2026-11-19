@@ -1798,6 +1798,7 @@ impl<'a> ScriptBindings<'a> {
             }
             "tearDown" => self.request("tearDown", vec![("buildingId", p(0)?)]),
             "repair" => self.request("repair", vec![("buildingId", p(0)?)]),
+            "gather" => self.request("gather", vec![("good", p(0)?)]),
             "workAt" => {
                 let input = if a(0).is_some_and(|v| !v.is_null()) {
                     vec![("makes", p(0)?)]
