@@ -646,7 +646,9 @@ The shared language of the game. Domain terms only — no implementation details
   and while a town builds or upgrades its wall in stone, Stone set aside for that wall (a balance
   number of tiles' worth; Daniel, 2026-11-19, Epic 113): its roads, repairs and trade leave it, its
   founding party's Stone counts only above it, and only its walls spend it, so the building for its
-  growing population doesn't use up the Stone its wall needs; weapons
+  growing population doesn't use up the Stone its wall needs. It never makes the city short: its
+  spare hands refill it working for surplus, so its walls spending it don't pull them off other
+  work; weapons
   for the soldiers it keeps by its size, and the Iron and Wood to forge them (a city that knows of a
   coal node wants a steel Sword, Armour and Shield for each soldier instead of a spear, forged in that
   order, and keeps them, their Steel and Wood, the Iron and Coal for that Steel and the Iron ore for

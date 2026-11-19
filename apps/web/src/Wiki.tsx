@@ -3453,7 +3453,8 @@ export function Wiki() {
           this last of all its projects. While it does, its reserve sets aside the Stone of{' '}
           {num(NPC_WALL_STONE_SET_ASIDE_TILES)} tiles of stone wall for it: its roads, repairs and
           trade leave that Stone, a founding party's Stone counts only above it, and only its walls
-          spend it. It upgrades a tile at a time once it holds a builder's trip of Stone it may
+          spend it. It never counts as short: its spare hands refill it working for surplus, so the
+          wall doesn't pull them off other work. It upgrades a tile at a time once it holds a builder's trip of Stone it may
           spend, from what it sets aside or beyond its reserve, while its road crew is in and its
           wall is not moving out. A town with none builds a quarry for it, and its spare hands work it. A
           new outer wall it puts up when it grows is of stone once its old one was. Villages,

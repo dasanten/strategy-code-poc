@@ -146,12 +146,12 @@ fn a_town_sets_stone_aside_in_its_reserve_for_its_wall_and_upgrades_from_it() {
         .iter()
         .position(|b| b.city_id.as_ref() == Some(&t.city) && b.kind == BuildingKind::Storage)
         .unwrap();
-    // Holding its reserve but for less than a trip of its set-aside, it waits, and is short of
-    // Stone, so its hands quarry it.
+    // Holding its reserve but for less than a trip of its set-aside, it waits. That makes it short
+    // of nothing: its hands refill the set-aside working for surplus, not off other work.
     let mut stock = npc_reserve(&t.world, t.city());
     stock.insert(Good::Stone, reserve - aside + trip() - 1.0);
     t.world.buildings[i].stock = Some(stock.clone());
-    assert!(short_goods(&t.world, t.city(), t.terrain.size, None).contains(&Good::Stone));
+    assert!(!short_goods(&t.world, t.city(), t.terrain.size, None).contains(&Good::Stone));
     assert_eq!(t.upgrade(), None);
     // A trip of its set-aside: the gate goes stone, though it has no Stone beyond its reserve.
     stock.insert(Good::Stone, reserve - aside + trip());

@@ -31,8 +31,9 @@ const SEASON_DAYS: usize = (TICKS_PER_GAME_YEAR / TICKS_PER_GAME_DAY / 4.0) as u
 /// its land; day 27 on open plains before a full town saved its founding party's Stone, #1379).
 const GATE_BY_DAY: usize = 70;
 
-/// The share of its outer wall of stone at the end of the season (31% when measured with Hills
-/// past its land; 40% on open plains before #1379; 62% before its wooden walls decayed, Epic 97:
+/// The share of its outer wall of stone at the end of the season (30% when measured with Hills
+/// past its land and the Stone it sets aside for its wall never short, Epic 113; 31% before it;
+/// 40% on open plains before #1379; 62% before its wooden walls decayed, Epic 97:
 /// once worn their repairs take a Wood a tile, Wood its quarry and upgrade then wait on).
 const SHARE_BY_SEASON: f64 = 0.3;
 
