@@ -986,14 +986,23 @@ pub fn step_founders(
                 // Food of their own past that goes into the storage first, to make room for the
                 // materials (T100.8).
                 let spare = (carried_food(r) - food_walk - food_stay).floor();
+                // One too full for their own Food puts down what crowds it out first (#1379: a
+                // hand from the quarry set out with 27 Stone and no Food, and starved).
+                let food_there = held_in(store.stock.as_ref(), Good::Food).floor();
+                let crowd = crowded_out(world, i, (on_way + stay).min(food_there));
                 let load = load_for(world, i, &parts, store);
-                if spare >= 1.0 || load.is_some() {
+                if spare >= 1.0 || !crowd.is_empty() || load.is_some() {
                     let (sid, sx, sy) = (store.id.clone(), store.x, store.y);
                     let here = is_at(at, placed(store), size);
                     let order = if here && spare >= 1.0 {
                         ResidentOrder::Drop(DropOrder {
                             to: GoodsSpot::Storage { storage_id: sid },
                             goods: Stock::from([(Good::Food, spare)]),
+                        })
+                    } else if here && !crowd.is_empty() {
+                        ResidentOrder::Drop(DropOrder {
+                            to: GoodsSpot::Storage { storage_id: sid },
+                            goods: crowd,
                         })
                     } else if let (true, Some(load)) = (here, load) {
                         ResidentOrder::PickUp(PickUpOrder {
@@ -1046,6 +1055,37 @@ fn join_daughter(world: &mut WorldState, i: usize, daughter: &str) {
 
 /// What a member takes from the storage of `wanted` (`loadFor`): part by part in its order, as far
 /// as the storage holds it and it fits; none if nothing.
+/// What a founding party's member puts down at the storage to make room for `food` of their own
+/// (`CONTEXT.md`: Founding, their own Food first): of what they carry but Food, Coins and what
+/// they have equipped, as little as frees the room, in the order they carry it.
+fn crowded_out(world: &WorldState, i: usize, food: f64) -> Stock {
+    let r = &world.residents[i];
+    if food < 1.0 {
+        return Stock::new();
+    }
+    let room = (carry_capacity(r, world.tick as f64) - stock_weight(&r.carried)).max(0.0);
+    let mut need = food.floor() * good_weight(Good::Food) - room;
+    let gear = [r.equipped.weapon, r.equipped.shield, r.equipped.armour];
+    let mut out = Stock::new();
+    for (good, units) in &r.carried {
+        if need <= 1e-9 {
+            break;
+        }
+        if matches!(good, Good::Food | Good::Coins) {
+            continue;
+        }
+        let worn = gear.iter().filter(|g| **g == Some(*good)).count() as f64;
+        let w = good_weight(*good);
+        let n = (need / w).ceil().min((units - worn).floor());
+        if w <= 0.0 || n <= 0.0 {
+            continue;
+        }
+        out.insert(*good, n);
+        need -= n * w;
+    }
+    out
+}
+
 fn load_for(world: &WorldState, i: usize, wanted: &[Stock], storage: &Building) -> Option<Stock> {
     let r = &world.residents[i];
     let mut room = carry_capacity(r, world.tick as f64) - stock_weight(&r.carried);

@@ -1391,6 +1391,51 @@ fn wave_of(
 }
 
 #[test]
+fn one_too_full_of_stone_for_their_own_food_puts_some_down_and_takes_their_food() {
+    let days = npc_full_days(110.0);
+    let mut t = full_for(110, days);
+    t.plan_city();
+    let party = t.party();
+    assert!(!party.is_empty());
+    let site = t.plan().founding_site.expect("a site");
+    let city = t.city.clone();
+    let home = t.home();
+    let i = t.world.residents.iter().position(|r| r.id == party[0]).unwrap();
+    // Back from the quarry with as much Stone as they carry and no Food (#1379).
+    let full = (carry_capacity(&t.world.residents[i], t.world.tick as f64)
+        / good_weight(Good::Stone))
+    .floor();
+    let r = &mut t.world.residents[i];
+    (r.x, r.y, r.order, r.script) = (home.x, home.y, None, None);
+    r.carried = Stock::from([(Good::Stone, full)]);
+    let storage = t.world.buildings.iter().position(|b| b.id == home.id);
+    let size = t.terrain.size;
+    let walk = wrap_distance(size, (home.x as i32, home.y as i32), (site.x as i32, site.y as i32))
+        * WALK_TICKS_PER_TILE;
+    let (food_walk, food_stay) = founding_food(walk);
+    let own = food_walk + food_stay;
+
+    super::step_founders(&mut t.world, &city, &[i], storage, size);
+    let Some(ResidentOrder::Drop(drop)) = t.world.residents[i].order.clone() else {
+        panic!("{:?}", t.world.residents[i].order);
+    };
+    assert_eq!(drop.goods.keys().copied().collect::<Vec<_>>(), [Good::Stone]);
+    let put = held(&drop.goods, Good::Stone);
+    assert!(put * good_weight(Good::Stone) >= own * good_weight(Good::Food) - 1e-9, "{put}");
+    assert!(put < full, "only what makes room");
+
+    // Then they take their Food.
+    let r = &mut t.world.residents[i];
+    r.carried.insert(Good::Stone, full - put);
+    r.order = None;
+    super::step_founders(&mut t.world, &city, &[i], storage, size);
+    let Some(ResidentOrder::PickUp(pick)) = &t.world.residents[i].order else {
+        panic!("{:?}", t.world.residents[i].order);
+    };
+    assert!(held(&pick.goods, Good::Food) >= own.floor(), "{pick:?}");
+}
+
+#[test]
 fn once_founded_it_sends_what_its_daughter_still_lacks_after_it_until_its_storage_stands() {
     let days = npc_full_days(110.0);
     let mut t = full_for(110, days);

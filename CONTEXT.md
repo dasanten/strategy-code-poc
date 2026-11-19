@@ -747,7 +747,8 @@ The shared language of the game. Domain terms only — no implementation details
   to it, until its storage stands (from then it gathers what it lacks like any city). Like the
   party's extra carriers they stay with the daughter (decided by the second-wave session, closest
   to the existing rule; Daniel to confirm). A hand called home leaves the workplace far out it
-  was called from. The daughter is an
+  was called from. One too full of what they carry for their own Food puts down at the storage what crowds it
+  out first, so nobody sets out without it (#1379). The daughter is an
   ordinary NPC city with a name from the game; then its storage, a farm and a house. Until its
   storage stands its armed residents build with the rest, since the materials are on them and
   there is nowhere else to put them. A member gone back to the mother's storage for materials

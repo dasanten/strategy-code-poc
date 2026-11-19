@@ -3432,7 +3432,8 @@ export function Wiki() {
           is going up they join the party, and once the daughter stands they carry what it still
           lacks to it, until its storage stands. Like the party, they stay as the daughter's
           residents. Hands sent back from far workplaces leave them, and none of them goes back to
-          work there while called home. The party builds the town hall, which founds the daughter: an NPC city of
+          work there while called home. One too full for their own Food puts
+          down what crowds it out at the storage first, so nobody sets out without it. The party builds the town hall, which founds the daughter: an NPC city of
           its own with a name from the game. It then builds its storage, a farm and a house, and
           once its storage holds the Wood of its reserve, its first wall, a ring{' '}
           {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its home. Mother and daughter start at
