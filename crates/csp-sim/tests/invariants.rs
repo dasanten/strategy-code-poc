@@ -464,10 +464,12 @@ fn invariants_for_tick_runs_all_of_them_when_every_tick_is_sampled_none_at_a_rat
     // (T97.9), `tower-room` (T109.1), `siege-machines-in-place` (T110.1), `threat-sound` (T98.2),
     // `trading-posts-have-no-temperament` (T98.1), `npc-hunts-sound` (T98.6),
     // `stances-sound` (T98.4), `npc-demands-sound` (T98.7),
-    // `npc-takings-sound` (T98.10), `marches-sound` (T98.8), `npc-founding-stone-kept`,
-    // `npc-called-home-sound` (#1379), `founding-party-sets-out-loaded` and `founding-wave-sound`
-    // (#1438).
-    assert_eq!(all.len(), 193);
+    // `npc-takings-sound` (T98.10), `marches-sound` (T98.8), `npc-founding-stone-kept` (#1379),
+    // `npc-far-workers-go-home-fed` (#1379), `patches-sound` and `gather-orders-sound` (T114.1),
+    // `drifters-sound` and `drifters-join-with-room` (T115.1), `zeal-within-cap` (T116.1),
+    // `rallies-sound` (T116.2), `npc-called-home-sound` (#1379), `founding-party-sets-out-loaded`
+    // and `founding-wave-sound` (#1438).
+    assert_eq!(all.len(), 200);
 }
 
 /// A starting city with everyone idle on the storage's tile, carrying nothing (`atHome` of

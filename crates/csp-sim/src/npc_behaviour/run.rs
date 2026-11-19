@@ -145,6 +145,22 @@ fn run_city(
     let houses: Vec<Building> = houses_to_stand_at(world, &city);
 
     stop_builders_who_cant_go_on(world, &adults, store);
+    // A worker sent far out before the city set the Food they go home with gets it now (#1379).
+    for &i in &adults {
+        let far_out =
+            world.residents[i].script.as_ref().filter(|s| s.task == Some(Task::Work)).and_then(
+                |s| {
+                    if s.memory.get("foodAt").is_some() {
+                        return None;
+                    }
+                    let id = s.memory.get("workplaceId")?.as_str()?;
+                    world.buildings.iter().find(|b| b.id == id).cloned()
+                },
+            );
+        if let Some(place) = far_out {
+            far_work_food(world, i, &place, storage, terrain);
+        }
+    }
     for &i in &adults {
         // On alarm, they get back to all this when their Alarm script hands back.
         if world.residents[i].script.as_ref().is_some_and(|s| s.task == Some(Task::Alarm)) {
@@ -538,6 +554,7 @@ fn run_city(
                             let pb = world.buildings[place].clone();
                             let makes = chain_makes(world, &pb);
                             put_to_work_making(&mut world.residents[i], &pb, makes);
+                            far_work_food(world, i, &pb, storage, terrain);
                             places.take(&pb);
                         }
                         continue;
@@ -802,6 +819,34 @@ fn breed_horses(world: &mut WorldState, city: &City, i: usize) -> bool {
     false
 }
 
+/// A worker sent to a workplace further from the storage than `NPC_NODE_REACH` goes home for Food
+/// while they still have what the walk home eats (`CONTEXT.md`: Crew food; Daniel, #1379): their Work
+/// default's `foodAt` and `foodTake` are a far builder's (`far_site_food`). With the default `foodAt`
+/// of a unit, Larkspur's quarry workers 270 tiles out set out home with none and went Down on the way.
+fn far_work_food(
+    world: &mut WorldState,
+    i: usize,
+    place: &Building,
+    storage: Option<usize>,
+    terrain: Option<&TerrainMap>,
+) {
+    let Some(s) = storage else { return };
+    let far = crate::npc_growth::far_site_food(
+        world,
+        i,
+        &world.buildings[s],
+        (place.x, place.y),
+        terrain,
+    );
+    let (Some((at, take)), Some(script)) = (far, world.residents[i].script.as_mut()) else {
+        return;
+    };
+    // Numbers as a script keeps them: a whole one reads back as one (`running-scripts-sound`).
+    let num = csp_lang::plain::number_json;
+    script.memory.insert("foodAt".into(), num(at));
+    script.memory.insert("foodTake".into(), num(take));
+}
+
 /// Before a resident sets out for a workplace, they take the Food for the walk there and back and
 /// their first days of work from the storage (`takeSetOutFood`). Whether they set out now.
 fn take_set_out_food(
@@ -823,7 +868,16 @@ fn take_set_out_food(
         Some(t) => walk_time(world, t, &|_, _| true, r, at, (pb.x as i32, pb.y as i32)),
         None => wrap_distance(size, at, (pb.x as i32, pb.y as i32)) * WALK_TICKS_PER_TILE,
     };
-    let short = set_out_food(walk) - held(&r.carried, Good::Food);
+    // Far out, what the walk home eats on top, as they go home for more before they lack it.
+    let far = crate::npc_growth::far_site_food(
+        world,
+        i,
+        &world.buildings[storage],
+        (pb.x, pb.y),
+        terrain,
+    );
+    let r = &world.residents[i];
+    let short = set_out_food(walk) + far.map_or(0.0, |(at, _)| at) - held(&r.carried, Good::Food);
     if short <= 1e-9 {
         return true;
     }

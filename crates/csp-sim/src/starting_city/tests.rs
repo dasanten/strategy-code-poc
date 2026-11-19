@@ -6,7 +6,7 @@ use csp_shared::balance::NPC_VILLAGE;
 use csp_shared::balance::{
     ADULT_AGE, HOUSING_ROOM, MAX_HEALTH, MAX_HUNGER, START_CARRIED_FOOD, START_CITY_SIZE,
     START_COINS, START_FOOD, START_HORSES, START_RESIDENTS, START_SPEARS, START_STABLE_FOOD,
-    STAT_BASE_MAX, STAT_BASE_MIN,
+    START_STONE, START_TOOLS, START_WOOD, STAT_BASE_MAX, STAT_BASE_MIN,
 };
 use csp_shared::terrain::{terrain_at, Terrain};
 use csp_shared::world::{AlarmKind, BuildingKind, Good, ResidentOrder, Stock, WorldState};
@@ -38,7 +38,8 @@ fn founded_for(players: u64) -> WorldState {
 }
 
 /// The world as the TypeScript founded it: its starting cities held no Coins (T101.2 gave them
-/// `START_COINS`, which `gives_a_player_a_realm_with_everything_a_starting_city_has` checks) and
+/// `START_COINS`, T113.1 its Wood, Stone and Tools, which
+/// `gives_a_player_a_realm_with_everything_a_starting_city_has` checks) and
 /// its residents no Spear (T104.1, `starting_residents_each_carry_an_iron_spear_and_are_armed`), so
 /// these are taken out to compare the rest with the frozen fixtures. Nor did its realms keep when
 /// they began (T98.7, `a_realm_keeps_when_it_began_for_its_shelter`).
@@ -49,6 +50,9 @@ fn as_the_typescript_founded(mut world: WorldState) -> WorldState {
     for b in world.buildings.iter_mut().filter(|b| b.kind == BuildingKind::Storage) {
         if let Some(stock) = b.stock.as_mut() {
             assert_eq!(stock.shift_remove(&Good::Coins), Some(START_COINS));
+            assert_eq!(stock.shift_remove(&Good::Wood), Some(START_WOOD));
+            assert_eq!(stock.shift_remove(&Good::Stone), Some(START_STONE));
+            assert_eq!(stock.shift_remove(&Good::Tools), Some(START_TOOLS));
         }
     }
     for r in &mut world.residents {
@@ -190,7 +194,13 @@ fn gives_a_player_a_realm_with_everything_a_starting_city_has() {
     assert_eq!(count(BuildingKind::Storage), 1);
     assert_eq!(count(BuildingKind::Farm), 1);
     let storage = world.buildings.iter().find(|b| b.kind == BuildingKind::Storage).unwrap();
-    let start = [(Good::Food, START_FOOD), (Good::Coins, START_COINS)];
+    let start = [
+        (Good::Food, START_FOOD),
+        (Good::Coins, START_COINS),
+        (Good::Wood, START_WOOD),
+        (Good::Stone, START_STONE),
+        (Good::Tools, START_TOOLS),
+    ];
     assert_eq!(storage.stock, Some(start.into_iter().collect()));
     // The farm lies just past the city's area, so working it is not being at home.
     assert!(!in_city_area(&world, &city.id, farm.x, farm.y, terrain.size));
@@ -311,6 +321,24 @@ fn an_npc_villages_start_is_unchanged() {
     for r in villagers {
         assert_eq!(r.carried, [(Good::Food, START_CARRIED_FOOD)].into_iter().collect::<Stock>());
     }
+    // Nor does its storage get a starting city's Wood, Stone and Tools (T113.1).
+    let storage = world
+        .buildings
+        .iter()
+        .find(|b| b.kind == BuildingKind::Storage && b.city_id.as_deref() == Some(id.as_str()))
+        .expect("a village has a storage");
+    let stock = storage.stock.as_ref().expect("a stock");
+    assert_eq!(stock, &Stock::from([(Good::Food, NPC_VILLAGE.food)]));
+}
+
+#[test]
+fn a_starting_citys_storage_holds_wood_stone_and_tools_for_a_first_building() {
+    let world = founded_for(1);
+    let storage = world.buildings.iter().find(|b| b.kind == BuildingKind::Storage).unwrap();
+    let stock = storage.stock.as_ref().expect("a stock");
+    assert_eq!(stock.get(&Good::Wood), Some(&START_WOOD));
+    assert_eq!(stock.get(&Good::Stone), Some(&START_STONE));
+    assert_eq!(stock.get(&Good::Tools), Some(&START_TOOLS));
 }
 
 #[test]

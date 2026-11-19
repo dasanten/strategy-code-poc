@@ -2251,9 +2251,9 @@ pub fn carrying_doesnt_work(world: &WorldState, _: &TerrainMap) -> Out {
 }
 
 /// Orders only a grown resident can hold (`ADULT_ORDERS`).
-const ADULT_ORDERS: [&str; 15] = [
+const ADULT_ORDERS: [&str; 16] = [
     "build", "roadLine", "wallLine", "tearDown", "repair", "workAt", "teach", "train", "breed",
-    "drive", "feed", "crew", "push", "ram", "throw",
+    "drive", "feed", "crew", "push", "ram", "throw", "gather",
 ];
 
 /// Children don't work until they are grown (`childrenDontWork`).

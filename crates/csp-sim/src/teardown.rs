@@ -101,9 +101,12 @@ pub fn resolve_tearing_down(
             let b = &world.buildings[bi];
             let under = terrain.map(|t| terrain_at(t, b.x as i32, b.y as i32));
             let work = site_work_of(build_work(r, tick), b.kind, under);
-            let total = teardown_work(b).min(b.teardown.unwrap_or(0.0) + work);
             let learned = construction_learned(r, tick);
             let had = skill_of(r, SkillName::Construction);
+            let id = b.id.clone();
+            let work = work * crate::rally::rallied_pace(world, ri, &id);
+            let b = &world.buildings[bi];
+            let total = teardown_work(b).min(b.teardown.unwrap_or(0.0) + work);
             world.buildings[bi].teardown = Some(total);
             world.residents[ri].skills.insert(SkillName::Construction, had + learned);
             crate::wear::wear_tools(world, ri);

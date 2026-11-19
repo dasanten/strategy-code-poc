@@ -20,6 +20,9 @@
 //! goes on to the end (or to `GAME_YEAR_DAYS`), holding the same things: resuming is the same run
 //! tick for tick (`resuming_from_a_save_is_the_same_run`), so a late failure is looked at from the
 //! last checkpoint before it.
+//!
+//! `GAME_YEAR_TRACE=<file>` writes a line a game day for each NPC city and one for each resident who
+//! starves (where, doing what); `GAME_YEAR_WHO=<id>,<id>` adds a line a game hour for those residents.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -309,6 +312,9 @@ fn run(
     let mut trace = std::env::var("GAME_YEAR_TRACE")
         .ok()
         .map(|p| std::io::BufWriter::new(std::fs::File::create(p).expect("a trace file")));
+    let who: Vec<String> = std::env::var("GAME_YEAR_WHO")
+        .map(|ids| ids.split(',').map(str::to_string).collect())
+        .unwrap_or_default();
     while watch.day < to {
         watch.day += 1;
         let day = watch.day;
@@ -318,6 +324,12 @@ fn run(
             }
             let step = runner.step_with_result(world, terrain);
             let starved: Vec<_> = step.survival.died.clone();
+            if let Some(t) = trace.as_mut() {
+                trace_deaths(t, world, terrain, &starved);
+                if world.tick.is_multiple_of(TRACE_WHO_TICKS) {
+                    trace_who(t, world, &who);
+                }
+            }
             watch.tick(world, &starved);
         }
         watch.day(world);
@@ -360,6 +372,62 @@ fn run(
                 watch.traders_short(world).len(),
             );
         }
+    }
+}
+
+/// Ticks between two lines for each resident named in `GAME_YEAR_WHO`: a game hour.
+const TRACE_WHO_TICKS: u64 = 60;
+
+/// One line for each resident named in `GAME_YEAR_WHO` (ids, comma-separated), to
+/// `GAME_YEAR_TRACE`: where they are, how fed, what they carry, their job and what they do.
+fn trace_who(out: &mut impl std::io::Write, world: &WorldState, who: &[String]) {
+    for id in who {
+        let Some(r) = world.residents.iter().find(|r| &r.id == id) else { continue };
+        let job = r.city_id.as_ref().and_then(|c| world.city_plans.get(c)?.jobs.get(id));
+        let short = |s: String| s.chars().take(200).collect::<String>();
+        let _ = writeln!(
+            out,
+            "t{} {id} at=({:.0},{:.0}) hunger={:.1} health={:.0} down={:?} carried={:?} \
+             job={job:?} order={} script={}",
+            world.tick,
+            r.x,
+            r.y,
+            r.hunger,
+            r.health,
+            r.down_until,
+            r.carried,
+            short(format!("{:?}", r.order)),
+            short(format!("{:?}", r.script)),
+        );
+    }
+}
+
+/// One line for each resident who starved this tick, to `GAME_YEAR_TRACE` if set: their city,
+/// their job there, how far from its home they died, what they carried and what they were doing.
+fn trace_deaths(
+    out: &mut impl std::io::Write,
+    world: &WorldState,
+    terrain: &TerrainMap,
+    died: &[csp_shared::world::Resident],
+) {
+    for r in died {
+        let Some(city) = r.city_id.as_deref() else { continue };
+        let job = world.city_plans.get(city).and_then(|p| p.jobs.get(&r.id));
+        let from_home = crate::npc_behaviour::npc_home(world, city).map(|h| {
+            wrap_distance(terrain.size, (h.x as i32, h.y as i32), (r.x as i32, r.y as i32))
+        });
+        let order = format!("{:?}", r.order);
+        let _ = writeln!(
+            out,
+            "t{} died {} {city} job={job:?} from_home={from_home:?} at=({:.0},{:.0}) \
+             carried={:?} order={}",
+            world.tick,
+            r.id,
+            r.x,
+            r.y,
+            r.carried,
+            order.chars().take(400).collect::<String>(),
+        );
     }
 }
 

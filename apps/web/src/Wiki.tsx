@@ -37,6 +37,11 @@ import {
   CARRY_PER_STRENGTH,
   CARRYING_DAYS,
   PAIRING_WAIT_DAYS,
+  DRIFTER_REALM_CAP,
+  DRIFTER_WAIT_DAYS,
+  DRIFTER_DISTANCE_MIN,
+  DRIFTER_DISTANCE_MAX,
+  DRIFTER_FOOD,
   CHILD_STAT_SPREAD,
   CHILD_YEAR_DAYS,
   CITY_AREA_MARGIN,
@@ -288,7 +293,13 @@ import {
   START_HORSES,
   START_RESIDENTS,
   START_SPEARS,
+  START_STONE,
+  START_TOOLS,
+  START_WOOD,
   STARTING_SITE_WALK,
+  STARTING_SITE_NODE_REACH,
+  STARTING_SITE_FOREST_REACH,
+  HEARTLAND_GROVE_SPACING,
   STARTING_SITES_PER_HEARTLAND,
   STAT_BASE_MAX,
   STAT_BASE_MIN,
@@ -369,6 +380,11 @@ import {
   RECIPES,
   BATCHES_PER_DAY,
   WORK_OUTPUT_PER_DAY,
+  GATHER_PER_DAY,
+  GATHER_REACH,
+  PATCH_SIZE,
+  PATCH_REGROW_DAYS,
+  PATCH_REST_DAYS,
   NPC_FOOD_REFILL_DAYS,
   RICHNESS_FACTOR,
   FRONTIER_RICH_NODES,
@@ -394,6 +410,8 @@ import {
   carryCapacity,
   walkSpeed,
   workFactor,
+  RALLY_PACE,
+  ZEAL_CAP_HOURS,
 } from '@csp/balance'
 import { PARAM_DESCRIPTIONS, DEFAULT_SCRIPTS, SCRIPT_VIEWS } from '@csp/lang-wasm'
 import { WORKPLACE_PARAM } from './shared/default-scripts.js'
@@ -461,6 +479,8 @@ import {
   transport,
   horseRow,
   wikiResident,
+  zealFillRealHours,
+  zealFullRealMinutes,
   type PricedGood,
 } from './wiki-view.js'
 import { GROUP_SLOTS } from './saved-groups.js'
@@ -517,6 +537,8 @@ export const WIKI_TOPICS = [
   { id: 'training', title: 'Training' },
   { id: 'food', title: 'Food & hunger' },
   { id: 'work', title: 'Workplaces & output' },
+  { id: 'zeal', title: 'Zeal & rallying the crew' },
+  { id: 'gathering', title: 'Gathering by hand' },
   { id: 'building', title: 'Building & tearing down' },
   { id: 'transport', title: 'Carrying & transport' },
   { id: 'water', title: 'Water & havens' },
@@ -1352,6 +1374,15 @@ export function Wiki() {
           names the heartland your city stands in.
         </p>
         <p>
+          Every starting site has a poor stone and iron node within{' '}
+          {num(STARTING_SITE_NODE_REACH)} tiles of its middle, and a poor forest node within{' '}
+          {num(STARTING_SITE_FOREST_REACH)} tiles, about{' '}
+          {duration(STARTING_SITE_FOREST_REACH * WALK_TICKS_PER_TILE)} on foot over Plains, so Wood
+          is close from the start. A heartland’s Forest lies in wide patches; where none lies near,
+          a small grove of Forest grows on its Plains, at most one every{' '}
+          {num(HEARTLAND_GROVE_SPACING)} tiles.
+        </p>
+        <p>
           Resource nodes lie thicker away from home: a frontier region holds{' '}
           {num(FRONTIER_NODE_DENSITY)} times as many as a heartland, an island{' '}
           {num(ISLAND_NODE_DENSITY)} times. <strong>Gold ore</strong> is a rare good like Coal: no
@@ -1367,7 +1398,15 @@ export function Wiki() {
           residents, your Leader among them, working the farm. Every grown one, your Leader too,
           carries {num(START_SPEARS)} iron Spear, so they are armed from the first tick and an alarm
           sends them to defend the city. Children get none, and no spare weapons lie in the storage.
-          NPC villages keep their own start.
+          Beside its Food and Coins, the storage holds {num(START_WOOD)} Wood and{' '}
+          {num(START_STONE)} Stone for a first building, and {num(START_TOOLS)} sets of Tools for
+          residents to fetch. NPC villages keep their own start.
+        </p>
+        <p>
+          <strong>First steps.</strong> Before any camp or quarry stands, your residents can{' '}
+          <a href="#gathering">gather by hand</a>: give a few of them Gather (Wood) on their card
+          and they bring load after load of Wood from the forest beside the city to its storage,
+          enough for your first houses while you look for nodes.
         </p>
         <p>
           One resident of your starting city, never your Leader, is its <strong>stable hand</strong>
@@ -1616,6 +1655,23 @@ export function Wiki() {
           Health runs up to {num(MAX_HEALTH)}.
         </p>
         <p>
+          <b>Drifters.</b> A small realm draws newcomers on its own. While your realm has fewer than{' '}
+          {num(DRIFTER_REALM_CAP)} residents, your Leader lives, and the city your Leader lives in
+          has free housing and a food surplus, a grown drifter sets out for that city every{' '}
+          {days(DRIFTER_WAIT_DAYS)}, one at a time; the wait counts only while all of that holds.
+          Founding more cities brings no more drifters, and NPC cities, trading posts and the HQ
+          draw none. A drifter comes into being out of every Player’s sight,{' '}
+          {num(DRIFTER_DISTANCE_MIN)} to {num(DRIFTER_DISTANCE_MAX)} tiles from the town hall, with
+          stats and an age like a starting city’s residents and {num(DRIFTER_FOOD)} Food for the
+          walk, and walks in. On the way they belong to nobody: they take no orders, and whatever is
+          done to them is no crime. Stepping into the city’s area they join it and your realm,
+          standing idle, and your realm log names them. If by then the city has no free housing, is
+          no longer yours, or your realm has reached the cap, they turn round and are gone once
+          nobody sees them. Residents on their way (a drifter, those relocating, children being
+          carried) count toward the free housing and the cap. The town hall of your Leader’s city
+          says when the next drifter comes, or why none does.
+        </p>
+        <p>
           <b>Names.</b> A name the game gives a resident, in a starting city, at birth or when they
           join your realm, is one no living resident of that realm has (an NPC city counts as a
           realm of its own); a name it gives a city is one no city in the world has. Once its list
@@ -1768,7 +1824,8 @@ export function Wiki() {
           city sends to a workplace sets out with Food for the walk there and back plus{' '}
           {days(SET_OUT_WORK_DAYS)} of work, not a fixed amount, so they last until the carrier's
           first round trip. Its builders of a site more than {num(NPC_NODE_REACH)} tiles from its
-          storage take the same, and go back for more while they still have what the walk home eats.
+          storage take the same, and go back for more while they still have what the walk home eats;
+          so do its workers at a workplace that far out.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -1979,6 +2036,73 @@ export function Wiki() {
           Example: a miner with Strength {num(strong.stats.strength.base)} and Mining{' '}
           {num(strong.skills.mining ?? 0)} digs {num(outputPerDay('ironOre', 'mining', strong))}{' '}
           iron ore a game day, against {num(outputPerDay('ironOre', 'mining'))} at average.
+        </p>
+      </Section>
+
+      <Section id="zeal">
+        <p>
+          <strong>Zeal</strong> is yours, not your realm's: a pool that fills in real time, whether
+          you are online or not, from empty to full in about {num(zealFillRealHours())} real hours.
+          A full pool holds {num(ZEAL_CAP_HOURS)} game hours of rallying, about{' '}
+          {num(zealFullRealMinutes())} real minutes. A new Player starts with it full, and a Leader
+          handover or your Leader's death keeps it. The meter in the top bar shows how full it is,
+          and while it drains.
+        </p>
+        <p>
+          <strong>Rally the crew</strong> is an order for your Leader alone. Stand them at a
+          workplace or a construction site and pick Rally the crew on their card or the building's:
+          everyone of your realm working there, or building, tearing down or repairing there, works
+          at {num(RALLY_PACE)} times their pace, on top of their skill, Strength and Tools. Your
+          Leader does no work of their own meanwhile. Zeal drains a game hour of rallying for every
+          game hour, only while somebody is being rallied, and goes on filling meanwhile; the
+          building's card says about how long it lasts. Only work is faster: not walking, carrying,
+          fetching, training or fighting.
+        </p>
+        <p>
+          It ends when you stop it or give your Leader another order, when they leave the building,
+          are struck or go Down, or when the Zeal is used up. Whatever Zeal is left stays. A blow
+          ends it for good: it doesn't come back after the defence script.
+        </p>
+        <p>
+          It is given by hand only. No script can rally the crew and it can't be a queue step: the
+          game API has no call for it, as a script would spend the pool the moment it filled.
+        </p>
+      </Section>
+
+      <Section id="gathering">
+        <p>
+          A grown resident takes <strong>Wood</strong> or <strong>Food</strong> from a Forest tile
+          they stand on, or <strong>Stone</strong> from a Hills tile, straight into their hands: no
+          node, no workplace. Not on a tile with a building, a road, a construction site or a
+          resource node on it. Iron ore, Gold ore and Coal are never gathered. An average resident
+          gathers {num(GATHER_PER_DAY.wood ?? 0)} Wood, {num(GATHER_PER_DAY.food ?? 0)} Food or{' '}
+          {num(GATHER_PER_DAY.stone ?? 0)} Stone a game day: more than working a poor node (
+          {num((WORK_OUTPUT_PER_DAY.wood ?? 0) * RICHNESS_FACTOR.poor)} Wood), less than a normal
+          one ({num(WORK_OUTPUT_PER_DAY.wood ?? 0)} Wood). Strength, the good’s skill (Woodcutting,
+          Farming, Mining) and Tools count as they do at a workplace, and gathering teaches that
+          skill.
+        </p>
+        <p>
+          <strong>Patches.</strong> Each Forest and Hills tile holds {num(PATCH_SIZE)} units for
+          gathering, about one load, shared by everyone and by Wood and Food alike. Once it is gone
+          the tile is <strong>picked over</strong> and gives nothing. Once nobody has gathered there
+          for {days(PATCH_REST_DAYS)}, it grows back steadily, from empty to full in{' '}
+          {days(PATCH_REGROW_DAYS)}. So the land beside a city empties under a few gatherers, while
+          a workplace on a node never runs out. The tile card says what a tile gives and, while it
+          is in sight, how much is left or when it is full again; up close the map shows picked-over
+          tiles in sight thinned out.
+        </p>
+        <p>
+          <strong>The Gather task.</strong> Gather on a resident’s card, on the group card, as a
+          queue step or from the realm bar asks what to gather first. The resident walks to the
+          nearest tile within {num(GATHER_REACH)} tiles of where they started that gives it and
+          isn’t picked over as far as they can see, gathers until their hands are full or the patch
+          is gone, and goes on to the next tile; with a full load they store it at their{' '}
+          <code>storage</code>, else the nearest storage of your realm, and come back. Several
+          gatherers take different tiles. With no such tile left in reach they store what they carry
+          and end, saying why. The usual food params work as in Work. In a script,{' '}
+          <code>gather(good)</code> gathers on the tile you stand on, and a tile’s{' '}
+          <code>pickedOver</code> says whether its patch is gone.
         </p>
       </Section>
 
@@ -3380,8 +3504,8 @@ export function Wiki() {
           {num(NPC_ESCORT_TOWN_RESIDENTS)} residents or more, a town, sends{' '}
           {num(NPC_TRADER_ESCORTS)} soldier with each trader as their escort, of the soldiers beyond
           those on its town hall and at its gates; a village's trader goes alone. The escort keeps
-          pace with the trader, who waits for them on the way, fights whoever goes for them and
-          comes home with them. Nothing else protects them on the way; a trader not back after{' '}
+          pace with the trader: the trader waits for an escort fallen behind, and one gone ahead waits
+          for the trader. It fights whoever goes for them and comes home with them. Nothing else protects them on the way; a trader not back after{' '}
           {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may send another.
         </p>
         <p>

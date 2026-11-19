@@ -474,7 +474,7 @@ fn task_memory(
         Task::FeedStable => {
             m.insert("stableId".into(), f.get("stableId").cloned().unwrap_or(Json::Null));
         }
-        Task::Explore | Task::Defend | Task::Alarm => {}
+        Task::Explore | Task::Defend | Task::Alarm | Task::Gather => {}
     }
     m
 }
@@ -489,7 +489,7 @@ fn task_target(
     at: (f64, f64),
 ) -> Option<String> {
     let (id, ty) = match task {
-        Task::BuildLine | Task::Explore | Task::Defend | Task::Alarm => return None,
+        Task::BuildLine | Task::Explore | Task::Defend | Task::Alarm | Task::Gather => return None,
         Task::Work => (field_str(o, "workplaceId").map(str::to_string), ParamType::Building),
         Task::TearDown | Task::Repair => {
             (field_str(o, "buildingId").map(str::to_string), ParamType::Building)
@@ -590,6 +590,9 @@ impl TaskOrder {
         }
         if task == Task::Explore {
             return (!can_work(r.born_at, tick)).then(|| "children can’t explore".into());
+        }
+        if task == Task::Gather {
+            return (!can_work(r.born_at, tick)).then(|| "children can’t gather".into());
         }
         if task == Task::Build {
             if let Some(at) = o.fields.get("at") {

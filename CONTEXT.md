@@ -63,6 +63,10 @@ The shared language of the game. Domain terms only — no implementation details
 - **Heartland:** a mainland region of good farmland and poor resource nodes, where Players start
   (Starting city). It has a trading post near its middle. No rule protects it: it is safe only in
   that it holds little worth taking, and the admin directive covers whoever farms new Players.
+  Its Forest lies in wide patches, so where none lies near, a small **grove** of Forest grows on
+  its Plains, a grove at most every few dozen tiles (balance numbers; decided while Daniel was
+  away, Daniel to confirm): Forest is never far, and every starting site has its forest node a
+  short walk away.
 - **Frontier:** a mainland region beyond the passes and land bridges, with normal resource nodes,
   a few rich ones, and the rare goods (Coal, Gold ore). Nobody starts there.
 - **Island:** land off the mainland, reached only by vessel, holding the richest nodes.
@@ -147,8 +151,40 @@ The shared language of the game. Domain terms only — no implementation details
   of work, not a fixed amount, so they last until the carrier's first round trip. An NPC
   city's builders of a site beyond its node reach from its storage set out with the same, and go back for
   more while they still have what the walk home eats (decided overnight, Daniel to confirm).
+  So do its workers at a workplace beyond its node reach: they set out with that too, and go home
+  for Food while they still have what the walk home eats, not once they have none (Daniel, #1379:
+  Larkspur's quarry workers 270 tiles out set off home with nothing and went Down on the way).
 - **Holding a workplace:** whoever physically works and guards a workplace gets its output.
   There is no ownership flag. Drive out the workers, move your own in, and it's yours.
+- **Gathering** (Epic 114, settled with Daniel on 2026-11-19): a grown resident takes Wood or Food
+  from a Forest tile they stand on, or Stone from a Hills tile, straight into their hands, with no
+  resource node and no workplace. For each resident it goes faster than working a poor node and
+  slower than working a normal one (a balance number). Strength, the good's skill (Woodcutting for
+  Wood, Mining for Stone, Farming for Food) and Tools count as at a workplace, and gathering
+  teaches that skill as working there does. Iron ore, Gold ore and Coal are never gathered. A tile
+  under a building, a construction site or a resource node gives nothing; a road counts as a
+  building (decided while Daniel was away, Daniel to confirm). A gatherer gathers until their
+  hands are full or the patch is gone, and their order then says which.
+- **Patch:** what a Forest or Hills tile still holds for gathering: about one resident's load (a
+  balance number), on a Forest tile used up by Wood and Food alike, and the same for everyone who
+  gathers there. A tile whose patch is gone is **picked over** and gives nothing; it grows back
+  steadily over some game days (a balance number). A patch grows back only once nobody has
+  gathered there for a while (a balance number, about a game day), so a tile being gathered runs
+  out rather than growing about as fast as one gatherer takes from it (decided while Daniel was
+  away, Daniel to confirm). So the land near a city empties and gatherers
+  walk further out, while a workplace on a node never runs out. A Player sees on the tile card
+  and on the map whether a tile in sight is picked over, and scripts see it.
+- **Gather:** a task (default script "Gather") for a grown resident. Its params: `good` (Wood,
+  Stone or Food), `storage` (where the load goes; unset, the nearest storage of their realm) and
+  the usual food params (Getting food). They walk to the nearest tile that fits the good and
+  isn't picked over, gather there until their hands are full or the patch is gone, go on to the
+  next tile, and with a full load store it and come back. With no such tile within a set reach (a
+  balance number) of where they started, they end and say why, first storing what they carry of
+  it. "Nearest" counts from where they started, so they work outward from it; a tile out of
+  sight counts as not picked over until they get there and see it (decided while Daniel was
+  away, Daniel to confirm). Scripts have `gather(good)` for the
+  tile they stand on (ADR 0002). Only Players' residents gather: NPC cities, trading posts and
+  the HQ keep to their workplaces for now.
 - **Tools** (Epic 97): a good a smithy makes from Iron and Wood. A resident carrying Tools works a
   share faster at a workplace or a construction site (also tearing down and repairing); without
   them they work at the plain pace, so nothing stops for want of Tools. They aren't equipped:
@@ -698,7 +734,7 @@ The shared language of the game. Domain terms only — no implementation details
   trader takes one soldier per run (a village's goes alone); a founding party takes soldiers in
   proportion to its size, at least one, in place of its one armed member. Both take more when the
   city knows the way is dangerous. Only soldiers beyond those on its hall and at its gates go. An
-  escort fights for those it guards and keeps pace with them; a trader's comes home with them, a
+  escort fights for those it guards and keeps pace with them (a trader waits for an escort fallen behind, one gone ahead waits for the trader; #1434); a trader's comes home with them, a
   founding party's stays as the daughter's first soldiers. With no soldier to spare, a trader or
   founding party sets out without an escort.
 - **Soldiers in peace** (Epic 97): the soldiers an NPC city keeps by its size are what it keeps in
@@ -1269,6 +1305,23 @@ The shared language of the game. Domain terms only — no implementation details
 - **Leader:** the Player's figure in the world. A resident like any other (stats, food, can die),
   except that the Player controls their cities and residents only while their Leader lives.
   A Leader serves no one else: they are never hired out or handed over to an alliance army.
+- **Zeal** (Epic 116, ADR 0042, settled with Daniel on 2026-11-19): a pool every Player holds,
+  apart from the world, counted in game hours of rallying. It fills steadily in real time,
+  whether the Player is online or not, up to a cap (balance numbers: about two real hours from
+  empty to full), and a new Player starts with it full. It is the Player's, not the realm's: a
+  Leader handover and a Leader death keep it. NPC cities and the Trade Organization have none.
+  The HUD shows how full it is. _Avoid:_ Drive (Driving is the carriage skill).
+- **Rallying the crew:** an order for the Leader alone, given by the Player by hand: never from
+  a script or a queue (ADR 0042, the one exception to ADR 0002). The Leader has to be at a
+  workplace or a construction site (At a building). While they stay there on that order, every
+  resident of their realm working that workplace, or building, tearing down or repairing at that
+  site, does so at three times their pace (a balance number), and the Player's Zeal drains; it
+  drains only while somebody is being rallied. The Leader does no work of their own meanwhile.
+  Only work is faster: not walking, carrying, fetching, training or fighting. It ends when the
+  Player stops it or gives the Leader another order, when the Leader leaves the building, is
+  struck or goes Down, or when the Zeal is used up; whatever Zeal is left stays. The Leader's
+  Doing line says "Rallying the crew", and the building's card shows its owning Player that the
+  crew is rallied.
 - **Leader handover:** the Player makes another resident their Leader while the old one lives,
   so the realm passes to a younger one. The new Leader is an adult of the realm who isn't serving
   anyone else (in a mercenary contract or the alliance army); both stand
@@ -1378,7 +1431,8 @@ The shared language of the game. Domain terms only — no implementation details
   including money, so nobody walks around with a fortune in their pocket.
 - **Pairing:** two adult residents of the same city set to have children (a Player order, or on
   its own in NPC cities). Each pair has one child at most. The only way, besides integrating,
-  that residents come into being. Once 10 game days have passed since they paired, and their city
+  that residents come into being. Once 10 game days have passed since they paired (3 game days
+  are agreed for Epic 113 but not built yet: #1459 waits for Daniel), and their city
   has free housing and a food surplus, one partner, chosen at random,
   starts **Carrying** the child; the other keeps working as before.
 - **Carrying:** a partner carrying a child can't work for 10 game days (4 real hours); then the
@@ -1392,10 +1446,30 @@ The shared language of the game. Domain terms only — no implementation details
   less than their own food on them tops up to it from the city's storage (Refilling at home,
   but to their own food and not only when running low), so a child leaving the city has food
   on them.
+- **Drifter** (Epic 115, settled with Daniel on 2026-11-19): a grown resident who comes to a small
+  realm on their own; beside pairing and integrating, the one other way a realm gets residents.
+  While a Player's realm has fewer residents than a cap (a balance number, about 16), its Leader
+  lives, and the city the Leader lives in has free housing and a food surplus, a drifter sets out
+  for that city every few game days (a balance number), one at a time. They come into being on a
+  passable tile a few minutes' walk from the city that no Player has in sight (as a new vein
+  does), with stats and an age drawn as in a starting city, Food for the walk and nothing else,
+  and walk to its town hall. On the way they belong to no Organization: they take no orders,
+  anyone with them in sight sees a drifter, and whatever is done to them is no crime. Stepping
+  into the city's area they become a resident of that city and its realm, standing idle, and the
+  realm log names them. Founding more cities brings no more drifters. NPC cities (self-managed
+  ones too), trading posts and the HQ draw none. Decided while planning, Daniel to confirm: when
+  on arrival the city has no free housing, is no longer that realm's, or the realm has reached
+  the cap, the drifter turns round and is gone once out of every Player's sight.
+- **Drifters on the city card:** the card of the city the Leader lives in has a line saying
+  whether drifters are coming, with about how long until the next (Estimates), or why none
+  comes: no free housing, no food surplus, or the realm is too big. Only the owning Player sees
+  it.
 - **Aging:** residents grow old; their stats decline late in life, and they die of old age at
   around 60 game years. Children age faster: each year of age up to 14 takes 10 game days
   (4 real hours), so a child is grown after about 140 game days (~56 real hours); from 14 on, a
-  year of age is a game year.
+  year of age is a game year. Agreed with Daniel on 2026-11-19 for Epic 113 but not built yet:
+  4 game days a year, so grown after about 56 game days (~22 real hours). It waits for Daniel
+  (#1459): with it, a growing NPC town never upgrades its wall to stone.
 - **Hunger:** each resident eats a fixed amount of Food per game day, more on hard terrain and
   less with high Endurance. An empty hunger meter costs health; without food a resident goes
   Down after about 5 game days (2 real hours), and dies if nobody revives them. While the meter
@@ -1669,14 +1743,15 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
 
 - **Starting site:** a place in a heartland where a starting city can stand. Each heartland has a
   set number of them (a balance number), a walk of 20 to 40 real minutes from the next, each with
-  farmland and a poor forest, stone and iron node in reach. A new Leader (a Player's first, or one
+  farmland and a poor forest, stone and iron node in reach, the forest node only a short walk
+  away (a few real minutes, a balance number; Epic 113). A new Leader (a Player's first, or one
   after a Leader death with no heir) gets a free site in the **open** heartland with the most
   Players' cities; a heartland opens only once every open one is full. So Players start as
   neighbours.
 - **Starting city:** what a Leader spawns with, on a starting site: about 8 residents with
   random stats (one of them the Leader), a town hall, a ring of wooden wall with a gate, houses for everyone with a little room
-  to spare, a storage with a small food stock and a few Coins (for a first trade: a heartland has
-  no gold), one farm outside the wall, a stable next to it
+  to spare, a storage with a small food stock, a few Coins (for a first trade: a heartland has
+  no gold), some Wood and Stone for a first building and two sets of Tools (Epic 113), one farm outside the wall, a stable next to it
   with two horses and a little Food, and one carriage standing at the stable with one of the
   horses hitched to it. The residents start on the farm, working
   it, each with a little food on them, and every grown one (the Leader too) with an iron Spear

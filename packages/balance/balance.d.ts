@@ -34,6 +34,9 @@ export interface Balance {
     forest: number
     [key: string]: number
   }
+  readonly HEARTLAND_GROVE_SPACING: number
+  readonly HEARTLAND_GROVE_RADIUS: number
+  readonly HEARTLAND_GROVE_GAP: number
   readonly ISLAND_RELIEF: number
   readonly NODE_DENSITY: {
     forest: {
@@ -124,6 +127,7 @@ export interface Balance {
   }
   readonly STARTING_SITE_WAY_DISTANCE: number
   readonly STARTING_SITE_NODE_REACH: number
+  readonly STARTING_SITE_FOREST_REACH: number
   readonly TERRAIN_SPEED: {
     '0': number
     '1': number
@@ -158,6 +162,9 @@ export interface Balance {
   readonly START_COINS: number
   readonly START_CARRIED_FOOD: number
   readonly START_SPEARS: number
+  readonly START_WOOD: number
+  readonly START_STONE: number
+  readonly START_TOOLS: number
   readonly START_HORSES: number
   readonly START_STABLE_FOOD: number
   readonly HORSE_FOOD_PER_DAY: number
@@ -652,6 +659,11 @@ export interface Balance {
   readonly ENDURANCE_TERRAIN_EFFECT: number
   readonly FOOD_SURPLUS_DAYS: number
   readonly CHILD_STAT_SPREAD: number
+  readonly DRIFTER_REALM_CAP: number
+  readonly DRIFTER_WAIT_DAYS: number
+  readonly DRIFTER_DISTANCE_MIN: number
+  readonly DRIFTER_DISTANCE_MAX: number
+  readonly DRIFTER_FOOD: number
   readonly WALK_TICKS_PER_TILE: number
   readonly PATH_DETOUR_LIMIT: number
   readonly PATH_DETOUR_SLACK: number
@@ -1481,6 +1493,16 @@ export interface Balance {
     coal: number
     [key: string]: number
   }
+  readonly GATHER_PER_DAY: {
+    wood: number
+    stone: number
+    food: number
+    [key: string]: number
+  }
+  readonly PATCH_SIZE: number
+  readonly PATCH_REGROW_DAYS: number
+  readonly PATCH_REST_DAYS: number
+  readonly GATHER_REACH: number
   readonly WORK_STRENGTH_AVERAGE: number
   readonly WORK_SKILL_EFFECT: number
   readonly WORK_SKILL_LIMIT: number
@@ -1671,6 +1693,9 @@ export interface Balance {
   readonly DEMAND_TRADE_ORG_STANDING_LOSS: number
   readonly DIRECT_OFFER_DAYS: number
   readonly DIRECT_OFFERS_TO_ONE_REALM: number
+  readonly ZEAL_CAP_HOURS: number
+  readonly ZEAL_FILL_TICKS: number
+  readonly RALLY_PACE: number
   readonly TERRAIN: {
     Plains: number
     Forest: number

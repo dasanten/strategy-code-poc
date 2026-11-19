@@ -382,6 +382,8 @@ pub fn resolve_building(
             let work = site_work_of(build_work(r, tick), kind, under);
             let learned = construction_learned(r, tick);
             let had = skill_of(r, SkillName::Construction);
+            let site_id = world.buildings[si].id.clone();
+            let work = work * crate::rally::rallied_pace(world, ri, &site_id);
             if let Some(s) = world.buildings[si].site.as_mut() {
                 s.work = total.min(s.work + work);
             }

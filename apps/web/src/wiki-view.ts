@@ -34,6 +34,8 @@ import {
   TERRITORY_PER_ARMED,
   TERRITORY_PER_RESIDENT,
   TICK_MS,
+  ZEAL_CAP_HOURS,
+  ZEAL_FILL_TICKS,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_HOUR,
   HORSE_FOOD_PER_DAY,
@@ -139,6 +141,12 @@ export function num(n: number, decimals = 2): string {
 export const signed = (n: number) => (n > 0 ? `+${num(n)}` : num(n))
 
 /** A share as a percentage: 0.02 → "2 %". */
+/** Real hours a Player's Zeal takes from empty to full (`CONTEXT.md`: Zeal). */
+export const zealFillRealHours = () => (ZEAL_FILL_TICKS * TICK_MS) / 3_600_000
+
+/** Real minutes a full pool of Zeal rallies a crew for, not counting what fills meanwhile. */
+export const zealFullRealMinutes = () => (ZEAL_CAP_HOURS * TICKS_PER_GAME_HOUR * TICK_MS) / 60_000
+
 export const pct = (share: number) => `${num(share * 100, 1)} %`
 
 /** Real time for a number of real seconds: "1 h 36 min". */

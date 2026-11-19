@@ -1,4 +1,5 @@
 import { offerTerms, setAsideLine } from './offers-view.js'
+import { ralliesAt, rallyProblem, zealLasts } from './zeal.js'
 import {
   BUILD_MATERIALS,
   BUILD_WORK,
@@ -47,6 +48,8 @@ import {
   RAM_STRENGTH,
   CATAPULT_CREW,
   CATAPULT_STRENGTH,
+  RALLY_PACE,
+  PATCH_SIZE,
 } from '@csp/balance'
 import {
   carriageCapacity,
@@ -108,6 +111,7 @@ import type {
   SeenCarriage,
   SeenVessel,
   SeenMachine,
+  SeenPatch,
   VesselKind,
   SiegeMachineKind,
   GoodsPlace,
@@ -118,12 +122,15 @@ import type {
   Good,
   SeenBuilding,
   SeenCity,
+  DrifterCard,
+  DrifterLine,
   RealmLabel,
   VeinWord,
 } from '@csp/shared-types'
 import { covers, FOOTPRINT, footprintTiles } from './shared/footprint.js'
 import { conditionLine, isRuin, repairable } from './shared/decay.js'
 import { wrap, Terrain, UNEXPLORED } from './shared/terrain.js'
+import { fullAt, gatheredOn, isPickedOver, patchLeft } from './shared/patch.js'
 import { handOverProblem, heirProblem } from './shared/leader.js'
 import { aboutTime, workLeft } from './shared/estimates.js'
 import type { Relationship } from './theme.js'
@@ -160,6 +167,7 @@ export type ActionId =
   | 'stealHorse'
   | 'haul'
   | 'explore'
+  | 'gather'
   | 'build'
   | 'roadTo'
   | 'wallTo'
@@ -189,6 +197,7 @@ export type ActionId =
   | 'push'
   | 'ram'
   | 'throw'
+  | 'rally'
 
 /** The key that runs each action; fixed per action, so it is the same whatever is selected. */
 export const ACTION_KEYS: Record<ActionId, string> = {
@@ -207,6 +216,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   stealHorse: 'M',
   haul: 'H',
   explore: 'Z',
+  gather: 'U',
   build: 'B',
   roadTo: 'R',
   wallTo: 'Q',
@@ -236,6 +246,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   push: 'D',
   ram: 'R',
   throw: 'R',
+  rally: 'Y',
 }
 
 /**
@@ -314,6 +325,11 @@ export interface ResidentHere {
   }
   /** One of the Player's own residents, whom they can rename (`CONTEXT.md`: Renaming a resident). */
   renamable?: boolean
+  /**
+   * For the Player's own Leader: why they can't rally the crew where they stand now, undefined when
+   * they can (`CONTEXT.md`: Rallying the crew). Absent for anyone else, who gets no such row.
+   */
+  rally?: { problem: string | undefined }
   /**
    * For one of the Player's own residents: why they can't be told to relocate at all
    * (`relocateActionProblem`), undefined when they can. Absent for anyone else's resident, who
@@ -600,6 +616,9 @@ function ordersOffered(h: ResidentHere): {
   // Into the unknown and back for Food (`CONTEXT.md`: Explore).
   if (h.adult) add(row('explore', 'Explore'))
   else miss('explore', 'children can’t explore')
+  // Wood, Food or Stone by hand from the land around (`CONTEXT.md`: Gather).
+  if (works) add(row('gather', 'Gather…', { opens: true }))
+  else miss('gather', h.adult ? CARRYING_A_CHILD : 'children can’t gather')
   if (works && isWorkable(h.building, h.node)) {
     add(
       row('work', `Work at the ${BUILDING_NAMES[h.building!.kind].toLowerCase()}…`, {
@@ -667,6 +686,11 @@ function ordersOffered(h: ResidentHere): {
     )
   }
   if (h.renamable) add(row('rename', 'Rename…', { opens: true }))
+  // The Leader's own order, by hand only (`CONTEXT.md`: Rallying the crew, ADR 0042).
+  if (h.rally) {
+    const { problem } = h.rally
+    add(row('rally', 'Rally the crew', problem ? { disabled: true, reason: problem } : {}))
+  }
   return { actions, missing }
 }
 
@@ -717,6 +741,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   haul: 'move',
   explore: 'move',
   work: 'work',
+  gather: 'work',
   feedStable: 'work',
   teach: 'work',
   train: 'work',
@@ -725,6 +750,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   wallTo: 'work',
   tearDown: 'work',
   breed: 'work',
+  rally: 'work',
   goods: 'goods',
   feed: 'goods',
   script: 'scripts',
@@ -1037,6 +1063,11 @@ export interface TileCard {
    * repair lacks.
    */
   repair?: { buildingId: string; name: string; rebuild?: true }
+  /**
+   * The Player's Leader stands at this workplace or site (`CONTEXT.md`: Rallying the crew): Rally
+   * the crew, greyed with why when it can't be given, or Stop while they rally it.
+   */
+  rally?: { leaderId: string; rallying: boolean; problem?: string }
   stealHorse?: {
     horseId: string
     residents: { id: string; name: string; problem: string | undefined }[]
@@ -1185,6 +1216,8 @@ export interface TileThings {
   terrain?: number
   /** The region the tile lies in, where the Player explored it (`CONTEXT.md`: Region). */
   region?: TileRegion
+  /** The tile's patch, in sight and not full (`CONTEXT.md`: Patch). */
+  patch?: SeenPatch
   /** Residents in sight on the tile that are not the Player's to command. */
   strangers: SeenResident[]
   /** Everyone in sight, for who works where and who lives in a city. */
@@ -1197,6 +1230,8 @@ export interface TileThings {
   /** The realms the Player knows by name, for who occupies a town hall. */
   realms?: RealmLabel[]
   viewer: Viewer
+  /** The Player's Leader and Zeal, for rallying the crew at a building (`CONTEXT.md`: Rallying the crew). */
+  rally?: { leaderId: string; zeal: number }
   tick?: number
   /** Residents in sight working each building, by building id. */
   workers: (b: Building) => number
@@ -1205,6 +1240,8 @@ export interface TileThings {
    * (`CONTEXT.md`: Running dry); the server sends no others.
    */
   veins?: Readonly<Record<string, VeinWord>>
+  /** Whether drifters come to the city the Leader lives in, for its town hall (`CONTEXT.md`: Drifters on the city card). */
+  drifters?: DrifterCard | null
   /**
    * About how many ticks until one of the Player's residents arrives where they drive
    * (`arrivalTicks`), for a haul route's leg.
@@ -1791,6 +1828,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         card.occupation = describeOccupation(city, t.tick ?? 0, t.viewer.realmId, t.realms ?? [])
       if (building.kind === 'townHall' && (rel === 'own' || rel === 'alliance') && city) {
         if (live) lines.push(...townHallLines(city.id, t))
+        // Whether drifters come, on the Leader's city only, which only its Player is told.
+        if (rel === 'own' && t.drifters?.cityId === city.id)
+          lines.push(drifterLine(t.drifters.line, t.tick ?? 0))
         if (rel === 'own')
           card.city = { id: city.id, label: `Open ${city.name} in the city inspector` }
         // Renaming a city (`CONTEXT.md`): from its town hall's card, while it is the Player's.
@@ -1817,6 +1857,12 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     if (condition) lines.push(condition)
     if (live && repairable(live))
       repair = { buildingId: live.id, name: name.toLowerCase(), ...rebuildOf(live) }
+    const rallyHere = live && rallyAt(live, t)
+    if (rallyHere) {
+      card.rally = rallyHere
+      if (rallyHere.rallying)
+        lines.push(`The crew is rallied · Zeal lasts ${zealLasts(t.rally!.zeal)}`)
+    }
     if (remembered && t.lastSeen) {
       card.lastSeen = {
         when: lastSeenText(remembered.seenAt, t.lastSeen.tick),
@@ -2035,8 +2081,14 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     }
     if (t.strangers.length === 1) {
       const gear = gearText(r, goodLabels)
+      // One of no realm and no city is a drifter (`CONTEXT.md`: Drifter).
+      const whose = rel
+        ? RELATIONSHIP_NAMES[rel]
+        : r.owner === null && r.cityId === null
+          ? 'Drifter'
+          : ''
       lines.push(
-        `${r.name}${rel ? ` · ${RELATIONSHIP_NAMES[rel]}` : ''}${isDown(r) ? ' · Down' : ''}${gear ? ` · ${gear}` : ''}`,
+        `${r.name}${whose ? ` · ${whose}` : ''}${isDown(r) ? ' · Down' : ''}${gear ? ` · ${gear}` : ''}`,
       )
     } else lines.push(...strangersLines(t.strangers))
   }
@@ -2066,9 +2118,14 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     const condition = conditionLine(road)
     if (condition) lines.push(condition)
     // The building's repair first; a worn road under it waits for the next.
-    if (!repair && repairable(road)) repair = { buildingId: road.id, name: 'road', ...rebuildOf(road) }
+    if (!repair && repairable(road))
+      repair = { buildingId: road.id, name: 'road', ...rebuildOf(road) }
   }
   if (terrain && !(road && !road.site)) lines.push(terrain)
+  // What a Forest or Hills tile gives by hand, and its patch while in sight (`CONTEXT.md`: Patch).
+  const tileTaken = !!road || !!t.node || here(t.buildings).length > 0 || !!live
+  const gather = tileTaken ? undefined : gatherLine(t.terrain, t.patch, t.tick ?? 0)
+  if (gather) lines.push(gather)
   // A wandering trader standing at a stop buys and sells on its tile (`CONTEXT.md`: Trader stop).
   const visitor = t.traders?.find((v) => v.standing?.x === t.x && v.standing.y === t.y)
   if (visitor) lines.push('A wandering trader buys and sells here')
@@ -2333,6 +2390,28 @@ function groundName(terrain: number | undefined): string | undefined {
  * How the tile's ground walks and feeds (`CONTEXT.md`: Terrain, Road): "Hills · speed ~70% · food
  * 130%", or a finished road's speed on whatever it lies on.
  */
+/**
+ * What a tile gives by hand (`CONTEXT.md`: Gathering, Patch): "Gather by hand: wood, food", and
+ * while its patch is in sight and not full how it stands: "· picked over, full again in about 2 h
+ * (6 game days)" or "· 12 of 30 left". Undefined for a tile that gives nothing.
+ */
+export function gatherLine(
+  terrain: number | undefined,
+  patch: Pick<SeenPatch, 'left' | 'at'> | undefined,
+  tick: number,
+): string | undefined {
+  const goods = gatheredOn(terrain as Terrain | undefined)
+  if (goods.length === 0) return undefined
+  const what = `Gather by hand: ${goods.join(', ')}`
+  if (!patch) return what
+  const left = patchLeft(patch, tick)
+  if (left >= PATCH_SIZE) return what
+  if (isPickedOver(patch, tick)) {
+    return `${what} · picked over, full again in ${aboutTime(fullAt(patch) - tick)}`
+  }
+  return `${what} · ${Math.floor(left)} of ${PATCH_SIZE} left`
+}
+
 function terrainLine(terrain: number | undefined, road: Building | undefined): string | undefined {
   const speed = (v: number) => `speed ${v === 1 ? '' : '~'}${Math.round(v * 100)}%`
   const food = (v: number) => `food ${Math.round(v * 100)}%`
@@ -2438,6 +2517,20 @@ function goodMadeAt(b: Building, t: TileThings, makes?: Good): Good | undefined 
   return node && NODE_GOOD[node.kind]
 }
 
+/**
+ * The Player's Leader at a workplace or site the Player sees (`CONTEXT.md`: Rallying the crew):
+ * whether they rally its crew, else why they can't, if they can't. Undefined when the Leader isn't
+ * there or it is nowhere to rally.
+ */
+function rallyAt(b: Building, t: TileThings): TileCard['rally'] {
+  if (!t.rally || !ralliesAt(b)) return undefined
+  const leader = t.residents?.find((r) => r.id === t.rally!.leaderId)
+  if (!leader || isDown(leader) || !covers(b, leader.x, leader.y)) return undefined
+  const rallying = leader.order?.kind === 'rally' && leader.order.buildingId === b.id
+  const problem = rallying ? undefined : rallyProblem(b, t.rally.zeal, leader.order)
+  return { leaderId: leader.id, rallying, ...(problem ? { problem } : {}) }
+}
+
 /** The known node a node's workplace stands on, if the Player knows one under it. */
 function nodeUnder(b: Building, t: TileThings): KnownNode | undefined {
   if (!NODE_WORKPLACE_KINDS.has(b.kind) || !t.nodeAt) return undefined
@@ -2451,7 +2544,8 @@ function nodeUnder(b: Building, t: TileThings): KnownNode | undefined {
  * the Player's realm working there, with what they make and how much a game day at their Strength
  * and skill, then a row for the total of each good. Undefined with none of them there. It is the
  * pace while they have what they need; other realms' workers aren't counted, as their stats aren't
- * known.
+ * known. While the realm's Leader rallies the crew there it is the rallied pace (`CONTEXT.md`:
+ * Rallying the crew).
  */
 function amountsList(
   b: Building,
@@ -2459,12 +2553,15 @@ function amountsList(
   labels: Record<string, string>,
 ): CardList | undefined {
   if (MAX_WORKERS[b.kind] === undefined || !WORKPLACE_SKILL[b.kind]) return undefined
+  const rallied = (t.residents ?? []).some(
+    (r) => r.owner === t.viewer.realmId && r.order?.kind === 'rally' && r.order.buildingId === b.id,
+  )
   const made = (t.residents ?? []).flatMap((r) => {
     const o = r.order
     if (r.owner !== t.viewer.realmId || o?.kind !== 'workAt' || o.buildingId !== b.id) return []
     const good = goodMadeAt(b, t, o.makes)
     if (!good) return []
-    const factor = richnessFactor(nodeUnder(b, t)?.richness)
+    const factor = richnessFactor(nodeUnder(b, t)?.richness) * (rallied ? RALLY_PACE : 1)
     return [{ r, good, perDay: madePerDay(r as Resident, b.kind, good, t.tick ?? 0) * factor }]
   })
   if (made.length === 0) return undefined
@@ -2576,6 +2673,27 @@ function townHallLines(cityId: string, t: TileThings): string[] {
     )
   }
   return lines
+}
+
+/**
+ * Whether drifters come to the city the Leader lives in (`CONTEXT.md`: Drifter, Drifters on the
+ * city card): one on the way, about how long until the next (Estimates), or why none comes.
+ */
+export function drifterLine(line: DrifterLine, tick: number): string {
+  switch (line.state) {
+    case 'onTheWay':
+      return 'A drifter is on the way'
+    case 'coming':
+      return `Next drifter in ${aboutTime(Math.max(0, line.at - tick))}`
+    case 'none':
+      return `No drifters come: ${DRIFTER_WHY[line.why]}`
+  }
+}
+
+const DRIFTER_WHY: Record<Extract<DrifterLine, { state: 'none' }>['why'], string> = {
+  noFreeHousing: 'no free housing',
+  noFoodSurplus: 'no food surplus',
+  realmTooBig: 'the realm is too big',
 }
 
 /**
@@ -2694,6 +2812,18 @@ export function tileActions(
       id: 'repair',
       label: `${card.repair.rebuild ? 'Rebuild' : 'Repair'} ${card.repair.name}`,
       key: ACTION_KEYS.repair,
+      ...(reason ? { disabled: true as const, reason } : {}),
+    })
+  }
+  // The Leader's order, from the building's card too (`CONTEXT.md`: Rallying the crew).
+  if (card.rally?.rallying)
+    actions.push({ id: 'stop', label: 'Stop rallying the crew', key: ACTION_KEYS.stop })
+  else if (card.rally) {
+    const reason = card.rally.problem
+    actions.push({
+      id: 'rally',
+      label: 'Rally the crew',
+      key: ACTION_KEYS.rally,
       ...(reason ? { disabled: true as const, reason } : {}),
     })
   }

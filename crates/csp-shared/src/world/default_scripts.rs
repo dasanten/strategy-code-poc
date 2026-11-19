@@ -19,4 +19,6 @@ pub enum Task {
     BuildLine,
     Explore,
     Alarm,
+    /// Gathering by hand (`CONTEXT.md`: Gather).
+    Gather,
 }
