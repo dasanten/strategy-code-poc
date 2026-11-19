@@ -7,22 +7,23 @@
 //! `STARTING_SITE_WALK` from the nearest site already there, so a Player's neighbours are a 20 to
 //! 40 minute walk away. A site is a place where a starting city with its farm and stable fits
 //! (`site_fits`), on Plains, all of it in the heartland and well away from the heartland's passes
-//! and land bridges. Each has a forest, a stone and an iron node within `STARTING_SITE_NODE_REACH`;
-//! where the land holds none that near, one is placed on fitting terrain.
+//! and land bridges. Each has a stone and an iron node within `STARTING_SITE_NODE_REACH` and a
+//! forest node within the shorter `STARTING_SITE_FOREST_REACH`; where the land holds none that
+//! near, one is placed on fitting terrain. A site is only picked where such terrain lies in reach.
 
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashSet};
 
 use csp_shared::balance::{
-    MAP_SIZE, NODE_MIN_SPACING, STARTING_SITES_PER_HEARTLAND, STARTING_SITE_NODE_REACH,
-    STARTING_SITE_WALK, STARTING_SITE_WAY_DISTANCE, START_CITY_SIZE, TERRAIN_SPEED,
-    WALK_TICKS_PER_TILE,
+    MAP_SIZE, NODE_MIN_SPACING, STARTING_SITES_PER_HEARTLAND, STARTING_SITE_FOREST_REACH,
+    STARTING_SITE_NODE_REACH, STARTING_SITE_WALK, STARTING_SITE_WAY_DISTANCE, START_CITY_SIZE,
+    TERRAIN_SPEED, WALK_TICKS_PER_TILE,
 };
 use csp_shared::terrain::{
     is_passable_terrain, terrain_at, wrap, wrap_delta, wrap_distance, Terrain, TerrainMap,
     DIAGONAL_STEP,
 };
-use csp_shared::world::{ResourceKind, ResourceNode, StartingSite, WorldState};
+use csp_shared::world::{BuildingKind, ResourceKind, ResourceNode, StartingSite, WorldState};
 use csp_shared::TICK_MS;
 
 use crate::invariants::checks::node_terrains;
@@ -30,7 +31,7 @@ use crate::node_gen::{assign_richness, place_resource_nodes_by_region};
 use crate::placing::Ground;
 use crate::random::hash;
 use crate::regions::{Region, RegionKind, Regions};
-use crate::starting_city::{site_fits, FARM_RING};
+use crate::starting_city::{footprint, site_fits, FARM_RING};
 
 /// The kinds of node every starting site has in reach.
 pub const NODES_IN_REACH: [ResourceKind; 3] =
@@ -54,9 +55,11 @@ pub struct SiteRules {
     pub max_seconds: f64,
     /// Straight tiles from a site's middle to every pass and land bridge of its heartland.
     pub way_distance: f64,
-    /// Straight tiles from a site's middle to its forest, stone and iron node, at most (not
-    /// scaled: the land's Hills and Forest are as far apart on a map of any size).
+    /// Straight tiles from a site's middle to its stone and iron node, at most (not scaled: the
+    /// land's Hills and Forest are as far apart on a map of any size).
     pub node_reach: f64,
+    /// Straight tiles from a site's middle to its forest node, at most (not scaled either).
+    pub forest_reach: f64,
 }
 
 impl SiteRules {
@@ -72,7 +75,22 @@ impl SiteRules {
             max_seconds: w.max_minutes * 60.0 * max_tiles / w.max_tiles,
             way_distance: STARTING_SITE_WAY_DISTANCE * f,
             node_reach: STARTING_SITE_NODE_REACH,
+            forest_reach: STARTING_SITE_FOREST_REACH,
         }
+    }
+
+    /// Straight tiles from a site's middle to its node of `kind`, at most.
+    pub fn reach(&self, kind: ResourceKind) -> f64 {
+        if kind == ResourceKind::Forest {
+            self.forest_reach
+        } else {
+            self.node_reach
+        }
+    }
+
+    /// The farthest any node of a site lies from its middle.
+    fn widest_reach(&self) -> f64 {
+        self.node_reach.max(self.forest_reach)
     }
 }
 
@@ -150,7 +168,11 @@ fn place_in_heartland(
             if ways.iter().any(|&w| wrap_distance(size, w, (gx, gy)) < rules.way_distance) {
                 continue;
             }
-            if !fitting.iter().all(|f| f.any_near((gx, gy), rules.node_reach)) {
+            if !fitting
+                .iter()
+                .zip(NODES_IN_REACH)
+                .all(|(f, k)| f.any_near((gx, gy), rules.reach(k)))
+            {
                 continue;
             }
             if !whole_in(x, y) {
@@ -354,17 +376,20 @@ fn nodes_for(
     rules: &SiteRules,
 ) -> Option<Vec<(ResourceKind, (i32, i32))>> {
     let size = terrain.size;
-    let reach = rules.node_reach;
+    let reach = rules.widest_reach();
     let near: Vec<(ResourceKind, (i32, i32))> = world
         .nodes
         .iter()
         .map(|n| (n.kind, (n.x as i32, n.y as i32)))
-        .filter(|&(_, at)| wrap_distance(size, at, c.middle) <= reach + NODE_MIN_SPACING)
+        // Spacing is along each direction, so a node up to √2 of it past the reach still counts.
+        .filter(|&(_, at)| wrap_distance(size, at, c.middle) <= reach + 2.0 * NODE_MIN_SPACING)
         .collect();
     let lacking: Vec<ResourceKind> = NODES_IN_REACH
         .into_iter()
         .filter(|&kind| {
-            !near.iter().any(|&(k, at)| k == kind && wrap_distance(size, at, c.middle) <= reach)
+            !near
+                .iter()
+                .any(|&(k, at)| k == kind && wrap_distance(size, at, c.middle) <= rules.reach(kind))
         })
         .collect();
     if lacking.is_empty() {
@@ -385,8 +410,12 @@ fn nodes_for(
     };
     let spacing = NODE_MIN_SPACING as i32;
     let around = (2 * spacing - 1, 2 * spacing - 1);
+    // A site's square, and past it as far as its farm or stable may reach (`spots_outside`).
+    let reach_out = footprint(BuildingKind::Farm).max(footprint(BuildingKind::Stable));
+    let side_out = SITE_SIDE + 2 * reach_out;
     for s in world.starting_sites.iter().map(|s| (s.x, s.y)).chain([(c.x, c.y)]) {
-        block(&mut blocked, (s.0 - FARM_RING, s.1 - FARM_RING), (SITE_SIDE, SITE_SIDE));
+        let corner = (s.0 - FARM_RING - reach_out, s.1 - FARM_RING - reach_out);
+        block(&mut blocked, corner, (side_out, side_out));
     }
     for &(_, (nx, ny)) in &near {
         block(&mut blocked, (nx - spacing + 1, ny - spacing + 1), around);
@@ -396,7 +425,7 @@ fn nodes_for(
         let fits = node_terrains(kind);
         let seed = world.seed as f64 + 104_729.0 * (kind as u8 as f64 + 1.0);
         let fit: Vec<u8> = fits.iter().map(|t| *t as u8).collect();
-        let reach2 = reach * reach;
+        let reach2 = rules.reach(kind) * rules.reach(kind);
         let mut best: Option<(f64, (i32, i32))> = None;
         for dy in -r..=r {
             let y = wrap(c.middle.1 + dy, size);
@@ -580,7 +609,7 @@ pub fn check_starting_sites(
         for kind in NODES_IN_REACH {
             let near = world.nodes.iter().any(|n| {
                 n.kind == kind
-                    && wrap_distance(size, (n.x as i32, n.y as i32), m) <= rules.node_reach
+                    && wrap_distance(size, (n.x as i32, n.y as i32), m) <= rules.reach(kind)
             });
             if !near {
                 fail("site-nodes-in-reach", format!("{at} has no {kind:?} node in reach"));

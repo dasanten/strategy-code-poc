@@ -293,7 +293,13 @@ import {
   START_HORSES,
   START_RESIDENTS,
   START_SPEARS,
+  START_STONE,
+  START_TOOLS,
+  START_WOOD,
   STARTING_SITE_WALK,
+  STARTING_SITE_NODE_REACH,
+  STARTING_SITE_FOREST_REACH,
+  HEARTLAND_GROVE_SPACING,
   STARTING_SITES_PER_HEARTLAND,
   STAT_BASE_MAX,
   STAT_BASE_MIN,
@@ -1368,6 +1374,15 @@ export function Wiki() {
           names the heartland your city stands in.
         </p>
         <p>
+          Every starting site has a poor stone and iron node within{' '}
+          {num(STARTING_SITE_NODE_REACH)} tiles of its middle, and a poor forest node within{' '}
+          {num(STARTING_SITE_FOREST_REACH)} tiles, about{' '}
+          {duration(STARTING_SITE_FOREST_REACH * WALK_TICKS_PER_TILE)} on foot over Plains, so Wood
+          is close from the start. A heartland’s Forest lies in wide patches; where none lies near,
+          a small grove of Forest grows on its Plains, at most one every{' '}
+          {num(HEARTLAND_GROVE_SPACING)} tiles.
+        </p>
+        <p>
           Resource nodes lie thicker away from home: a frontier region holds{' '}
           {num(FRONTIER_NODE_DENSITY)} times as many as a heartland, an island{' '}
           {num(ISLAND_NODE_DENSITY)} times. <strong>Gold ore</strong> is a rare good like Coal: no
@@ -1383,7 +1398,9 @@ export function Wiki() {
           residents, your Leader among them, working the farm. Every grown one, your Leader too,
           carries {num(START_SPEARS)} iron Spear, so they are armed from the first tick and an alarm
           sends them to defend the city. Children get none, and no spare weapons lie in the storage.
-          NPC villages keep their own start.
+          Beside its Food and Coins, the storage holds {num(START_WOOD)} Wood and{' '}
+          {num(START_STONE)} Stone for a first building, and {num(START_TOOLS)} sets of Tools for
+          residents to fetch. NPC villages keep their own start.
         </p>
         <p>
           <strong>First steps.</strong> Before any camp or quarry stands, your residents can{' '}

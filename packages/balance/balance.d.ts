@@ -34,6 +34,9 @@ export interface Balance {
     forest: number
     [key: string]: number
   }
+  readonly HEARTLAND_GROVE_SPACING: number
+  readonly HEARTLAND_GROVE_RADIUS: number
+  readonly HEARTLAND_GROVE_GAP: number
   readonly ISLAND_RELIEF: number
   readonly NODE_DENSITY: {
     forest: {
@@ -124,6 +127,7 @@ export interface Balance {
   }
   readonly STARTING_SITE_WAY_DISTANCE: number
   readonly STARTING_SITE_NODE_REACH: number
+  readonly STARTING_SITE_FOREST_REACH: number
   readonly TERRAIN_SPEED: {
     '0': number
     '1': number
@@ -158,6 +162,9 @@ export interface Balance {
   readonly START_COINS: number
   readonly START_CARRIED_FOOD: number
   readonly START_SPEARS: number
+  readonly START_WOOD: number
+  readonly START_STONE: number
+  readonly START_TOOLS: number
   readonly START_HORSES: number
   readonly START_STABLE_FOOD: number
   readonly HORSE_FOOD_PER_DAY: number

@@ -63,6 +63,10 @@ The shared language of the game. Domain terms only — no implementation details
 - **Heartland:** a mainland region of good farmland and poor resource nodes, where Players start
   (Starting city). It has a trading post near its middle. No rule protects it: it is safe only in
   that it holds little worth taking, and the admin directive covers whoever farms new Players.
+  Its Forest lies in wide patches, so where none lies near, a small **grove** of Forest grows on
+  its Plains, a grove at most every few dozen tiles (balance numbers; decided while Daniel was
+  away, Daniel to confirm): Forest is never far, and every starting site has its forest node a
+  short walk away.
 - **Frontier:** a mainland region beyond the passes and land bridges, with normal resource nodes,
   a few rich ones, and the rare goods (Coal, Gold ore). Nobody starts there.
 - **Island:** land off the mainland, reached only by vessel, holding the richest nodes.
@@ -1414,7 +1418,8 @@ The shared language of the game. Domain terms only — no implementation details
   including money, so nobody walks around with a fortune in their pocket.
 - **Pairing:** two adult residents of the same city set to have children (a Player order, or on
   its own in NPC cities). Each pair has one child at most. The only way, besides integrating,
-  that residents come into being. Once 3 game days have passed since they paired, and their city
+  that residents come into being. Once 10 game days have passed since they paired (3 game days
+  are agreed for Epic 113 but not built yet: #1459 waits for Daniel), and their city
   has free housing and a food surplus, one partner, chosen at random,
   starts **Carrying** the child; the other keeps working as before.
 - **Carrying:** a partner carrying a child can't work for 10 game days (4 real hours); then the
@@ -1447,9 +1452,11 @@ The shared language of the game. Domain terms only — no implementation details
   comes: no free housing, no food surplus, or the realm is too big. Only the owning Player sees
   it.
 - **Aging:** residents grow old; their stats decline late in life, and they die of old age at
-  around 60 game years. Children age faster: each year of age up to 14 takes 4 game days
-  (about 1.6 real hours), so a child is grown after about 56 game days (~22 real hours); from 14
-  on, a year of age is a game year (Epic 113, Daniel 2026-11-19: it was 10 game days a year).
+  around 60 game years. Children age faster: each year of age up to 14 takes 10 game days
+  (4 real hours), so a child is grown after about 140 game days (~56 real hours); from 14 on, a
+  year of age is a game year. Agreed with Daniel on 2026-11-19 for Epic 113 but not built yet:
+  4 game days a year, so grown after about 56 game days (~22 real hours). It waits for Daniel
+  (#1459): with it, a growing NPC town never upgrades its wall to stone.
 - **Hunger:** each resident eats a fixed amount of Food per game day, more on hard terrain and
   less with high Endurance. An empty hunger meter costs health; without food a resident goes
   Down after about 5 game days (2 real hours), and dies if nobody revives them. While the meter
