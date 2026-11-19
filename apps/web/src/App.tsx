@@ -1933,6 +1933,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const order = { kind: 'setWorkSettings', buildingId, params, scriptId }
     setOrderError(await sendOrder(order))
   }
+  /**
+   * Has the Player's Leader rally the crew where they stand (`CONTEXT.md`: Rallying the crew), or
+   * stop. By hand only: never into a queue, whatever is held (ADR 0042).
+   */
+  async function rallyBy(leaderId: string, stopIt = false) {
+    const kind = stopIt ? 'stop' : 'rally'
+    setOrderError(await giveOrder({ kind, residentId: leaderId }, false))
+  }
+  /** The picked resident, the Leader, rallies the crew (`CONTEXT.md`: Rallying the crew). */
+  async function rally() {
+    if (selected) await rallyBy(selected.id)
+  }
   async function stop() {
     if (!selected) return
     setOrderError(await giveOrder({ kind: 'stop', residentId: selected.id }))
@@ -2426,6 +2438,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         onWiki={() => reportFirstDay('openWiki')}
         control={world ? { mode: controlMode, onSwitch: switchControlMode } : undefined}
         zeal={world?.zeal}
+        zealDraining={world?.zealDraining}
       />
       {world && controlMode === 'realm' && (
         <RealmBar
@@ -2849,6 +2862,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   realmId: world.home.realmId,
                   allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
                 },
+                rally: { leaderId: world.home.leaderId, zeal: world.zeal },
                 workers: (b) => workersHere(world.residents, b),
                 veins: world.veins,
                 // A haul route's arrival only for the Player's own driver.
@@ -2976,6 +2990,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             mapSize={world.map.size}
             onFeed={(targetId, units) => void feed(targetId, units)}
             onRepair={(buildingId) => void repair(buildingId)}
+            onRally={(leaderId, stopIt) => void rallyBy(leaderId, stopIt)}
             onPickUp={async (residentId, spot, goods) =>
               setOrderError(await giveOrder({ kind: 'pickUp', residentId, spot, goods }))
             }
@@ -3155,6 +3170,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 setPicking((p) => (p === 'haul' ? false : 'haul'))
               }}
               onStop={stop}
+              onRally={rally}
+              zeal={world.zeal}
               horseToRide={onTile(
                 world.horses.filter(
                   (h) =>

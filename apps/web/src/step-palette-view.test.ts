@@ -48,3 +48,10 @@ describe('the insert point', () => {
     expect(followInsert([1, 2], [1, 2], 2)).toBeUndefined()
   })
 })
+
+describe('rallying the crew (ADR 0042)', () => {
+  it('is no step of the queue planner: it is given by hand only', () => {
+    expect(PLAN_STEPS.some((k) => (k.id as string) === 'rally')).toBe(false)
+    expect(PALETTE_GROUPS.flatMap((g) => g.steps as readonly string[])).not.toContain('rally')
+  })
+})
