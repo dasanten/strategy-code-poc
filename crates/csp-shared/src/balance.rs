@@ -175,6 +175,20 @@ pub struct RegionTerrain {
 pub const HEARTLAND_TERRAIN: RegionTerrain =
     RegionTerrain { mountain: 0.01, hills: 0.08, forest: 0.18 };
 
+/// Groves in a heartland (`CONTEXT.md`: Heartland, Starting site; Epic 113): a heartland's Forest
+/// lies in wide patches, so on a grid of this many tiles a small grove of Forest grows on Plains
+/// wherever no Forest lies within `HEARTLAND_GROVE_GAP`. So Forest is never far, and every starting
+/// site can have its forest node within `STARTING_SITE_FOREST_REACH`.
+pub const HEARTLAND_GROVE_SPACING: f64 = 64.0;
+
+/// Tiles from a grove's middle to its edge: a disc of about 13 tiles of Forest.
+pub const HEARTLAND_GROVE_RADIUS: f64 = 2.0;
+
+/// A grove grows only where no Forest lies within this many tiles of it: near enough that every
+/// starting site finds Forest within `STARTING_SITE_FOREST_REACH`, far enough that the Plains
+/// between groves still hold a trading post's or NPC village's all-Plains square.
+pub const HEARTLAND_GROVE_GAP: f64 = 28.0;
+
 /// How much higher an island's land lies than a frontier region's: the generator's relief on an
 /// island is multiplied by this before Mountain and Hills are cut (`CONTEXT.md`: Island).
 pub const ISLAND_RELIEF: f64 = 1.25;
@@ -345,10 +359,16 @@ pub const STARTING_SITE_WALK: StartingSiteWalk =
 /// least, in tiles (about 20 minutes' walk): the way in is nobody's doorstep.
 pub const STARTING_SITE_WAY_DISTANCE: f64 = 120.0;
 
-/// How far from a starting site's middle its forest, stone and iron node lie, at most, in tiles
-/// (about 15 minutes' walk; Hills and Forest lie a median 80 to 100 tiles from a heartland's
-/// Plains). Where the land holds none that near, one is placed. The same on a map of any size.
+/// How far from a starting site's middle its stone and iron node lie, at most, in tiles (about 15
+/// minutes' walk; Hills and Forest lie a median 80 to 100 tiles from a heartland's Plains). Where
+/// the land holds none that near, one is placed. The same on a map of any size.
 pub const STARTING_SITE_NODE_REACH: f64 = 160.0;
+
+/// How far from a starting site's middle its forest node lies, at most, in tiles (`CONTEXT.md`:
+/// Starting site; Epic 113): a short walk, about 5 minutes on Plains, so a new Player has Wood
+/// close by. A site is only picked where Forest lies that near, and a forest node is placed on it
+/// where none is. The same on a map of any size.
+pub const STARTING_SITE_FOREST_REACH: f64 = 40.0;
 
 /// How fast an unloaded resident crosses each terrain, relative to Plains (`CONTEXT.md`:
 /// Terrain). Agility softens the penalty (`walkSpeed`).
@@ -3143,6 +3163,9 @@ pub fn balance_json() -> Value {
     m.insert("SEA_ARM_SHARE".into(), json!(SEA_ARM_SHARE));
     m.insert("SECOND_WAY_SHARE".into(), json!(SECOND_WAY_SHARE));
     m.insert("HEARTLAND_TERRAIN".into(), to_value(HEARTLAND_TERRAIN).expect("serialisable"));
+    m.insert("HEARTLAND_GROVE_SPACING".into(), json!(HEARTLAND_GROVE_SPACING));
+    m.insert("HEARTLAND_GROVE_RADIUS".into(), json!(HEARTLAND_GROVE_RADIUS));
+    m.insert("HEARTLAND_GROVE_GAP".into(), json!(HEARTLAND_GROVE_GAP));
     m.insert("ISLAND_RELIEF".into(), json!(ISLAND_RELIEF));
     m.insert("NODE_DENSITY".into(), to_value(NODE_DENSITY).expect("serialisable"));
     m.insert("NODE_MIN_SPACING".into(), json!(NODE_MIN_SPACING));
@@ -3162,6 +3185,7 @@ pub fn balance_json() -> Value {
     m.insert("STARTING_SITE_WALK".into(), to_value(STARTING_SITE_WALK).expect("serialisable"));
     m.insert("STARTING_SITE_WAY_DISTANCE".into(), json!(STARTING_SITE_WAY_DISTANCE));
     m.insert("STARTING_SITE_NODE_REACH".into(), json!(STARTING_SITE_NODE_REACH));
+    m.insert("STARTING_SITE_FOREST_REACH".into(), json!(STARTING_SITE_FOREST_REACH));
     m.insert("TERRAIN_SPEED".into(), to_value(TERRAIN_SPEED).expect("serialisable"));
     m.insert("STAT_BASE_MIN".into(), json!(STAT_BASE_MIN));
     m.insert("STAT_BASE_MAX".into(), json!(STAT_BASE_MAX));

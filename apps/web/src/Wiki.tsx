@@ -289,6 +289,9 @@ import {
   START_RESIDENTS,
   START_SPEARS,
   STARTING_SITE_WALK,
+  STARTING_SITE_NODE_REACH,
+  STARTING_SITE_FOREST_REACH,
+  HEARTLAND_GROVE_SPACING,
   STARTING_SITES_PER_HEARTLAND,
   STAT_BASE_MAX,
   STAT_BASE_MIN,
@@ -1350,6 +1353,15 @@ export function Wiki() {
           on the farmland round it, so one whose city is gone is free again. Should every site be
           taken, your city goes on the free place nearest an open heartland’s middle. Your realm log
           names the heartland your city stands in.
+        </p>
+        <p>
+          Every starting site has a poor stone and iron node within{' '}
+          {num(STARTING_SITE_NODE_REACH)} tiles of its middle, and a poor forest node within{' '}
+          {num(STARTING_SITE_FOREST_REACH)} tiles, about{' '}
+          {duration(STARTING_SITE_FOREST_REACH * WALK_TICKS_PER_TILE)} on foot over Plains, so Wood
+          is close from the start. A heartland’s Forest lies in wide patches; where none lies near,
+          a small grove of Forest grows on its Plains, at most one every{' '}
+          {num(HEARTLAND_GROVE_SPACING)} tiles.
         </p>
         <p>
           Resource nodes lie thicker away from home: a frontier region holds{' '}

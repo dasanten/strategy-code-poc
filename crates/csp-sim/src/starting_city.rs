@@ -49,7 +49,7 @@ pub const FARM_RING: i32 = 1 + CITY_AREA_MARGIN as i32;
 
 const START_SIZE: i32 = START_CITY_SIZE as i32;
 
-fn footprint(kind: BuildingKind) -> i32 {
+pub(crate) fn footprint(kind: BuildingKind) -> i32 {
     FOOTPRINT.get(kind_name(kind)).expect("every kind has a footprint")
 }
 
