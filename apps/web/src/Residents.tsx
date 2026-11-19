@@ -243,6 +243,7 @@ import {
   useEscapeClosesPanel,
   useKeptRows,
 } from './SelectionCard.js'
+import { rallyProblem } from './zeal.js'
 import { HorsePick } from './HorsePick.js'
 import {
   orderGroupOf,
@@ -1336,6 +1337,10 @@ export function orderDoing(
     // `CONTEXT.md`: Catapult.
     return 'Throwing Stone with the crew'
   }
+  if (o?.kind === 'rally') {
+    // `CONTEXT.md`: Rallying the crew.
+    return 'Rallying the crew'
+  }
   if (o?.kind === 'push') {
     if (!o.path) return `Finding a way for the ram to ${o.target.x}, ${o.target.y}`
     return `Pushing the ram to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
@@ -2298,6 +2303,8 @@ export function ResidentCard({
   onRoadTo,
   onWallTo,
   onStop,
+  onRally,
+  zeal,
   horseToRide,
   carriageToBoard,
   boatToBoard,
@@ -2393,6 +2400,10 @@ export function ResidentCard({
   onWallTo: () => void
   /** Orders the resident to stop what they are doing. */
   onStop: () => void
+  /** Orders the Player's Leader to rally the crew where they stand (`CONTEXT.md`: Rallying the crew). */
+  onRally?: () => void
+  /** The Player's Zeal (`CONTEXT.md`: Zeal), for the Leader's Rally the crew row. */
+  zeal?: number
   /**
    * A horse of the realm on the resident's tile that pulls no carriage and nobody rides, if one is
    * in sight (`CONTEXT.md`: Riding).
@@ -2670,6 +2681,10 @@ export function ResidentCard({
     makeLeader,
     ...(relocate ? { relocate: { problem: relocate.problem } } : {}),
     renamable: !!rename,
+    // Only the Player's own Leader rallies the crew (`CONTEXT.md`: Rallying the crew).
+    ...(r.id === leaderId && r.owner === realmId && zeal !== undefined
+      ? { rally: { problem: rallyProblem(building, zeal, r.order) } }
+      : {}),
     riding: r.riding !== undefined,
     horseToRide: !!horseToRide,
     aboard: r.aboard !== undefined,
@@ -2715,6 +2730,7 @@ export function ResidentCard({
     if (a.id === 'roadTo') onRoadTo()
     if (a.id === 'wallTo') onWallTo()
     if (a.id === 'stop') onStop()
+    if (a.id === 'rally') onRally?.()
     if (a.id === 'ride') onRide(r.riding === undefined ? horseToRide?.id : undefined)
     if (a.id === 'unhitch' && carriageToUnhitch) onUnhitch(carriageToUnhitch.id)
     if (a.id === 'board')

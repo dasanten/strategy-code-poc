@@ -1,5 +1,7 @@
 import { aboutTime } from './shared/estimates.js'
 import { describe, expect, it } from 'vitest'
+import { RALLY_PACE } from '@csp/balance'
+import { FIRST_DAY_RALLY_TIP } from './notices-view.js'
 import {
   LANE_GAP,
   MIN_LANE_WIDTH,
@@ -156,5 +158,12 @@ describe('the first-day card’s lines', () => {
     const view = firstDayView({ done: ['claimHorses', 'openWiki'], dismissed: false })
     expect(view.lines.filter((l) => l.done).map((l) => l.line)).toEqual(['claimHorses', 'openWiki'])
     expect(view).toMatchObject({ next: 'pickResident', ticked: 2 })
+  })
+})
+
+describe('the first-day card’s tip (CONTEXT.md: Rallying the crew)', () => {
+  it('points a new Player at rallying the crew, with its pace from the balance', () => {
+    expect(FIRST_DAY_RALLY_TIP).toContain('Rally the crew')
+    expect(FIRST_DAY_RALLY_TIP).toContain(`${RALLY_PACE} times as fast`)
   })
 })

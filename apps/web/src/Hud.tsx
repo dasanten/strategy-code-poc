@@ -34,7 +34,13 @@ import {
   type OpenDrawer,
 } from './hud-view.js'
 import { groupSentLine, type Skipped } from './group-orders.js'
-import { firstDayView, laneSpot, skippedByWhy, traderVisitLine } from './notices-view.js'
+import {
+  FIRST_DAY_RALLY_TIP,
+  firstDayView,
+  laneSpot,
+  skippedByWhy,
+  traderVisitLine,
+} from './notices-view.js'
 import type { ConnectionStatus } from './useWorld.js'
 import { WIKI_PATH } from './wiki-view.js'
 
@@ -260,6 +266,7 @@ export function TopBar({
   onWiki,
   control,
   zeal,
+  zealDraining,
 }: {
   /** The realm's name (`CONTEXT.md`: Realm name), once the world has come. */
   realm?: string
@@ -280,6 +287,8 @@ export function TopBar({
   control?: { mode: ControlMode; onSwitch: (mode: ControlMode) => void }
   /** The Player's own Zeal in game hours (`CONTEXT.md`: Zeal), once the world has come. */
   zeal?: number
+  /** The Zeal went down since the last tick: the crew is rallied (`CONTEXT.md`: Rallying the crew). */
+  zealDraining?: boolean
 }) {
   return (
     <header className="hud-top">
@@ -316,7 +325,7 @@ export function TopBar({
       {zeal !== undefined && (
         <>
           <span className="hud-sep" />
-          <ZealMeter zeal={zeal} />
+          <ZealMeter zeal={zeal} draining={zealDraining} />
         </>
       )}
       {heir !== undefined && (
@@ -341,10 +350,10 @@ export function TopBar({
 }
 
 /** The Player's Zeal in the top bar (`CONTEXT.md`: Zeal): how full, and about how long until full. */
-export function ZealMeter({ zeal }: { zeal: number }) {
-  const shown = zealShown(zeal)
+export function ZealMeter({ zeal, draining = false }: { zeal: number; draining?: boolean }) {
+  const shown = zealShown(zeal, draining)
   return (
-    <span className="hud-zeal" title={shown.title}>
+    <span className={`hud-zeal${shown.draining ? ' draining' : ''}`} title={shown.title}>
       <span
         className="hud-zeal-bar"
         role="meter"
@@ -1044,6 +1053,7 @@ export function FirstDayCard({
             </li>
           ))}
         </ul>
+        <p className="first-day-tip small">{FIRST_DAY_RALLY_TIP}</p>
       </div>
       <button
         type="button"

@@ -914,6 +914,7 @@ export const GROUP_COUNTERPARTS: Record<
   script: ['script'],
   pair: { none: 'pairs two residents with each other' },
   makeLeader: { none: 'the realm has one Leader' },
+  rally: { none: 'only the Leader rallies the crew, by hand' },
   rename: { none: 'names one resident' },
   relocate: ['relocate'],
   feed: ['feed'],

@@ -92,6 +92,8 @@ export interface ClientWorld {
   traderVisits: TraderVisit[]
   /** The Player's Zeal, in game hours of rallying (`CONTEXT.md`: Zeal). */
   zeal: number
+  /** The Zeal went down with the last change: the Player's crew is rallied (`CONTEXT.md`: Rallying the crew). */
+  zealDraining: boolean
   /** The Player's waypoints, oldest first (`CONTEXT.md`: Waypoint). */
   waypoints: Waypoint[]
   /** The Player's first-day card (`CONTEXT.md`: First day). */
@@ -223,6 +225,7 @@ export function useWorld(onLoggedOut: () => void) {
             goneNodes: goneNodesOf(msg.goneNodes),
             traderVisits: msg.traderVisits,
             zeal: msg.zeal,
+            zealDraining: false,
             waypoints: msg.waypoints,
             firstDay: msg.firstDay,
             workSettings: msg.workSettings,
@@ -287,6 +290,7 @@ export function useWorld(onLoggedOut: () => void) {
               goneNodes: msg.goneNodes ? goneNodesOf(msg.goneNodes) : w.goneNodes,
               traderVisits: msg.traderVisits ?? w.traderVisits,
               zeal: msg.zeal ?? w.zeal,
+              zealDraining: msg.zeal === undefined ? w.zealDraining : msg.zeal < w.zeal,
               workSettings: msg.workSettings ?? w.workSettings,
               veins: msg.veins ?? w.veins,
               waypoints: msg.waypoints ?? w.waypoints,

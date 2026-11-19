@@ -831,7 +831,7 @@ describe('the rows of a card that stays open', () => {
         'throw',
       ]
       if (tileCard.includes(id)) continue
-      if (['relocate', 'makeLeader', 'rename'].includes(id)) continue
+      if (['relocate', 'makeLeader', 'rename', 'rally'].includes(id)) continue
       expect(missing[id], id).toBeTruthy()
     }
     expect(residentOrders(here({ adult: false })).missing.work).toBe('children can’t work')
@@ -2530,5 +2530,25 @@ describe('a carriage on the tile card (`CONTEXT.md`: Goods on cards)', () => {
       noHorse: 'Horse hitched',
       driver: { id: 'cid', name: 'Cid', pick: false },
     })
+  })
+})
+
+describe('Rally the crew on the Leader’s card (`CONTEXT.md`: Rallying the crew)', () => {
+  const rallyRow = (h: ResidentHere) => residentActions(h).find((a) => a.id === 'rally')
+  it('is offered, under Work & build, to the Player’s Leader only', () => {
+    expect(rallyRow(here())).toBeUndefined()
+    const row = rallyRow(here({ rally: { problem: undefined } }))
+    expect(row).toMatchObject({ label: 'Rally the crew', key: ACTION_KEYS.rally })
+    expect(row?.disabled).toBeUndefined()
+    expect(orderGroupOf('rally')).toBe('work')
+  })
+
+  it('is greyed out saying why elsewhere or with no Zeal left', () => {
+    for (const reason of ['not at a workplace or construction site', 'no Zeal left']) {
+      expect(rallyRow(here({ rally: { problem: reason } }))).toMatchObject({
+        disabled: true,
+        reason,
+      })
+    }
   })
 })

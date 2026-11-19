@@ -811,3 +811,29 @@ describe('strangers on a tile’s card', () => {
     )
   })
 })
+
+describe('rallying the crew on a building’s card (`CONTEXT.md`: Rallying the crew)', () => {
+  const farm = building({ kind: 'farm', cityId: 'c-me' })
+  const leader = (order: Resident['order'] = null, x = 5) =>
+    resident({ id: 'lead', name: 'Lead', owner: 'me', x, y: 5, order })
+  const card = (r: Resident, zeal = 20) =>
+    tile({ buildings: [farm], residents: [r], rally: { leaderId: 'lead', zeal } })
+  const row = (r: Resident, zeal?: number) =>
+    tileActions(card(r, zeal), undefined).find((a) => a.id === 'rally' || a.id === 'stop')
+
+  it('offers Rally the crew while the Leader stands there, greyed with no Zeal left', () => {
+    expect(row(leader())).toMatchObject({ id: 'rally', label: 'Rally the crew' })
+    expect(row(leader(), 0)).toMatchObject({ disabled: true, reason: 'no Zeal left' })
+    // Not with the Leader elsewhere.
+    expect(row(leader(null, 30))).toBeUndefined()
+  })
+
+  it('says the crew is rallied and about how long the Zeal lasts, with Stop', () => {
+    const rallying = leader({ kind: 'rally', buildingId: farm.id })
+    expect(
+      card(rallying).lines.some((l) => /^The crew is rallied · Zeal lasts about /.test(l)),
+    ).toBe(true)
+    expect(row(rallying)).toMatchObject({ id: 'stop', label: 'Stop rallying the crew' })
+    expect(card(leader()).lines.some((l) => l.startsWith('The crew is rallied'))).toBe(false)
+  })
+})
