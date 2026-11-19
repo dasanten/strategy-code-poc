@@ -145,6 +145,22 @@ describe('realm log', () => {
     expect(
       describeEvent({ kind: 'grownUp', residentId: 'r3', name: 'Wren', seq: 5, ...at }),
     ).toEqual({ text: 'Wren has grown up and can work now.', tone: 'info' })
+    expect(
+      describeEvent({
+        kind: 'drifterJoined',
+        residentId: 'r9',
+        name: 'Ivo',
+        city: 'Ashford',
+        x: 12,
+        y: 30,
+        seq: 6,
+        ...at,
+      }),
+    ).toEqual({
+      text: 'Ivo, a drifter, came to Ashford and joined your realm.',
+      tone: 'info',
+      places: [{ name: 'Ashford', x: 12, y: 30 }],
+    })
     const horseHungry = {
       kind: 'horseHungry',
       horseId: 'h1',

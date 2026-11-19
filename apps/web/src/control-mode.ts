@@ -104,7 +104,7 @@ export const REALM_BAR_HINT =
 
 /** An order the realm bar starts (`CONTEXT.md`: Realm order): one that begins with a kind or a place. */
 export type RealmBarOrder =
-  'build' | 'road' | 'wall' | 'walkTo' | 'explore' | 'runScript' | 'relocate'
+  'build' | 'road' | 'wall' | 'walkTo' | 'explore' | 'gather' | 'runScript' | 'relocate'
 
 /** The realm bar's orders, in its order, each with what its button says on hover. */
 export const REALM_BAR_ORDERS: readonly { id: RealmBarOrder; label: string; title: string }[] = [
@@ -121,6 +121,7 @@ export const REALM_BAR_ORDERS: readonly { id: RealmBarOrder; label: string; titl
   },
   { id: 'walkTo', label: 'Walk to', title: 'Walk to: pick where, then who walks there' },
   { id: 'explore', label: 'Explore', title: 'Explore: what to look for, then who goes' },
+  { id: 'gather', label: 'Gather', title: 'Gather: what to gather by hand, then who goes' },
   { id: 'runScript', label: 'Run script', title: 'Run script: pick the script, then who runs it' },
   { id: 'relocate', label: 'Relocate', title: 'Relocate: pick the city, then who moves there' },
 ]

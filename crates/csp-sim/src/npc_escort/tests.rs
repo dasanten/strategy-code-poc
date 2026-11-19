@@ -290,3 +290,44 @@ fn an_escort_not_at_the_storage_goes_for_the_food_for_the_way_first() {
     assert!(fed, "the escort never took Food for the way");
     assert_eq!(check_all(&f.world, &f.terrain), []);
 }
+
+#[test]
+fn an_escort_gone_ahead_holds_for_the_trader_who_walks_on() {
+    let mut f = city_with_soldiers(20.0, 0);
+    let hold = posts_to_hold(&f.world, f.city()) as usize;
+    f = city_with_soldiers(20.0, hold + 1);
+    f.plan();
+    let run = f.runs().into_iter().next().expect("a trader out");
+    let (trader, escort) = (run.resident_id.clone(), run.escort_ids[0].clone());
+    let mut runner = Runner::new(&f.terrain);
+    let size = f.terrain.size;
+    let warehouse = f.world.buildings.iter().find(|b| b.id == f.warehouse).unwrap().clone();
+    let storage = f.world.buildings.iter().find(|b| b.id == f.storage).unwrap().clone();
+    // On the road together, 10 tiles out.
+    let mut t = 0;
+    while wrap_distance(size, f.at(&trader), (storage.x as i32, storage.y as i32)) < 10.0 {
+        runner.step(&mut f.world, &f.terrain);
+        t += 1;
+        assert!(t < 2 * DAY, "the trader sets out");
+    }
+    // The escort is put 15 tiles ahead on the way, still walking there.
+    let e = f.index(&escort);
+    let (ax, ay) = f.at(&trader);
+    let r = &mut f.world.residents[e];
+    (r.x, r.y, r.order) = (f64::from(ax + 15), f64::from(ay), None);
+    let mut reached = false;
+    for t in 0..2 * DAY {
+        runner.step(&mut f.world, &f.terrain);
+        let (a, b) = (f.at(&trader), f.at(&escort));
+        if t > 20 {
+            // The escort held: it came no further ahead.
+            assert!(wrap_delta(a.0, b.0, size).abs() <= 16, "tick {t}: {a:?} {b:?}");
+        }
+        if is_at(a, placed(&warehouse), size) {
+            reached = true;
+            break;
+        }
+    }
+    // The trader walked on to the warehouse rather than standing for the escort ahead (#1434).
+    assert!(reached, "trader at {:?}, escort at {:?}", f.at(&trader), f.at(&escort));
+}

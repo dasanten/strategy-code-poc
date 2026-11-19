@@ -191,6 +191,7 @@ fn describe_every_field_of_everything_the_queries_and_me_hand_a_script() {
         ("wayFood", "wayFood(me, building(\"s1\"))"),
         ("exploredEdge", "exploredEdge(me, \"north\")"),
         ("crewTile", "crewTile(building(\"s1\"))"),
+        ("gatherTile", "gatherTile(\"wood\", me)"),
         (
             "lineTiles",
             "lineTiles({building: \"road\", from: {x: 10, y: 12}, to: {x: 13, y: 12}}, me)",
@@ -571,7 +572,7 @@ fn a_tile_view_names_the_region_of_an_explored_tile_and_null_otherwise() {
     let land = TileLand { regions: &regions, explored: &explored };
     assert_eq!(
         tile_data(Some(&land), hx, hy),
-        json!({ "x": hx, "y": hy, "region": heartland.name, "regionKind": "heartland" })
+        json!({ "x": hx, "y": hy, "region": heartland.name, "regionKind": "heartland", "pickedOver": null })
     );
     // A tile next to it, of land or not, is unexplored.
     let next = tile_data(Some(&land), hx + 1, hy);

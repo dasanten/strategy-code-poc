@@ -153,6 +153,38 @@ body {
   }
 }
 .hud-good,
+/* The Player's Zeal (`CONTEXT.md`: Zeal): a small bar and how full. */
+.hud-zeal {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hud-zeal-bar {
+  width: 40px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--ui-muted);
+  opacity: 0.9;
+  overflow: hidden;
+}
+.hud-zeal-fill {
+  display: block;
+  height: 100%;
+  background: var(--rel-own);
+}
+.hud-zeal.draining .hud-zeal-fill {
+  animation: hud-zeal-drain 1.2s ease-in-out infinite alternate;
+}
+@keyframes hud-zeal-drain {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.45;
+  }
+}
 .hud-leader {
   display: inline-flex;
   align-items: center;

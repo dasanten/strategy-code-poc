@@ -1,5 +1,5 @@
 import { Terrain, UNEXPLORED, tileIndex } from './shared/terrain.js'
-import { arrivalTicks, timeLeft, type ArrivalWorld } from './shared/estimates.js'
+import { aboutTime, arrivalTicks, timeLeft, type ArrivalWorld } from './shared/estimates.js'
 import { drivenCarriageId } from './shared/carriages.js'
 import { isVesselId } from './shared/vessels.js'
 import { isDown } from './shared/world.js'
@@ -140,6 +140,7 @@ function doingOfOrder(
   const task = r.script && taskOf(r.script, scripts)
   const step = stepLine(r.order, buildings, horses)
   if (!task) return step ?? orderDoing(r, arrives, cities)
+  if (task === 'gather') return gatherDoing(r, step, arrives, cities)
   const what = taskLine(task, r.script!.building, r.script!.site)
   const o = r.order
   // Building the workplace first, Work's own order is building (`CONTEXT.md`: Working a site).
@@ -154,6 +155,31 @@ function doingOfOrder(
       : what
   }
   return `${what}: ${o ? lower(step ?? orderDoing(r, arrives, cities)) : 'waiting'}`
+}
+
+/**
+ * The Gather task's Doing line (`CONTEXT.md`: Gather): "Gathering wood" at a tile, "Gathering
+ * wood: walking to the forest · about 3 min (3 game hours)" (the hills for stone) on the way, and
+ * the step's own line while storing a load or fetching Food.
+ */
+function gatherDoing(
+  r: DoingOf,
+  step: string | undefined,
+  arrives: number | undefined,
+  cities: readonly Pick<City, 'id' | 'name'>[],
+): string {
+  const good = r.script?.params?.good
+  const what = typeof good === 'string' ? `Gathering ${good}` : 'Gathering'
+  const o = r.order
+  if (!o) return `${what}: waiting`
+  if (o.kind === 'gather') return what
+  if (o.kind === 'walkTo') {
+    const going = `${r.riding === undefined ? 'walking' : 'riding'} to ${good === 'stone' ? 'the hills' : 'the forest'}`
+    if (!o.path) return `${what}: ${going}`
+    const left = arrives === undefined ? `${o.path.length} tiles to go` : aboutTime(arrives)
+    return `${what}: ${going} · ${left}`
+  }
+  return `${what}: ${lower(step ?? orderDoing(r, arrives, cities))}`
 }
 
 /**
@@ -184,6 +210,7 @@ const TASK_ORDER: Record<Task, ResidentOrder['kind'] | undefined> = {
   defend: undefined,
   explore: undefined,
   alarm: undefined,
+  gather: 'gather',
 }
 
 /**
@@ -215,6 +242,7 @@ function taskLine(task: Task, building: SeenScript['building'], site?: true): st
   if (task === 'breed') return 'Breeding horses'
   if (task === 'haul') return 'Hauling'
   if (task === 'explore') return 'Exploring'
+  if (task === 'gather') return 'Gathering'
   return task satisfies never
 }
 

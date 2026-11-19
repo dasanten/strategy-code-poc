@@ -47,6 +47,7 @@ export const PALETTE_GROUPS: readonly PaletteGroup[] = [
     label: ORDER_GROUP_LABELS.work,
     steps: [
       'work',
+      'gather',
       'build',
       'road',
       'wall',
@@ -73,6 +74,7 @@ export const FLOW_STEPS: readonly PlanStepId[] = ['waitUntil', 'if']
 export const PLAN_STEP_ICONS: Record<PlanStepId, string> = {
   walk: '🚶',
   explore: '🧭',
+  gather: '🧺',
   relocate: '🏠',
   mount: '🐎',
   dismount: '⏬',

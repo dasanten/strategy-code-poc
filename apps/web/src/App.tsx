@@ -1362,7 +1362,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * for Explore; for a script when it needs values or Customise was pressed), then the who-list,
    * nearest a building, carriage or waypoint picked for a param first, else the town hall.
    */
-  function realmScriptOrder(order: Extract<WhoPlaceOrder, { kind: 'explore' | 'runScript' }>) {
+  function realmScriptOrder(
+    order: Extract<WhoPlaceOrder, { kind: 'explore' | 'gather' | 'runScript' }>,
+  ) {
     if (!world) return
     setRealmOrder(undefined)
     const script =
@@ -1376,7 +1378,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       })
       realmWho(params ? { ...order, params } : order, place ?? realmHome(), names)
     }
-    if (order.kind === 'explore') customising.current = true
+    if (order.kind === 'explore' || order.kind === 'gather') customising.current = true
     const asked = opensForm(groupOrderStart(order) ?? { kind: order.kind }, [], async (params) =>
       toWho(params),
     )
@@ -1872,6 +1874,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setOrderError(await giveOrder({ kind: 'task', task: 'explore', residentId: selected.id }))
   }
   /**
+   * Gives the picked resident the Gather task (`CONTEXT.md`: Gather), its form first so the
+   * Player picks the good; with Shift held it goes in their queue.
+   */
+  async function gather() {
+    if (!selected) return
+    customising.current = true
+    setOrderError(await giveOrder({ kind: 'task', task: 'gather', residentId: selected.id }))
+  }
+  /**
    * Orders the picked resident to teach `subject` at the training ground they stand on
    * (`CONTEXT.md`: Teacher); with Shift held it goes in their queue.
    */
@@ -1932,6 +1943,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   ) {
     const order = { kind: 'setWorkSettings', buildingId, params, scriptId }
     setOrderError(await sendOrder(order))
+  }
+  /**
+   * Has the Player's Leader rally the crew where they stand (`CONTEXT.md`: Rallying the crew), or
+   * stop. By hand only: never into a queue, whatever is held (ADR 0042).
+   */
+  async function rallyBy(leaderId: string, stopIt = false) {
+    const kind = stopIt ? 'stop' : 'rally'
+    setOrderError(await giveOrder({ kind, residentId: leaderId }, false))
+  }
+  /** The picked resident, the Leader, rallies the crew (`CONTEXT.md`: Rallying the crew). */
+  async function rally() {
+    if (selected) await rallyBy(selected.id)
   }
   async function stop() {
     if (!selected) return
@@ -2261,7 +2284,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       at = realmOrder.at
     } else return undefined
     // Explore and a script go no set way: as the crow flies from where the list measures.
-    const crow = order.kind === 'explore' || order.kind === 'runScript'
+    const crow = order.kind === 'explore' || order.kind === 'gather' || order.kind === 'runScript'
     const size = world.map.size
     const { ground, blocked } = wayGround(world)
     const ways = whoWays.current
@@ -2425,6 +2448,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         onLogout={logout}
         onWiki={() => reportFirstDay('openWiki')}
         control={world ? { mode: controlMode, onSwitch: switchControlMode } : undefined}
+        zeal={world?.zeal}
+        zealDraining={world?.zealDraining}
       />
       {world && controlMode === 'realm' && (
         <RealmBar
@@ -2433,6 +2458,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             setSelectedTile(undefined)
             if (order === realmBarOpen) return setRealmOrder(undefined)
             if (order === 'explore') return realmScriptOrder({ kind: 'explore' })
+            if (order === 'gather') return realmScriptOrder({ kind: 'gather' })
             setRealmOrder(
               order === 'build'
                 ? { step: 'menu' }
@@ -2837,6 +2863,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 nodeAt,
                 terrain: terrainAt?.(selectedTile.x, selectedTile.y),
                 region: regionAt(land, world.map.size, selectedTile.x, selectedTile.y),
+                patch: world.patches.find((p) => p.x === selectedTile.x && p.y === selectedTile.y),
                 strangers: world.residents.filter((r) => !own.some((o) => o.id === r.id)),
                 residents: world.residents,
                 // A building remembered out of sight is named after its city as last seen.
@@ -2848,8 +2875,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   realmId: world.home.realmId,
                   allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
                 },
+                rally: { leaderId: world.home.leaderId, zeal: world.zeal },
                 workers: (b) => workersHere(world.residents, b),
                 veins: world.veins,
+                drifters: world.drifters,
                 // A haul route's arrival only for the Player's own driver.
                 arrivesIn: (r) => {
                   const mine = own.find((o) => o.id === r.id)
@@ -2975,6 +3004,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             mapSize={world.map.size}
             onFeed={(targetId, units) => void feed(targetId, units)}
             onRepair={(buildingId) => void repair(buildingId)}
+            onRally={(leaderId, stopIt) => void rallyBy(leaderId, stopIt)}
             onPickUp={async (residentId, spot, goods) =>
               setOrderError(await giveOrder({ kind: 'pickUp', residentId, spot, goods }))
             }
@@ -3154,6 +3184,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 setPicking((p) => (p === 'haul' ? false : 'haul'))
               }}
               onStop={stop}
+              onRally={rally}
+              zeal={world.zeal}
               horseToRide={onTile(
                 world.horses.filter(
                   (h) =>
@@ -3232,6 +3264,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onFeedStable={feedStable}
               onTrain={train}
               onExplore={explore}
+              onGather={gather}
               onTeach={teach}
               onTearDown={tearDown}
               horses={world.horses}
@@ -3413,14 +3446,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               }
             }
             // Picking a defence or Alarm script is never queued: it leaves what they do as it is.
-            onOrder={(order) =>
+            // Gather shows its form first, for the good (`CONTEXT.md`: Gather).
+            onOrder={(order) => {
+              if (order.kind === 'gather') customising.current = true
               void sendGroup(
                 order,
                 order.kind !== 'setDefenceScript' &&
                   order.kind !== 'setAlarmScript' &&
                   shift.current,
               )
-            }
+            }}
             orderError={groupError}
             onPick={(id) => select([id])}
             onClose={() => select([])}

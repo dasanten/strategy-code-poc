@@ -247,6 +247,35 @@ pub struct SeenCity {
     pub horses_to_sell: Option<Vec<NpcHorseOffer>>,
 }
 
+/// What the realm's Player is told of drifters (`CONTEXT.md`: Drifters on the city card): for the
+/// city its Leader lives in, and only for that Player, in `welcome` and in a tick once it changed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct DrifterCard {
+    pub city_id: String,
+    pub line: DrifterLine,
+}
+
+/// Whether drifters come to the city the Leader lives in (`CONTEXT.md`: Drifters on the city
+/// card): one is on the way, the next sets out at tick `at` while the wait goes on, or why none
+/// comes. A tick, not the time left, so it changes only when something does.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TS)]
+#[serde(tag = "state", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum DrifterLine {
+    OnTheWay,
+    Coming { at: f64 },
+    None { why: NoDrifterWhy },
+}
+
+/// Why no drifter comes to the Leader's city (`CONTEXT.md`: Drifters on the city card).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum NoDrifterWhy {
+    NoFreeHousing,
+    NoFoodSurplus,
+    RealmTooBig,
+}
+
 /// A horse as Players see it (`SeenHorse`): its hunger and health, and when its Down ends, only for
 /// its own realm and allies; that it is Down for anyone.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -464,6 +493,22 @@ pub enum SeenEntity {
     Vessel(SeenVessel),
     /// A siege machine in the field (`CONTEXT.md`: Siege machine).
     Machine(SeenMachine),
+    /// A Forest or Hills tile in sight that isn't full (`CONTEXT.md`: Patch).
+    Patch(SeenPatch),
+}
+
+/// The patch of a tile in sight that isn't full, as Players see it (`CONTEXT.md`: Patch): what it
+/// held when last gathered from (`left`, at tick `at`). What it holds now, and when it is full
+/// again, follow from the patch balance numbers, so it changes only when someone gathers there.
+/// Its id is `patch:x,y`. Last seen doesn't keep it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SeenPatch {
+    pub id: String,
+    pub x: i32,
+    pub y: i32,
+    pub left: f64,
+    pub at: u64,
 }
 
 impl SeenEntity {
@@ -481,6 +526,7 @@ impl SeenEntity {
             SeenEntity::Trader(e) => &e.id,
             SeenEntity::Vessel(e) => &e.id,
             SeenEntity::Machine(e) => &e.id,
+            SeenEntity::Patch(e) => &e.id,
         }
     }
 
@@ -498,6 +544,7 @@ impl SeenEntity {
             SeenEntity::Trader(_) => "trader",
             SeenEntity::Vessel(_) => "vessel",
             SeenEntity::Machine(_) => "machine",
+            SeenEntity::Patch(_) => "patch",
         }
     }
 }

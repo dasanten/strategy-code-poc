@@ -300,6 +300,8 @@ pub fn order_kind(o: &ResidentOrder) -> &'static str {
         ResidentOrder::Push(_) => "push",
         ResidentOrder::Ram(_) => "ram",
         ResidentOrder::Throw(_) => "throw",
+        ResidentOrder::Gather(_) => "gather",
+        ResidentOrder::Rally(_) => "rally",
     }
 }
 

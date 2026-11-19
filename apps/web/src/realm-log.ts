@@ -104,7 +104,10 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         fell: 'died in a fall from a broken wall',
       }[e.cause]
       if (e.leader && e.heir) {
-        return { text: `Your Leader ${e.name} ${how}. Your heir ${e.heir} takes over.`, tone: 'bad' }
+        return {
+          text: `Your Leader ${e.name} ${how}. Your heir ${e.heir} takes over.`,
+          tone: 'bad',
+        }
       }
       if (e.leader) {
         return { text: `Your Leader ${e.name} ${how}. Your realm has ended.`, tone: 'bad' }
@@ -657,6 +660,12 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       return { text: `${e.parents[0]} and ${e.parents[1]} had a child, ${e.name}.`, tone: 'info' }
     case 'grownUp':
       return { text: `${e.name} has grown up and can work now.`, tone: 'info' }
+    case 'drifterJoined':
+      return {
+        text: `${e.name}, a drifter, came to ${e.city} and joined your realm.`,
+        tone: 'info',
+        places: [{ name: e.city, x: e.x, y: e.y }],
+      }
     case 'horseDied':
       // Entries from before horses had names (`CONTEXT.md`: Horse name) say "a horse".
       return {
