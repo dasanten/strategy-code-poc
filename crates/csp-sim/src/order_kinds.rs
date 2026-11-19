@@ -118,6 +118,15 @@ pub fn add_rule_orders(kinds: &mut OrderKinds) {
             Box::new(|w, _, o, _| crate::teardown::apply_tear_down(w, o)),
         ),
     );
+    // T116.2: rallying the crew, by hand only: it is in no script call and no queue step
+    // (ADR 0042, the one exception to ADR 0002; `rally`).
+    kinds.insert(
+        crate::rally::RALLY,
+        fn_kind(
+            Box::new(|w, s, o, _| crate::rally::validate_rally(w, s, o)),
+            Box::new(|w, _, o, _| crate::rally::apply_rally(w, o)),
+        ),
+    );
     kinds.insert(
         "workAt",
         fn_kind(

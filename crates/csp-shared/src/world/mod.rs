@@ -1392,6 +1392,22 @@ pub enum ResidentOrder {
     /// Throwing Stone with a catapult at a wall, gate or tower in its reach, as one of its crew
     /// (`CONTEXT.md`: Catapult).
     Throw(ThrowOrder),
+    /// The Leader rallying the crew of the workplace or site they are at (`CONTEXT.md`: Rallying
+    /// the crew). Given by the Player by hand only (ADR 0042).
+    Rally(RallyOrder),
+}
+
+/// Rallying the crew of a workplace or construction site (`CONTEXT.md`: Rallying the crew).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RallyOrder {
+    /// The workplace or site the Leader stands at.
+    pub building_id: String,
+    /// The last tick somebody of the realm worked there at the rallied pace, for the drain: Zeal
+    /// drains only while somebody is being rallied. None until then.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub worked_at: Option<f64>,
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).

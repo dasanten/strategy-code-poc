@@ -14,6 +14,7 @@ import {
   WORK_SKILL_EFFECT,
   WORK_STRENGTH_AVERAGE,
   RICHNESS_FACTOR,
+  RALLY_PACE,
   hungerFactor,
 } from '@csp/balance'
 import { GOODS } from './shared/world.js'
@@ -218,6 +219,19 @@ describe('buildings on a tile’s card', () => {
       ])
       // The rows say what it makes, so the line doesn't.
       expect(linesOf({ buildings: [farm], residents })).not.toContain('Makes food')
+    })
+
+    it('gives the rallied pace while the realm’s Leader rallies the crew there', () => {
+      const farm = building({ kind: 'farm', cityId: 'c-me' })
+      const perDay = WORK_OUTPUT_PER_DAY.food! * (10 / WORK_STRENGTH_AVERAGE)
+      const leader = (buildingId: string, owner = 'me') =>
+        resident({ id: 'lead', name: 'Lead', owner, order: { kind: 'rally', buildingId } })
+      const rows = (r: Resident) =>
+        amounts({ buildings: [farm], residents: [worker(farm, 'Ana', 10), r] })
+      expect(rows(leader(farm.id))?.[0]).toEqual(['Ana', 'Food', tenth(perDay * RALLY_PACE)])
+      // Rallying elsewhere, or another realm's Leader, changes nothing here.
+      expect(rows(leader('elsewhere'))?.[0]).toEqual(['Ana', 'Food', tenth(perDay)])
+      expect(rows(leader(farm.id, 'them'))?.[0]).toEqual(['Ana', 'Food', tenth(perDay)])
     })
 
     it('gives a mine what its node yields, the same way', () => {

@@ -483,6 +483,7 @@ export const DIRECT_OFFER_DAYS = balance.DIRECT_OFFER_DAYS
 export const DIRECT_OFFERS_TO_ONE_REALM = balance.DIRECT_OFFERS_TO_ONE_REALM
 export const ZEAL_CAP_HOURS = balance.ZEAL_CAP_HOURS
 export const ZEAL_FILL_TICKS = balance.ZEAL_FILL_TICKS
+export const RALLY_PACE = balance.RALLY_PACE
 export const TERRAIN = balance.TERRAIN
 export const TICK_MS = balance.TICK_MS
 export const TICKS_PER_GAME_DAY = balance.TICKS_PER_GAME_DAY

@@ -1673,6 +1673,7 @@ export interface Balance {
   readonly DIRECT_OFFERS_TO_ONE_REALM: number
   readonly ZEAL_CAP_HOURS: number
   readonly ZEAL_FILL_TICKS: number
+  readonly RALLY_PACE: number
   readonly TERRAIN: {
     Plains: number
     Forest: number
