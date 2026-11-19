@@ -373,6 +373,14 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, t| crate::npc_founding::founding_site_clear(w, t.size),
         },
         Invariant {
+            name: "founding-party-sets-out-loaded",
+            check: |w, t| crate::npc_founding::founding_party_sets_out_loaded(w, t.size),
+        },
+        Invariant {
+            name: "founding-wave-sound",
+            check: |w, _t| crate::npc_founding::founding_wave_sound(w),
+        },
+        Invariant {
             name: "starting-sites-sound",
             check: |w, _t| crate::player_start::starting_sites_sound(w),
         },
