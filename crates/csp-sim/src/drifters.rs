@@ -18,6 +18,7 @@ use std::sync::Arc;
 use csp_shared::balance::{
     DRIFTER_DISTANCE_MAX, DRIFTER_DISTANCE_MIN, DRIFTER_FOOD, DRIFTER_REALM_CAP, DRIFTER_WAIT_DAYS,
 };
+use csp_shared::protocol::{DrifterCard, DrifterLine, NoDrifterWhy};
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, wrap_distance, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
@@ -386,6 +387,26 @@ fn come_into_being(
         set_out_at: world.tick as f64,
         turned_away: false,
     });
+}
+
+/// What the realm's Player is told of drifters (`CONTEXT.md`: Drifters on the city card): the
+/// city its Leader lives in and whether drifters come there; None when the Leader lives in none.
+pub fn drifter_card(world: &WorldState, realm_id: &str) -> Option<DrifterCard> {
+    let realm = world.realms.iter().find(|r| r.id == realm_id)?;
+    let ci = leader_city(world, realm)?;
+    let line = match drifter_outlook(world, realm) {
+        DrifterOutlook::OnTheWay => DrifterLine::OnTheWay,
+        DrifterOutlook::Next { ticks } => DrifterLine::Coming { at: world.tick as f64 + ticks },
+        DrifterOutlook::None(why) => DrifterLine::None {
+            why: match why {
+                NoDrifter::NoFreeHousing => NoDrifterWhy::NoFreeHousing,
+                NoDrifter::NoFoodSurplus => NoDrifterWhy::NoFoodSurplus,
+                NoDrifter::RealmTooBig => NoDrifterWhy::RealmTooBig,
+                NoDrifter::NoLeaderCity => return None,
+            },
+        },
+    };
+    Some(DrifterCard { city_id: world.cities[ci].id.clone(), line })
 }
 
 /// Invariant `drifters-sound` (ADR 0004; `CONTEXT.md`: Drifter): every drifter is a living

@@ -2,6 +2,7 @@
 //! sight; they walk in and join, or turn away and are gone once unseen.
 
 use csp_shared::balance::{DRIFTER_FOOD, DRIFTER_REALM_CAP, MAX_HEALTH};
+use csp_shared::protocol::{DrifterLine, NoDrifterWhy};
 use csp_shared::world::{BuildingKind, Good, RealmEventWhat, WorldState};
 use serde_json::json;
 
@@ -322,4 +323,56 @@ fn the_invariant_catches_a_drifter_who_joined_a_full_city() {
     crate::events::record_event(&mut g.world, Some(&realm), what);
     let found = drifters_join_with_room(&g.world, &g.terrain);
     assert_eq!(found.len(), 1, "{found:?}");
+}
+
+/// The drifter line the realm's Player is told for the realm's first city, if any.
+fn line_for(world: &WorldState, realm: &str) -> Option<DrifterLine> {
+    drifter_card(world, realm).filter(|c| c.city_id == world.cities[0].id).map(|c| c.line)
+}
+
+#[test]
+fn the_leaders_city_tells_its_player_whether_drifters_come_and_nobody_else() {
+    let mut g = game();
+    let realm = realm_id(&g.world);
+    // While the wait goes on, the tick the next sets out stays put.
+    let at = g.world.tick as f64 + DRIFTER_WAIT_TICKS;
+    assert_eq!(line_for(&g.world, &realm), Some(DrifterLine::Coming { at }));
+    g.run(3);
+    assert_eq!(line_for(&g.world, &realm), Some(DrifterLine::Coming { at }));
+    drifter_sets_out(&mut g);
+    assert_eq!(line_for(&g.world, &realm), Some(DrifterLine::OnTheWay));
+
+    // Each reason none comes.
+    let why = |why| Some(DrifterLine::None { why });
+    let mut g = game();
+    fill_housing(&mut g);
+    assert_eq!(line_for(&g.world, &realm), why(NoDrifterWhy::NoFreeHousing));
+    let mut g = game();
+    for b in g.world.buildings.iter_mut().filter(|b| b.kind == BuildingKind::Storage) {
+        b.stock = None;
+    }
+    assert_eq!(line_for(&g.world, &realm), why(NoDrifterWhy::NoFoodSurplus));
+    let mut g = game();
+    let template = g.world.residents[0].clone();
+    for n in 0..DRIFTER_REALM_CAP as usize {
+        let mut r = template.clone();
+        r.id = format!("extra{n}");
+        r.city_id = None;
+        g.world.residents.push(r);
+    }
+    assert_eq!(line_for(&g.world, &realm), why(NoDrifterWhy::RealmTooBig));
+
+    // Another Player is told of their own Leader's city only; with the Leader in no city, nothing.
+    let mut g = game();
+    found_starting_city(&mut g.world, &g.terrain, 8, None);
+    let other = g.world.realms.iter().find(|r| r.user_id == 8).unwrap().id.clone();
+    let theirs = drifter_card(&g.world, &other).unwrap();
+    assert_eq!(
+        g.world.cities.iter().find(|c| c.id == theirs.city_id).unwrap().realm_id,
+        Some(other.clone())
+    );
+    assert_eq!(line_for(&g.world, &other), None);
+    let leader = g.world.realms[0].leader_id.clone();
+    g.world.residents.iter_mut().find(|r| r.id == leader).unwrap().city_id = None;
+    assert_eq!(drifter_card(&g.world, &realm), None);
 }

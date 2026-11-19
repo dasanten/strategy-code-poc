@@ -14,12 +14,14 @@ import {
   WORK_SKILL_EFFECT,
   WORK_STRENGTH_AVERAGE,
   RICHNESS_FACTOR,
+  TICKS_PER_GAME_DAY,
   hungerFactor,
 } from '@csp/balance'
+import { aboutTime } from './shared/estimates.js'
 import { GOODS } from './shared/world.js'
 import { Terrain, UNEXPLORED } from './shared/terrain.js'
 import { teardownWork } from './shared/building.js'
-import type { Good, Pile, Resident, SeenBuilding } from '@csp/shared-types'
+import type { DrifterLine, Good, Pile, Resident, SeenBuilding } from '@csp/shared-types'
 import { describeTile, tileActions, tradesHere, type TileThings } from './selection-view.js'
 import { GOOD_LABELS } from './Residents.js'
 
@@ -530,6 +532,40 @@ describe('buildings on a tile’s card', () => {
     // Another realm's town hall tells nothing of how its city lives.
     const theirs = at('c-them')
     expect(theirs.lines.some((l) => l.includes('residents') || l.startsWith('Food'))).toBe(false)
+  })
+
+  it('says on the Leader’s town hall whether drifters come, and why not', () => {
+    const viewer = { realmId: 'me', allies: new Set(['ally']) }
+    const hall = (cityId: string) => [building({ id: `th-${cityId}`, kind: 'townHall', cityId })]
+    const tick = 1000
+    const at = (line: DrifterLine | undefined, realmId = 'me', cityId = 'c1') =>
+      linesOf({
+        buildings: hall('c1'),
+        cities: [{ id: 'c1', name: 'Eastmere', realmId }],
+        viewer,
+        tick,
+        drifters: line ? { cityId, line } : null,
+      })
+    const day = TICKS_PER_GAME_DAY
+    expect(at({ state: 'coming', at: tick + 3 * day })).toContain(
+      `Next drifter in ${aboutTime(3 * day)}`,
+    )
+    expect(at({ state: 'onTheWay' })).toContain('A drifter is on the way')
+    expect(at({ state: 'none', why: 'noFreeHousing' })).toContain(
+      'No drifters come: no free housing',
+    )
+    expect(at({ state: 'none', why: 'noFoodSurplus' })).toContain(
+      'No drifters come: no food surplus',
+    )
+    expect(at({ state: 'none', why: 'realmTooBig' })).toContain(
+      'No drifters come: the realm is too big',
+    )
+    // Nothing when the Player is told nothing, on another city of the realm, or on anyone
+    // else's town hall.
+    const says = (lines: string[]) => lines.some((l) => l.includes('drifter'))
+    expect(says(at(undefined))).toBe(false)
+    expect(says(at({ state: 'onTheWay' }, 'me', 'c2'))).toBe(false)
+    expect(says(at({ state: 'onTheWay' }, 'ally'))).toBe(false)
   })
 
   it('says a house’s room, and how its city is housed where the Player may know', () => {
