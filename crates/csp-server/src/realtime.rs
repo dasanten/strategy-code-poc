@@ -167,6 +167,9 @@ struct Client {
     /// ever learn of more.
     gone_nodes: usize,
     last_work_settings: String,
+    /// What the Player was last told of drifters (`CONTEXT.md`: Drifters on the city card), as
+    /// JSON.
+    last_drifters: String,
     /// The veins the Player was last sent (`CONTEXT.md`: Running dry), as JSON.
     last_veins: String,
     last_waypoints: String,
@@ -433,6 +436,7 @@ fn build_welcome(
         gone_nodes: gone_nodes_of(world, user_id as u64).len(),
         last_work_settings: String::new(),
         last_veins: String::new(),
+        last_drifters: String::new(),
         last_waypoints: json_of(
             &world.waypoints.get(&(user_id as u64)).cloned().unwrap_or_default(),
         ),
@@ -465,6 +469,8 @@ fn build_welcome(
     client.last_work_settings = json_of(&work_settings);
     let veins = json!(veins_seen_by(world, &realm.id));
     client.last_veins = json_of(&veins);
+    let drifters = json!(csp_sim::drifters::drifter_card(world, &realm.id));
+    client.last_drifters = json_of(&drifters);
     let mut cache = None;
     if let Some(territory) = view.territory {
         RegionCache::update(&mut cache, world, territory, size);
@@ -499,6 +505,7 @@ fn build_welcome(
         "firstDay": first_day,
         "workSettings": work_settings,
         "veins": veins,
+        "drifters": drifters,
     });
     let mut message = message;
     // Explored terrain: the chunks with their counts, or the plain list for an older client.
@@ -1052,6 +1059,14 @@ impl Realtime {
                 if veins_json != client.last_veins {
                     client.last_veins = veins_json;
                     tick.insert("veins".into(), veins);
+                }
+                // Whether drifters come to its Leader's city, only when that changed (`CONTEXT.md`:
+                // Drifters on the city card).
+                let drifters = json!(csp_sim::drifters::drifter_card(world, &client.realm_id));
+                let drifters_json = json_of(&drifters);
+                if drifters_json != client.last_drifters {
+                    client.last_drifters = drifters_json;
+                    tick.insert("drifters".into(), drifters);
                 }
                 // Only the Player's own waypoints, only when they changed (`CONTEXT.md`: Waypoint).
                 let waypoints =

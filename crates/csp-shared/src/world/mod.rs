@@ -1493,11 +1493,39 @@ pub struct WorldState {
     pub wear: IndexMap<String, Wear>,
     /// The Zeal of each Player whose pool is not full, by account id (see `Realm::user_id`), in
     /// game hours of rallying (`CONTEXT.md`: Zeal). A Player with no entry has a full pool, so a
-    /// new Player and one from before format 146 start full. Kept by account, not by realm, so a
+    /// new Player and one from before format 147 start full. Kept by account, not by realm, so a
     /// Leader handover or death keeps it. Left out of a save while every pool is full.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     #[ts(optional, as = "Option<BTreeMap<u64, f64>>")]
     pub zeal: BTreeMap<u64, f64>,
+    /// How long each Player's realm has waited for its next drifter (`CONTEXT.md`: Drifter), in
+    /// ticks, by realm id; the wait counts only while a drifter may come. A realm that has not
+    /// waited is in no entry. Left out of a save while none has.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[ts(optional, as = "Option<IndexMap<String, f64>>")]
+    pub drifter_waits: IndexMap<String, f64>,
+    /// The drifters on their way to a city, or turned away from one (`CONTEXT.md`: Drifter).
+    /// Left out of a save while there are none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub drifters: Vec<Drifter>,
+}
+
+/// A drifter (`CONTEXT.md`: Drifter): a resident of no Organization walking to the city the
+/// Leader of `realm_id` lived in when they set out, to join it on stepping into its area; or,
+/// `turned_away`, walking off again until no Player sees them, when they are gone.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Drifter {
+    pub resident_id: String,
+    pub realm_id: String,
+    pub city_id: String,
+    /// Where they came into being, and walk back to when turned away.
+    pub from: Tile,
+    /// The tick they came into being.
+    pub set_out_at: f64,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[ts(as = "Option<bool>", optional)]
+    pub turned_away: bool,
 }
 
 impl WorldState {
@@ -3049,6 +3077,15 @@ pub enum RealmEventWhat {
     GrownUp {
         resident_id: String,
         name: String,
+    },
+    /// A drifter stepped into the city the realm's Leader lives in and joined it (`CONTEXT.md`:
+    /// Drifter).
+    DrifterJoined {
+        resident_id: String,
+        name: String,
+        city: String,
+        x: f64,
+        y: f64,
     },
     HorseDied {
         horse_id: String,
