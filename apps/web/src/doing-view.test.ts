@@ -483,9 +483,9 @@ describe('the Gather task’s Doing line (`CONTEXT.md`: Gather)', () => {
 
   it('says what they gather at a tile, and where they walk with the usual estimate', () => {
     expect(line({ order: gathering, script: gatherer })).toBe('Gathering wood')
-    expect(doingLine({ order: walk, script: gatherer }, { scripts, buildings, arrives: 1 })).toMatch(
-      /^Gathering wood: walking to the forest · /,
-    )
+    expect(
+      doingLine({ order: walk, script: gatherer }, { scripts, buildings, arrives: 1 }),
+    ).toMatch(/^Gathering wood: walking to the forest · /)
     const stone = { ...gatherer, params: { good: 'stone' } }
     expect(line({ order: walk, script: stone })).toBe(
       'Gathering stone: walking to the hills · 1 tiles to go',

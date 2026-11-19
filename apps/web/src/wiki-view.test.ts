@@ -306,7 +306,13 @@ describe('the Wiki’s Gathering section (`CONTEXT.md`: Gathering, Patch)', () =
     expect(at).toBeGreaterThan(-1)
     const section = html.slice(at, html.indexOf('</section>', at))
     const pace = balance.GATHER_PER_DAY as Record<string, number>
-    for (const n of [pace.wood!, pace.food!, pace.stone!, balance.PATCH_SIZE, balance.GATHER_REACH]) {
+    for (const n of [
+      pace.wood!,
+      pace.food!,
+      pace.stone!,
+      balance.PATCH_SIZE,
+      balance.GATHER_REACH,
+    ]) {
       expect(section).toContain(num(n))
     }
     expect(section).toContain('picked over')

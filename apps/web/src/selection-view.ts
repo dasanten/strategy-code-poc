@@ -2077,7 +2077,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     const condition = conditionLine(road)
     if (condition) lines.push(condition)
     // The building's repair first; a worn road under it waits for the next.
-    if (!repair && repairable(road)) repair = { buildingId: road.id, name: 'road', ...rebuildOf(road) }
+    if (!repair && repairable(road))
+      repair = { buildingId: road.id, name: 'road', ...rebuildOf(road) }
   }
   if (terrain && !(road && !road.site)) lines.push(terrain)
   // What a Forest or Hills tile gives by hand, and its patch while in sight (`CONTEXT.md`: Patch).

@@ -1997,8 +1997,8 @@ export function Wiki() {
       <Section id="gathering">
         <p>
           A grown resident takes <strong>Wood</strong> or <strong>Food</strong> from a Forest tile
-          they stand on, or <strong>Stone</strong> from a Hills tile, straight into their hands:
-          no node, no workplace. Not on a tile with a building, a road, a construction site or a
+          they stand on, or <strong>Stone</strong> from a Hills tile, straight into their hands: no
+          node, no workplace. Not on a tile with a building, a road, a construction site or a
           resource node on it. Iron ore, Gold ore and Coal are never gathered. An average resident
           gathers {num(GATHER_PER_DAY.wood ?? 0)} Wood, {num(GATHER_PER_DAY.food ?? 0)} Food or{' '}
           {num(GATHER_PER_DAY.stone ?? 0)} Stone a game day: more than working a poor node (
@@ -2009,13 +2009,13 @@ export function Wiki() {
         </p>
         <p>
           <strong>Patches.</strong> Each Forest and Hills tile holds {num(PATCH_SIZE)} units for
-          gathering, about one load, shared by everyone and by Wood and Food alike. Once it is
-          gone the tile is <strong>picked over</strong> and gives nothing. Once nobody has
-          gathered there for {days(PATCH_REST_DAYS)}, it grows back steadily, from empty to full
-          in {days(PATCH_REGROW_DAYS)}. So the land beside a city empties under a few gatherers,
-          while a workplace on a node never runs out. The tile card says what a tile gives and,
-          while it is in sight, how much is left or when it is full again; up close the map shows
-          picked-over tiles in sight thinned out.
+          gathering, about one load, shared by everyone and by Wood and Food alike. Once it is gone
+          the tile is <strong>picked over</strong> and gives nothing. Once nobody has gathered there
+          for {days(PATCH_REST_DAYS)}, it grows back steadily, from empty to full in{' '}
+          {days(PATCH_REGROW_DAYS)}. So the land beside a city empties under a few gatherers, while
+          a workplace on a node never runs out. The tile card says what a tile gives and, while it
+          is in sight, how much is left or when it is full again; up close the map shows picked-over
+          tiles in sight thinned out.
         </p>
         <p>
           <strong>The Gather task.</strong> Gather on a resident’s card, on the group card, as a
@@ -2024,8 +2024,8 @@ export function Wiki() {
           isn’t picked over as far as they can see, gathers until their hands are full or the patch
           is gone, and goes on to the next tile; with a full load they store it at their{' '}
           <code>storage</code>, else the nearest storage of your realm, and come back. Several
-          gatherers take different tiles. With no such tile left in reach they store what they
-          carry and end, saying why. The usual food params work as in Work. In a script,{' '}
+          gatherers take different tiles. With no such tile left in reach they store what they carry
+          and end, saying why. The usual food params work as in Work. In a script,{' '}
           <code>gather(good)</code> gathers on the tile you stand on, and a tile’s{' '}
           <code>pickedOver</code> says whether its patch is gone.
         </p>

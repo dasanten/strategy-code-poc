@@ -1669,10 +1669,21 @@ describe('horses on the tile card', () => {
   it('says a ruin does nothing and offers to rebuild it (`CONTEXT.md`: Ruin)', () => {
     const tick = 100 * TICKS_PER_GAME_YEAR
     const ruin = (more: Partial<Building>) =>
-      ({ id: 'h1', kind: 'house', cityId: 'c-npc', x: 5, y: 5, decay: 1, ruinedAt: 0, ...more }) as Building
+      ({
+        id: 'h1',
+        kind: 'house',
+        cityId: 'c-npc',
+        x: 5,
+        y: 5,
+        decay: 1,
+        ruinedAt: 0,
+        ...more,
+      }) as Building
     const ada = { id: 'r1', name: 'Ada', x: 1, y: 1, bornAt: 0, carried: {} } as unknown as Resident
     const card = tile({ buildings: [ruin({})], tick })
-    expect(card.lines).toContain('A ruin: it does nothing until it is rebuilt, and collapses if left')
+    expect(card.lines).toContain(
+      'A ruin: it does nothing until it is rebuilt, and collapses if left',
+    )
     expect(card.repair).toEqual({ buildingId: 'h1', name: 'house', rebuild: true })
     expect(tileActions(card, ada, tick).find((a) => a.id === 'repair')).toEqual({
       id: 'repair',
@@ -2578,7 +2589,9 @@ describe('Gather (CONTEXT.md: Gathering, Patch, Gather)', () => {
   it('puts the line on the card of an open forest tile, not under a road or on a node', () => {
     const patch = { id: 'patch:5,5', x: 5, y: 5, left: 0, at: 0 }
     const open = tile({ terrain: Terrain.Forest, patch, tick: 0 })
-    expect(open.lines.some((l) => l.startsWith('Gather by hand: wood, food · picked over'))).toBe(true)
+    expect(open.lines.some((l) => l.startsWith('Gather by hand: wood, food · picked over'))).toBe(
+      true,
+    )
     const road = { id: 'r1', kind: 'road' as const, cityId: null, x: 5, y: 5 }
     const under = tile({ terrain: Terrain.Forest, patch, tick: 0, buildings: [road] })
     expect(under.lines.some((l) => l.startsWith('Gather by hand'))).toBe(false)
