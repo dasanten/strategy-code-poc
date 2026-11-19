@@ -2425,6 +2425,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         onLogout={logout}
         onWiki={() => reportFirstDay('openWiki')}
         control={world ? { mode: controlMode, onSwitch: switchControlMode } : undefined}
+        zeal={world?.zeal}
       />
       {world && controlMode === 'realm' && (
         <RealmBar

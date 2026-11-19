@@ -1671,6 +1671,8 @@ export interface Balance {
   readonly DEMAND_TRADE_ORG_STANDING_LOSS: number
   readonly DIRECT_OFFER_DAYS: number
   readonly DIRECT_OFFERS_TO_ONE_REALM: number
+  readonly ZEAL_CAP_HOURS: number
+  readonly ZEAL_FILL_TICKS: number
   readonly TERRAIN: {
     Plains: number
     Forest: number

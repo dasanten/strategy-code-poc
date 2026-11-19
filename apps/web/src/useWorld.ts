@@ -90,6 +90,8 @@ export interface ClientWorld {
   goneNodes: ReadonlySet<string>
   /** Wandering traders standing at the realm's cities, in sight or not (`CONTEXT.md`: Trader stop). */
   traderVisits: TraderVisit[]
+  /** The Player's Zeal, in game hours of rallying (`CONTEXT.md`: Zeal). */
+  zeal: number
   /** The Player's waypoints, oldest first (`CONTEXT.md`: Waypoint). */
   waypoints: Waypoint[]
   /** The Player's first-day card (`CONTEXT.md`: First day). */
@@ -220,6 +222,7 @@ export function useWorld(onLoggedOut: () => void) {
             horseOffer: msg.horseOffer,
             goneNodes: goneNodesOf(msg.goneNodes),
             traderVisits: msg.traderVisits,
+            zeal: msg.zeal,
             waypoints: msg.waypoints,
             firstDay: msg.firstDay,
             workSettings: msg.workSettings,
@@ -283,6 +286,7 @@ export function useWorld(onLoggedOut: () => void) {
               horseOffer: msg.horseOffer ?? w.horseOffer,
               goneNodes: msg.goneNodes ? goneNodesOf(msg.goneNodes) : w.goneNodes,
               traderVisits: msg.traderVisits ?? w.traderVisits,
+              zeal: msg.zeal ?? w.zeal,
               workSettings: msg.workSettings ?? w.workSettings,
               veins: msg.veins ?? w.veins,
               waypoints: msg.waypoints ?? w.waypoints,

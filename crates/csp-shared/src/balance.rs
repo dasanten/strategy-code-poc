@@ -3123,6 +3123,17 @@ pub const DIRECT_OFFER_DAYS: f64 = 60.0;
 /// room to deal in several goods at once, and few enough that it can't flood the other's list.
 pub const DIRECT_OFFERS_TO_ONE_REALM: f64 = 5.0;
 
+/// How much Zeal a Player's pool holds when full, in game hours of rallying (`CONTEXT.md`: Zeal):
+/// two game days, 48 real minutes of a rallied crew.
+pub const ZEAL_CAP_HOURS: f64 = 48.0;
+
+/// Ticks a Player's Zeal takes to fill from empty to full (`CONTEXT.md`: Zeal): two real hours, so
+/// a Player who comes back a few times a day finds it full, and nobody is punished for sleeping.
+pub const ZEAL_FILL_TICKS: f64 = 2.0 * 60.0 * 60.0;
+
+/// The Zeal a pool gains in a tick while it is not full (`ZEAL_CAP_HOURS` over `ZEAL_FILL_TICKS`).
+pub const ZEAL_PER_TICK: f64 = ZEAL_CAP_HOURS / ZEAL_FILL_TICKS;
+
 /// Every exported constant of the table as JSON, keyed by its TypeScript name: what
 /// `pnpm balance:rust` writes to `packages/balance/balance.json` for the client.
 pub fn balance_json() -> Value {
@@ -3621,6 +3632,8 @@ pub fn balance_json() -> Value {
     m.insert("DEMAND_TRADE_ORG_STANDING_LOSS".into(), json!(DEMAND_TRADE_ORG_STANDING_LOSS));
     m.insert("DIRECT_OFFER_DAYS".into(), json!(DIRECT_OFFER_DAYS));
     m.insert("DIRECT_OFFERS_TO_ONE_REALM".into(), json!(DIRECT_OFFERS_TO_ONE_REALM));
+    m.insert("ZEAL_CAP_HOURS".into(), json!(ZEAL_CAP_HOURS));
+    m.insert("ZEAL_FILL_TICKS".into(), json!(ZEAL_FILL_TICKS));
     Value::Object(m)
 }
 

@@ -184,3 +184,4 @@ pub mod work;
 pub mod workplace_settings;
 pub mod world;
 pub mod world_index;
+pub mod zeal;

@@ -1475,6 +1475,13 @@ pub struct WorldState {
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[ts(optional, as = "Option<IndexMap<String, Wear>>")]
     pub wear: IndexMap<String, Wear>,
+    /// The Zeal of each Player whose pool is not full, by account id (see `Realm::user_id`), in
+    /// game hours of rallying (`CONTEXT.md`: Zeal). A Player with no entry has a full pool, so a
+    /// new Player and one from before format 146 start full. Kept by account, not by realm, so a
+    /// Leader handover or death keeps it. Left out of a save while every pool is full.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[ts(optional, as = "Option<BTreeMap<u64, f64>>")]
+    pub zeal: BTreeMap<u64, f64>,
 }
 
 impl WorldState {
