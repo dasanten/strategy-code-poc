@@ -168,6 +168,16 @@ pub fn reserve_lacks(
             *want.entry(good).or_insert(0.0) += n;
         }
     }
+    // Nor is the Stone a town sets aside for its wall ever short (Epic 113): its roads, repairs
+    // and trade leave it, but its walls spending it don't pull its hands off other work; they
+    // refill it working for surplus. (A big city upgrading its wall kept its whole crew at the
+    // quarry, off its new mine.)
+    if city.trade_org.is_none() {
+        let aside = crate::npc_stone_walls::wall_stone_set_aside(world, city);
+        if let Some(stone) = want.get_mut(&Good::Stone).filter(|_| aside > 0.0) {
+            *stone = (*stone - aside).max(0.0);
+        }
+    }
     let stock = if city.trade_org.is_some() {
         warehouse_stock(world, city)
     } else {
