@@ -497,14 +497,14 @@ fn a_resident_of_no_city_cant_pair() {
     assert!(pair_up(&mut world, "loner", &ids[0], &ME).is_some());
 }
 
-/// Epic 113: a pair with free housing and a food surplus waits 3 game days before one partner
+/// Epic 113: a pair with free housing and a food surplus waits 5 game days before one partner
 /// starts carrying, and their child is grown after 56 game days (14 years of 4 game days).
 #[test]
-fn a_pair_starts_carrying_after_3_game_days_and_a_child_is_grown_after_56() {
+fn a_pair_starts_carrying_after_5_game_days_and_a_child_is_grown_after_56() {
     let (mut world, ids) = setup(100_000.0);
     let (a, b) = (&ids[0], &ids[1]);
     pair_up(&mut world, a, b, &ME);
-    days(&mut world, 2);
+    days(&mut world, 4);
     assert_eq!(carrier_of(&world, a, b), None);
     days(&mut world, 1);
     assert!(carrier_of(&world, a, b).is_some());

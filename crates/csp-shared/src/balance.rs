@@ -921,9 +921,9 @@ pub const CARRYING_DAYS: f64 = 10.0;
 pub const CARRYING_TICKS: f64 = CARRYING_DAYS * TICKS_PER_GAME_DAY;
 
 /// Game days a pair waits after pairing before one partner starts carrying (`CONTEXT.md`: Pairing),
-/// if their city then has free housing and a food surplus: 3 game days, about 1.2 real hours
+/// if their city then has free housing and a food surplus: 5 game days, about 2 real hours
 /// (Epic 113).
-pub const PAIRING_WAIT_DAYS: f64 = 3.0;
+pub const PAIRING_WAIT_DAYS: f64 = 5.0;
 
 /// Ticks from pairing until a partner can start carrying (`PAIRING_WAIT_DAYS`).
 pub const PAIRING_WAIT_TICKS: f64 = PAIRING_WAIT_DAYS * TICKS_PER_GAME_DAY;
@@ -1103,6 +1103,12 @@ pub const NPC_WALL_TILES_PER_TRIP: f64 = 4.0;
 /// Wall / Gate, Wood or stone): as many as a town has when the world is made, so a village goes
 /// stone once it has grown into one.
 pub const NPC_STONE_WALL_RESIDENTS: f64 = NPC_TOWN.residents;
+
+/// Tiles of stone wall whose Stone an NPC town sets aside in its reserve while it builds or
+/// upgrades its wall in stone (`CONTEXT.md`: NPC reserve, Wood or stone): two builders' trips
+/// (`NPC_WALL_TILES_PER_TRIP`), 32 Stone, so its roads, repairs and trade leave the wall a trip
+/// in hand while the next one is quarried (Epic 113: with faster growth they took it all).
+pub const NPC_WALL_STONE_SET_ASIDE_TILES: f64 = 2.0 * NPC_WALL_TILES_PER_TRIP;
 
 /// How far from its home an NPC city looks for a resource node to build a workplace on when it
 /// needs a material it has no workplace for (`CONTEXT.md`: NPC city), in tiles: about twenty
@@ -3409,6 +3415,7 @@ pub fn balance_json() -> Value {
     m.insert("CITY_QUARTER_ROWS".into(), json!(CITY_QUARTER_ROWS));
     m.insert("NPC_WALL_TILES_PER_TRIP".into(), json!(NPC_WALL_TILES_PER_TRIP));
     m.insert("NPC_STONE_WALL_RESIDENTS".into(), json!(NPC_STONE_WALL_RESIDENTS));
+    m.insert("NPC_WALL_STONE_SET_ASIDE_TILES".into(), json!(NPC_WALL_STONE_SET_ASIDE_TILES));
     m.insert("NPC_NODE_REACH".into(), json!(NPC_NODE_REACH));
     m.insert("NPC_RESIDENTS_PER_SCOUT".into(), json!(NPC_RESIDENTS_PER_SCOUT));
     m.insert("NPC_SCOUT_LIMIT".into(), json!(NPC_SCOUT_LIMIT));

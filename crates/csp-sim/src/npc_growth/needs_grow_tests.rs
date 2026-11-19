@@ -269,7 +269,10 @@ fn and_so_does_a_town() {
     let t = npc_city(&NPC_TOWN);
     assert_eq!(t.scale(), 1.0);
     assert_eq!(npc_road_crew(&t.world, t.c()), NPC_ROAD_CREW);
-    assert_eq!(t.reserve().get(&Good::Stone), None);
+    // Only the Stone it sets aside for its wooden wall's upgrade to stone (Epic 113).
+    let aside = crate::npc_stone_walls::wall_stone_set_aside(&t.world, t.c());
+    assert!(aside > 0.0);
+    assert_eq!(t.reserve().get(&Good::Stone).copied(), Some(aside));
 }
 
 // a big city
@@ -291,7 +294,10 @@ fn keeps_more_wood_and_stone_by_the_step() {
     let reserve = t.reserve();
     // Wood for the weapons it hasn't armed yet comes on top, and it has armed all it keeps.
     assert_eq!(held(&reserve, Good::Wood), wood * steps);
-    assert_eq!(held(&reserve, Good::Stone), NPC_TRADE.reserve_stone_per_step * (steps - 1.0));
+    // And the Stone it sets aside for its wall while it has wooden tiles to upgrade (Epic 113).
+    let aside = crate::npc_stone_walls::wall_stone_set_aside(&t.world, t.c());
+    let stone = NPC_TRADE.reserve_stone_per_step * (steps - 1.0) + aside;
+    assert_eq!(held(&reserve, Good::Stone), stone);
 }
 
 #[test]
