@@ -164,6 +164,7 @@ import {
   NPC_BUILDERS,
   NPC_INNER_WALL_REACH,
   NPC_STONE_WALL_RESIDENTS,
+  NPC_WALL_STONE_SET_ASIDE_TILES,
   NPC_ROAD_CREW,
   NPC_ROAD_LONGEST,
   NPC_CITY_MIN_DISTANCE,
@@ -3449,9 +3450,13 @@ export function Wiki() {
           NPC city upgrades its wall to <strong>stone</strong> (see{' '}
           <a href="#transport">Upgrading to stone</a>): its outer gate first, then that wall tile by
           tile, nearest the gate first, and its inner ring once the outer one is all stone. It does
-          this last of all its projects, from Stone beyond its reserve: a tile at a time once it
-          holds a builder's trip of it above its reserve, while its road crew is in and its wall is
-          not moving out. A town with none builds a quarry for it, and its spare hands work it. A
+          this last of all its projects. While it does, its reserve sets aside the Stone of{' '}
+          {num(NPC_WALL_STONE_SET_ASIDE_TILES)} tiles of stone wall for it: its roads, repairs and
+          trade leave that Stone, a founding party's Stone counts only above it, and only its walls
+          spend it. It never counts as short: its spare hands refill it working for surplus, so the
+          wall doesn't pull them off other work. It upgrades a tile at a time once it holds a builder's trip of Stone it may
+          spend, from what it sets aside or beyond its reserve, while its road crew is in and its
+          wall is not moving out. A town with none builds a quarry for it, and its spare hands work it. A
           new outer wall it puts up when it grows is of stone once its old one was. Villages,
           starting cities and the Trade Organization's cities stay wooden.
         </p>
@@ -3529,7 +3534,8 @@ export function Wiki() {
           while they do. Food, Wood and Stone come first, Food its surplus too: only once it holds{' '}
           {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus cap past its reserve, and while
           full its farmers work to win that back as they do its reserve. While it saves for its
-          party, its walls and repairs spend only the Stone above its reserve and the party's Stone.
+          party, its walls and repairs spend only the Stone above its reserve and the party's Stone,
+          and its walls the Stone its reserve sets aside for them.
           Its workplaces come first as well: its spare hands go on a road crew, scout and work at
           its workplaces for surplus, and only those left over gather for the party. Past{' '}
           {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less for each{' '}

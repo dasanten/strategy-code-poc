@@ -1021,7 +1021,8 @@ mod invariants;
 pub(crate) use invariants::violation;
 pub use invariants::{
     city_plans_sound, npc_called_home_sound, npc_farmers_kept, npc_founding_stone_kept,
-    npc_leaves_dry_workplaces, npc_spare_hands_work, npc_surplus_capped, npc_workplaces_bounded,
+    npc_leaves_dry_workplaces, npc_spare_hands_work, npc_surplus_capped, npc_wall_stone_set_aside,
+    npc_workplaces_bounded,
 };
 
 #[cfg(test)]

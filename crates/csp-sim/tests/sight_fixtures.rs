@@ -38,8 +38,9 @@ fn every_side_sees_what_it_sees_in_typescript() {
         for (side, want) in sides {
             let what = format!("{world_file} as seen by {side}");
             let seen = entities_in_sight(&world, &index, Some(side), None);
-            let want = &without_hire_spare(want.clone());
-            let seen_json = without_hire_spare(serde_json::to_value(&*seen).unwrap());
+            let as_now = |v: Value| without_wall_stone(&world, without_hire_spare(v));
+            let want = &as_now(want.clone());
+            let seen_json = as_now(serde_json::to_value(&*seen).unwrap());
             let (want_now, seen_now) = as_equipment_shows(want, &seen_json);
             assert_same_json(&what, &want_now, &common::without_coal(&seen_now));
             compared += seen.len();
@@ -58,9 +59,7 @@ fn every_side_sees_what_it_sees_in_typescript() {
             assert_same_json(
                 &format!("{what}, places"),
                 &Value::Array(want_places),
-                &common::without_coal(&without_hire_spare(
-                    serde_json::to_value(&*places.seen).unwrap(),
-                )),
+                &common::without_coal(&as_now(serde_json::to_value(&*places.seen).unwrap())),
             );
         }
     }
@@ -116,6 +115,30 @@ fn without_hire_spare(mut v: Value) -> Value {
         }
         if let Some(hire) = e.get_mut("hire").and_then(Value::as_object_mut) {
             hire.remove("spare");
+        }
+    }
+    v
+}
+
+/// Leaves out the Stone a town's trade card shows (what it wants, its prices) while it sets Stone
+/// aside for its wall (`CONTEXT.md`: NPC reserve; Daniel, 2026-11-19, Epic 113): the set-aside is
+/// part of its reserve, which the frozen TypeScript knew nothing of. `npc_stone_walls` and
+/// `needs_grow_tests` test it in Rust.
+fn without_wall_stone(world: &csp_shared::world::WorldState, mut v: Value) -> Value {
+    use csp_sim::npc_stone_walls::wall_stone_set_aside;
+    let aside = |id: &str| {
+        world
+            .cities
+            .iter()
+            .find(|c| c.id == id)
+            .is_some_and(|c| wall_stone_set_aside(world, c) > 0.0)
+    };
+    for e in v.as_array_mut().into_iter().flatten() {
+        if e["is"] != "city" || !e["id"].as_str().is_some_and(aside) {
+            continue;
+        }
+        if let Some(trade) = e.get_mut("trade").and_then(Value::as_array_mut) {
+            trade.retain(|t| t["good"] != "stone");
         }
     }
     v

@@ -151,7 +151,7 @@ mod tests {
     use csp_shared::balance::ticks_for_age;
 
     #[test]
-    fn ages_children_ten_game_days_a_year() {
+    fn ages_children_child_year_days_a_year() {
         assert_eq!(age_in_years(0.0, CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY), 1.0);
         for age in [3.0, ADULT_AGE, 30.0] {
             assert!((age_in_years(0.0, ticks_for_age(age)) - age).abs() < 1e-9);

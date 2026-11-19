@@ -51,30 +51,31 @@ describe('goods and carrying', () => {
 describe('aging', () => {
   const newborn = { bornAt: 0 } as unknown as Resident
   const day = TICKS_PER_GAME_DAY
+  const childhood = ADULT_AGE * CHILD_YEAR_DAYS * day
 
   it('ages a child a year every CHILD_YEAR_DAYS game days', () => {
     expect(ageInYears(newborn, 0)).toBe(0)
     expect(ageInYears(newborn, CHILD_YEAR_DAYS * day)).toBe(1)
-    expect(ageInYears(newborn, 70 * day)).toBe(7)
-    expect(ageInYears(newborn, 140 * day - 1)).toBeLessThan(ADULT_AGE)
-    expect(ageInYears(newborn, 140 * day)).toBe(ADULT_AGE)
+    expect(ageInYears(newborn, 7 * CHILD_YEAR_DAYS * day)).toBe(7)
+    expect(ageInYears(newborn, childhood - 1)).toBeLessThan(ADULT_AGE)
+    expect(ageInYears(newborn, childhood)).toBe(ADULT_AGE)
   })
 
   it('ages an adult a year every game year', () => {
-    expect(ageInYears(newborn, 140 * day + TICKS_PER_GAME_YEAR)).toBe(ADULT_AGE + 1)
-    expect(ageInYears(newborn, 140 * day + 6 * TICKS_PER_GAME_YEAR + 210 * day)).toBe(20.5)
+    expect(ageInYears(newborn, childhood + TICKS_PER_GAME_YEAR)).toBe(ADULT_AGE + 1)
+    expect(ageInYears(newborn, childhood + 6 * TICKS_PER_GAME_YEAR + 210 * day)).toBe(20.5)
   })
 
-  it('lets a newborn work after 140 game days, not before', () => {
-    expect(canWork(newborn, 140 * day - 1)).toBe(false)
-    expect(canWork(newborn, 140 * day)).toBe(true)
+  it('lets a newborn work once its childhood is over, not before', () => {
+    expect(canWork(newborn, childhood - 1)).toBe(false)
+    expect(canWork(newborn, childhood)).toBe(true)
   })
 
   it('turns an age back into ticks lived on both sides of the boundary', () => {
     for (const age of [0, 3.5, ADULT_AGE, ADULT_AGE + 0.25, 30, 60]) {
       expect(ageInYears(newborn, ticksForAge(age))).toBeCloseTo(age, 9)
     }
-    expect(ticksForAge(ADULT_AGE)).toBe(140 * day)
+    expect(ticksForAge(ADULT_AGE)).toBe(childhood)
   })
 })
 
