@@ -26,6 +26,10 @@ fn have_one_of_their_residents_breed_their_horses_through_the_default_task() {
     for r in &mut world.residents {
         r.carried = Stock::from([(Good::Food, 100.0)]);
     }
+    // No Tools in the storage (a starting city has some, T113.1): an NPC resident without a set
+    // would fetch one first, and this is about the breeding.
+    let storage = world.buildings.iter().position(|b| b.kind == BuildingKind::Storage).unwrap();
+    world.buildings[storage].stock.as_mut().unwrap().shift_remove(&Good::Tools);
     end_realm(&mut world, &realm.id, land.size);
     let city = world.cities[0].id.clone();
     assert!(world

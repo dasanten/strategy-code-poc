@@ -473,6 +473,18 @@ pub const START_FOOD: f64 = 100.0;
 /// spear or a few days' Food.
 pub const START_COINS: f64 = 50.0;
 
+/// Wood in a starting city's storage (`CONTEXT.md`: Starting city): enough for a first building,
+/// such as a house, in the first minute.
+pub const START_WOOD: f64 = 40.0;
+
+/// Stone in a starting city's storage (`CONTEXT.md`: Starting city): with `START_WOOD`, a storage's
+/// Stone or most of a quarry.
+pub const START_STONE: f64 = 20.0;
+
+/// Sets of Tools in a starting city's storage (`CONTEXT.md`: Starting city, Tools): two, so two
+/// residents work faster from the start.
+pub const START_TOOLS: f64 = 2.0;
+
 /// Food each resident of a starting city carries, in units: four game days' meals, so they have
 /// something to eat while the farm's first harvest comes in (`CONTEXT.md`: Eating).
 pub const START_CARRIED_FOOD: f64 = 2.0;
@@ -3210,6 +3222,9 @@ pub fn balance_json() -> Value {
     m.insert("START_COINS".into(), json!(START_COINS));
     m.insert("START_CARRIED_FOOD".into(), json!(START_CARRIED_FOOD));
     m.insert("START_SPEARS".into(), json!(START_SPEARS));
+    m.insert("START_WOOD".into(), json!(START_WOOD));
+    m.insert("START_STONE".into(), json!(START_STONE));
+    m.insert("START_TOOLS".into(), json!(START_TOOLS));
     m.insert("START_HORSES".into(), json!(START_HORSES));
     m.insert("START_STABLE_FOOD".into(), json!(START_STABLE_FOOD));
     m.insert("HORSE_FOOD_PER_DAY".into(), json!(HORSE_FOOD_PER_DAY));
