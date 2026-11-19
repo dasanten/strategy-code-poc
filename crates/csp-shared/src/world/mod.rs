@@ -958,9 +958,11 @@ pub enum OrderEndedKind {
     Store,
     Fetch,
     Relocate,
+    /// Gathering by hand (`CONTEXT.md`: Gathering): ended with full hands or a picked-over tile.
+    Gather,
 }
 
-/// How a resident's last store, fetch or relocate order ended.
+/// How a resident's last store, fetch, relocate or gather order ended.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 pub struct OrderEnded {
@@ -980,6 +982,27 @@ pub struct BuildOrder {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub material: Option<WallMaterial>,
+}
+
+/// Gathering a good by hand from the patch of the tile the resident stands on (`CONTEXT.md`:
+/// Gathering, Patch): `progress` is their share of the next unit.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GatherOrder {
+    pub good: Good,
+    pub at: Tile,
+    pub progress: f64,
+}
+
+/// What a Forest or Hills tile that isn't full still holds for gathering (`CONTEXT.md`: Patch):
+/// `left` units at tick `at`, growing back steadily from then on.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Patch {
+    pub x: i32,
+    pub y: i32,
+    pub left: f64,
+    pub at: u64,
 }
 
 /// Working at a workplace.
@@ -1392,6 +1415,8 @@ pub enum ResidentOrder {
     /// Throwing Stone with a catapult at a wall, gate or tower in its reach, as one of its crew
     /// (`CONTEXT.md`: Catapult).
     Throw(ThrowOrder),
+    /// Gathering by hand on a Forest or Hills tile (`CONTEXT.md`: Gathering).
+    Gather(GatherOrder),
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).
@@ -1475,6 +1500,12 @@ pub struct WorldState {
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[ts(optional, as = "Option<IndexMap<String, Wear>>")]
     pub wear: IndexMap<String, Wear>,
+    /// The patches of the Forest and Hills tiles that aren't full (`CONTEXT.md`: Patch), sorted
+    /// by tile, row (`y`) first; a full tile is in no entry, so the list stays small on a big map.
+    /// Left out of a save while there are none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[ts(optional, as = "Option<Vec<Patch>>")]
+    pub patches: Vec<Patch>,
 }
 
 impl WorldState {

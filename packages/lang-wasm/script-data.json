@@ -3261,6 +3261,16 @@
       "returns": "string"
     },
     {
+      "name": "gather",
+      "is": "action",
+      "params": [
+        "good"
+      ],
+      "cost": 10,
+      "description": "Gather \"wood\" or \"food\" by hand on the Forest tile I stand on, or \"stone\" on a Hills tile, with nothing built on it and no node: a little slower than working a node, and it teaches the skill. Each tile's patch holds about one load for everyone and grows back over some game days once picked over. My order is \"gather\" until my hands are full or the patch is gone; then `me.orderEnded` says which (\"hands full\" or \"picked over\"). Children can't.",
+      "returns": "string"
+    },
+    {
       "name": "teach",
       "is": "action",
       "params": [

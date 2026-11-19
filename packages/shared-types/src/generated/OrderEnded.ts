@@ -2,6 +2,6 @@
 import type { OrderEndedKind } from "./OrderEndedKind.js";
 
 /**
- * How a resident's last store, fetch or relocate order ended.
+ * How a resident's last store, fetch, relocate or gather order ended.
  */
 export type OrderEnded = { kind: OrderEndedKind, tick: number, reason: string | null, };
