@@ -32,6 +32,8 @@ pub mod equipping;
 pub mod events;
 pub mod explored;
 pub mod explored_edge;
+#[doc(hidden)]
+pub mod fixture_ages;
 #[cfg(test)]
 mod game_test_world;
 pub mod gates;

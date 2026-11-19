@@ -390,8 +390,9 @@ pub const LIFESPAN_MAX: f64 = 65.0;
 pub const ADULT_AGE: f64 = 14.0;
 
 /// Game days each year of age up to `ADULT_AGE` takes: children age faster, so a newborn is grown
-/// after 140 game days (~56 real hours). Later years take a full game year (`CONTEXT.md`: Aging).
-pub const CHILD_YEAR_DAYS: f64 = 10.0;
+/// after 56 game days (~22 real hours; Epic 113). Later years take a full game year (`CONTEXT.md`:
+/// Aging).
+pub const CHILD_YEAR_DAYS: f64 = 4.0;
 
 /// Ticks from birth until a resident is grown up.
 const CHILDHOOD_TICKS: f64 = ADULT_AGE * CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY;
@@ -900,8 +901,9 @@ pub const CARRYING_DAYS: f64 = 10.0;
 pub const CARRYING_TICKS: f64 = CARRYING_DAYS * TICKS_PER_GAME_DAY;
 
 /// Game days a pair waits after pairing before one partner starts carrying (`CONTEXT.md`: Pairing),
-/// if their city then has free housing and a food surplus: 10 game days, 4 real hours.
-pub const PAIRING_WAIT_DAYS: f64 = 10.0;
+/// if their city then has free housing and a food surplus: 3 game days, about 1.2 real hours
+/// (Epic 113).
+pub const PAIRING_WAIT_DAYS: f64 = 3.0;
 
 /// Ticks from pairing until a partner can start carrying (`PAIRING_WAIT_DAYS`).
 pub const PAIRING_WAIT_TICKS: f64 = PAIRING_WAIT_DAYS * TICKS_PER_GAME_DAY;
@@ -3652,13 +3654,10 @@ mod tests {
 
     #[test]
     fn turns_an_age_back_into_ticks_on_both_sides_of_the_boundary() {
-        assert_eq!(ticks_for_age(ADULT_AGE), 140.0 * TICKS_PER_GAME_DAY);
+        assert_eq!(ticks_for_age(ADULT_AGE), 56.0 * TICKS_PER_GAME_DAY);
         assert_eq!(ticks_for_age(0.0), 0.0);
-        assert_eq!(ticks_for_age(3.5), 35.0 * TICKS_PER_GAME_DAY);
-        assert_eq!(
-            ticks_for_age(ADULT_AGE + 1.0),
-            140.0 * TICKS_PER_GAME_DAY + TICKS_PER_GAME_YEAR
-        );
+        assert_eq!(ticks_for_age(3.5), 14.0 * TICKS_PER_GAME_DAY);
+        assert_eq!(ticks_for_age(ADULT_AGE + 1.0), 56.0 * TICKS_PER_GAME_DAY + TICKS_PER_GAME_YEAR);
     }
 
     #[test]

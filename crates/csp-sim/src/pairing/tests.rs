@@ -409,7 +409,14 @@ fn makes_a_child_of_the_carriers_city_and_realm_on_their_tile_inheriting_base_st
 #[test]
 fn still_has_the_child_when_the_other_parent_dies_while_it_is_carried() {
     let (mut world, ids) = setup(100_000.0);
-    let (a, b) = (&ids[0], &ids[1]);
+    // Neither of them the Leader, whose death would end the realm (`CONTEXT.md`: Leader).
+    let leader = world.realms[0].leader_id.clone();
+    let tick = world.tick as f64;
+    let mut grown = ids.iter().filter(|id| {
+        **id != leader
+            && crate::queries::residents::can_work(live(&world, id).unwrap().born_at, tick)
+    });
+    let (a, b) = (grown.next().unwrap(), grown.next().unwrap());
     pair_up(&mut world, a, b, &ME);
     days(&mut world, WAIT_DAYS);
     let carrier = carrier_of(&world, a, b).unwrap();
@@ -420,7 +427,7 @@ fn still_has_the_child_when_the_other_parent_dies_while_it_is_carried() {
     let born = days(&mut world, CARRYING_DAYS);
     assert_eq!(born.len(), 1);
     assert!(
-        matches!(&world.events.last().unwrap().what, RealmEventWhat::Born { parents, .. } if *parents == [names.0.clone(), names.1.clone()])
+        matches!(&world.events.last().unwrap().what, RealmEventWhat::Born { parents, .. } if *parents == [names.0.clone(), names.1.clone()]),
     );
 }
 
@@ -488,4 +495,21 @@ fn a_resident_of_no_city_cant_pair() {
     let owner = live(&world, &ids[0]).unwrap().owner.clone();
     resident(&mut world, "loner", owner.as_deref(), 0.0, 0.0);
     assert!(pair_up(&mut world, "loner", &ids[0], &ME).is_some());
+}
+
+/// Epic 113: a pair with free housing and a food surplus waits 3 game days before one partner
+/// starts carrying, and their child is grown after 56 game days (14 years of 4 game days).
+#[test]
+fn a_pair_starts_carrying_after_3_game_days_and_a_child_is_grown_after_56() {
+    let (mut world, ids) = setup(100_000.0);
+    let (a, b) = (&ids[0], &ids[1]);
+    pair_up(&mut world, a, b, &ME);
+    days(&mut world, 2);
+    assert_eq!(carrier_of(&world, a, b), None);
+    days(&mut world, 1);
+    assert!(carrier_of(&world, a, b).is_some());
+
+    let day = TICKS_PER_GAME_DAY;
+    assert!(!crate::queries::residents::can_work(0.0, 56.0 * day - 1.0));
+    assert!(crate::queries::residents::can_work(0.0, 56.0 * day));
 }
