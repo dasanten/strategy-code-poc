@@ -1417,6 +1417,22 @@ pub enum ResidentOrder {
     Throw(ThrowOrder),
     /// Gathering by hand on a Forest or Hills tile (`CONTEXT.md`: Gathering).
     Gather(GatherOrder),
+    /// The Leader rallying the crew of the workplace or site they are at (`CONTEXT.md`: Rallying
+    /// the crew). Given by the Player by hand only (ADR 0042).
+    Rally(RallyOrder),
+}
+
+/// Rallying the crew of a workplace or construction site (`CONTEXT.md`: Rallying the crew).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RallyOrder {
+    /// The workplace or site the Leader stands at.
+    pub building_id: String,
+    /// The last tick somebody of the realm worked there at the rallied pace, for the drain: Zeal
+    /// drains only while somebody is being rallied. None until then.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub worked_at: Option<f64>,
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).
@@ -1500,6 +1516,13 @@ pub struct WorldState {
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[ts(optional, as = "Option<IndexMap<String, Wear>>")]
     pub wear: IndexMap<String, Wear>,
+    /// The Zeal of each Player whose pool is not full, by account id (see `Realm::user_id`), in
+    /// game hours of rallying (`CONTEXT.md`: Zeal). A Player with no entry has a full pool, so a
+    /// new Player and one from before format 148 start full. Kept by account, not by realm, so a
+    /// Leader handover or death keeps it. Left out of a save while every pool is full.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[ts(optional, as = "Option<BTreeMap<u64, f64>>")]
+    pub zeal: BTreeMap<u64, f64>,
     /// The patches of the Forest and Hills tiles that aren't full (`CONTEXT.md`: Patch), sorted
     /// by tile, row (`y`) first; a full tile is in no entry, so the list stays small on a big map.
     /// Left out of a save while there are none.

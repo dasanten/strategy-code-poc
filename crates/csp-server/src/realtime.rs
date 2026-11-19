@@ -45,6 +45,7 @@ use csp_sim::tick::Scratch;
 use csp_sim::vein_stands::veins_seen_by;
 use csp_sim::veins::gone_nodes_of;
 use csp_sim::world_index::{world_index, WorldIndex};
+use csp_sim::zeal::zeal_of;
 use flate2::{write::GzEncoder, Compression};
 use rusqlite::Connection;
 use serde_json::{json, Map, Value};
@@ -173,6 +174,8 @@ struct Client {
     last_veins: String,
     last_waypoints: String,
     last_trader_visits: String,
+    /// The Zeal the Player was last sent (`CONTEXT.md`: Zeal).
+    last_zeal: f64,
 }
 
 #[derive(Default)]
@@ -438,6 +441,7 @@ fn build_welcome(
             &world.waypoints.get(&(user_id as u64)).cloned().unwrap_or_default(),
         ),
         last_trader_visits: json_of(&trader_visits_to(world, &realm.id)),
+        last_zeal: zeal_of(world, user_id as u64),
     };
     // The view starts at the town hall of the realm's first city, or with the Leader if it has
     // none left.
@@ -497,6 +501,7 @@ fn build_welcome(
         "goneNodes": gone_nodes_of(world, user_id as u64),
         "waypoints": world.waypoints.get(&(user_id as u64)).cloned().unwrap_or_default(),
         "traderVisits": trader_visits_to(world, &realm.id),
+        "zeal": client.last_zeal,
         "firstDay": first_day,
         "workSettings": work_settings,
         "veins": veins,
@@ -1076,6 +1081,12 @@ impl Realtime {
                 if visits_json != client.last_trader_visits {
                     client.last_trader_visits = visits_json;
                     tick.insert("traderVisits".into(), visits);
+                }
+                // Only the Player's own Zeal, only when it changed (`CONTEXT.md`: Zeal).
+                let zeal = zeal_of(world, client.user_id as u64);
+                if zeal != client.last_zeal {
+                    client.last_zeal = zeal;
+                    tick.insert("zeal".into(), json!(zeal));
                 }
                 // `changed` and `gone` go last, as the JSON the realm's sockets in step share.
                 let rest = Value::Object(tick).to_string();

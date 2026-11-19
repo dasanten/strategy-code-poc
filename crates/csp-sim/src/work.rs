@@ -196,6 +196,10 @@ pub fn resolve_work(world: &mut WorldState, actions: &[WorkAction], scratch: &mu
         };
         let learned = work_learned(r, skill, tick);
         let had = skill_of(r, skill);
+        // Rallied by their Leader, they work at a multiple of their pace (`CONTEXT.md`: Rallying
+        // the crew); what they learn stays as it was.
+        let place_id = world.buildings[pi].id.clone();
+        let gain = gain * crate::rally::rallied_pace(world, ri, &place_id);
         work_order(world, ri).progress += gain;
         world.residents[ri].skills.insert(skill, had + learned);
         crate::wear::wear_tools(world, ri);
@@ -248,6 +252,7 @@ fn mend_work(world: &mut WorldState, ri: usize, pi: usize, tick: f64) {
     let gain = batch_work(r, place.kind, tick) * mend_pace();
     let learned = work_learned(r, skill, tick);
     let had = skill_of(r, skill);
+    let gain = gain * crate::rally::rallied_pace(world, ri, &place.id);
     world.residents[ri].skills.insert(skill, had + learned);
     let o = work_order(world, ri);
     o.progress += gain;

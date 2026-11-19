@@ -541,6 +541,8 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "script-logs-sound",
             check: |w, _| crate::script_log::script_logs_sound(w),
         },
+        Invariant { name: "zeal-within-cap", check: |w, _| crate::zeal::zeal_within_cap(w) },
+        Invariant { name: "rallies-sound", check: |w, _| crate::rally::rallies_sound(w) },
     ]
 }
 

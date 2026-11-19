@@ -81,6 +81,8 @@ pub enum ServerMessage {
         gone_nodes: Vec<(i32, i32)>,
         waypoints: Vec<Waypoint>,
         trader_visits: Vec<TraderVisit>,
+        /// The Player's own Zeal, in game hours of rallying (`CONTEXT.md`: Zeal); nobody else's.
+        zeal: f64,
         first_day: FirstDay,
         /// The realm's Workplace settings by building id; only its own.
         work_settings: IndexMap<String, WorkplaceSettings>,
@@ -133,6 +135,9 @@ pub enum ServerMessage {
         waypoints: Option<Vec<Waypoint>>,
         #[ts(optional)]
         trader_visits: Option<Vec<TraderVisit>>,
+        /// The Player's Zeal, once it changed.
+        #[ts(optional)]
+        zeal: Option<f64>,
     },
     /// The memory of the script run by a watched resident or army.
     ScriptMemory {

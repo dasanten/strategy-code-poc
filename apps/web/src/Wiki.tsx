@@ -404,6 +404,8 @@ import {
   carryCapacity,
   walkSpeed,
   workFactor,
+  RALLY_PACE,
+  ZEAL_CAP_HOURS,
 } from '@csp/balance'
 import { PARAM_DESCRIPTIONS, DEFAULT_SCRIPTS, SCRIPT_VIEWS } from '@csp/lang-wasm'
 import { WORKPLACE_PARAM } from './shared/default-scripts.js'
@@ -471,6 +473,8 @@ import {
   transport,
   horseRow,
   wikiResident,
+  zealFillRealHours,
+  zealFullRealMinutes,
   type PricedGood,
 } from './wiki-view.js'
 import { GROUP_SLOTS } from './saved-groups.js'
@@ -527,6 +531,7 @@ export const WIKI_TOPICS = [
   { id: 'training', title: 'Training' },
   { id: 'food', title: 'Food & hunger' },
   { id: 'work', title: 'Workplaces & output' },
+  { id: 'zeal', title: 'Zeal & rallying the crew' },
   { id: 'gathering', title: 'Gathering by hand' },
   { id: 'building', title: 'Building & tearing down' },
   { id: 'transport', title: 'Carrying & transport' },
@@ -2014,6 +2019,36 @@ export function Wiki() {
           Example: a miner with Strength {num(strong.stats.strength.base)} and Mining{' '}
           {num(strong.skills.mining ?? 0)} digs {num(outputPerDay('ironOre', 'mining', strong))}{' '}
           iron ore a game day, against {num(outputPerDay('ironOre', 'mining'))} at average.
+        </p>
+      </Section>
+
+      <Section id="zeal">
+        <p>
+          <strong>Zeal</strong> is yours, not your realm's: a pool that fills in real time, whether
+          you are online or not, from empty to full in about {num(zealFillRealHours())} real hours.
+          A full pool holds {num(ZEAL_CAP_HOURS)} game hours of rallying, about{' '}
+          {num(zealFullRealMinutes())} real minutes. A new Player starts with it full, and a Leader
+          handover or your Leader's death keeps it. The meter in the top bar shows how full it is,
+          and while it drains.
+        </p>
+        <p>
+          <strong>Rally the crew</strong> is an order for your Leader alone. Stand them at a
+          workplace or a construction site and pick Rally the crew on their card or the building's:
+          everyone of your realm working there, or building, tearing down or repairing there, works
+          at {num(RALLY_PACE)} times their pace, on top of their skill, Strength and Tools. Your
+          Leader does no work of their own meanwhile. Zeal drains a game hour of rallying for every
+          game hour, only while somebody is being rallied, and goes on filling meanwhile; the
+          building's card says about how long it lasts. Only work is faster: not walking, carrying,
+          fetching, training or fighting.
+        </p>
+        <p>
+          It ends when you stop it or give your Leader another order, when they leave the building,
+          are struck or go Down, or when the Zeal is used up. Whatever Zeal is left stays. A blow
+          ends it for good: it doesn't come back after the defence script.
+        </p>
+        <p>
+          It is given by hand only. No script can rally the crew and it can't be a queue step: the
+          game API has no call for it, as a script would spend the pool the moment it filled.
         </p>
       </Section>
 

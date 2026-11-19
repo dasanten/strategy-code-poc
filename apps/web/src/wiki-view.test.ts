@@ -200,6 +200,16 @@ describe('wiki figures', () => {
 })
 
 describe('wiki page', () => {
+  it('explains Zeal and rallying the crew with the balance numbers', () => {
+    const html = render()
+    expect(html).toContain('id="zeal"')
+    expect(html).toContain(`at ${balance.RALLY_PACE} times their pace`)
+    expect(html).toContain(`holds ${balance.ZEAL_CAP_HOURS} game hours of rallying`)
+    const hours = (balance.ZEAL_FILL_TICKS * balance.TICK_MS) / 3_600_000
+    expect(html).toContain(`about ${hours} real hours`)
+    expect(html).toContain('No script can rally the crew')
+  })
+
   it('has a section with an anchor for every topic', () => {
     const html = render()
     for (const t of WIKI_TOPICS) expect(html).toContain(`id="${t.id}"`)

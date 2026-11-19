@@ -506,6 +506,8 @@ describe('every resident order on the group card', () => {
     wallsInSight: 1,
     picking: false,
     makeLeader: { problem: undefined },
+    // As if the Leader: their Rally the crew row (`CONTEXT.md`: Rallying the crew).
+    rally: { problem: undefined },
     relocate: { problem: undefined },
     renamable: true,
     horseToRide: true,
@@ -548,6 +550,7 @@ describe('every resident order on the group card', () => {
       'hitchOff',
       'makeLeader',
       'pair',
+      'rally',
       'rename',
       'rowOff',
       'stealHorse',

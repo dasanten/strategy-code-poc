@@ -1,4 +1,5 @@
 import { offerTerms, setAsideLine } from './offers-view.js'
+import { ralliesAt, rallyProblem, zealLasts } from './zeal.js'
 import {
   BUILD_MATERIALS,
   BUILD_WORK,
@@ -47,6 +48,7 @@ import {
   RAM_STRENGTH,
   CATAPULT_CREW,
   CATAPULT_STRENGTH,
+  RALLY_PACE,
   PATCH_SIZE,
 } from '@csp/balance'
 import {
@@ -195,6 +197,7 @@ export type ActionId =
   | 'push'
   | 'ram'
   | 'throw'
+  | 'rally'
 
 /** The key that runs each action; fixed per action, so it is the same whatever is selected. */
 export const ACTION_KEYS: Record<ActionId, string> = {
@@ -243,6 +246,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   push: 'D',
   ram: 'R',
   throw: 'R',
+  rally: 'Y',
 }
 
 /**
@@ -321,6 +325,11 @@ export interface ResidentHere {
   }
   /** One of the Player's own residents, whom they can rename (`CONTEXT.md`: Renaming a resident). */
   renamable?: boolean
+  /**
+   * For the Player's own Leader: why they can't rally the crew where they stand now, undefined when
+   * they can (`CONTEXT.md`: Rallying the crew). Absent for anyone else, who gets no such row.
+   */
+  rally?: { problem: string | undefined }
   /**
    * For one of the Player's own residents: why they can't be told to relocate at all
    * (`relocateActionProblem`), undefined when they can. Absent for anyone else's resident, who
@@ -677,6 +686,11 @@ function ordersOffered(h: ResidentHere): {
     )
   }
   if (h.renamable) add(row('rename', 'Rename…', { opens: true }))
+  // The Leader's own order, by hand only (`CONTEXT.md`: Rallying the crew, ADR 0042).
+  if (h.rally) {
+    const { problem } = h.rally
+    add(row('rally', 'Rally the crew', problem ? { disabled: true, reason: problem } : {}))
+  }
   return { actions, missing }
 }
 
@@ -736,6 +750,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   wallTo: 'work',
   tearDown: 'work',
   breed: 'work',
+  rally: 'work',
   goods: 'goods',
   feed: 'goods',
   script: 'scripts',
@@ -1048,6 +1063,11 @@ export interface TileCard {
    * repair lacks.
    */
   repair?: { buildingId: string; name: string; rebuild?: true }
+  /**
+   * The Player's Leader stands at this workplace or site (`CONTEXT.md`: Rallying the crew): Rally
+   * the crew, greyed with why when it can't be given, or Stop while they rally it.
+   */
+  rally?: { leaderId: string; rallying: boolean; problem?: string }
   stealHorse?: {
     horseId: string
     residents: { id: string; name: string; problem: string | undefined }[]
@@ -1210,6 +1230,8 @@ export interface TileThings {
   /** The realms the Player knows by name, for who occupies a town hall. */
   realms?: RealmLabel[]
   viewer: Viewer
+  /** The Player's Leader and Zeal, for rallying the crew at a building (`CONTEXT.md`: Rallying the crew). */
+  rally?: { leaderId: string; zeal: number }
   tick?: number
   /** Residents in sight working each building, by building id. */
   workers: (b: Building) => number
@@ -1835,6 +1857,12 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     if (condition) lines.push(condition)
     if (live && repairable(live))
       repair = { buildingId: live.id, name: name.toLowerCase(), ...rebuildOf(live) }
+    const rallyHere = live && rallyAt(live, t)
+    if (rallyHere) {
+      card.rally = rallyHere
+      if (rallyHere.rallying)
+        lines.push(`The crew is rallied · Zeal lasts ${zealLasts(t.rally!.zeal)}`)
+    }
     if (remembered && t.lastSeen) {
       card.lastSeen = {
         when: lastSeenText(remembered.seenAt, t.lastSeen.tick),
@@ -2489,6 +2517,20 @@ function goodMadeAt(b: Building, t: TileThings, makes?: Good): Good | undefined 
   return node && NODE_GOOD[node.kind]
 }
 
+/**
+ * The Player's Leader at a workplace or site the Player sees (`CONTEXT.md`: Rallying the crew):
+ * whether they rally its crew, else why they can't, if they can't. Undefined when the Leader isn't
+ * there or it is nowhere to rally.
+ */
+function rallyAt(b: Building, t: TileThings): TileCard['rally'] {
+  if (!t.rally || !ralliesAt(b)) return undefined
+  const leader = t.residents?.find((r) => r.id === t.rally!.leaderId)
+  if (!leader || isDown(leader) || !covers(b, leader.x, leader.y)) return undefined
+  const rallying = leader.order?.kind === 'rally' && leader.order.buildingId === b.id
+  const problem = rallying ? undefined : rallyProblem(b, t.rally.zeal, leader.order)
+  return { leaderId: leader.id, rallying, ...(problem ? { problem } : {}) }
+}
+
 /** The known node a node's workplace stands on, if the Player knows one under it. */
 function nodeUnder(b: Building, t: TileThings): KnownNode | undefined {
   if (!NODE_WORKPLACE_KINDS.has(b.kind) || !t.nodeAt) return undefined
@@ -2502,7 +2544,8 @@ function nodeUnder(b: Building, t: TileThings): KnownNode | undefined {
  * the Player's realm working there, with what they make and how much a game day at their Strength
  * and skill, then a row for the total of each good. Undefined with none of them there. It is the
  * pace while they have what they need; other realms' workers aren't counted, as their stats aren't
- * known.
+ * known. While the realm's Leader rallies the crew there it is the rallied pace (`CONTEXT.md`:
+ * Rallying the crew).
  */
 function amountsList(
   b: Building,
@@ -2510,12 +2553,15 @@ function amountsList(
   labels: Record<string, string>,
 ): CardList | undefined {
   if (MAX_WORKERS[b.kind] === undefined || !WORKPLACE_SKILL[b.kind]) return undefined
+  const rallied = (t.residents ?? []).some(
+    (r) => r.owner === t.viewer.realmId && r.order?.kind === 'rally' && r.order.buildingId === b.id,
+  )
   const made = (t.residents ?? []).flatMap((r) => {
     const o = r.order
     if (r.owner !== t.viewer.realmId || o?.kind !== 'workAt' || o.buildingId !== b.id) return []
     const good = goodMadeAt(b, t, o.makes)
     if (!good) return []
-    const factor = richnessFactor(nodeUnder(b, t)?.richness)
+    const factor = richnessFactor(nodeUnder(b, t)?.richness) * (rallied ? RALLY_PACE : 1)
     return [{ r, good, perDay: madePerDay(r as Resident, b.kind, good, t.tick ?? 0) * factor }]
   })
   if (made.length === 0) return undefined
@@ -2766,6 +2812,18 @@ export function tileActions(
       id: 'repair',
       label: `${card.repair.rebuild ? 'Rebuild' : 'Repair'} ${card.repair.name}`,
       key: ACTION_KEYS.repair,
+      ...(reason ? { disabled: true as const, reason } : {}),
+    })
+  }
+  // The Leader's order, from the building's card too (`CONTEXT.md`: Rallying the crew).
+  if (card.rally?.rallying)
+    actions.push({ id: 'stop', label: 'Stop rallying the crew', key: ACTION_KEYS.stop })
+  else if (card.rally) {
+    const reason = card.rally.problem
+    actions.push({
+      id: 'rally',
+      label: 'Rally the crew',
+      key: ACTION_KEYS.rally,
       ...(reason ? { disabled: true as const, reason } : {}),
     })
   }

@@ -344,9 +344,12 @@ pub fn resolve_repairing(
             let r = &world.residents[ri];
             let under = terrain.map(|t| terrain_at(t, b.x as i32, b.y as i32));
             let work = site_work_of(build_work(r, tick), b.kind, under);
-            let total = repair_work_of(b).min(b.repair.as_ref().map_or(0.0, |x| x.work) + work);
             let learned = construction_learned(r, tick);
             let had = skill_of(r, SkillName::Construction);
+            let id = b.id.clone();
+            let work = work * crate::rally::rallied_pace(world, ri, &id);
+            let b = &world.buildings[bi];
+            let total = repair_work_of(b).min(b.repair.as_ref().map_or(0.0, |x| x.work) + work);
             if let Some(x) = world.buildings[bi].repair.as_mut() {
                 x.work = total;
             }

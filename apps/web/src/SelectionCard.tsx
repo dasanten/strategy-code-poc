@@ -551,6 +551,7 @@ export function TileCard({
   onFeed,
   onPickUp,
   onRepair,
+  onRally,
   realm,
 }: {
   card: TileCardData
@@ -625,6 +626,8 @@ export function TileCard({
   onPickUp: (residentId: string, from: GoodsSpot, goods: Stock) => void
   /** Gives the actor the Repair task for a worn building, wall, gate or road on the tile. */
   onRepair?: (buildingId: string) => void
+  /** Has the Player's Leader rally the crew there, or stop (`CONTEXT.md`: Rallying the crew). */
+  onRally?: (leaderId: string, stop: boolean) => void
   /** The realm orders about the tile in realm control mode (`RealmTileOrders`), if any. */
   realm?: ReactNode
 }) {
@@ -744,6 +747,8 @@ export function TileCard({
             if (a.opens) setOpen(shown === a.id ? undefined : a.id)
             if (a.id === 'sendHere') onSendHere()
             if (a.id === 'repair' && card.repair) onRepair?.(card.repair.buildingId)
+            if ((a.id === 'rally' || a.id === 'stop') && card.rally)
+              onRally?.(card.rally.leaderId, a.id === 'stop')
             if (a.id === 'build' && card.buildHere?.at)
               onBuildHere(card.buildHere.kind, card.buildHere.at)
             if (a.id === 'gate' && card.gate) onSetGate(card.gate.id, !!card.gate.closed)

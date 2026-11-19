@@ -111,6 +111,7 @@ pub mod queries;
 pub mod queue;
 pub mod queue_tree;
 pub mod queues;
+pub mod rally;
 pub mod random;
 #[cfg(test)]
 mod realm_test_world;
@@ -186,3 +187,4 @@ pub mod work;
 pub mod workplace_settings;
 pub mod world;
 pub mod world_index;
+pub mod zeal;

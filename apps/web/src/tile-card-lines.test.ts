@@ -14,6 +14,7 @@ import {
   WORK_SKILL_EFFECT,
   WORK_STRENGTH_AVERAGE,
   RICHNESS_FACTOR,
+  RALLY_PACE,
   TICKS_PER_GAME_DAY,
   hungerFactor,
 } from '@csp/balance'
@@ -220,6 +221,19 @@ describe('buildings on a tile’s card', () => {
       ])
       // The rows say what it makes, so the line doesn't.
       expect(linesOf({ buildings: [farm], residents })).not.toContain('Makes food')
+    })
+
+    it('gives the rallied pace while the realm’s Leader rallies the crew there', () => {
+      const farm = building({ kind: 'farm', cityId: 'c-me' })
+      const perDay = WORK_OUTPUT_PER_DAY.food! * (10 / WORK_STRENGTH_AVERAGE)
+      const leader = (buildingId: string, owner = 'me') =>
+        resident({ id: 'lead', name: 'Lead', owner, order: { kind: 'rally', buildingId } })
+      const rows = (r: Resident) =>
+        amounts({ buildings: [farm], residents: [worker(farm, 'Ana', 10), r] })
+      expect(rows(leader(farm.id))?.[0]).toEqual(['Ana', 'Food', tenth(perDay * RALLY_PACE)])
+      // Rallying elsewhere, or another realm's Leader, changes nothing here.
+      expect(rows(leader('elsewhere'))?.[0]).toEqual(['Ana', 'Food', tenth(perDay)])
+      expect(rows(leader(farm.id, 'them'))?.[0]).toEqual(['Ana', 'Food', tenth(perDay)])
     })
 
     it('gives a mine what its node yields, the same way', () => {
@@ -831,5 +845,31 @@ describe('strangers on a tile’s card', () => {
         '2 residents of other realms · 1 armed',
       ]),
     )
+  })
+})
+
+describe('rallying the crew on a building’s card (`CONTEXT.md`: Rallying the crew)', () => {
+  const farm = building({ kind: 'farm', cityId: 'c-me' })
+  const leader = (order: Resident['order'] = null, x = 5) =>
+    resident({ id: 'lead', name: 'Lead', owner: 'me', x, y: 5, order })
+  const card = (r: Resident, zeal = 20) =>
+    tile({ buildings: [farm], residents: [r], rally: { leaderId: 'lead', zeal } })
+  const row = (r: Resident, zeal?: number) =>
+    tileActions(card(r, zeal), undefined).find((a) => a.id === 'rally' || a.id === 'stop')
+
+  it('offers Rally the crew while the Leader stands there, greyed with no Zeal left', () => {
+    expect(row(leader())).toMatchObject({ id: 'rally', label: 'Rally the crew' })
+    expect(row(leader(), 0)).toMatchObject({ disabled: true, reason: 'no Zeal left' })
+    // Not with the Leader elsewhere.
+    expect(row(leader(null, 30))).toBeUndefined()
+  })
+
+  it('says the crew is rallied and about how long the Zeal lasts, with Stop', () => {
+    const rallying = leader({ kind: 'rally', buildingId: farm.id })
+    expect(
+      card(rallying).lines.some((l) => /^The crew is rallied · Zeal lasts about /.test(l)),
+    ).toBe(true)
+    expect(row(rallying)).toMatchObject({ id: 'stop', label: 'Stop rallying the crew' })
+    expect(card(leader()).lines.some((l) => l.startsWith('The crew is rallied'))).toBe(false)
   })
 })
