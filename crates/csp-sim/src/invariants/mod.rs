@@ -446,6 +446,10 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, _t| crate::npc_behaviour::npc_residents_kept_going(w),
         },
         Invariant {
+            name: "npc-far-workers-go-home-fed",
+            check: |w, t| crate::npc_behaviour::npc_far_workers_go_home_fed(w, t),
+        },
+        Invariant {
             name: "npc-idle-off-the-storage",
             check: |w, t| crate::npc_behaviour::npc_idle_off_the_storage(w, t),
         },

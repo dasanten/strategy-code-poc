@@ -147,6 +147,9 @@ The shared language of the game. Domain terms only — no implementation details
   of work, not a fixed amount, so they last until the carrier's first round trip. An NPC
   city's builders of a site beyond its node reach from its storage set out with the same, and go back for
   more while they still have what the walk home eats (decided overnight, Daniel to confirm).
+  So do its workers at a workplace beyond its node reach: they set out with that too, and go home
+  for Food while they still have what the walk home eats, not once they have none (Daniel, #1379:
+  Larkspur's quarry workers 270 tiles out set off home with nothing and went Down on the way).
 - **Holding a workplace:** whoever physically works and guards a workplace gets its output.
   There is no ownership flag. Drive out the workers, move your own in, and it's yours.
 - **Tools** (Epic 97): a good a smithy makes from Iron and Wood. A resident carrying Tools works a

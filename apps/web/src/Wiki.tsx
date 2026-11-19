@@ -1768,7 +1768,8 @@ export function Wiki() {
           city sends to a workplace sets out with Food for the walk there and back plus{' '}
           {days(SET_OUT_WORK_DAYS)} of work, not a fixed amount, so they last until the carrier's
           first round trip. Its builders of a site more than {num(NPC_NODE_REACH)} tiles from its
-          storage take the same, and go back for more while they still have what the walk home eats.
+          storage take the same, and go back for more while they still have what the walk home eats;
+          so do its workers at a workplace that far out.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
