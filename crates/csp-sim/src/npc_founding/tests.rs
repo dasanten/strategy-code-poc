@@ -1498,6 +1498,75 @@ fn once_founded_it_sends_what_its_daughter_still_lacks_after_it_until_its_storag
 }
 
 #[test]
+fn while_its_daughter_lacks_the_rest_of_the_load_its_building_leaves_that_wood_and_stone_alone() {
+    // #1379 (Daniel, 2026-11-19: none of its building spends the Wood and Stone the party needs):
+    // Fallowby's begun smithy took each load of Stone its quarry brought home after Oakhurst
+    // stood, so Oakhurst never got its storage and its people starved.
+    use super::{kept_for_party, kept_from_walls, waits_for_party};
+    use crate::npc_plan::npc_founding_materials_kept;
+    use crate::queries::building::build_materials;
+    use csp_shared::world::CityProject;
+    let days = npc_full_days(110.0);
+    let mut t = full_for(110, days);
+    t.plan_city();
+    assert!(!t.party().is_empty());
+    let site = t.plan().founding_site.expect("a site");
+    let (_, daughter) = hall_and_city(&mut t.world, site.x, site.y);
+    let city = t.city.clone();
+    assert_eq!(found_daughter(&mut t.world, &city), Some(daughter.clone()));
+    let lacks = super::daughter_lacks(&t.world, &daughter).expect("no storage yet");
+    let stone = held(&lacks, Good::Stone);
+    assert!(stone > 0.0, "{lacks:?}");
+
+    // It keeps the Wood and Stone its daughter lacks on top of its reserve.
+    let c = t.city().clone();
+    let kept = kept_for_party(&t.world, &c).expect("its daughter lacks some");
+    assert_eq!(held(&kept, Good::Stone), stone);
+    assert_eq!(held(&kept, Good::Wood), held(&lacks, Good::Wood));
+    let reserve = npc_reserve(&t.world, &c);
+    assert_eq!(
+        held(&kept_from_walls(&t.world, &c), Good::Stone),
+        held(&reserve, Good::Stone) + stone
+    );
+
+    // A smithy waits while it holds no more Stone than that, and the invariant catches a plan
+    // that builds it; with the smithy's Stone on top, it goes ahead.
+    let home = t.home();
+    let smithy = CityProject::Build {
+        building: BuildingKind::Smithy,
+        x: home.x + 6.0,
+        y: home.y + 6.0,
+        material: None,
+    };
+    let wood = held(&reserve, Good::Wood) + held(&kept, Good::Wood) + 100.0;
+    let need = held(&build_materials(BuildingKind::Smithy), Good::Stone);
+    t.home_stock().insert(Good::Wood, wood);
+    t.home_stock().insert(Good::Stone, held(&reserve, Good::Stone) + stone);
+    assert!(waits_for_party(&t.world, &c, &smithy));
+    let tick = t.world.tick as f64;
+    t.plan_mut().planned_at = tick;
+    t.plan_mut().project = Some(smithy.clone());
+    assert_eq!(npc_founding_materials_kept(&t.world).len(), 1);
+    t.home_stock().insert(Good::Stone, held(&reserve, Good::Stone) + stone + need);
+    assert!(!waits_for_party(&t.world, &c, &smithy));
+    assert_eq!(npc_founding_materials_kept(&t.world), []);
+
+    // Once its daughter's storage stands it keeps nothing for it.
+    t.home_stock().insert(Good::Stone, held(&reserve, Good::Stone) + stone);
+    let mut storage = crate::test_support::building(
+        "dstore",
+        BuildingKind::Storage,
+        Some(&daughter),
+        site.x + 4.0,
+        site.y,
+    );
+    storage.site = None;
+    t.world.buildings.push(storage);
+    assert_eq!(kept_for_party(&t.world, &c), None);
+    assert!(!waits_for_party(&t.world, &c, &smithy));
+}
+
+#[test]
 fn keeping_a_founding_site_with_no_wait_and_no_hall_there_breaks_founding_wave_sound() {
     let mut t = full_for(30, NPC_FULL_DAYS);
     let tick = t.world.tick as f64;

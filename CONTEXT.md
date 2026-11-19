@@ -762,7 +762,10 @@ The shared language of the game. Domain terms only — no implementation details
   2026-11-18, #1379): they kept spending it, so no city held it. Nor does any of its building
   spend the Wood and Stone the party needs (Daniel, 2026-11-19, #1379): a site that needs them
   waits until it holds them above its reserve and the party's, while its farms and the workplaces
-  for Wood and Stone go ahead; begun workshops took each load its quarry brought home. Its workplaces come first too (Daniel, 2026-11-16): its spare hands'
+  for Wood and Stone go ahead; begun workshops took each load its quarry brought home. The same
+  holds once its daughter stands, for the Wood and Stone the daughter still lacks of the party's
+  load, until its storage stands (#1379: a begun smithy took the Stone its daughter's storage
+  needed, and the daughter starved). Its workplaces come first too (Daniel, 2026-11-16): its spare hands'
   work (Spare hands' work: road crew, scouting, its workplaces for surplus) comes before gathering
   for the party, and only the hands left over gather. Those gathering them are still spare hands
   for its full wait. A dip below the reserve only restarts that time if it lasts longer than a game

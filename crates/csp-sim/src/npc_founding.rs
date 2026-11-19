@@ -168,25 +168,46 @@ pub fn saving_to_found(world: &WorldState, city: &City) -> bool {
 /// party (`CONTEXT.md`: Full city; Daniel, 2026-11-19, #1379).
 pub const PARTY_BUILD_GOODS: [Good; 2] = [Good::Wood, Good::Stone];
 
+/// The Wood and Stone of its founding party's load that an NPC city's building leaves alone
+/// (`CONTEXT.md`: Full city; Daniel, 2026-11-19, #1379): while it saves for the party
+/// (`saving_to_found`), the party's; once its daughter stands, what that still lacks of the rest
+/// of the load (`daughter_lacks`), until its storage stands. None while neither, or when nothing
+/// is lacked. Before this, Fallowby's begun smithy took each load of Stone its quarry brought home
+/// after its daughter Oakhurst stood, so Oakhurst never got the Stone for its storage, had
+/// neither storage nor farm, and its people starved at their far lumber camp.
+pub fn kept_for_party(world: &WorldState, city: &City) -> Option<Stock> {
+    let load = if saving_to_found(world, city) {
+        founding_materials(Some(npc_founding_party_size(
+            city_residents(world, &city.id).len() as f64
+        )))
+    } else {
+        let plan = world.city_plans.get(&city.id)?;
+        let daughter = daughter_supplied(world, plan, &city.id)?;
+        daughter_lacks(world, &daughter.id)?
+    };
+    let kept: Stock = PARTY_BUILD_GOODS
+        .into_iter()
+        .map(|good| (good, held(&load, good)))
+        .filter(|(_, n)| *n > 0.0)
+        .collect();
+    (!kept.is_empty()).then_some(kept)
+}
+
 /// What an NPC city's building and repairs leave in its storages (`CONTEXT.md`: Full city): its
-/// reserve and, while it saves for its founding party (`saving_to_found`), the party's Wood and
-/// Stone on top (Daniel, 2026-11-18 and 2026-11-19, #1379: walls, repairs and its workshops kept
-/// spending them, so no city held them).
+/// reserve and the Wood and Stone of its founding party's load on top (`kept_for_party`; Daniel,
+/// 2026-11-18 and 2026-11-19, #1379: walls, repairs and its workshops kept spending them, so no
+/// city held them).
 pub fn kept_from_walls(world: &WorldState, city: &City) -> Stock {
     let mut kept = npc_reserve(world, city);
-    if saving_to_found(world, city) {
-        let party = founding_materials(Some(npc_founding_party_size(
-            city_residents(world, &city.id).len() as f64,
-        )));
-        for good in PARTY_BUILD_GOODS {
-            *kept.entry(good).or_insert(0.0) += held(&party, good);
-        }
+    for (good, n) in kept_for_party(world, city).unwrap_or_default() {
+        *kept.entry(good).or_insert(0.0) += n;
     }
     kept
 }
 
 /// Whether a project of an NPC city waits for its founding party (`CONTEXT.md`: Full city; Daniel,
-/// 2026-11-19, #1379): while the city saves for the party, a building that needs Wood or Stone it
+/// 2026-11-19, #1379): while the city keeps Wood or Stone for the party's load (`kept_for_party`:
+/// saving for it, or its daughter lacking the rest of it), a building that needs Wood or Stone it
 /// doesn't hold above its reserve and the party's (`kept_from_walls`) waits. Farms, lumber camps and
 /// quarries go ahead. A wall or gate counts a builder's trip, a few tiles' worth. Before this,
 /// Larkspur's quarry brought its Stone home load by load, and a begun smelter, mine, smithy and mint
@@ -196,7 +217,7 @@ pub fn waits_for_party(world: &WorldState, city: &City, project: &CityProject) -
     use csp_shared::balance::NPC_WALL_TILES_PER_TRIP;
     let CityProject::Build { building, x, y, material } = project else { return false };
     if matches!(building, BuildingKind::Farm | BuildingKind::LumberCamp | BuildingKind::Quarry)
-        || !saving_to_found(world, city)
+        || kept_for_party(world, city).is_none()
     {
         return false;
     }

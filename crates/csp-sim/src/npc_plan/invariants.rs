@@ -386,7 +386,8 @@ pub fn npc_founding_stone_kept(world: &WorldState) -> Vec<InvariantViolation> {
 }
 
 /// Invariant `npc-founding-materials-kept` (`CONTEXT.md`: Full city; Daniel, 2026-11-19, #1379):
-/// a plan made this tick by a city saving for its founding party has no project that would spend
+/// a plan made this tick by a city keeping Wood or Stone for its founding party's load (saving for
+/// it, or its daughter lacking the rest: `kept_for_party`) has no project that would spend
 /// the party's Wood or Stone (`waits_for_party`): farms, lumber camps and quarries aside, its
 /// building waits until it holds them above its reserve and the party's.
 pub fn npc_founding_materials_kept(world: &WorldState) -> Vec<InvariantViolation> {

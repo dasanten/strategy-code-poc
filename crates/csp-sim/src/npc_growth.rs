@@ -490,7 +490,8 @@ pub fn next_project(
     if !crate::npc_founding::waits_for_party(world, city, &first) {
         return Some(first);
     }
-    // While it saves for its founding party, a building that would spend the party's Wood or Stone
+    // While it keeps Wood or Stone for its founding party's load (saving for it, or its daughter
+    // lacking the rest), a building that would spend them
     // waits (`CONTEXT.md`: Full city; Daniel, 2026-11-19, #1379): the workplace for a material the
     // party lacks instead, if it has none, else nothing, so its hands gather them.
     crate::npc_founding::founding_lacks(world, city, Some(home), terrain.size)
