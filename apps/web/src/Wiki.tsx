@@ -37,6 +37,11 @@ import {
   CARRY_PER_STRENGTH,
   CARRYING_DAYS,
   PAIRING_WAIT_DAYS,
+  DRIFTER_REALM_CAP,
+  DRIFTER_WAIT_DAYS,
+  DRIFTER_DISTANCE_MIN,
+  DRIFTER_DISTANCE_MAX,
+  DRIFTER_FOOD,
   CHILD_STAT_SPREAD,
   CHILD_YEAR_DAYS,
   CITY_AREA_MARGIN,
@@ -1626,6 +1631,23 @@ export function Wiki() {
           {num(LIFESPAN_MAX)}. A house holds {num(HOUSING_ROOM.house ?? 0)} residents (a site holds
           nobody yet), and a city's free housing is the room of its houses minus its residents.
           Health runs up to {num(MAX_HEALTH)}.
+        </p>
+        <p>
+          <b>Drifters.</b> A small realm draws newcomers on its own. While your realm has fewer than{' '}
+          {num(DRIFTER_REALM_CAP)} residents, your Leader lives, and the city your Leader lives in
+          has free housing and a food surplus, a grown drifter sets out for that city every{' '}
+          {days(DRIFTER_WAIT_DAYS)}, one at a time; the wait counts only while all of that holds.
+          Founding more cities brings no more drifters, and NPC cities, trading posts and the HQ
+          draw none. A drifter comes into being out of every Player’s sight,{' '}
+          {num(DRIFTER_DISTANCE_MIN)} to {num(DRIFTER_DISTANCE_MAX)} tiles from the town hall, with
+          stats and an age like a starting city’s residents and {num(DRIFTER_FOOD)} Food for the
+          walk, and walks in. On the way they belong to nobody: they take no orders, and whatever is
+          done to them is no crime. Stepping into the city’s area they join it and your realm,
+          standing idle, and your realm log names them. If by then the city has no free housing, is
+          no longer yours, or your realm has reached the cap, they turn round and are gone once
+          nobody sees them. Residents on their way (a drifter, those relocating, children being
+          carried) count toward the free housing and the cap. The town hall of your Leader’s city
+          says when the next drifter comes, or why none does.
         </p>
         <p>
           <b>Names.</b> A name the game gives a resident, in a starting city, at birth or when they

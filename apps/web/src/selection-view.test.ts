@@ -1451,6 +1451,14 @@ describe('the card for a tile', () => {
     expect(tile({ strangers: [r] })).toMatchObject({ title: 'Brann', rel: 'otherRealm' })
   })
 
+  it('shows a resident of no realm and no city as a drifter', () => {
+    const r = { name: 'Ivo', owner: null, cityId: null, carried: { food: 1 } } as Resident
+    const card = tile({ strangers: [r] })
+    expect(card).toMatchObject({ title: 'Ivo' })
+    expect(card.rel).toBeUndefined()
+    expect(card.lines).toContain('Ivo · Drifter')
+  })
+
   it('shows a building only remembered as last seen, apart from what is there now', () => {
     const storage = building({ kind: 'storage', cityId: 'c-npc', stock: { food: 3 } })
     const card = tile({

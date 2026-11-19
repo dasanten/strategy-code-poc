@@ -321,3 +321,15 @@ describe('the Wiki’s Gathering section (`CONTEXT.md`: Gathering, Patch)', () =
     expect(html).toContain('href="#gathering"')
   })
 })
+
+describe('the Wiki’s Drifters part (`CONTEXT.md`: Drifter)', () => {
+  it('gives the cap, the distance and the Food from the balance', () => {
+    const html = render()
+    expect(html).toContain('<b>Drifters.</b>')
+    expect(html).toContain(`fewer than ${balance.DRIFTER_REALM_CAP} residents`)
+    expect(html).toContain(
+      `${balance.DRIFTER_DISTANCE_MIN} to ${balance.DRIFTER_DISTANCE_MAX} tiles from the town hall`,
+    )
+    expect(html).toContain(`${balance.DRIFTER_FOOD} Food for`)
+  })
+})

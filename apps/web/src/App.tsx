@@ -2863,6 +2863,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 },
                 workers: (b) => workersHere(world.residents, b),
                 veins: world.veins,
+                drifters: world.drifters,
                 // A haul route's arrival only for the Player's own driver.
                 arrivesIn: (r) => {
                   const mine = own.find((o) => o.id === r.id)

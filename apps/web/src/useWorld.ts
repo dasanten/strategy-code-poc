@@ -27,6 +27,7 @@ import type {
   ScriptRunSeen,
   ServerMessage,
   VeinWord,
+  DrifterCard,
   WorkplaceSettings,
   Waypoint,
 } from '@csp/shared-types'
@@ -104,6 +105,8 @@ export interface ClientWorld {
    * Running dry): words, never a number.
    */
   veins: Readonly<Record<string, VeinWord>>
+  /** Whether drifters come to the city the Leader lives in (`CONTEXT.md`: Drifters on the city card). */
+  drifters: DrifterCard | null
 }
 
 /** Sorts what is in sight by kind, dropping the tag. */
@@ -229,6 +232,7 @@ export function useWorld(onLoggedOut: () => void) {
             firstDay: msg.firstDay,
             workSettings: msg.workSettings,
             veins: msg.veins,
+            drifters: msg.drifters,
             ...byKind(entities.values()),
             lastSeen: lastSeenByKind(remembered.values()),
           })
@@ -290,6 +294,7 @@ export function useWorld(onLoggedOut: () => void) {
               traderVisits: msg.traderVisits ?? w.traderVisits,
               workSettings: msg.workSettings ?? w.workSettings,
               veins: msg.veins ?? w.veins,
+              drifters: msg.drifters !== undefined ? msg.drifters : w.drifters,
               waypoints: msg.waypoints ?? w.waypoints,
             }
           })
