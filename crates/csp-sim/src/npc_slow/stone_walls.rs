@@ -4,9 +4,10 @@
 //!
 //! The upgrade is the last use of its Stone (beyond its reserve, after its roads and other
 //! projects), and a town's ring is long (a ring 22 tiles out has 176 tiles, 704 Stone): it builds
-//! its quarry first, so its gate goes stone in its second game month and over a third of its outer
-//! wall within a game season (70 of 176 when measured, with its wooden ring's repairs), the rest
-//! over the next.
+//! its quarry first, so its gate goes stone in its third game month and near a third of its outer
+//! wall within a game season (55 of 176 when measured, with its wooden ring's repairs and its
+//! founding party's Stone kept while it is full), the rest over the next. Hills past its land keep
+//! it from founding a daughter (#1379), which would leave it a village.
 
 use csp_shared::balance::NPC_TOWN;
 use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR};
@@ -26,14 +27,13 @@ use crate::world::create_world;
 /// A game season: a quarter of the game year.
 const SEASON_DAYS: usize = (TICKS_PER_GAME_YEAR / TICKS_PER_GAME_DAY / 4.0) as usize;
 
-/// The game day by which its gate is of stone (day 5 when measured: it starts with its reserve,
-/// which holds the Stone it sets aside for its wall, Epic 113; day 27 before).
-const GATE_BY_DAY: usize = 45;
+/// The game day by which its gate is of stone (day 64 when measured, on dev too, with Hills past
+/// its land; day 27 on open plains before a full town saved its founding party's Stone, #1379).
+const GATE_BY_DAY: usize = 70;
 
-/// The share of its outer wall of stone at the end of the season (45% when measured, with the Stone
-/// it sets aside for its wall while it grows and saves for a founding party, Epic 113; 40% before;
-/// 62% before its wooden walls decayed, Epic 97: once worn their repairs take a Wood a tile, Wood
-/// its quarry and upgrade then wait on).
+/// The share of its outer wall of stone at the end of the season (31% when measured with Hills
+/// past its land; 40% on open plains before #1379; 62% before its wooden walls decayed, Epic 97:
+/// once worn their repairs take a Wood a tile, Wood its quarry and upgrade then wait on).
 const SHARE_BY_SEASON: f64 = 0.3;
 
 #[test]
@@ -47,6 +47,18 @@ fn a_town_upgrades_its_outer_wall_to_stone_gate_first_through_a_season() {
     let home = npc_home(&world, &city).expect("a home").clone();
     add_node(&mut world, &mut terrain, ResourceKind::Forest, home.x + 40.0, home.y);
     add_node(&mut world, &mut terrain, ResourceKind::Stone, home.x - 40.0, home.y);
+    // Hills past its land, so it finds no Plains site for a daughter and stays whole all season: a
+    // full town calls its hands home and sends its spare farmers along (#1379), so on open plains
+    // it founds before its wall goes stone.
+    let (hx, hy) = (home.x as i32, home.y as i32);
+    for y in 0..terrain.size {
+        for x in 0..terrain.size {
+            if (x - hx).abs().max((y - hy).abs()) > 70 {
+                let i = csp_shared::terrain::tile_index(terrain.size, x, y);
+                terrain.tiles[i] = csp_shared::terrain::Terrain::Hills as u8;
+            }
+        }
+    }
     let reserve = npc_reserve(&world, world.cities.iter().find(|c| c.id == city).unwrap());
     home_mut(&mut world, &city).stock = Some(reserve);
     let size = terrain.size;

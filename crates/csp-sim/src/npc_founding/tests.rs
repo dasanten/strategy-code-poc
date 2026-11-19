@@ -1110,3 +1110,400 @@ fn keeps_a_daughter_the_usual_distance_away_on_a_full_map_scaled_with_the_side_o
     // A test map under half the side keeps the full distance.
     assert_eq!(super::daughter_min_distance(1300), NPC_CITY_MIN_DISTANCE);
 }
+
+// #1379 (Daniel, 2026-11-18): Millbrook held all its party took, but five of its seven workers
+// were far out and its farmers and soldiers didn't go, so it never had a party to send.
+
+/// The town's grown, unarmed residents, by index.
+fn hands(t: &Town) -> Vec<usize> {
+    (0..t.world.residents.len())
+        .filter(|&i| {
+            let r = &t.world.residents[i];
+            r.city_id.as_deref() == Some(t.city.as_str())
+                && crate::queries::residents::can_work(r.born_at, t.world.tick as f64)
+                && !crate::queries::residents::is_armed(r)
+        })
+        .collect()
+}
+
+fn job_of(kind: CityJobKind, at: Option<&str>) -> CityJob {
+    CityJob { building_id: at.map(String::from), ..super::job(kind) }
+}
+
+fn pick(t: &Town, adults: &[usize], jobs: &crate::npc_behaviour::Jobs) -> Option<Vec<usize>> {
+    let home = t.home();
+    let home_at = (home.x as i32, home.y as i32);
+    let site = t.plan().founding_site.expect("a site");
+    let site_at = (site.x as i32, site.y as i32);
+    let walk = wrap_distance(t.terrain.size, home_at, site_at) * WALK_TICKS_PER_TILE;
+    let size = t.terrain.size;
+    let near = |i: usize| {
+        let r = &t.world.residents[i];
+        !super::far_out((r.x as i32, r.y as i32), home_at, size)
+    };
+    super::pick_party(&t.world, t.city(), adults, &[], &near, jobs, (walk, site_at))
+}
+
+#[test]
+fn farmers_beyond_those_who_feed_it_join_its_party_after_its_spare_hands() {
+    let t = full_for(60, NPC_FULL_DAYS);
+    let adults = hands(&t);
+    let feed = crate::npc_plan::farmers_to_feed(&t.world, t.city()).ceil() as usize;
+    let members = npc_founding_party_size(city_residents(&t.world, &t.city).len() as f64) as usize;
+    // Two working, all the rest on the farms: too few without the farmers.
+    let mut jobs = crate::npc_behaviour::Jobs::new();
+    for (n, &i) in adults.iter().enumerate() {
+        let kind = if n < 2 { CityJobKind::Work } else { CityJobKind::Farm };
+        jobs.insert(t.world.residents[i].id.clone(), job_of(kind, None));
+    }
+    let farmers = adults.len() - 2;
+    assert!(farmers > feed + members, "{farmers} farmers, {feed} feed it");
+    let party = pick(&t, &adults, &jobs).expect("a party");
+    let from_farms =
+        party.iter().filter(|&&i| jobs[&t.world.residents[i].id].kind == CityJobKind::Farm).count();
+    assert_eq!(party.len() - from_farms, 2, "its workers first");
+    assert!(farmers - from_farms >= feed, "it keeps those who feed it");
+    // With no more farmers than feed it, none of them go: no party.
+    let keep: Vec<usize> = adults.iter().copied().take(2 + feed).collect();
+    for &i in &adults[2 + feed..] {
+        jobs.shift_remove(&t.world.residents[i].id);
+    }
+    assert_eq!(pick(&t, &keep, &jobs), None);
+}
+
+#[test]
+fn its_workers_far_out_are_called_home_and_then_join_its_party() {
+    let mut t = full_for(30, NPC_FULL_DAYS);
+    let home = t.home();
+    let home_at = (home.x as i32, home.y as i32);
+    let size = t.terrain.size;
+    let far_x = home.x + csp_shared::balance::NPC_NODE_REACH + 40.0;
+    let mut quarry = crate::test_support::building(
+        "farquarry",
+        BuildingKind::Quarry,
+        Some(&t.city),
+        far_x,
+        home.y,
+    );
+    quarry.city_id = None;
+    t.world.buildings.push(quarry);
+    let near_at = t.home().id;
+    let adults = hands(&t);
+    // Half work the far quarry, out there; the others work near home.
+    let mut jobs = crate::npc_behaviour::Jobs::new();
+    let half = adults.len() / 2;
+    for (n, &i) in adults.iter().enumerate() {
+        let (at, x) = if n < half { ("farquarry", far_x) } else { (near_at.as_str(), home.x) };
+        jobs.insert(t.world.residents[i].id.clone(), job_of(CityJobKind::Work, Some(at)));
+        t.world.residents[i].x = x;
+        t.world.residents[i].y = home.y;
+    }
+    super::call_home(&t.world, &adults, &mut jobs, home_at, size);
+    for (n, &i) in adults.iter().enumerate() {
+        let job = &jobs[&t.world.residents[i].id];
+        assert_eq!(super::called_home(job), n < half, "{n}: {job:?}");
+    }
+    // Home again with the last pass's call, they are its party's to pick, even put back to work.
+    t.plan_mut().jobs = jobs.clone();
+    for &i in &adults[..half] {
+        t.world.residents[i].x = home.x;
+        let id = t.world.residents[i].id.clone();
+        jobs.insert(id, job_of(CityJobKind::Scout, None));
+    }
+    let party = pick(&t, &adults[..half], &jobs).expect("a party of those called home");
+    assert!(party.iter().all(|i| adults[..half].contains(i)));
+}
+
+#[test]
+fn calls_nobody_home_without_a_founding_party_to_wait_for() {
+    let mut t = full_for(30, NPC_FULL_DAYS);
+    let id = t.world.residents[hands(&t)[0]].id.clone();
+    let tick = t.world.tick as f64;
+    let at = t.home().id;
+    let plan = t.plan_mut();
+    plan.planned_at = tick;
+    plan.jobs.insert(id, job_of(CityJobKind::Idle, Some(&at)));
+    assert_eq!(crate::npc_plan::npc_called_home_sound(&t.world), []);
+    t.plan_mut().founding_site = None;
+    assert_eq!(crate::npc_plan::npc_called_home_sound(&t.world).len(), 1);
+}
+
+#[test]
+fn a_worker_called_home_leaves_the_workplace_out_there() {
+    // #1379: the call named the workplace they came from, and they went on working out there, so
+    // its party never had them.
+    let mut t = full_for(30, NPC_FULL_DAYS);
+    let home = t.home();
+    let far_x = home.x + csp_shared::balance::NPC_NODE_REACH + 40.0;
+    let mut quarry = crate::test_support::building(
+        "farquarry",
+        BuildingKind::Quarry,
+        Some(&t.city),
+        far_x,
+        home.y,
+    );
+    quarry.city_id = None;
+    t.world.buildings.push(quarry);
+    // Between two planning passes, so this tick's plan is the one set here.
+    let city = t.city.clone();
+    while crate::npc_plan::plan_due(&t.world, &city) {
+        t.world.tick += 1;
+    }
+    let i = hands(&t)[0];
+    let id = t.world.residents[i].id.clone();
+    let memory = json!({ "workplaceId": "farquarry" });
+    t.world.residents[i].script =
+        Some(crate::npc_behaviour::default_script(csp_shared::world::Task::Work, memory));
+    t.world.residents[i].x = far_x;
+    t.world.residents[i].carrying = None;
+    let tick = t.world.tick as f64;
+    let plan = t.plan_mut();
+    plan.planned_at = tick;
+    plan.jobs.insert(id.clone(), job_of(CityJobKind::Idle, Some("farquarry")));
+    let size = t.terrain.size;
+    crate::npc_behaviour::step_npc_cities(&mut t.world, size, Some(&t.terrain), None);
+    let r = t.world.residents.iter().find(|r| r.id == id).unwrap();
+    assert_eq!(crate::npc_behaviour::workplace_of(r), None, "{:?}", r.script);
+}
+
+#[test]
+fn what_its_hands_carry_of_the_materials_counts_toward_the_load_not_against_their_room() {
+    // #1379, #1438: a hand back from the lumber camp with Wood on them brings the party's share of
+    // it (`party_lacks`), so it was wrong to count it as room lost.
+    let mut t = full_for(40, NPC_FULL_DAYS);
+    let adults = hands(&t);
+    let mut jobs = crate::npc_behaviour::Jobs::new();
+    for &i in &adults {
+        jobs.insert(t.world.residents[i].id.clone(), job_of(CityJobKind::Work, None));
+        t.world.residents[i].carried = Stock::new();
+    }
+    let unladen = pick(&t, &adults, &jobs).expect("a party");
+    let members = npc_founding_party_size(city_residents(&t.world, &t.city).len() as f64);
+    let wood = held(&founding_materials(Some(members)), Good::Wood);
+    // Together they carry no more Wood than it needs.
+    let each = (wood / adults.len() as f64).floor().max(1.0);
+    let carrying = |t: &mut Town, good: Good| {
+        for &i in &adults {
+            t.world.residents[i].carried = Stock::from([(good, each)]);
+        }
+    };
+    carrying(&mut t, Good::Wood);
+    assert_eq!(pick(&t, &adults, &jobs), Some(unladen.clone()));
+    // Iron ore is no share of it: as heavy, it is room lost.
+    carrying(&mut t, Good::IronOre);
+    assert!(pick(&t, &adults, &jobs).is_none_or(|p| p.len() > unladen.len()));
+}
+
+// The second wave (Daniel, 2026-11-19, #1438): a party too few to carry all its load sets out with
+// its town hall's materials and Food, and the mother sends more hands after it with the rest.
+
+/// The party's load for the town's site.
+fn party_load(t: &Town) -> super::PartyLoad<'_> {
+    let home = t.home();
+    let site = t.plan().founding_site.expect("a site");
+    let walk = wrap_distance(
+        t.terrain.size,
+        (home.x as i32, home.y as i32),
+        (site.x as i32, site.y as i32),
+    ) * WALK_TICKS_PER_TILE;
+    super::PartyLoad::new(&t.world, t.city(), walk)
+}
+
+/// Loads each of `who` with Iron ore, no share of the party's materials, so that together they
+/// have `room` left.
+fn leave_room(t: &mut Town, who: &[usize], room: f64) {
+    let tick = t.world.tick as f64;
+    for &i in who {
+        let r = &mut t.world.residents[i];
+        r.carried = Stock::new();
+        let ore = carry_capacity(r, tick) - room / who.len() as f64;
+        r.carried.insert(Good::IronOre, ore / good_weight(Good::IronOre));
+    }
+}
+
+#[test]
+fn too_few_to_carry_it_all_it_sets_out_with_its_hall_and_food() {
+    let mut t = full_for(30, NPC_FULL_DAYS);
+    let members = npc_founding_party_size(city_residents(&t.world, &t.city).len() as f64) as usize;
+    let hands: Vec<usize> = hands(&t).into_iter().take(members).collect();
+    let mut jobs = crate::npc_behaviour::Jobs::new();
+    for &i in &hands {
+        jobs.insert(t.world.residents[i].id.clone(), job_of(CityJobKind::Work, None));
+    }
+    let (least, all) = {
+        let load = party_load(&t);
+        (load.to_set_out(members), load.all(members))
+    };
+    assert!(least < all);
+    // Room for the hall and their Food, not for all: they go, all of them.
+    leave_room(&mut t, &hands, (least + all) / 2.0);
+    let party = pick(&t, &hands, &jobs).expect("a party");
+    assert_eq!(party.len(), members);
+    // Not even for the hall and their Food: none.
+    leave_room(&mut t, &hands, least - 5.0);
+    assert_eq!(pick(&t, &hands, &jobs), None);
+}
+
+#[test]
+fn its_second_wave_is_as_many_more_as_it_takes_to_carry_the_rest() {
+    let mut t = full_for(40, NPC_FULL_DAYS);
+    let members = npc_founding_party_size(city_residents(&t.world, &t.city).len() as f64) as usize;
+    let all_hands = hands(&t);
+    let (party, others) = all_hands.split_at(members);
+    let all = party_load(&t).all(members);
+    leave_room(&mut t, party, all / 2.0);
+    let mut jobs = crate::npc_behaviour::Jobs::new();
+    for &i in others {
+        t.world.residents[i].carried = Stock::new();
+        jobs.insert(t.world.residents[i].id.clone(), job_of(CityJobKind::Work, None));
+    }
+    let wave = wave_of(&t, party, others, &jobs);
+    assert!(!wave.is_empty());
+    assert!(wave.iter().all(|i| others.contains(i)));
+    let load = party_load(&t);
+    let with = |n: usize| [party, &wave[..n]].concat();
+    assert!(load.holds(&with(wave.len())) >= load.all(members + wave.len()), "it carries it all");
+    let one_less = wave.len() - 1;
+    assert!(load.holds(&with(one_less)) < load.all(members + one_less), "no more than it takes");
+    // With all of it carried, nobody more.
+    leave_room(&mut t, party, all * 2.0);
+    assert_eq!(wave_of(&t, party, others, &jobs), Vec::<usize>::new());
+}
+
+/// The second wave the town sends after `party`, from `others`.
+fn wave_of(
+    t: &Town,
+    party: &[usize],
+    others: &[usize],
+    jobs: &crate::npc_behaviour::Jobs,
+) -> Vec<usize> {
+    let home = t.home();
+    let home_at = (home.x as i32, home.y as i32);
+    let size = t.terrain.size;
+    let near = |i: usize| {
+        let r = &t.world.residents[i];
+        !super::far_out((r.x as i32, r.y as i32), home_at, size)
+    };
+    let people = super::FoundingPeople { adults: others, unneeded: &[], members: party };
+    let site = t.plan().founding_site.expect("a site");
+    let walk = wrap_distance(size, home_at, (site.x as i32, site.y as i32)) * WALK_TICKS_PER_TILE;
+    super::second_wave(&t.world, t.city(), &people, &near, jobs, walk)
+}
+
+#[test]
+fn one_too_full_of_stone_for_their_own_food_puts_some_down_and_takes_their_food() {
+    let days = npc_full_days(110.0);
+    let mut t = full_for(110, days);
+    t.plan_city();
+    let party = t.party();
+    assert!(!party.is_empty());
+    let site = t.plan().founding_site.expect("a site");
+    let city = t.city.clone();
+    let home = t.home();
+    let i = t.world.residents.iter().position(|r| r.id == party[0]).unwrap();
+    // Back from the quarry with as much Stone as they carry and no Food (#1379).
+    let full = (carry_capacity(&t.world.residents[i], t.world.tick as f64)
+        / good_weight(Good::Stone))
+    .floor();
+    let r = &mut t.world.residents[i];
+    (r.x, r.y, r.order, r.script) = (home.x, home.y, None, None);
+    r.carried = Stock::from([(Good::Stone, full)]);
+    let storage = t.world.buildings.iter().position(|b| b.id == home.id);
+    let size = t.terrain.size;
+    let walk = wrap_distance(size, (home.x as i32, home.y as i32), (site.x as i32, site.y as i32))
+        * WALK_TICKS_PER_TILE;
+    let (food_walk, food_stay) = founding_food(walk);
+    let own = food_walk + food_stay;
+
+    super::step_founders(&mut t.world, &city, &[i], storage, size);
+    let Some(ResidentOrder::Drop(drop)) = t.world.residents[i].order.clone() else {
+        panic!("{:?}", t.world.residents[i].order);
+    };
+    assert_eq!(drop.goods.keys().copied().collect::<Vec<_>>(), [Good::Stone]);
+    let put = held(&drop.goods, Good::Stone);
+    assert!(put * good_weight(Good::Stone) >= own * good_weight(Good::Food) - 1e-9, "{put}");
+    assert!(put < full, "only what makes room");
+
+    // Then they take their Food.
+    let r = &mut t.world.residents[i];
+    r.carried.insert(Good::Stone, full - put);
+    r.order = None;
+    super::step_founders(&mut t.world, &city, &[i], storage, size);
+    let Some(ResidentOrder::PickUp(pick)) = &t.world.residents[i].order else {
+        panic!("{:?}", t.world.residents[i].order);
+    };
+    assert!(held(&pick.goods, Good::Food) >= own.floor(), "{pick:?}");
+}
+
+#[test]
+fn once_founded_it_sends_what_its_daughter_still_lacks_after_it_until_its_storage_stands() {
+    let days = npc_full_days(110.0);
+    let mut t = full_for(110, days);
+    t.plan_city();
+    let party = t.party();
+    assert!(!party.is_empty());
+    // Its town hall stands with the party carrying nothing: the daughter lacks the rest.
+    let site = t.plan().founding_site.expect("a site");
+    let (_, daughter) = hall_and_city(&mut t.world, site.x, site.y);
+    let city = t.city.clone();
+    assert_eq!(found_daughter(&mut t.world, &city), Some(daughter.clone()));
+    assert_eq!(t.plan().founding_site, Some(site), "it keeps the site");
+    assert_eq!(t.plan().full_since, None);
+    let lacks = super::daughter_lacks(&t.world, &daughter).expect("no storage yet");
+    assert!(held(&lacks, Good::Wood) > 0.0 && held(&lacks, Good::Stone) > 0.0, "{lacks:?}");
+    assert_eq!(super::founding_wave_sound(&t.world), []);
+
+    // Its next pass sends hands after it.
+    t.plan_city();
+    let wave = t.party();
+    assert!(!wave.is_empty());
+    assert!(wave.iter().all(|id| !party.contains(id)));
+    assert_eq!(super::founding_wave_sound(&t.world), []);
+
+    // One loaded with all it lacks and their Food joins the daughter and walks to it.
+    let i = t.world.residents.iter().position(|r| r.id == wave[0]).unwrap();
+    let home = t.home();
+    let walk = wrap_distance(
+        t.terrain.size,
+        (home.x as i32, home.y as i32),
+        (site.x as i32, site.y as i32),
+    ) * WALK_TICKS_PER_TILE;
+    let (food_walk, food_stay) = founding_food(walk);
+    let mut load = lacks.clone();
+    load.insert(Good::Food, food_walk + food_stay);
+    let r = &mut t.world.residents[i];
+    (r.x, r.y, r.carried, r.order, r.script) = (home.x, home.y, load, None, None);
+    let storage = t.world.buildings.iter().position(|b| b.id == home.id);
+    let size = t.terrain.size;
+    super::step_founders(&mut t.world, &city, &[i], storage, size);
+    let r = &t.world.residents[i];
+    assert_eq!(r.city_id.as_deref(), Some(daughter.as_str()));
+    assert!(matches!(r.order, Some(ResidentOrder::WalkTo(_))), "{:?}", r.order);
+    assert!(!t.plan().jobs.contains_key(&wave[0]));
+
+    // With its storage standing, the daughter gathers the rest itself: the mother is done.
+    let mut storage = crate::test_support::building(
+        "dstore",
+        BuildingKind::Storage,
+        Some(&daughter),
+        site.x + 4.0,
+        site.y,
+    );
+    storage.site = None;
+    t.world.buildings.push(storage);
+    assert_eq!(super::daughter_lacks(&t.world, &daughter), None);
+    t.plan_city();
+    assert_eq!(t.plan().founding_site, None);
+    assert_eq!(super::founding_wave_sound(&t.world), []);
+}
+
+#[test]
+fn keeping_a_founding_site_with_no_wait_and_no_hall_there_breaks_founding_wave_sound() {
+    let mut t = full_for(30, NPC_FULL_DAYS);
+    let tick = t.world.tick as f64;
+    let plan = t.plan_mut();
+    plan.planned_at = tick;
+    plan.full_since = None;
+    plan.founding_site = Some(Tile { x: 250.0, y: 250.0 });
+    assert_eq!(super::founding_wave_sound(&t.world).len(), 1);
+}

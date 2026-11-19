@@ -380,6 +380,14 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, t| crate::npc_founding::founding_site_clear(w, t.size),
         },
         Invariant {
+            name: "founding-party-sets-out-loaded",
+            check: |w, t| crate::npc_founding::founding_party_sets_out_loaded(w, t.size),
+        },
+        Invariant {
+            name: "founding-wave-sound",
+            check: |w, _t| crate::npc_founding::founding_wave_sound(w),
+        },
+        Invariant {
             name: "starting-sites-sound",
             check: |w, _t| crate::player_start::starting_sites_sound(w),
         },
@@ -414,6 +422,10 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, t| crate::npc_inner_wall::inner_wall_leaves_a_way(w, t),
         },
         Invariant { name: "npc-farmers-kept", check: |w, _t| crate::npc_plan::npc_farmers_kept(w) },
+        Invariant {
+            name: "npc-called-home-sound",
+            check: |w, _t| crate::npc_plan::npc_called_home_sound(w),
+        },
         Invariant {
             name: "npc-founding-stone-kept",
             check: |w, _t| crate::npc_plan::npc_founding_stone_kept(w),

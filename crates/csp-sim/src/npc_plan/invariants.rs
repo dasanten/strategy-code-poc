@@ -194,8 +194,10 @@ pub fn npc_spare_hands_work(world: &WorldState) -> Vec<InvariantViolation> {
             .copied()
             .filter(|&i| {
                 let r = &world.residents[i];
-                plan.jobs.get(&r.id).is_some_and(|j| j.kind == CityJobKind::Idle)
-                    && can_work(r.born_at, tick)
+                // Those called home to set out with its founding party wait for it (#1379).
+                plan.jobs.get(&r.id).is_some_and(|j| {
+                    j.kind == CityJobKind::Idle && !crate::npc_founding::called_home(j)
+                }) && can_work(r.born_at, tick)
                     && !is_down(r.down_until)
                     && r.carrying.is_none()
                     && !is_armed(r)
@@ -426,6 +428,51 @@ pub fn npc_founding_stone_kept(world: &WorldState) -> Vec<InvariantViolation> {
                 ),
                 vec![city_id.clone()],
             ));
+        }
+    }
+    out
+}
+
+/// Invariant `npc-called-home-sound` (`CONTEXT.md`: Founding; Daniel, 2026-11-18, #1379): a plan
+/// made this tick calls hands home (`called_home`) only while its city saves for its founding
+/// party with its site picked, and those it calls home leave the workplace they were called from
+/// (#1379: they worked on out there, so the party never went), but for one carrying a child, on
+/// alarm or Down.
+pub fn npc_called_home_sound(world: &WorldState) -> Vec<InvariantViolation> {
+    use crate::npc_founding::{called_home, saving_to_found};
+    let mut out = Vec::new();
+    let tick = world.tick as f64;
+    for (city_id, plan) in &world.city_plans {
+        if plan.planned_at != tick {
+            continue;
+        }
+        let Some(city) = world.cities.iter().find(|c| &c.id == city_id) else { continue };
+        let waits = saving_to_found(world, city) && plan.founding_site.is_some();
+        for (resident_id, job) in plan.jobs.iter().filter(|(_, j)| called_home(j)) {
+            if !waits {
+                out.push(violation(
+                    "npc-called-home-sound",
+                    format!(
+                        "{city_id} calls {resident_id} home with no founding party to wait for"
+                    ),
+                    vec![city_id.clone(), resident_id.clone()],
+                ));
+            }
+            let Some(r) = world.residents.iter().find(|r| &r.id == resident_id) else { continue };
+            let held_back = r.carrying.is_some()
+                || r.down_until.is_some()
+                || r.script
+                    .as_ref()
+                    .is_some_and(|s| s.task == Some(csp_shared::world::Task::Alarm));
+            if !held_back && crate::npc_behaviour::workplace_of(r) == job.building_id {
+                out.push(violation(
+                    "npc-called-home-sound",
+                    format!(
+                        "{city_id} called {resident_id} home, but they work on where they were"
+                    ),
+                    vec![city_id.clone(), resident_id.clone()],
+                ));
+            }
         }
     }
     out

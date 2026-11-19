@@ -773,11 +773,24 @@ The shared language of the game. Domain terms only — no implementation details
 - **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
   from every city (on a map smaller than the game's but at least half its side, scaled with the
   side: Daniel, 2026-11-15, T100.8), within a set reach of itself and on no realm's territory, nearest a node of
-  the good it is short of and has no node for. A **founding party** of a village's worth of
+  the good it is short of and has no node for. Its party comes from its spare hands and its
+  workers near home first, then from its farmers beyond those who feed it (Daniel, 2026-11-18,
+  #1379); while too few are at hand, its workers far out are called home to set out, and stand
+  there until it goes. A **founding party** of a village's worth of
   adults, more from a big city, one of them armed, each carrying a share of the materials (a town
   hall's and a storage's, and houses for those past a village's worth) and Food for the walk and
   the first weeks, with as many more as it takes to carry it all (Daniel, 2026-11-15, T100.8;
   those bring no house of their own), walks there and builds the town hall, which founds the **daughter** as an
+  ordinary NPC city (below). With too few hands to carry it all, the party sets out once it
+  holds the town hall's materials and its Food, and the mother sends a **second wave** of
+  carriers after it with the rest of the load (Daniel, 2026-11-19, #1438), as hands come free,
+  taken like the party: while the town hall is going up they join the party; once the daughter
+  stands they take what it still lacks of the party's materials, become its residents and walk
+  to it, until its storage stands (from then it gathers what it lacks like any city). Like the
+  party's extra carriers they stay with the daughter (decided by the second-wave session, closest
+  to the existing rule; Daniel to confirm). A hand called home leaves the workplace far out it
+  was called from. One too full of what they carry for their own Food puts down at the storage what crowds it
+  out first, so nobody sets out without it (#1379). The daughter is an
   ordinary NPC city with a name from the game; then its storage, a farm and a house. Until its
   storage stands its armed residents build with the rest, since the materials are on them and
   there is nowhere else to put them. A member gone back to the mother's storage for materials
