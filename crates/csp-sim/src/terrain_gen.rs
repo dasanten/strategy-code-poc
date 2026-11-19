@@ -19,8 +19,9 @@
 use std::time::{Duration, Instant};
 
 use csp_shared::balance::{
-    HEARTLAND_TERRAIN, ISLAND_COUNT, ISLAND_OFFSHORE_SHARE, ISLAND_RADIUS, ISLAND_RELIEF,
-    JOIN_SEA_SHARE, MAINLAND_SHARE, MAINLAND_STRETCH, MAP_SIZE, NARROWEST_STRAIT, TERRAIN_SHARES,
+    HEARTLAND_GROVE_GAP, HEARTLAND_GROVE_RADIUS, HEARTLAND_GROVE_SPACING, HEARTLAND_TERRAIN,
+    ISLAND_COUNT, ISLAND_OFFSHORE_SHARE, ISLAND_RADIUS, ISLAND_RELIEF, JOIN_SEA_SHARE,
+    MAINLAND_SHARE, MAINLAND_STRETCH, MAP_SIZE, NARROWEST_STRAIT, TERRAIN_SHARES,
 };
 use csp_shared::terrain::{is_passable_terrain, is_water, Terrain, TerrainMap};
 
@@ -521,6 +522,12 @@ pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) 
     });
     drop((field_a, field_b, values, rest, coarse));
 
+    // Groves: small patches of Forest on a heartland's Plains wherever no Forest lies near
+    // (`HEARTLAND_GROVE_SPACING`), so every starting site has Forest a short walk away.
+    timed(timer, "groves", || {
+        plant_groves(&mut tiles, size, seed, |t| cells[t] != NONE && part(cells[t]) == 0)
+    });
+
     // The mainland joined and every island one to build on (`join_land`).
     let mut map = TerrainMap { size, tiles };
     timed(timer, "joining", || join_land(&mut map));
@@ -539,6 +546,62 @@ pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) 
         join_for_carriages(&mut map, &cells);
     });
     map
+}
+
+/// Plants a grove of Forest (`HEARTLAND_GROVE_RADIUS`) at each point of a grid of
+/// `HEARTLAND_GROVE_SPACING` tiles, moved a little by the seed, on the heartland Plains tile
+/// nearest it (if one is near) with no Forest within `HEARTLAND_GROVE_GAP`. Only heartland
+/// Plains turn to Forest.
+fn plant_groves(tiles: &mut [u8], size: i32, seed: f64, heartland: impl Fn(usize) -> bool) {
+    let spacing = HEARTLAND_GROVE_SPACING as i32;
+    let gap = HEARTLAND_GROVE_GAP as i32;
+    let radius = HEARTLAND_GROVE_RADIUS as i32;
+    let at = |x: i32, y: i32| (wrap_i(y, size) * size + wrap_i(x, size)) as usize;
+    let plains = Terrain::Plains as u8;
+    let forest = Terrain::Forest as u8;
+    for gy in (0..size).step_by(spacing as usize) {
+        for gx in (0..size).step_by(spacing as usize) {
+            let jitter = |s: f64| {
+                ((hash(f64::from(gx), f64::from(gy), seed + s) - 0.5) * 0.25 * f64::from(spacing))
+                    as i32
+            };
+            let (jx, jy) = (gx + jitter(7.0), gy + jitter(11.0));
+            // The heartland Plains tile nearest the point, ring by ring, if one is near.
+            let fits = |x: i32, y: i32| tiles[at(x, y)] == plains && heartland(at(x, y));
+            let Some((x, y)) = (0..=spacing / 8).find_map(|r| {
+                (-r..=r).find_map(|dy| {
+                    (-r..=r)
+                        .filter(|dx| dx.abs().max(dy.abs()) == r)
+                        .map(|dx| (jx + dx, jy + dy))
+                        .find(|&(x, y)| fits(x, y))
+                })
+            }) else {
+                continue;
+            };
+            let forest_near = (-gap..=gap).any(|dy| {
+                (-gap..=gap)
+                    .any(|dx| dx * dx + dy * dy <= gap * gap && tiles[at(x + dx, y + dy)] == forest)
+            });
+            if forest_near {
+                continue;
+            }
+            for dy in -radius..=radius {
+                for dx in -radius..=radius {
+                    let g = at(x + dx, y + dy);
+                    if dx * dx + dy * dy <= radius * radius + 1
+                        && tiles[g] == plains
+                        && heartland(g)
+                    {
+                        tiles[g] = forest;
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn wrap_i(v: i32, size: i32) -> i32 {
+    v.rem_euclid(size)
 }
 
 /// Places up to `ISLAND_COUNT` islands in the Sea (`CONTEXT.md`: Island): each a blob of a radius
@@ -839,7 +902,7 @@ mod tests {
         generate_terrain_timed(1, 64, &mut |stage, _| stages.push(stage));
         assert_eq!(
             stages,
-            ["mainland", "lakes", "islands", "relief", "forest", "joining", "regions"]
+            ["mainland", "lakes", "islands", "relief", "forest", "groves", "joining", "regions"]
         );
     }
 

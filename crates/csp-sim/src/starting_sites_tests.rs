@@ -51,6 +51,18 @@ fn assert_the_sites(seed: i64, size: i32) {
         assert!(walk >= rules.min_seconds, "{seed}-{size}: {s:?} {walk} s from the next");
     }
 
+    // A forest node a short walk away (T113.2): within the forest reach, on Forest.
+    for s in &world.starting_sites {
+        let m = site_middle(s);
+        let near = world.nodes.iter().any(|n| {
+            let at = (n.x as i32, n.y as i32);
+            n.kind == ResourceKind::Forest
+                && wrap_distance(size, at, m) <= STARTING_SITE_FOREST_REACH
+                && terrain_at(&terrain, at.0, at.1) == Terrain::Forest as u8
+        });
+        assert!(near, "{seed}-{size}: {s:?} has no forest node a short walk away");
+    }
+
     // The nodes: on fitting terrain, apart, with unique ids, and none on a site.
     assert_eq!(nodes_on_fitting_terrain(&world, &terrain), []);
     let ids: HashSet<&str> = world.nodes.iter().map(|n| n.id.as_str()).collect();
