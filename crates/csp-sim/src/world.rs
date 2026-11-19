@@ -104,6 +104,7 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
         new_veins: Vec::new(),
         waiting_veins: Vec::new(),
         wear: Default::default(),
+        zeal: Default::default(),
     }
 }
 
@@ -211,6 +212,8 @@ pub fn step_world(
         let horses_died = step_horses(world, terrain);
         step_spoilage(world);
         step_stock_floor(world, &mut scratch.made);
+        // Every Player's Zeal fills, online or not (`CONTEXT.md`: Zeal).
+        crate::zeal::step_zeal(world);
         (survival, horses_died)
     });
     let mut npc_plan_ms = 0.0;

@@ -55,7 +55,11 @@ horseOffer: boolean,
  * The tiles (x, y) of the dry nodes the Player knows are gone (`CONTEXT.md`: Running dry):
  * their map leaves out the nodes there.
  */
-goneNodes: Array<[number, number]>, waypoints: Array<Waypoint>, traderVisits: Array<TraderVisit>, firstDay: FirstDay, 
+goneNodes: Array<[number, number]>, waypoints: Array<Waypoint>, traderVisits: Array<TraderVisit>, 
+/**
+ * The Player's own Zeal, in game hours of rallying (`CONTEXT.md`: Zeal); nobody else's.
+ */
+zeal: number, firstDay: FirstDay, 
 /**
  * The realm's Workplace settings by building id; only its own.
  */
@@ -81,4 +85,8 @@ goneNodes?: Array<[number, number]>, workSettings?: { [key in string]: Workplace
 /**
  * All of `veins` again, once a word changed.
  */
-veins?: { [key in string]: VeinWord }, waypoints?: Array<Waypoint>, traderVisits?: Array<TraderVisit>, } | { "type": "scriptMemory", id: string, memory: { [key in string]: JsonValue } | null, } | { "type": "scriptRun", id: string, run: ScriptRunSeen | null, } | { "type": "scriptLog", id: string, lines: Array<ScriptLogLine> | null, } | { "type": "firstDay", firstDay: FirstDay, } | { "type": "ack", requestId: string, } | { "type": "rejected", requestId: string, reason: string, };
+veins?: { [key in string]: VeinWord }, waypoints?: Array<Waypoint>, traderVisits?: Array<TraderVisit>, 
+/**
+ * The Player's Zeal, once it changed.
+ */
+zeal?: number, } | { "type": "scriptMemory", id: string, memory: { [key in string]: JsonValue } | null, } | { "type": "scriptRun", id: string, run: ScriptRunSeen | null, } | { "type": "scriptLog", id: string, lines: Array<ScriptLogLine> | null, } | { "type": "firstDay", firstDay: FirstDay, } | { "type": "ack", requestId: string, } | { "type": "rejected", requestId: string, reason: string, };

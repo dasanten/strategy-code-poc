@@ -36,6 +36,7 @@ use csp_sim::queries::region_map::{
     region_update, RegionChanges, RegionIndex, RegionMap, RegionSent,
 };
 use csp_sim::queries::territory::Territory;
+use csp_sim::zeal::zeal_of;
 use csp_sim::region_map::region_map_unsound;
 use csp_sim::sight::{
     entities_in_sight, sent_inside_unseen, sent_out_of_sight, with_sight, InvariantViolation,
@@ -170,6 +171,8 @@ struct Client {
     last_veins: String,
     last_waypoints: String,
     last_trader_visits: String,
+    /// The Zeal the Player was last sent (`CONTEXT.md`: Zeal).
+    last_zeal: f64,
 }
 
 #[derive(Default)]
@@ -434,6 +437,7 @@ fn build_welcome(
             &world.waypoints.get(&(user_id as u64)).cloned().unwrap_or_default(),
         ),
         last_trader_visits: json_of(&trader_visits_to(world, &realm.id)),
+        last_zeal: zeal_of(world, user_id as u64),
     };
     // The view starts at the town hall of the realm's first city, or with the Leader if it has
     // none left.
@@ -491,6 +495,7 @@ fn build_welcome(
         "goneNodes": gone_nodes_of(world, user_id as u64),
         "waypoints": world.waypoints.get(&(user_id as u64)).cloned().unwrap_or_default(),
         "traderVisits": trader_visits_to(world, &realm.id),
+        "zeal": client.last_zeal,
         "firstDay": first_day,
         "workSettings": work_settings,
         "veins": veins,
@@ -1061,6 +1066,12 @@ impl Realtime {
                 if visits_json != client.last_trader_visits {
                     client.last_trader_visits = visits_json;
                     tick.insert("traderVisits".into(), visits);
+                }
+                // Only the Player's own Zeal, only when it changed (`CONTEXT.md`: Zeal).
+                let zeal = zeal_of(world, client.user_id as u64);
+                if zeal != client.last_zeal {
+                    client.last_zeal = zeal;
+                    tick.insert("zeal".into(), json!(zeal));
                 }
                 // `changed` and `gone` go last, as the JSON the realm's sockets in step share.
                 let rest = Value::Object(tick).to_string();

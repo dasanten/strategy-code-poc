@@ -10,6 +10,7 @@ import {
 import { formatGameTime } from './shared/time.js'
 import type { FirstDay, TraderVisit } from '@csp/shared-types'
 import { DrawerStatus } from './drawer-head.js'
+import { zealShown } from './zeal.js'
 import {
   REALM_BAR_HINT,
   REALM_BAR_ORDERS,
@@ -258,6 +259,7 @@ export function TopBar({
   onLogout,
   onWiki,
   control,
+  zeal,
 }: {
   /** The realm's name (`CONTEXT.md`: Realm name), once the world has come. */
   realm?: string
@@ -276,6 +278,8 @@ export function TopBar({
   onWiki?: () => void
   /** The Unit | Realm switch (`CONTEXT.md`: Control mode), once the world has come. */
   control?: { mode: ControlMode; onSwitch: (mode: ControlMode) => void }
+  /** The Player's own Zeal in game hours (`CONTEXT.md`: Zeal), once the world has come. */
+  zeal?: number
 }) {
   return (
     <header className="hud-top">
@@ -309,6 +313,12 @@ export function TopBar({
           </span>
         </>
       )}
+      {zeal !== undefined && (
+        <>
+          <span className="hud-sep" />
+          <ZealMeter zeal={zeal} />
+        </>
+      )}
       {heir !== undefined && (
         <>
           <span className="hud-sep" />
@@ -327,6 +337,26 @@ export function TopBar({
         Log out
       </button>
     </header>
+  )
+}
+
+/** The Player's Zeal in the top bar (`CONTEXT.md`: Zeal): how full, and about how long until full. */
+export function ZealMeter({ zeal }: { zeal: number }) {
+  const shown = zealShown(zeal)
+  return (
+    <span className="hud-zeal" title={shown.title}>
+      <span
+        className="hud-zeal-bar"
+        role="meter"
+        aria-label="Zeal"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.floor(shown.share * 100)}
+      >
+        <span className="hud-zeal-fill" style={{ width: `${shown.share * 100}%` }} />
+      </span>
+      {shown.label}
+    </span>
   )
 }
 
