@@ -20,6 +20,9 @@ import {
   SHIP_MIN_CREW,
   ticksForAge,
   RICHNESS_FACTOR,
+  PATCH_SIZE,
+  PATCH_REST_DAYS,
+  PATCH_REGROW_DAYS,
 } from '@csp/balance'
 import { rebuildWork } from './shared/decay.js'
 import { FOOTPRINT, footprintTiles } from './shared/footprint.js'
@@ -71,6 +74,7 @@ import {
   rowGroups,
   feedTargetLabel,
   feedTargets,
+  gatherLine,
   tileActions,
   commandedCarriages,
   strangersCarriage,
@@ -121,7 +125,16 @@ const ids = (h: ResidentHere) => residentActions(h).map((a) => a.id)
 
 describe('the actions on a resident’s card', () => {
   it('offers walking, exploring, building, a road, a wall, pairing and scripts to an idle adult on open ground', () => {
-    expect(ids(here())).toEqual(['walk', 'explore', 'build', 'roadTo', 'wallTo', 'pair', 'script'])
+    expect(ids(here())).toEqual([
+      'walk',
+      'explore',
+      'gather',
+      'build',
+      'roadTo',
+      'wallTo',
+      'pair',
+      'script',
+    ])
   })
 
   it('offers stop only while they have an order or run a script', () => {
@@ -259,6 +272,7 @@ describe('the actions on a resident’s card', () => {
       'drive',
       'haul',
       'explore',
+      'gather',
       'feedStable',
       'build',
       'roadTo',
@@ -685,7 +699,7 @@ describe('the Orders tab', () => {
     )
     expect(groupOrders(a).map((g) => [g.label, g.actions.map((x) => x.id)])).toEqual([
       ['Move', ['walk', 'stop', 'drive', 'haul', 'explore']],
-      ['Work & build', ['build', 'roadTo', 'wallTo']],
+      ['Work & build', ['gather', 'build', 'roadTo', 'wallTo']],
       ['Goods', ['goods']],
       ['Scripts', ['script']],
       ['Other', ['pair', 'attack', 'rename']],
@@ -740,7 +754,7 @@ describe('the rows of a card that stays open', () => {
     const rows = keep(before, here({ busy: true, building: farm }))
     expect(rowGroups(rows, orderGroupOf).map((g) => [g.group, ids(g.actions)])).toEqual([
       ['move', ['walk', 'explore', 'stop']],
-      ['work', ['build', 'roadTo', 'wallTo', 'work', 'tearDown']],
+      ['work', ['gather', 'build', 'roadTo', 'wallTo', 'work', 'tearDown']],
       ['scripts', ['script']],
       ['other', ['pair']],
     ])
@@ -1655,10 +1669,21 @@ describe('horses on the tile card', () => {
   it('says a ruin does nothing and offers to rebuild it (`CONTEXT.md`: Ruin)', () => {
     const tick = 100 * TICKS_PER_GAME_YEAR
     const ruin = (more: Partial<Building>) =>
-      ({ id: 'h1', kind: 'house', cityId: 'c-npc', x: 5, y: 5, decay: 1, ruinedAt: 0, ...more }) as Building
+      ({
+        id: 'h1',
+        kind: 'house',
+        cityId: 'c-npc',
+        x: 5,
+        y: 5,
+        decay: 1,
+        ruinedAt: 0,
+        ...more,
+      }) as Building
     const ada = { id: 'r1', name: 'Ada', x: 1, y: 1, bornAt: 0, carried: {} } as unknown as Resident
     const card = tile({ buildings: [ruin({})], tick })
-    expect(card.lines).toContain('A ruin: it does nothing until it is rebuilt, and collapses if left')
+    expect(card.lines).toContain(
+      'A ruin: it does nothing until it is rebuilt, and collapses if left',
+    )
     expect(card.repair).toEqual({ buildingId: 'h1', name: 'house', rebuild: true })
     expect(tileActions(card, ada, tick).find((a) => a.id === 'repair')).toEqual({
       id: 'repair',
@@ -2530,5 +2555,45 @@ describe('a carriage on the tile card (`CONTEXT.md`: Goods on cards)', () => {
       noHorse: 'Horse hitched',
       driver: { id: 'cid', name: 'Cid', pick: false },
     })
+  })
+})
+
+describe('Gather (CONTEXT.md: Gathering, Patch, Gather)', () => {
+  it('is offered to a grown resident, opening its form, and not to a child or one carrying a child', () => {
+    const gather = residentActions(here()).find((a) => a.id === 'gather')
+    expect(gather).toMatchObject({ label: 'Gather…', opens: true, key: ACTION_KEYS.gather })
+    expect(ids(here({ adult: false }))).not.toContain('gather')
+    expect(residentOrders(here({ adult: false })).missing.gather).toBe('children can’t gather')
+    expect(ids(here({ carrying: true }))).not.toContain('gather')
+    expect(residentOrders(here({ carrying: true })).missing.gather).toMatch(/child/)
+  })
+
+  it('tells on a tile card what a tile gives by hand and how its patch stands', () => {
+    const day = TICKS_PER_GAME_DAY
+    expect(gatherLine(Terrain.Plains, undefined, 0)).toBeUndefined()
+    expect(gatherLine(Terrain.Forest, undefined, 0)).toBe('Gather by hand: wood, food')
+    expect(gatherLine(Terrain.Hills, undefined, 0)).toBe('Gather by hand: stone')
+    // Half used, just now.
+    expect(gatherLine(Terrain.Forest, { left: 12.6, at: 100 }, 100)).toBe(
+      `Gather by hand: wood, food · 12 of ${PATCH_SIZE} left`,
+    )
+    // Picked over: full again after its rest and its regrowth.
+    const full = (PATCH_REST_DAYS + PATCH_REGROW_DAYS) * day
+    expect(gatherLine(Terrain.Forest, { left: 0, at: 0 }, 0)).toBe(
+      `Gather by hand: wood, food · picked over, full again in ${aboutTime(full)}`,
+    )
+    // Grown back full: no more to say.
+    expect(gatherLine(Terrain.Forest, { left: 0, at: 0 }, full)).toBe('Gather by hand: wood, food')
+  })
+
+  it('puts the line on the card of an open forest tile, not under a road or on a node', () => {
+    const patch = { id: 'patch:5,5', x: 5, y: 5, left: 0, at: 0 }
+    const open = tile({ terrain: Terrain.Forest, patch, tick: 0 })
+    expect(open.lines.some((l) => l.startsWith('Gather by hand: wood, food · picked over'))).toBe(
+      true,
+    )
+    const road = { id: 'r1', kind: 'road' as const, cityId: null, x: 5, y: 5 }
+    const under = tile({ terrain: Terrain.Forest, patch, tick: 0, buildings: [road] })
+    expect(under.lines.some((l) => l.startsWith('Gather by hand'))).toBe(false)
   })
 })

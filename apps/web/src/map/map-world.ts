@@ -10,6 +10,7 @@ import type {
   SeenTrader,
   SeenVessel,
   SeenMachine,
+  SeenPatch,
   Waypoint,
 } from '@csp/shared-types'
 import type { CityEmblem, FarMarker } from './far.js'
@@ -53,6 +54,13 @@ export interface MapWorld {
    * node is drawn there, though their explored terrain still lists one. None on the admin map.
    */
   goneNodes?: ReadonlySet<string>
+  /**
+   * The tiles in sight that aren't full for gathering (`CONTEXT.md`: Patch), drawn thinned up
+   * close; none on the admin map.
+   */
+  patches?: readonly SeenPatch[]
+  /** The tick now, for how far a patch has grown back; none on the admin map. */
+  tick?: number
   diplomacy: { alliance?: { members: readonly { realmId: string }[] } | null }
   region: RegionState | null
   /** Set on the admin map, which looks at the world as nobody's (`CONTEXT.md`: admin map). */

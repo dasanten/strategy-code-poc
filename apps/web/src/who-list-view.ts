@@ -34,7 +34,7 @@ export type WhoOrder = BuildingGroupOrder | WhoLine | WhoPlaceOrder | VehicleGro
  */
 export type WhoPlaceOrder = Extract<
   GroupOrder,
-  { kind: 'walkTo' | 'explore' | 'runScript' | 'relocate' | 'store' | 'fetch' }
+  { kind: 'walkTo' | 'explore' | 'gather' | 'runScript' | 'relocate' | 'store' | 'fetch' }
 >
 
 /** A road or wall line given as a realm order. */
@@ -62,6 +62,8 @@ export const WHO_SUGGESTS: Record<WhoOrder['kind'], number> = {
   // something take it to the storage.
   walkTo: 1,
   explore: 1,
+  // Two gatherers fill a storage twice as fast and take tiles side by side (`CONTEXT.md`: Gather).
+  gather: 2,
   runScript: 1,
   relocate: 1,
   store: 2,
@@ -135,6 +137,10 @@ export function whoTitle(
       return 'Walk there'
     case 'explore':
       return 'Explore'
+    case 'gather': {
+      const good = order.params?.good
+      return typeof good === 'string' ? `Gather ${good}` : 'Gather'
+    }
     case 'runScript':
       return `Run ${names.script ?? 'a script'}`
     case 'relocate':

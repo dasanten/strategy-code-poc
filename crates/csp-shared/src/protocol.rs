@@ -464,6 +464,22 @@ pub enum SeenEntity {
     Vessel(SeenVessel),
     /// A siege machine in the field (`CONTEXT.md`: Siege machine).
     Machine(SeenMachine),
+    /// A Forest or Hills tile in sight that isn't full (`CONTEXT.md`: Patch).
+    Patch(SeenPatch),
+}
+
+/// The patch of a tile in sight that isn't full, as Players see it (`CONTEXT.md`: Patch): what it
+/// held when last gathered from (`left`, at tick `at`). What it holds now, and when it is full
+/// again, follow from the patch balance numbers, so it changes only when someone gathers there.
+/// Its id is `patch:x,y`. Last seen doesn't keep it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SeenPatch {
+    pub id: String,
+    pub x: i32,
+    pub y: i32,
+    pub left: f64,
+    pub at: u64,
 }
 
 impl SeenEntity {
@@ -481,6 +497,7 @@ impl SeenEntity {
             SeenEntity::Trader(e) => &e.id,
             SeenEntity::Vessel(e) => &e.id,
             SeenEntity::Machine(e) => &e.id,
+            SeenEntity::Patch(e) => &e.id,
         }
     }
 
@@ -498,6 +515,7 @@ impl SeenEntity {
             SeenEntity::Trader(_) => "trader",
             SeenEntity::Vessel(_) => "vessel",
             SeenEntity::Machine(_) => "machine",
+            SeenEntity::Patch(_) => "patch",
         }
     }
 }

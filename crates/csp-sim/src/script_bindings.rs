@@ -199,6 +199,7 @@ fn seen_is(e: &SeenEntity) -> &'static str {
         SeenEntity::Trader(_) => "trader",
         SeenEntity::Vessel(_) => "vessel",
         SeenEntity::Machine(_) => "machine",
+        SeenEntity::Patch(_) => "patch",
     }
 }
 
