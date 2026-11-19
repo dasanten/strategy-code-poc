@@ -4,7 +4,7 @@
 //!
 //! The year holds: no NPC city starved out, nobody of the Trade Organization starved, every
 //! caravan made a round trip, every wandering trader went round its loop, and every invariant held
-//! each game day; whether a daughter was founded is printed. The season holds: both Players' cities live,
+//! each game day, and at least one NPC city founded a daughter. The season holds: both Players' cities live,
 //! nobody of theirs starved, and each has a Trade Org warehouse within its trader's reach.
 //!
 //! `GAME_YEAR_DAYS` runs fewer game days than a year, to look at a shorter stretch by hand; the
@@ -478,11 +478,9 @@ fn the_new_world_runs_a_game_year_on_its_own() {
     }
     assert_eq!(watch.caravans_short(), Vec::<(&String, &usize)>::new());
     assert_eq!(watch.traders_short(&world), []);
-    // Whether an NPC city founds a daughter in the year is printed above, not held to: since #1379
-    // its cities stay fed and grow, but their Food still sits at their reserve, dipping below it
-    // every few days, and their war chests grow with them, so none stays full long enough (#1379,
-    // its open item). Founding is covered by
-    // `big_city::on_a_map_with_room_founds_a_daughter_unaided_and_goes_on_feeding_itself`.
+    // At least one NPC city founds a daughter in the year (#1379, #1438: once its workers far out
+    // came home and a second wave carried what its party couldn't, Millbrook founded one).
+    assert!(!daughters.is_empty(), "no NPC city founded a daughter");
 }
 
 #[test]

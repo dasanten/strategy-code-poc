@@ -3426,7 +3426,13 @@ export function Wiki() {
           twice the walk and {days(NPC_FOUND_FOOD_DAYS)} there, with as many more adults as it takes
           to carry all of it. They come from its spare hands and its workers near home first, then
           from its farmers beyond those who feed it; while too few are at hand, its workers far out
-          come home to set out and wait there. The party builds the town hall, which founds the daughter: an NPC city of
+          come home to set out and wait there. With too few hands to carry all of it, the party
+          sets out once it holds the town hall's materials and its Food, and the city sends a
+          second wave of carriers after it with the rest, as hands come free: while the town hall
+          is going up they join the party, and once the daughter stands they carry what it still
+          lacks to it, until its storage stands. Like the party, they stay as the daughter's
+          residents. Hands sent back from far workplaces leave them, and none of them goes back to
+          work there while called home. The party builds the town hall, which founds the daughter: an NPC city of
           its own with a name from the game. It then builds its storage, a farm and a house, and
           once its storage holds the Wood of its reserve, its first wall, a ring{' '}
           {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its home. Mother and daughter start at
