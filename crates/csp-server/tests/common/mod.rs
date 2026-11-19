@@ -3,7 +3,7 @@ use csp_server::scripts::{game_defaults, DefaultScript};
 use csp_shared::world::default_scripts::Task;
 
 #[allow(dead_code)] // Not every test file that shares this module uses it.
-pub const TASKS: [Task; 12] = [
+pub const TASKS: [Task; 13] = [
     Task::Work,
     Task::Build,
     Task::Haul,
@@ -16,6 +16,7 @@ pub const TASKS: [Task; 12] = [
     Task::BuildLine,
     Task::Explore,
     Task::Alarm,
+    Task::Gather,
 ];
 
 /// The game's default scripts (`DEFAULT_SCRIPTS`), as the library's tests use them.

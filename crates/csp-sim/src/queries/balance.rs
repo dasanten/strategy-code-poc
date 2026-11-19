@@ -107,6 +107,13 @@ pub fn work_output(r: &Resident, good: Good, skill: SkillName, tick: f64) -> f64
     pace_of(r, WORK_OUTPUT_PER_DAY.get(good_name(good)).unwrap_or(0.0), skill, tick)
 }
 
+/// How much of a unit of `good` a resident gathers by hand per tick using `skill` (`CONTEXT.md`:
+/// Gathering): `GATHER_PER_DAY`, with Strength, skill and Tools as at a workplace.
+pub fn gather_output(r: &Resident, good: Good, skill: SkillName, tick: f64) -> f64 {
+    let per_day = csp_shared::balance::GATHER_PER_DAY.get(good_name(good)).unwrap_or(0.0);
+    pace_of(r, per_day, skill, tick)
+}
+
 /// How much of a batch a worker gets through per tick at a processing workplace (`batchWork`).
 pub fn batch_work(r: &Resident, kind: BuildingKind, tick: f64) -> f64 {
     match workplace_skill(kind) {

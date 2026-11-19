@@ -299,6 +299,15 @@ fn map_size(t: Option<&TerrainMap>) -> i32 {
 pub fn add_later_rule_orders(kinds: &mut OrderKinds) {
     use csp_shared::world::TradeSide;
 
+    // T114.1: gathering by hand (`CONTEXT.md`: Gathering).
+    kinds.insert(
+        "gather",
+        fn_kind(
+            Box::new(crate::gathering::validate_gather),
+            Box::new(|w, _, o, _| crate::gathering::apply_gather(w, o)),
+        ),
+    );
+
     // T86.5: goods.
     kinds.insert(
         "pickUp",

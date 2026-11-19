@@ -111,6 +111,8 @@ export type GroupOrder =
   | ({ kind: 'train' } & Starts)
   /** Each goes exploring from where they stand (`CONTEXT.md`: Explore). */
   | ({ kind: 'explore' } & Starts)
+  /** Each gathers by hand from where they stand (`CONTEXT.md`: Gather). */
+  | ({ kind: 'gather' } & Starts)
   /**
    * The first of them on each training ground teaches the subject there (`CONTEXT.md`: Teacher):
    * one teacher per ground.
@@ -176,6 +178,7 @@ export function groupOrderStart(order: GroupOrder): OrderRequest | undefined {
       return { kind: 'task', task: 'buildLine' }
     case 'build':
     case 'explore':
+    case 'gather':
     case 'feedStable':
     case 'train':
     case 'tearDown':
@@ -264,10 +267,19 @@ const ADULTS_ONLY: GroupOrder['kind'][] = [
   'unhitch',
   'feed',
   'explore',
+  'gather',
 ]
 
 /** Orders one carrying a child can't take (`CONTEXT.md`: Carrying). */
-const NOT_CARRYING: GroupOrder['kind'][] = ['work', 'build', 'line', 'tearDown', 'breed', 'haul']
+const NOT_CARRYING: GroupOrder['kind'][] = [
+  'work',
+  'build',
+  'line',
+  'tearDown',
+  'breed',
+  'haul',
+  'gather',
+]
 
 /** The thing on a resident's tile, if one is there. */
 const onTile = <T extends { x: number; y: number }>(
@@ -648,6 +660,9 @@ export function groupRequests(
       case 'explore':
         send(r, { kind: 'task', task: 'explore', ...params })
         break
+      case 'gather':
+        send(r, { kind: 'task', task: 'gather', ...params })
+        break
       case 'teach': {
         // One teacher per ground: the first of them there teaches, the rest are skipped.
         const ground = groundOf(r, seen, size)!
@@ -802,6 +817,7 @@ export type GroupButton =
   | 'haul'
   | 'explore'
   | 'work'
+  | 'gather'
   | 'feedStable'
   | 'teach'
   | 'train'
@@ -840,6 +856,7 @@ export const GROUP_BUTTONS: readonly { id: GroupButton; label: string; group: Or
   { id: 'relocate', label: 'Relocate…', group: 'move' },
   { id: 'explore', label: 'Explore', group: 'move' },
   { id: 'work', label: 'Work', group: 'work' },
+  { id: 'gather', label: 'Gather…', group: 'work' },
   { id: 'feedStable', label: 'Feed the stable', group: 'work' },
   { id: 'teach', label: 'Teach…', group: 'work' },
   { id: 'train', label: 'Train', group: 'work' },
@@ -899,6 +916,7 @@ export const GROUP_COUNTERPARTS: Record<
   stealHorse: { none: 'one resident steals one horse' },
   haul: ['haul'],
   explore: ['explore'],
+  gather: ['gather'],
   work: ['work'],
   feedStable: ['feedStable'],
   teach: ['teach'],
@@ -937,6 +955,7 @@ export const GROUP_KEYS: Record<GroupButton, string> = {
   haul: ACTION_KEYS.haul,
   relocate: ACTION_KEYS.relocate,
   explore: ACTION_KEYS.explore,
+  gather: ACTION_KEYS.gather,
   work: ACTION_KEYS.work,
   feedStable: ACTION_KEYS.feedStable,
   teach: ACTION_KEYS.teach,
@@ -1049,6 +1068,7 @@ export function groupRows(h: GroupHere): {
     work: { order: { kind: 'work', workplace: somewhere, name: '' }, queued: true },
     feedStable: { order: { kind: 'feedStable' } },
     explore: { order: { kind: 'explore' } },
+    gather: { order: { kind: 'gather' } },
     teach: { order: { kind: 'train' } },
     train: { order: { kind: 'train' } },
     build: { order: { kind: 'build', building: 'farm', at: somewhere }, queued: true },

@@ -49,6 +49,7 @@ import {
   CATAPULT_CREW,
   CATAPULT_STRENGTH,
   RALLY_PACE,
+  PATCH_SIZE,
 } from '@csp/balance'
 import {
   carriageCapacity,
@@ -110,6 +111,7 @@ import type {
   SeenCarriage,
   SeenVessel,
   SeenMachine,
+  SeenPatch,
   VesselKind,
   SiegeMachineKind,
   GoodsPlace,
@@ -128,6 +130,7 @@ import type {
 import { covers, FOOTPRINT, footprintTiles } from './shared/footprint.js'
 import { conditionLine, isRuin, repairable } from './shared/decay.js'
 import { wrap, Terrain, UNEXPLORED } from './shared/terrain.js'
+import { fullAt, gatheredOn, isPickedOver, patchLeft } from './shared/patch.js'
 import { handOverProblem, heirProblem } from './shared/leader.js'
 import { aboutTime, workLeft } from './shared/estimates.js'
 import type { Relationship } from './theme.js'
@@ -164,6 +167,7 @@ export type ActionId =
   | 'stealHorse'
   | 'haul'
   | 'explore'
+  | 'gather'
   | 'build'
   | 'roadTo'
   | 'wallTo'
@@ -212,6 +216,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   stealHorse: 'M',
   haul: 'H',
   explore: 'Z',
+  gather: 'U',
   build: 'B',
   roadTo: 'R',
   wallTo: 'Q',
@@ -611,6 +616,9 @@ function ordersOffered(h: ResidentHere): {
   // Into the unknown and back for Food (`CONTEXT.md`: Explore).
   if (h.adult) add(row('explore', 'Explore'))
   else miss('explore', 'children can’t explore')
+  // Wood, Food or Stone by hand from the land around (`CONTEXT.md`: Gather).
+  if (works) add(row('gather', 'Gather…', { opens: true }))
+  else miss('gather', h.adult ? CARRYING_A_CHILD : 'children can’t gather')
   if (works && isWorkable(h.building, h.node)) {
     add(
       row('work', `Work at the ${BUILDING_NAMES[h.building!.kind].toLowerCase()}…`, {
@@ -733,6 +741,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   haul: 'move',
   explore: 'move',
   work: 'work',
+  gather: 'work',
   feedStable: 'work',
   teach: 'work',
   train: 'work',
@@ -1207,6 +1216,8 @@ export interface TileThings {
   terrain?: number
   /** The region the tile lies in, where the Player explored it (`CONTEXT.md`: Region). */
   region?: TileRegion
+  /** The tile's patch, in sight and not full (`CONTEXT.md`: Patch). */
+  patch?: SeenPatch
   /** Residents in sight on the tile that are not the Player's to command. */
   strangers: SeenResident[]
   /** Everyone in sight, for who works where and who lives in a city. */
@@ -2111,6 +2122,10 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       repair = { buildingId: road.id, name: 'road', ...rebuildOf(road) }
   }
   if (terrain && !(road && !road.site)) lines.push(terrain)
+  // What a Forest or Hills tile gives by hand, and its patch while in sight (`CONTEXT.md`: Patch).
+  const tileTaken = !!road || !!t.node || here(t.buildings).length > 0 || !!live
+  const gather = tileTaken ? undefined : gatherLine(t.terrain, t.patch, t.tick ?? 0)
+  if (gather) lines.push(gather)
   // A wandering trader standing at a stop buys and sells on its tile (`CONTEXT.md`: Trader stop).
   const visitor = t.traders?.find((v) => v.standing?.x === t.x && v.standing.y === t.y)
   if (visitor) lines.push('A wandering trader buys and sells here')
@@ -2375,6 +2390,28 @@ function groundName(terrain: number | undefined): string | undefined {
  * How the tile's ground walks and feeds (`CONTEXT.md`: Terrain, Road): "Hills · speed ~70% · food
  * 130%", or a finished road's speed on whatever it lies on.
  */
+/**
+ * What a tile gives by hand (`CONTEXT.md`: Gathering, Patch): "Gather by hand: wood, food", and
+ * while its patch is in sight and not full how it stands: "· picked over, full again in about 2 h
+ * (6 game days)" or "· 12 of 30 left". Undefined for a tile that gives nothing.
+ */
+export function gatherLine(
+  terrain: number | undefined,
+  patch: Pick<SeenPatch, 'left' | 'at'> | undefined,
+  tick: number,
+): string | undefined {
+  const goods = gatheredOn(terrain as Terrain | undefined)
+  if (goods.length === 0) return undefined
+  const what = `Gather by hand: ${goods.join(', ')}`
+  if (!patch) return what
+  const left = patchLeft(patch, tick)
+  if (left >= PATCH_SIZE) return what
+  if (isPickedOver(patch, tick)) {
+    return `${what} · picked over, full again in ${aboutTime(fullAt(patch) - tick)}`
+  }
+  return `${what} · ${Math.floor(left)} of ${PATCH_SIZE} left`
+}
+
 function terrainLine(terrain: number | undefined, road: Building | undefined): string | undefined {
   const speed = (v: number) => `speed ${v === 1 ? '' : '~'}${Math.round(v * 100)}%`
   const food = (v: number) => `food ${Math.round(v * 100)}%`

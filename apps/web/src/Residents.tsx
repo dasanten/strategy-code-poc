@@ -1388,6 +1388,7 @@ export function orderDoing(
   if (o?.kind === 'fetch') return 'Fetching goods'
   if (o?.kind === 'tearDown') return 'Tearing down'
   if (o?.kind === 'repair') return 'Repairing'
+  if (o?.kind === 'gather') return `Gathering ${GOOD_LABELS[o.good].toLowerCase()}`
   if (o?.kind === 'breed') return 'Breeding horses'
   if (o?.kind === 'build') {
     const what = BUILDING_NAMES[o.building].toLowerCase()
@@ -1628,6 +1629,7 @@ const ROW_TASKS: Partial<Record<ActionId, Task>> = {
   feedStable: 'feedStable',
   train: 'train',
   explore: 'explore',
+  gather: 'gather',
 }
 
 /** The same on the group card, whose Work and Tear down pick the place on the map. */
@@ -1639,6 +1641,7 @@ const GROUP_ROW_TASKS: Partial<Record<GroupButton, Task>> = {
   feedStable: 'feedStable',
   train: 'train',
   explore: 'explore',
+  gather: 'gather',
 }
 
 export function GroupCard({
@@ -1765,6 +1768,7 @@ export function GroupCard({
     feedStable: { kind: 'feedStable' },
     train: { kind: 'train' },
     explore: { kind: 'explore' },
+    gather: { kind: 'gather' },
     store: { kind: 'store' },
     drop: { kind: 'drop' },
     getOff: { kind: 'getOff' },
@@ -2276,6 +2280,7 @@ export function ResidentCard({
   onFeedStable,
   onTrain,
   onExplore,
+  onGather,
   onTeach,
   onTearDown,
   horses,
@@ -2504,6 +2509,8 @@ export function ResidentCard({
   onTrain: (groundId: string) => void
   /** Gives the resident the Explore task. */
   onExplore: () => void
+  /** Gives the resident the Gather task, its form first (`CONTEXT.md`: Gather). */
+  onGather: () => void
   /** Orders the resident to teach `subject` at the training ground they stand on. */
   onTeach: (groundId: string, subject: TrainingSubject) => void
   /** Orders the resident to tear down the building or site on their tile. */
@@ -2738,6 +2745,7 @@ export function ResidentCard({
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
     if (a.id === 'train' && building) onTrain(building.id)
     if (a.id === 'explore') onExplore()
+    if (a.id === 'gather') onGather()
   }
   useActionKeys(rows, act)
   // Run script later starts on the script they were last seen running (`runScriptPick`).

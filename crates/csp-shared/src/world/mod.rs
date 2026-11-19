@@ -958,9 +958,11 @@ pub enum OrderEndedKind {
     Store,
     Fetch,
     Relocate,
+    /// Gathering by hand (`CONTEXT.md`: Gathering): ended with full hands or a picked-over tile.
+    Gather,
 }
 
-/// How a resident's last store, fetch or relocate order ended.
+/// How a resident's last store, fetch, relocate or gather order ended.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 pub struct OrderEnded {
@@ -980,6 +982,27 @@ pub struct BuildOrder {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub material: Option<WallMaterial>,
+}
+
+/// Gathering a good by hand from the patch of the tile the resident stands on (`CONTEXT.md`:
+/// Gathering, Patch): `progress` is their share of the next unit.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GatherOrder {
+    pub good: Good,
+    pub at: Tile,
+    pub progress: f64,
+}
+
+/// What a Forest or Hills tile that isn't full still holds for gathering (`CONTEXT.md`: Patch):
+/// `left` units at tick `at`, growing back steadily from then on.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Patch {
+    pub x: i32,
+    pub y: i32,
+    pub left: f64,
+    pub at: u64,
 }
 
 /// Working at a workplace.
@@ -1392,6 +1415,8 @@ pub enum ResidentOrder {
     /// Throwing Stone with a catapult at a wall, gate or tower in its reach, as one of its crew
     /// (`CONTEXT.md`: Catapult).
     Throw(ThrowOrder),
+    /// Gathering by hand on a Forest or Hills tile (`CONTEXT.md`: Gathering).
+    Gather(GatherOrder),
     /// The Leader rallying the crew of the workplace or site they are at (`CONTEXT.md`: Rallying
     /// the crew). Given by the Player by hand only (ADR 0042).
     Rally(RallyOrder),
@@ -1493,11 +1518,17 @@ pub struct WorldState {
     pub wear: IndexMap<String, Wear>,
     /// The Zeal of each Player whose pool is not full, by account id (see `Realm::user_id`), in
     /// game hours of rallying (`CONTEXT.md`: Zeal). A Player with no entry has a full pool, so a
-    /// new Player and one from before format 147 start full. Kept by account, not by realm, so a
+    /// new Player and one from before format 148 start full. Kept by account, not by realm, so a
     /// Leader handover or death keeps it. Left out of a save while every pool is full.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     #[ts(optional, as = "Option<BTreeMap<u64, f64>>")]
     pub zeal: BTreeMap<u64, f64>,
+    /// The patches of the Forest and Hills tiles that aren't full (`CONTEXT.md`: Patch), sorted
+    /// by tile, row (`y`) first; a full tile is in no entry, so the list stays small on a big map.
+    /// Left out of a save while there are none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[ts(optional, as = "Option<Vec<Patch>>")]
+    pub patches: Vec<Patch>,
     /// How long each Player's realm has waited for its next drifter (`CONTEXT.md`: Drifter), in
     /// ticks, by realm id; the wait counts only while a drifter may come. A realm that has not
     /// waited is in no entry. Left out of a save while none has.

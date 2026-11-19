@@ -155,11 +155,16 @@ The shared language of the game. Domain terms only — no implementation details
   slower than working a normal one (a balance number). Strength, the good's skill (Woodcutting for
   Wood, Mining for Stone, Farming for Food) and Tools count as at a workplace, and gathering
   teaches that skill as working there does. Iron ore, Gold ore and Coal are never gathered. A tile
-  under a building, a construction site or a resource node gives nothing.
+  under a building, a construction site or a resource node gives nothing; a road counts as a
+  building (decided while Daniel was away, Daniel to confirm). A gatherer gathers until their
+  hands are full or the patch is gone, and their order then says which.
 - **Patch:** what a Forest or Hills tile still holds for gathering: about one resident's load (a
   balance number), on a Forest tile used up by Wood and Food alike, and the same for everyone who
   gathers there. A tile whose patch is gone is **picked over** and gives nothing; it grows back
-  steadily over some game days (a balance number). So the land near a city empties and gatherers
+  steadily over some game days (a balance number). A patch grows back only once nobody has
+  gathered there for a while (a balance number, about a game day), so a tile being gathered runs
+  out rather than growing about as fast as one gatherer takes from it (decided while Daniel was
+  away, Daniel to confirm). So the land near a city empties and gatherers
   walk further out, while a workplace on a node never runs out. A Player sees on the tile card
   and on the map whether a tile in sight is picked over, and scripts see it.
 - **Gather:** a task (default script "Gather") for a grown resident. Its params: `good` (Wood,
@@ -167,7 +172,10 @@ The shared language of the game. Domain terms only — no implementation details
   the usual food params (Getting food). They walk to the nearest tile that fits the good and
   isn't picked over, gather there until their hands are full or the patch is gone, go on to the
   next tile, and with a full load store it and come back. With no such tile within a set reach (a
-  balance number) of where they started, they end and say why. Scripts have `gather(good)` for the
+  balance number) of where they started, they end and say why, first storing what they carry of
+  it. "Nearest" counts from where they started, so they work outward from it; a tile out of
+  sight counts as not picked over until they get there and see it (decided while Daniel was
+  away, Daniel to confirm). Scripts have `gather(good)` for the
   tile they stand on (ADR 0002). Only Players' residents gather: NPC cities, trading posts and
   the HQ keep to their workplaces for now.
 - **Tools** (Epic 97): a good a smithy makes from Iron and Wood. A resident carrying Tools works a
