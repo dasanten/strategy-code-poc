@@ -63,6 +63,10 @@ The shared language of the game. Domain terms only — no implementation details
 - **Heartland:** a mainland region of good farmland and poor resource nodes, where Players start
   (Starting city). It has a trading post near its middle. No rule protects it: it is safe only in
   that it holds little worth taking, and the admin directive covers whoever farms new Players.
+  Its Forest lies in wide patches, so where none lies near, a small **grove** of Forest grows on
+  its Plains, a grove at most every few dozen tiles (balance numbers; decided while Daniel was
+  away, Daniel to confirm): Forest is never far, and every starting site has its forest node a
+  short walk away.
 - **Frontier:** a mainland region beyond the passes and land bridges, with normal resource nodes,
   a few rich ones, and the rare goods (Coal, Gold ore). Nobody starts there.
 - **Island:** land off the mainland, reached only by vessel, holding the richest nodes.
