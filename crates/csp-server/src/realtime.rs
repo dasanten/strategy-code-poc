@@ -36,7 +36,6 @@ use csp_sim::queries::region_map::{
     region_update, RegionChanges, RegionIndex, RegionMap, RegionSent,
 };
 use csp_sim::queries::territory::Territory;
-use csp_sim::zeal::zeal_of;
 use csp_sim::region_map::region_map_unsound;
 use csp_sim::sight::{
     entities_in_sight, sent_inside_unseen, sent_out_of_sight, with_sight, InvariantViolation,
@@ -46,6 +45,7 @@ use csp_sim::tick::Scratch;
 use csp_sim::vein_stands::veins_seen_by;
 use csp_sim::veins::gone_nodes_of;
 use csp_sim::world_index::{world_index, WorldIndex};
+use csp_sim::zeal::zeal_of;
 use flate2::{write::GzEncoder, Compression};
 use rusqlite::Connection;
 use serde_json::{json, Map, Value};

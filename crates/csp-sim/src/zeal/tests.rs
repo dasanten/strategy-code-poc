@@ -145,10 +145,8 @@ fn a_leader_handover_keeps_it() {
         (r.x, r.y) = (hall.x, hall.y);
     }
     let size = Some(city_terrain().size);
-    let o = HandOverRequest {
-        resident_id: Some(&realm.leader_id),
-        new_leader_id: Some(&new_leader),
-    };
+    let o =
+        HandOverRequest { resident_id: Some(&realm.leader_id), new_leader_id: Some(&new_leader) };
     assert_eq!(validate_hand_over(&world, PLAYER, &o, size), None);
     apply_hand_over(&mut world, PLAYER, &o, size);
     assert_eq!(world.realms.iter().find(|r| r.id == realm.id).unwrap().leader_id, new_leader);
