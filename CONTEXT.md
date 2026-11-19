@@ -147,6 +147,9 @@ The shared language of the game. Domain terms only — no implementation details
   of work, not a fixed amount, so they last until the carrier's first round trip. An NPC
   city's builders of a site beyond its node reach from its storage set out with the same, and go back for
   more while they still have what the walk home eats (decided overnight, Daniel to confirm).
+  So do its workers at a workplace beyond its node reach: they set out with that too, and go home
+  for Food while they still have what the walk home eats, not once they have none (Daniel, #1379:
+  Larkspur's quarry workers 270 tiles out set off home with nothing and went Down on the way).
 - **Holding a workplace:** whoever physically works and guards a workplace gets its output.
   There is no ownership flag. Drive out the workers, move your own in, and it's yours.
 - **Gathering** (Epic 114, settled with Daniel on 2026-11-19): a grown resident takes Wood or Food
@@ -727,7 +730,7 @@ The shared language of the game. Domain terms only — no implementation details
   trader takes one soldier per run (a village's goes alone); a founding party takes soldiers in
   proportion to its size, at least one, in place of its one armed member. Both take more when the
   city knows the way is dangerous. Only soldiers beyond those on its hall and at its gates go. An
-  escort fights for those it guards and keeps pace with them; a trader's comes home with them, a
+  escort fights for those it guards and keeps pace with them (a trader waits for an escort fallen behind, one gone ahead waits for the trader; #1434); a trader's comes home with them, a
   founding party's stays as the daughter's first soldiers. With no soldier to spare, a trader or
   founding party sets out without an escort.
 - **Soldiers in peace** (Epic 97): the soldiers an NPC city keeps by its size are what it keeps in

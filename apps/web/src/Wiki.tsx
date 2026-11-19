@@ -1802,7 +1802,8 @@ export function Wiki() {
           city sends to a workplace sets out with Food for the walk there and back plus{' '}
           {days(SET_OUT_WORK_DAYS)} of work, not a fixed amount, so they last until the carrier's
           first round trip. Its builders of a site more than {num(NPC_NODE_REACH)} tiles from its
-          storage take the same, and go back for more while they still have what the walk home eats.
+          storage take the same, and go back for more while they still have what the walk home eats;
+          so do its workers at a workplace that far out.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -3451,8 +3452,8 @@ export function Wiki() {
           {num(NPC_ESCORT_TOWN_RESIDENTS)} residents or more, a town, sends{' '}
           {num(NPC_TRADER_ESCORTS)} soldier with each trader as their escort, of the soldiers beyond
           those on its town hall and at its gates; a village's trader goes alone. The escort keeps
-          pace with the trader, who waits for them on the way, fights whoever goes for them and
-          comes home with them. Nothing else protects them on the way; a trader not back after{' '}
+          pace with the trader: the trader waits for an escort fallen behind, and one gone ahead waits
+          for the trader. It fights whoever goes for them and comes home with them. Nothing else protects them on the way; a trader not back after{' '}
           {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may send another.
         </p>
         <p>
