@@ -158,6 +158,9 @@ export interface Balance {
   readonly START_COINS: number
   readonly START_CARRIED_FOOD: number
   readonly START_SPEARS: number
+  readonly START_WOOD: number
+  readonly START_STONE: number
+  readonly START_TOOLS: number
   readonly START_HORSES: number
   readonly START_STABLE_FOOD: number
   readonly HORSE_FOOD_PER_DAY: number

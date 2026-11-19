@@ -288,6 +288,9 @@ import {
   START_HORSES,
   START_RESIDENTS,
   START_SPEARS,
+  START_STONE,
+  START_TOOLS,
+  START_WOOD,
   STARTING_SITE_WALK,
   STARTING_SITES_PER_HEARTLAND,
   STAT_BASE_MAX,
@@ -1367,7 +1370,9 @@ export function Wiki() {
           residents, your Leader among them, working the farm. Every grown one, your Leader too,
           carries {num(START_SPEARS)} iron Spear, so they are armed from the first tick and an alarm
           sends them to defend the city. Children get none, and no spare weapons lie in the storage.
-          NPC villages keep their own start.
+          Beside its Food and Coins, the storage holds {num(START_WOOD)} Wood and{' '}
+          {num(START_STONE)} Stone for a first building, and {num(START_TOOLS)} sets of Tools for
+          residents to fetch. NPC villages keep their own start.
         </p>
         <p>
           One resident of your starting city, never your Leader, is its <strong>stable hand</strong>
