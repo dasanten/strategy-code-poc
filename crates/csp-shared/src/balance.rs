@@ -2464,6 +2464,12 @@ pub const PATCH_REGROW_DAYS: f64 = 10.0;
 /// they take from it.
 pub const PATCH_REST_DAYS: f64 = 1.0;
 
+/// Tiles from where a resident on the Gather task started that they look for a tile to gather on
+/// (`CONTEXT.md`: Gather): about a city's surroundings and a short walk beyond, so a gatherer
+/// beside a forest works it for many loads and ends once the land around has emptied, rather than
+/// wandering off.
+pub const GATHER_REACH: f64 = 24.0;
+
 /// The Strength at which a worker makes `WORK_OUTPUT_PER_DAY`.
 pub const WORK_STRENGTH_AVERAGE: f64 = 10.0;
 
@@ -3524,6 +3530,7 @@ pub fn balance_json() -> Value {
     m.insert("PATCH_SIZE".into(), json!(PATCH_SIZE));
     m.insert("PATCH_REGROW_DAYS".into(), json!(PATCH_REGROW_DAYS));
     m.insert("PATCH_REST_DAYS".into(), json!(PATCH_REST_DAYS));
+    m.insert("GATHER_REACH".into(), json!(GATHER_REACH));
     m.insert("WORK_STRENGTH_AVERAGE".into(), json!(WORK_STRENGTH_AVERAGE));
     m.insert("WORK_SKILL_EFFECT".into(), json!(WORK_SKILL_EFFECT));
     m.insert("WORK_SKILL_LIMIT".into(), json!(WORK_SKILL_LIMIT));

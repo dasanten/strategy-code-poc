@@ -60,6 +60,8 @@ mod feeding_stable;
 mod fetching_inputs;
 #[path = "fetching_materials.rs"]
 mod fetching_materials;
+#[path = "gather_task.rs"]
+mod gather_task;
 #[path = "gathering.rs"]
 mod gathering;
 #[path = "getting_food.rs"]

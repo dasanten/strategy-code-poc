@@ -184,6 +184,7 @@ const TASK_ORDER: Record<Task, ResidentOrder['kind'] | undefined> = {
   defend: undefined,
   explore: undefined,
   alarm: undefined,
+  gather: 'gather',
 }
 
 /**
@@ -215,6 +216,7 @@ function taskLine(task: Task, building: SeenScript['building'], site?: true): st
   if (task === 'breed') return 'Breeding horses'
   if (task === 'haul') return 'Hauling'
   if (task === 'explore') return 'Exploring'
+  if (task === 'gather') return 'Gathering'
   return task satisfies never
 }
 

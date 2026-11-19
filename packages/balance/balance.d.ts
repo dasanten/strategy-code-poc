@@ -1490,6 +1490,7 @@ export interface Balance {
   readonly PATCH_SIZE: number
   readonly PATCH_REGROW_DAYS: number
   readonly PATCH_REST_DAYS: number
+  readonly GATHER_REACH: number
   readonly WORK_STRENGTH_AVERAGE: number
   readonly WORK_SKILL_EFFECT: number
   readonly WORK_SKILL_LIMIT: number

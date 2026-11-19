@@ -781,6 +781,40 @@ impl<'a> ScriptBindings<'a> {
                 .sees(Spot { x: f64::from(x), y: f64::from(y) })
     }
 
+    /// Fills in `pickedOver` on each tile view a query answers with, also within the views and
+    /// lists it holds (`CONTEXT.md`: Patch): whether the tile's patch is gone, `false` for a tile
+    /// with no patch; left null for a tile out of sight, which the side can't tell.
+    fn mark_picked_over(&self, data: &mut Json, ty: ScriptType) {
+        match (data, ty) {
+            (Json::Array(items), ScriptType::List(of)) => {
+                for item in items {
+                    self.mark_picked_over(item, *of);
+                }
+            }
+            (Json::Object(record), ScriptType::View("tile")) => {
+                let at = |k: &str| record.get(k).and_then(Json::as_f64).map(|n| n.floor() as i32);
+                let (Some(x), Some(y)) = (at("x"), at("y")) else { return };
+                let size = self.size();
+                let (x, y) =
+                    (csp_shared::terrain::wrap(x, size), csp_shared::terrain::wrap(y, size));
+                if !self.in_sight((x, y)) {
+                    return;
+                }
+                let has = crate::gathering::has_patch(terrain_at(self.ctx.terrain, x, y));
+                let gone = has && crate::gathering::picked_over(self.world(), x, y);
+                record.insert("pickedOver".into(), Json::Bool(gone));
+            }
+            (Json::Object(record), ScriptType::View(view)) => {
+                for f in script_view(view).map_or(&[][..], |v| v.fields) {
+                    if let Some(inner) = record.get_mut(f.name) {
+                        self.mark_picked_over(inner, f.r#type);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Whether a resident is the side's own (`own`).
     fn own(&self, r: &Resident) -> bool {
         let Some(side) = &self.side else { return false };
@@ -1582,6 +1616,42 @@ impl<'a> ScriptBindings<'a> {
                 };
                 edge.map_or(Json::Null, |(x, y)| json!({ "x": x, "y": y }))
             }
+            "gatherTile" => {
+                let good = match arg(0) {
+                    Some(Value::String(g)) => good_of(g)
+                        .filter(|g| crate::gathering::gathered_on(*g).is_some())
+                        .ok_or_else(|| {
+                            script_error("\"gatherTile\" needs \"wood\", \"stone\" or \"food\"")
+                        })?,
+                    _ => {
+                        return Err(script_error(
+                            "\"gatherTile\" needs \"wood\", \"stone\" or \"food\"",
+                        ))
+                    }
+                };
+                let from = spot(arg(1), "gatherTile")?;
+                let skip: Vec<(i32, i32)> = match arg(2).filter(|v| !v.is_null()) {
+                    None => Vec::new(),
+                    Some(Value::List(l)) => {
+                        let items = l.borrow().items.clone();
+                        items
+                            .iter()
+                            .map(|s| spot(Some(s), "gatherTile"))
+                            .collect::<Result<_, _>>()?
+                    }
+                    Some(_) => return Err(script_error("\"gatherTile\" skips a list")),
+                };
+                let in_sight = |x: i32, y: i32| self.in_sight((x, y));
+                let search = crate::gathering::TileSearch {
+                    good,
+                    from,
+                    skip: &skip,
+                    explored: self.ctx.explored,
+                    in_sight: &in_sight,
+                };
+                crate::gathering::gather_tile(world, self.ctx.terrain, &search)
+                    .map_or(Json::Null, |(x, y)| json!({ "x": x, "y": y }))
+            }
             "crewTile" => {
                 let Some(b) = self.building_of(arg(0)) else { return Ok(Json::Null) };
                 if !(self.own_building(b) || self.in_sight((b.x as i32, b.y as i32))) {
@@ -2182,7 +2252,10 @@ impl Host for ScriptBindings<'_> {
                 Some(answer) => answer,
                 None => {
                     let land = self.land();
-                    self.query(b.name, &args).map(|d| view_value_in(&d, b.returns, land.as_ref()))
+                    self.query(b.name, &args).map(|mut d| {
+                        self.mark_picked_over(&mut d, b.returns);
+                        view_value_in(&d, b.returns, land.as_ref())
+                    })
                 }
             },
             Is::Action => self.action(b.name, &args),

@@ -901,6 +901,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "What its region is: \"heartland\", \"frontier\" or \"island\".",
                 null_when: Some("on water, or on a tile the Player hasn’t explored"),
             },
+            ScriptField {
+                name: "pickedOver",
+                r#type: ScriptType::Boolean,
+                description: "Whether its patch is gone (a Forest or Hills tile gathered bare), so it gives nothing until it has grown back; false for a tile with no patch.",
+                null_when: Some("out of sight, or for a tile an order or a view holds rather than a query answers with"),
+            },
         ],
     },
     ScriptView {
@@ -2796,6 +2802,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         params: &["from", "toward?", "skip?"],
         cost: 20.0,
         description: "The nearest tile to `from`, something with `x` and `y`, at the edge of my Player’s explored terrain: one they explored that I can go onto now (riding, one my horse can), beside one they haven’t. With `toward`, a compass direction (\"north\", \"northeast\", \"east\", \"southeast\", \"south\", \"southwest\", \"west\" or \"northwest\"), only tiles that way from `from`, at most 45° off it, the straightest first. With `skip`, a list of things with `x` and `y`, none within 8 tiles of them. Null with none within 192 tiles.",
+        returns: ScriptType::View("tile"),
+    },
+    ScriptBinding {
+        name: "gatherTile",
+        is: Is::Query,
+        params: &["good", "from", "skip?"],
+        cost: 20.0,
+        description: "The tile to gather `good` (\"wood\", \"food\" or \"stone\") on next: of the tiles my Player has explored within the gathering reach of `from` (the Wiki’s Gathering section says how far), something with `x` and `y`, whose terrain gives it (Forest, or Hills for stone) with nothing built on it and no node, the nearest to `from` that isn’t picked over as far as I can see. One out of sight may be picked over all the same. With `skip`, a list of things with `x` and `y`, none of those tiles. Null with none.",
         returns: ScriptType::View("tile"),
     },
     ScriptBinding {
@@ -6469,6 +6483,173 @@ fn goodsText(load, goods) {
     }
   }
   return text
+}
+"#,
+    ),
+    (
+        Task::Gather,
+        "Gather",
+        r#"// Gather (default): gather params.good by hand, wood or food in a forest,
+// stone in hills. From where I started, kept in memory.start, I take the
+// nearest tile within reach that gives it, has nothing built on it and isn't
+// picked over as far as I can see, and that no other of us gathering it has
+// taken; I walk there and gather until my hands are full or the patch is
+// gone, then go on to the next tile. With my hands full I store the load at
+// params.storage, else the nearest storage of my realm, my own food topped up
+// to params.foodTake there, and come back. With no tile left within reach I
+// store what I carry of it and end, saying why. Below params.foodAt units of
+// Food on me I get Food up to params.foodTake at params.food, else
+// params.storage, else the nearest storage of my realm with Food, and come
+// back. foodAt 0 turns getting food off.
+param good: choice(wood, stone, food) = wood // what to gather
+param storage: storage // where loads go; none: the nearest storage of my realm
+param food: storage // where Food comes from; a carriage too; none: my storage, else the nearest storage with Food
+param foodAt: number = 1 // get Food below this many units on me; 0 never
+param foodTake: number = 3 // units of Food to take along
+
+if (memory.start == null) { // starting
+  memory.start = {x: me.x, y: me.y}
+  memory.gathers = params.good
+  log("gathering " + params.good)
+}
+if (me.order != null) { // on my way, storing, getting food or gathering
+  wait()
+  return
+}
+if (backFromStoring()) { return }
+if (fits(params.good) < 1) {
+  storeLoad()
+  return
+}
+if (getFoodIfLow(params.food || params.storage, me)) { return }
+let tile = nextTile()
+if (tile == null) {
+  noTileLeft()
+  return
+}
+if (walkThere(tile)) { return }
+let problem = gather(params.good)
+if (problem == null) {
+  wait() // until my hands are full or the patch is gone
+} else if (problem == "picked over") {
+  memory.at = null // I see it now: the next tile
+} else {
+  end("can't gather " + params.good + " here: " + problem)
+}
+
+// The tile I gather on next, kept in memory.at: the nearest to where I
+// started that no other of us has taken.
+fn nextTile() {
+  let taken = []
+  for (r of withMemory("gathers", params.good)) {
+    let at = r.script.memory.at
+    if (r.id != me.id && at != null) { taken[taken.length] = at }
+  }
+  let tile = gatherTile(params.good, memory.start, taken)
+  if (tile == null) {
+    memory.at = null
+  } else {
+    memory.at = {x: tile.x, y: tile.y}
+  }
+  return tile
+}
+
+// Not on the tile yet: walk there, once. True until I am there; with no way
+// there I end.
+fn walkThere(tile) {
+  if (me.x == tile.x && me.y == tile.y) {
+    memory.walkedTo = null
+    return false
+  }
+  let walked = memory.walkedTo
+  if (walked != null && walked.x == tile.x && walked.y == tile.y) {
+    end("no way to " + tile.x + "," + tile.y)
+    return true
+  }
+  memory.walkedTo = {x: tile.x, y: tile.y}
+  let problem = walkTo(tile.x, tile.y)
+  if (problem == null) { wait() } // until I am there
+  else { end("can't walk to " + tile.x + "," + tile.y + ": " + problem) }
+  return true
+}
+
+// With my hands full, or nothing left to gather: store what I carry of
+// params.good at params.storage, else the nearest storage of my realm,
+// topping up my own food to params.foodTake there.
+fn storeLoad() {
+  let n = floor(me.carried[params.good] || 0)
+  let problem = store([params.good], params.storage, params.foodTake)
+  if (problem != null) {
+    end("can't store the " + params.good + ": " + problem)
+    return
+  }
+  wait() // until it is stored
+  memory.storing = true
+  log("storing " + n + " " + params.good)
+}
+
+// Back from storing: with still no room for any of it I end, as my hands
+// are full of other goods. True once I end.
+fn backFromStoring() {
+  if (memory.storing == null) { return false }
+  memory.storing = null
+  if (memory.last != null) {
+    end("no " + params.good + " left to gather within reach")
+    return true
+  }
+  if (fits(params.good) < 1) {
+    end("my hands are full of other goods")
+    return true
+  }
+  return false
+}
+
+// No tile left within reach: store what I carry of it first, once, then end.
+fn noTileLeft() {
+  let have = me.carried[params.good] || 0
+  if (params.good == "food") { have = have - params.foodTake }
+  if (memory.last == null && have >= 1) {
+    memory.last = true
+    storeLoad()
+    return
+  }
+  end("no " + params.good + " left to gather within reach")
+}
+
+// Getting food: below params.foodAt units of Food on me, fetch Food up to
+// params.foodTake at from while it holds Food, else at the nearest storage of
+// my realm with Food from near. True once I set off, which I log; I wait
+// until I have it.
+fn getFoodIfLow(from, near) {
+  let food = me.carried.food
+  if (food == null) { food = 0 }
+  if (food >= params.foodAt) { return false }
+  let units = floor(params.foodTake - food) // fetch takes whole units
+  if (units < 1) { return false }
+  let at = from
+  if (at == null || !holdsFood(at)) {
+    at = null
+    let stores = storages(near, ["food"]) // nearest first, holding some
+    if (stores.length > 0) { at = stores[0] }
+  }
+  if (at == null || fetch({food: units}, at.id) != null) { return false }
+  wait() // until I have it
+  log("low on Food (" + floor(food) + "): fetching " + units + " at " + placeName(at))
+  return true
+}
+
+// Whether a storage, or a carriage, holds a whole unit of Food to fetch.
+fn holdsFood(at) {
+  let held = at.stock
+  if (held == null) { held = at.load } // a carriage
+  return held != null && held.food != null && held.food >= 1
+}
+
+// A building or carriage for my log: "the storage at 12,6".
+fn placeName(b) {
+  let kind = b.kind
+  if (kind == null) { kind = "carriage" }
+  return "the " + kind + " at " + b.x + "," + b.y
 }
 "#,
     ),
