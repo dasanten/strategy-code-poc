@@ -279,7 +279,12 @@ mod tests {
                 tick: 5000.0,
             };
             let child = new_child(&mut rand, parents, &fields, Some(&mut taken));
-            assert!(crate::test_support::same_json(&made, &case["made"]), "seed {}", case["seed"]);
+            // Made at tick 1000 × i, aged by today's childhood (Epic 113).
+            let mut want = case["made"].clone();
+            for (i, r) in want.as_array_mut().unwrap().iter_mut().enumerate() {
+                crate::fixture_ages::json_aged_as_today(r, 1000.0 * i as f64);
+            }
+            assert!(crate::test_support::same_json(&made, &want), "seed {}", case["seed"]);
             assert!(
                 crate::test_support::same_json(&child, &case["child"]),
                 "seed {}",

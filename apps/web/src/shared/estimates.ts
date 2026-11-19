@@ -170,7 +170,7 @@ export const bornIn = (since: number, tick: number) =>
 export const pairingTicksLeft = (since: number, tick: number) =>
   Math.max(0, since + PAIRING_WAIT_TICKS - tick)
 
-/** A child: "grown in about 56 h (140 game days)"; undefined once grown (`CONTEXT.md`: Child). */
+/** A child: "grown in about 22 h (56 game days)"; undefined once grown (`CONTEXT.md`: Child). */
 export function grownIn(r: Pick<Resident, 'bornAt'>, tick: number): string | undefined {
   const left = r.bornAt + ticksForAge(ADULT_AGE) - tick
   return left > 0 ? `grown in ${aboutTime(left)}` : undefined

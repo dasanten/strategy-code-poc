@@ -26,12 +26,14 @@ use crate::world::create_world;
 /// A game season: a quarter of the game year.
 const SEASON_DAYS: usize = (TICKS_PER_GAME_YEAR / TICKS_PER_GAME_DAY / 4.0) as usize;
 
-/// The game day by which its gate is of stone (day 27 when measured).
+/// The game day by which its gate is of stone (day 5 when measured: it starts with its reserve,
+/// which holds the Stone it sets aside for its wall, Epic 113; day 27 before).
 const GATE_BY_DAY: usize = 45;
 
-/// The share of its outer wall of stone at the end of the season (40% when measured; 62% before
-/// its wooden walls decayed, Epic 97: once worn their repairs take a Wood a tile, Wood its quarry
-/// and upgrade then wait on).
+/// The share of its outer wall of stone at the end of the season (45% when measured, with the Stone
+/// it sets aside for its wall while it grows and saves for a founding party, Epic 113; 40% before;
+/// 62% before its wooden walls decayed, Epic 97: once worn their repairs take a Wood a tile, Wood
+/// its quarry and upgrade then wait on).
 const SHARE_BY_SEASON: f64 = 0.3;
 
 #[test]

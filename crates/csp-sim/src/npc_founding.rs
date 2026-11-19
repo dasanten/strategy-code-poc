@@ -178,12 +178,31 @@ pub fn kept_from_walls(world: &WorldState, city: &City) -> Stock {
     kept
 }
 
-/// Whether the city's storages hold `goods` above what its walls and repairs leave there
-/// (`kept_from_walls`).
+/// Whether the city's storages hold `goods` for its walls: above what its repairs leave there
+/// (`kept_from_walls`), and besides that the Stone it sets aside for its wall, which is its walls'
+/// to spend (`wall_stone_set_aside`, Epic 113). The set-aside is part of its reserve, so its
+/// founding party's Stone counts only above it (`is_full`), and its walls spend the set-aside
+/// whether or not it saves for a party.
 pub fn holds_for_walls(world: &WorldState, city: &City, goods: &Stock) -> bool {
+    let free = walls_may_spend(world, city);
+    goods.iter().all(|(good, n)| held(&free, *good) >= *n)
+}
+
+/// What of the city's storages its walls may spend (`holds_for_walls`), of each good it holds.
+pub fn walls_may_spend(world: &WorldState, city: &City) -> Stock {
     let stock = npc_city_stock(world, city);
     let kept = kept_from_walls(world, city);
-    goods.iter().all(|(good, n)| held(&stock, *good) - held(&kept, *good) >= *n)
+    let mut free: Stock = stock.iter().map(|(good, n)| (*good, n - held(&kept, *good))).collect();
+    let aside = crate::npc_stone_walls::wall_stone_set_aside(world, city);
+    if aside > 0.0 {
+        // The set-aside sits on top of the rest of its reserve, below its party's Stone.
+        let stone = held(&stock, Good::Stone);
+        let reserve = held(&npc_reserve(world, city), Good::Stone);
+        let set_aside = (stone - (reserve - aside)).clamp(0.0, aside);
+        let above = (stone - held(&kept, Good::Stone)).max(0.0);
+        free.insert(Good::Stone, set_aside + above);
+    }
+    free
 }
 
 /// Whether the city's last pass had hands at a workplace of one of `materials` (`founding_lacks`

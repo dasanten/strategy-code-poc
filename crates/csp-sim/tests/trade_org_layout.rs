@@ -44,7 +44,9 @@ fn lays_out_the_hq_as_the_typescript_did() {
 
 #[test]
 fn founds_the_hq_the_typescript_founded() {
-    let (want, _, _) = common::load_world("worlds/hq-0.json");
+    let (mut want, _, _) = common::load_world("worlds/hq-0.json");
+    // Its residents aged by today's childhood (Epic 113).
+    csp_sim::fixture_ages::residents_aged_as_today(&mut want);
     const MID: i32 = 320;
     let nodes = [
         (ResourceKind::Forest, MID + 80, MID),

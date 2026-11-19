@@ -337,6 +337,54 @@ pub fn npc_leaves_dry_workplaces(world: &WorldState) -> Vec<InvariantViolation> 
     out
 }
 
+/// Invariant `npc-wall-stone-set-aside` (`CONTEXT.md`: NPC reserve, Wood or stone; Daniel,
+/// 2026-11-19, Epic 113): a plan made this tick that starts upgrading one of the city's wooden
+/// walls or gates to stone holds a builder's trip of Stone its walls may spend, from the Stone it
+/// sets aside for its wall and what it holds above its reserve and its founding party's Stone
+/// (`holds_for_walls`): never Stone its roads, repairs or party keep.
+pub fn npc_wall_stone_set_aside(world: &WorldState) -> Vec<InvariantViolation> {
+    use crate::npc_founding::holds_for_walls;
+    use crate::npc_growth::project_site;
+    use crate::queries::building::is_stone;
+    let mut out = Vec::new();
+    let tick = world.tick as f64;
+    for (city_id, plan) in &world.city_plans {
+        if plan.planned_at != tick {
+            continue;
+        }
+        let Some(CityProject::Build { building, x, y, material }) = &plan.project else {
+            continue;
+        };
+        if !matches!(building, BuildingKind::Wall | BuildingKind::Gate)
+            || !is_stone(*building, *material)
+            || project_site(world, *building, *material, *x, *y).is_some()
+        {
+            continue;
+        }
+        let over_wood = world.buildings.iter().any(|b| {
+            b.city_id.as_ref() == Some(city_id)
+                && b.kind == *building
+                && b.site.is_none()
+                && !is_stone(b.kind, b.material)
+                && b.x == *x
+                && b.y == *y
+        });
+        let Some(city) = world.cities.iter().find(|c| &c.id == city_id) else { continue };
+        if over_wood && !holds_for_walls(world, city, &crate::npc_stone_walls::trip()) {
+            out.push(violation(
+                "npc-wall-stone-set-aside",
+                format!(
+                    "{city_id} starts upgrading its {} at ({x}, {y}) to stone without a trip of \
+                     Stone its walls may spend",
+                    kind_name(*building)
+                ),
+                vec![city_id.clone()],
+            ));
+        }
+    }
+    out
+}
+
 /// Invariant `npc-founding-stone-kept` (`CONTEXT.md`: Full city; Daniel, 2026-11-18, #1379): a
 /// plan made this tick by a city saving for its founding party starts no tile of stone wall, gate
 /// or tower whose Stone a builder's trip would take from that party's: it holds a trip's worth
