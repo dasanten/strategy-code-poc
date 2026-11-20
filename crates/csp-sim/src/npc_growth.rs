@@ -31,6 +31,7 @@ use crate::npc_inner_wall::{inner_wall_project, outer_walls, Rings as InnerRings
 use crate::npc_plan::farmers_to_feed;
 use crate::npc_scouts::knows_node;
 use crate::npc_stone_walls::{outer_ring_of_stone, stone_upgrade_project, wants_stone_for_walls};
+use crate::npc_supply::{materials_at_hand, may_begin, site_stuck};
 use crate::npc_training::wants_training_ground;
 use crate::placing::Ground;
 use crate::queries::building::{
@@ -488,17 +489,6 @@ pub fn next_project(
     Some(materials_first(world, city, home, terrain, rings.as_ref(), want, &mut HashSet::new()))
 }
 
-/// What the residents of a city carry, all together (`carriedBy`).
-fn carried_by(world: &WorldState, city: &City) -> Stock {
-    let mut out = Stock::new();
-    for r in world.residents.iter().filter(|r| r.city_id.as_ref() == Some(&city.id)) {
-        for (good, n) in &r.carried {
-            *out.entry(*good).or_insert(0.0) += n;
-        }
-    }
-    out
-}
-
 /// How many of a city's adults build at once (`npcBuilders`): `NPC_BUILDERS` for each step of an
 /// NPC city's needs, and just that at a Trade Org city; an NPC city with no storage yet lets
 /// everyone who can.
@@ -551,15 +541,8 @@ fn materials_first(
         Some(site) => materials_needed(site),
         None => build_materials_of(*building, *material),
     };
-    let storage = world.buildings.iter().find(|b| {
-        b.city_id.as_ref() == Some(&city.id) && b.kind == BuildingKind::Storage && b.site.is_none()
-    });
     // Without a storage yet (a daughter), what its people carry.
-    let have = if storage.is_some() || city.trade_org.is_some() {
-        storage.and_then(|s| s.stock.clone()).unwrap_or_default()
-    } else {
-        carried_by(world, city)
-    };
+    let have = materials_at_hand(world, city);
     for (good, units) in &need {
         if held(&have, *good) >= *units {
             continue;
@@ -656,10 +639,34 @@ pub fn chain_project(
             }
             None => house_tile(world, city, home, terrain, rings, kind),
         };
-        return t.map(|t| build(kind, t));
+        return t
+            .map(|t| build(kind, t))
+            .filter(|p| may_begin_project(world, city, home, terrain, p));
     }
     let (kind, at) = nearest_node(world, city, home, terrain, good)?;
     Some(build(node_workplace(kind), at))
+        .filter(|p| may_begin_project(world, city, home, terrain, p))
+}
+
+/// Whether an NPC town may begin a project's building (`CONTEXT.md`: NPC city, #1487): it has a
+/// way to get each of its materials (`npc_supply`). One begun already, or a tear-down, always.
+fn may_begin_project(
+    world: &WorldState,
+    city: &City,
+    home: &Building,
+    terrain: &TerrainMap,
+    p: &CityProject,
+) -> bool {
+    let CityProject::Build { building, x, y, material } = p else { return true };
+    project_site(world, *building, *material, *x, *y).is_some()
+        || may_begin(
+            world,
+            city,
+            (home.x as i32, home.y as i32),
+            *building,
+            *material,
+            terrain.size,
+        )
 }
 
 /// The nearest free resource node yielding `good` that the city knows of, with where its workplace
@@ -744,9 +751,15 @@ fn wanted(
                     && is_big_npc_city(world, city)
                     && in_area(b)))
     };
-    // A farm already begun is finished before anything else (`CONTEXT.md`: NPC city).
-    let begun =
-        world.buildings.iter().filter(|b| is_begun(b)).min_by_key(|b| b.kind != BuildingKind::Farm);
+    // A farm already begun is finished before anything else (`CONTEXT.md`: NPC city). One waiting
+    // on a material the town has no way to get no longer comes first (#1487): it waits, begun,
+    // until the material can come.
+    let home_at = (home.x as i32, home.y as i32);
+    let begun = world
+        .buildings
+        .iter()
+        .filter(|b| is_begun(b) && !site_stuck(world, city, home_at, b, size))
+        .min_by_key(|b| b.kind != BuildingKind::Farm);
     let wall_site = ring.iter().find(|t| t.site.is_some());
     let at = |building: BuildingKind, t: Option<(i32, i32)>| t.map(|t| build(building, t));
     let first = first_ring();
@@ -839,7 +852,9 @@ fn wanted(
                 return Some(chain);
             }
         }
-        if let Some(another) = another_workplace(world, city, home, terrain, rings) {
+        if let Some(another) = another_workplace(world, city, home, terrain, rings)
+            .filter(|p| may_begin_project(world, city, home, terrain, p))
+        {
             return Some(another);
         }
     }
@@ -866,7 +881,9 @@ fn wanted(
             return Some(chain);
         }
     }
-    if let Some(second) = second_workplace(world, city, home, terrain) {
+    if let Some(second) = second_workplace(world, city, home, terrain)
+        .filter(|p| may_begin_project(world, city, home, terrain, p))
+    {
         return Some(second);
     }
     if wants_training_ground(world, city, size) {
