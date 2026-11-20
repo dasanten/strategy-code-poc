@@ -287,7 +287,7 @@ export function TopBar({
   control?: { mode: ControlMode; onSwitch: (mode: ControlMode) => void }
   /** The Player's own Zeal in game hours (`CONTEXT.md`: Zeal), once the world has come. */
   zeal?: number
-  /** The Zeal went down since the last tick: the crew is rallied (`CONTEXT.md`: Rallying the crew). */
+  /** The Leader rallies the crew: the Zeal doesn't fill and drains while the crew works (`CONTEXT.md`: Zeal). */
   zealDraining?: boolean
 }) {
   return (

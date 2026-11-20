@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TICKS_PER_GAME_HOUR, ZEAL_CAP_HOURS, ZEAL_FILL_TICKS } from '@csp/balance'
+import { TICKS_PER_GAME_HOUR, ZEAL_CAP_HOURS } from '@csp/balance'
 import type { Building } from '@csp/shared-types'
 import { rallyProblem, untilFull, zealLasts, zealShown } from './zeal.js'
 
@@ -58,12 +58,11 @@ describe('rallying the crew (CONTEXT.md: Rallying the crew)', () => {
     )
   })
 
-  it('says about how long the Zeal lasts while it drains and fills', () => {
-    const perTick = 1 / TICKS_PER_GAME_HOUR - ZEAL_CAP_HOURS / ZEAL_FILL_TICKS
-    // A full pool: drained at a game hour an hour less what fills, a real second a tick.
-    expect(zealLasts(ZEAL_CAP_HOURS)).toBe(
-      `about ${Math.round((ZEAL_CAP_HOURS / perTick / 3600) * 2) / 2} h`,
-    )
+  it('says about how long the Zeal lasts while it drains, filling nothing meanwhile', () => {
+    const perTick = 1 / TICKS_PER_GAME_HOUR
+    // A full pool: drained at a game hour an hour, a real second a tick (Daniel, 2026-11-20).
+    // Under an hour of real time: 48 game hours are 48 real minutes.
+    expect(zealLasts(ZEAL_CAP_HOURS)).toBe(`about ${Math.ceil(ZEAL_CAP_HOURS / perTick / 60)} min`)
     expect(zealLasts(perTick * 600)).toBe('about 10 min')
     expect(zealLasts(0)).toBe('under a minute')
   })
@@ -72,7 +71,9 @@ describe('rallying the crew (CONTEXT.md: Rallying the crew)', () => {
     const shown = zealShown(ZEAL_CAP_HOURS / 2, true)
     expect(shown.draining).toBe(true)
     expect(shown.label).toBe('Zeal 50% ↓')
-    expect(shown.title).toMatch(/^Zeal: draining while your crew is rallied, lasts about /)
+    expect(shown.title).toMatch(
+      /^Zeal: not filling while your Leader rallies the crew; lasts about /,
+    )
     expect(zealShown(ZEAL_CAP_HOURS / 2).draining).toBeUndefined()
   })
 })
