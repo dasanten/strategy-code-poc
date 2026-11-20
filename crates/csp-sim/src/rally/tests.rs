@@ -210,13 +210,30 @@ fn zeal_drains_only_while_a_crew_works() {
     run(&mut world, &t, 20);
     assert!(rallying(&world));
     assert_eq!(zeal_of(&world, MARA), ZEAL_CAP_HOURS);
-    // A worker comes: it drains a game hour an hour, while it goes on filling at its pace (full
-    // the first tick, it starts filling once it is below the cap).
+    // A worker comes: it drains a game hour an hour, and doesn't fill while the rally runs.
     worker(&mut world, "w1", MARA, "farm");
     run(&mut world, &t, 60);
-    let want = ZEAL_CAP_HOURS - 60.0 * ZEAL_PER_RALLIED_TICK + 59.0 * ZEAL_PER_TICK;
+    let want = ZEAL_CAP_HOURS - 60.0 * ZEAL_PER_RALLIED_TICK;
     assert!(close(zeal_of(&world, MARA), want), "{}", zeal_of(&world, MARA));
     assert_eq!(zeal_of(&world, TOBIN), ZEAL_CAP_HOURS);
+}
+
+#[test]
+fn zeal_doesnt_fill_while_the_rally_runs_even_with_nobody_at_work() {
+    // Daniel, 2026-11-20: the pool pauses while the order runs, also when nothing drains.
+    let (mut world, t) = setup();
+    put(&mut world, LEADER, FARM);
+    set_zeal(&mut world, MARA, 10.0);
+    set_zeal(&mut world, TOBIN, 10.0);
+    rally(&mut world, MARA).unwrap();
+    run(&mut world, &t, 20);
+    assert!(rallying(&world));
+    assert_eq!(zeal_of(&world, MARA), 10.0);
+    // Another Player's pool fills on as ever.
+    assert!(close(zeal_of(&world, TOBIN), 10.0 + 20.0 * ZEAL_PER_TICK));
+    // Stopped, it fills again from the next tick.
+    send(&mut world, MARA, json!({ "kind": "stop", "residentId": LEADER })).unwrap();
+    the_rest_stays(&mut world, &t, 10.0);
 }
 
 /// A rallied farm with one worker, rallied for 10 ticks: (world, terrain, the Zeal then).
@@ -257,8 +274,9 @@ fn it_ends_when_the_leader_leaves_the_building() {
     let (mut world, t, zeal) = rallied_farm();
     put(&mut world, LEADER, (20.0, 6.0));
     run(&mut world, &t, 1);
-    // That tick, nobody was rallied any more: the pool only filled.
-    the_rest_stays(&mut world, &t, zeal + ZEAL_PER_TICK);
+    // That tick, nobody was rallied any more: nothing drained, and the pool filled no more than it
+    // does while the order runs, which ended only after the filling.
+    the_rest_stays(&mut world, &t, zeal);
 }
 
 #[test]
@@ -279,8 +297,8 @@ fn it_ends_when_the_zeal_is_used_up() {
     rally(&mut world, MARA).unwrap();
     run(&mut world, &t, 3);
     assert!(rallying(&world));
-    // Each tick spends more than it fills: it runs out within a few more.
-    let per_tick = ZEAL_PER_RALLIED_TICK - ZEAL_PER_TICK;
+    // Each tick spends a game hour's worth and fills nothing: it runs out within a few more.
+    let per_tick = ZEAL_PER_RALLIED_TICK;
     let left = (3.5 * ZEAL_PER_RALLIED_TICK - 3.0 * per_tick) / per_tick;
     run(&mut world, &t, left.ceil() as usize);
     assert!(!rallying(&world));
