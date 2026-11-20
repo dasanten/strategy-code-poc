@@ -786,7 +786,10 @@ The shared language of the game. Domain terms only — no implementation details
   carriers after it with the rest of the load (Daniel, 2026-11-19, #1438), as hands come free,
   taken like the party: while the town hall is going up they join the party; once the daughter
   stands they take what it still lacks of the party's materials, become its residents and walk
-  to it, until its storage stands (from then it gathers what it lacks like any city). Like the
+  to it, until its storage stands (from then it gathers what it lacks like any city). Until then
+  the daughter's own builders fetch what it lacks from the mother's storage too, with Food for the
+  way, and that is no theft (Daniel, 2026-11-19, #1379: a mother with no hands to send left its
+  daughter with no storage and so no farm, and its people starved). Like the
   party's extra carriers they stay with the daughter (Daniel, 2026-11-19,
   #1379). A hand called home leaves the workplace far out it
   was called from. One too full of what they carry for their own Food puts down at the storage what crowds it

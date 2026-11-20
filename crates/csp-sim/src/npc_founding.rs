@@ -516,6 +516,53 @@ pub fn daughter_supplied<'w>(
         .find(|c| Some(&c.id) == hall.city_id.as_ref() && c.id != mother && c.realm_id.is_none())
 }
 
+/// The mother that still supplies a daughter with the rest of its founding party's load
+/// (`daughter_supplied`), while the daughter's storage doesn't stand (`daughter_lacks`).
+pub fn supplying_mother<'w>(world: &'w WorldState, daughter: &str) -> Option<&'w City> {
+    daughter_lacks(world, daughter)?;
+    world.cities.iter().find(|c| {
+        c.id != daughter
+            && world
+                .city_plans
+                .get(&c.id)
+                .and_then(|p| daughter_supplied(world, p, &c.id))
+                .is_some_and(|d| d.id == daughter)
+    })
+}
+
+/// Whether a daughter's supplying mother holds any of `need` that the daughter lacks, for its
+/// builders to fetch (`mother_fetch`): they take part in a site that lacks only that.
+pub fn mother_holds(world: &WorldState, daughter: Option<&str>, need: &Stock) -> bool {
+    let Some(daughter) = daughter else { return false };
+    let Some(mother) = supplying_mother(world, daughter) else { return false };
+    let Some(lacks) = daughter_lacks(world, daughter) else { return false };
+    world.buildings.iter().any(|b| {
+        b.city_id.as_ref() == Some(&mother.id)
+            && b.kind == BuildingKind::Storage
+            && b.site.is_none()
+            && need.keys().any(|g| held(&lacks, *g) > 0.0 && held_in(b.stock.as_ref(), *g) >= 1.0)
+    })
+}
+
+/// What a daughter's resident may take from a storage of its supplying mother (`CONTEXT.md`:
+/// Founding; Daniel, 2026-11-19, #1379): its builders fetch what it lacks of the party's load from
+/// there, with Food for the way, and that is no theft. None for any other storage or resident.
+/// Before this, Oakhurst's mother had no hands to send after it, so Oakhurst never got the
+/// materials for its storage, built no farm, and starved.
+pub fn mother_fetch(world: &WorldState, city_id: Option<&str>, storage_id: &str) -> Option<Stock> {
+    let daughter = city_id?;
+    let mother = supplying_mother(world, daughter)?;
+    world.buildings.iter().find(|b| {
+        b.id == storage_id
+            && b.kind == BuildingKind::Storage
+            && b.site.is_none()
+            && b.city_id.as_ref() == Some(&mother.id)
+    })?;
+    let mut goods = daughter_lacks(world, daughter)?;
+    goods.insert(Good::Food, f64::INFINITY);
+    Some(goods)
+}
+
 /// What a daughter still lacks of the rest of its founding party's load (`CONTEXT.md`: Founding;
 /// Daniel, 2026-11-19, #1438): the party's materials (`founding_materials`, for its residents) but
 /// its town hall's, beyond what its residents carry, its sites have and its storages hold. None
@@ -1258,7 +1305,7 @@ pub fn npc_cities_have_halls(world: &WorldState) -> Vec<InvariantViolation> {
 mod invariants;
 pub use invariants::{
     founding_parties_sound, founding_party_sets_out_loaded, founding_site_clear,
-    founding_wave_sound, full_wait_sound,
+    founding_wave_sound, full_wait_sound, mother_fetch_sound,
 };
 #[cfg(test)]
 mod tests;

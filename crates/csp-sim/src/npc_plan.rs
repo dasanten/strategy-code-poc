@@ -973,7 +973,7 @@ fn can_take_part(world: &WorldState, city: &City, i: usize, project: &CityProjec
     need.keys().any(|g| {
         held(&world.residents[i].carried, *g) > 0.0
             || held_in(storage.and_then(|s| s.stock.as_ref()), *g) > 0.0
-    })
+    }) || crate::npc_founding::mother_holds(world, Some(&city.id), &need)
 }
 
 /// Whether a city's project is finished, or can't go on (`projectDone`).

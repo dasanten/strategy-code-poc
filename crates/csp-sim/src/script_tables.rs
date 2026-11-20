@@ -2777,7 +2777,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &["from?", "goods?"],
         cost: 20.0,
-        description: "The finished storages of my realm (of my city, for an NPC city’s resident); with `from`, something with `x` and `y`, nearest first by my `walkTime` from it; with `goods`, a list of goods, only those holding any of them.",
+        description: "The finished storages of my realm (of my city, for an NPC city’s resident, and its mother’s while my daughter city’s storage doesn’t stand yet); with `from`, something with `x` and `y`, nearest first by my `walkTime` from it; with `goods`, a list of goods, only those holding any of them.",
         returns: ScriptType::List(&ScriptType::View("building")),
     },
     ScriptBinding {

@@ -208,6 +208,8 @@ pub fn can_do_more(
     let need = materials_needed(site);
     pick(Some(&r.carried), &need).is_some()
         || pick(storage.and_then(|s| s.stock.as_ref()), &need).is_some()
+        // A daughter's builders fetch from its supplying mother (`CONTEXT.md`: Founding; #1379).
+        || crate::npc_founding::mother_holds(world, r.city_id.as_deref(), &need)
 }
 
 /// Whether a resident is building (by the Build default or not), tearing down or delivering
@@ -576,11 +578,25 @@ fn materials_first(
     let storage = world.buildings.iter().find(|b| {
         b.city_id.as_ref() == Some(&city.id) && b.kind == BuildingKind::Storage && b.site.is_none()
     });
-    // Without a storage yet (a daughter), what its people carry.
+    // Without a storage yet (a daughter), what its people carry, and what its supplying mother's
+    // storages hold that its builders fetch from there (`CONTEXT.md`: Founding; #1379: Oakhurst
+    // went for a lumber camp 122 tiles out instead, and starved).
     let have = if storage.is_some() || city.trade_org.is_some() {
         storage.and_then(|s| s.stock.clone()).unwrap_or_default()
     } else {
-        carried_by(world, city)
+        let mut have = carried_by(world, city);
+        if let Some(mother) = crate::npc_founding::supplying_mother(world, &city.id) {
+            for b in world.buildings.iter().filter(|b| {
+                b.city_id.as_ref() == Some(&mother.id)
+                    && b.kind == BuildingKind::Storage
+                    && b.site.is_none()
+            }) {
+                for (good, n) in b.stock.iter().flatten() {
+                    *have.entry(*good).or_insert(0.0) += n;
+                }
+            }
+        }
+        have
     };
     for (good, units) in &need {
         if held(&have, *good) >= *units {
