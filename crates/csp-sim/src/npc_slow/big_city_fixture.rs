@@ -324,8 +324,11 @@ pub struct BigCityHold {
     pub still_share: f64,
     pub mean_still_share: f64,
     /// The longest anyone stood on its storage with no order and no script, in ticks; one fetching
-    /// for their smelter or smithy isn't counted.
+    /// for their smelter or smithy isn't counted, nor a soldier (`longest_soldier_on_storage`).
     pub longest_on_storage: usize,
+    /// The longest a soldier stood there: one with no post free comes home and waits there for the
+    /// pass that gives them one (#1379).
+    pub longest_soldier_on_storage: usize,
     /// The job of whoever did: `child` for one too young for a job.
     pub longest_job: String,
     /// The most residents on its storage at any tick.
@@ -348,6 +351,7 @@ pub struct BigCityWatch {
     ticks: usize,
     still_share: f64,
     longest_on_storage: usize,
+    longest_soldier_on_storage: usize,
     longest_job: String,
     most_on_storage: usize,
     planned_at: Option<f64>,
@@ -365,6 +369,7 @@ impl BigCityWatch {
             ticks: 0,
             still_share: 0.0,
             longest_on_storage: 0,
+            longest_soldier_on_storage: 0,
             longest_job: "nobody".into(),
             most_on_storage: 0,
             planned_at: None,
@@ -433,6 +438,10 @@ impl BigCityWatch {
             }
             let stood = self.standing.get(&r.id).copied().unwrap_or(0) + 1;
             self.standing.insert(r.id.clone(), stood);
+            if job(&r.id).is_some_and(|j| j.kind == CityJobKind::Soldier) {
+                self.longest_soldier_on_storage = self.longest_soldier_on_storage.max(stood);
+                continue;
+            }
             if stood > self.longest_on_storage {
                 self.longest_on_storage = stood;
                 self.longest_job = if can_work(r.born_at, tick) {
@@ -457,6 +466,7 @@ impl BigCityWatch {
             still_share: self.still_share,
             mean_still_share: self.still_shares / self.ticks as f64,
             longest_on_storage: self.longest_on_storage,
+            longest_soldier_on_storage: self.longest_soldier_on_storage,
             longest_job: self.longest_job.clone(),
             most_on_storage: self.most_on_storage,
             farmers,
@@ -486,8 +496,11 @@ pub fn big_city_hold_report(hold: &BigCityHold) -> String {
             percent(hold.mean_still_share)
         ),
         format!(
-            "on the storage: at most {} at once; the longest anyone stood there {} ticks ({})",
-            hold.most_on_storage, hold.longest_on_storage, hold.longest_job
+            "on the storage: at most {} at once; the longest anyone stood there {} ticks ({}), a              soldier {} ticks",
+            hold.most_on_storage,
+            hold.longest_on_storage,
+            hold.longest_job,
+            hold.longest_soldier_on_storage
         ),
         format!("farmers: {}; swing {}", farmers.join(", "), hold.farmer_swing),
     ]

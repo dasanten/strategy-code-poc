@@ -34,6 +34,11 @@ const CLOSED_IN_DAYS: usize = 60;
 /// (`LONGEST_ON_STORAGE`).
 const LONGEST_ON_STORAGE: usize = NPC_PLAN_TICKS as usize + 5;
 
+/// The most ticks a soldier stands there: one with no post free at the pass after they came home
+/// waits for the next (#1379: 78 ticks once its building went on while a mine waited for its
+/// founding party's Stone; 62 before).
+const LONGEST_SOLDIER_ON_STORAGE: usize = 2 * NPC_PLAN_TICKS as usize + 5;
+
 /// The most its farmers may change from one game day to the next: what a founding party leaving
 /// takes off those it keeps, and the one more it keeps with no food surplus (`MOST_FARMER_SWING`).
 const MOST_FARMER_SWING: usize = (NPC_FOUND_PARTY_MOST / 4.0).ceil() as usize + 1;
@@ -66,6 +71,7 @@ fn with_no_room_and_no_warehouse_keeps_its_storage_clear_and_reports_its_jobs() 
     // stand down and its soldiers walk rounds and train, so few stand idle, those on a post counted.
     assert!(hold.idle_with_posts <= MOST_IDLE_SHARE, "{hold:?}");
     assert!(hold.longest_on_storage <= LONGEST_ON_STORAGE, "{hold:?}");
+    assert!(hold.longest_soldier_on_storage <= LONGEST_SOLDIER_ON_STORAGE, "{hold:?}");
     // Needs grow with the city (`CONTEXT.md`: Spare hands' work): at most a second of each
     // workplace on a node, and no more farms than it was staged with.
     let places = &run.counts.last().expect("a count").places;
@@ -152,6 +158,7 @@ fn on_a_map_with_room_holds_its_idle_share_keeps_its_storage_clear_and_its_farme
     eprintln!("From day {HOLDS_FROM_DAY}, on a map with room:\n{}", big_city_hold_report(&hold));
     assert!(hold.idle_share <= MOST_IDLE_SHARE, "{hold:?}");
     assert!(hold.longest_on_storage <= LONGEST_ON_STORAGE, "{hold:?}");
+    assert!(hold.longest_soldier_on_storage <= LONGEST_SOLDIER_ON_STORAGE, "{hold:?}");
     assert!(hold.farmer_swing <= MOST_FARMER_SWING, "{hold:?}");
 }
 
