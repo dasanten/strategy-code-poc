@@ -209,3 +209,70 @@ fn follows_who_commands_a_resident_as_armies_and_contracts_change() {
     // The owner is read as it is now.
     assert_eq!(commander(&mut slot, &world, "realmY").as_deref(), Some("realmY"));
 }
+
+/// Where a scan finds the buildings `on` holds for.
+fn scan(world: &WorldState, on: impl Fn(&csp_shared::world::Building) -> bool) -> Vec<usize> {
+    world.buildings.iter().enumerate().filter(|(_, b)| on(b)).map(|(i, _)| i).collect()
+}
+
+/// Every building lookup next to the scan it replaces, for each city and for the tiles on and
+/// round each of `step`th building.
+fn lookups_agree_with_scans(world: &WorldState, size: i32, step: usize) {
+    use csp_shared::footprint::covers;
+    use csp_shared::terrain::wrap;
+    use csp_sim::queries::names::placed;
+    use csp_sim::world_index::{building_indices_covering, building_indices_on, buildings_of_city};
+    for city in world.cities.iter().map(|c| c.id.as_str()).chain(["nobody's"]) {
+        let found: Vec<usize> = buildings_of_city(world, city).map(|(i, _)| i).collect();
+        assert_eq!(found, scan(world, |b| b.city_id.as_deref() == Some(city)), "{city}");
+    }
+    for b in world.buildings.iter().step_by(step) {
+        for (dx, dy) in [(0, 0), (1, 1), (-1, 0), (3, 3), (4, 0), (-size, size), (size + 2, 2)] {
+            let (x, y) = (b.x as i32 + dx, b.y as i32 + dy);
+            assert_eq!(
+                building_indices_covering(world, x, y, size),
+                scan(world, |o| covers(placed(o), x, y, size)),
+                "over ({x}, {y})"
+            );
+            assert_eq!(
+                building_indices_on(world, x, y, size),
+                scan(world, |o| wrap(o.x as i32, size) == wrap(x, size)
+                    && wrap(o.y as i32, size) == wrap(y, size)),
+                "on ({x}, {y})"
+            );
+        }
+    }
+}
+
+#[test]
+fn building_lookups_agree_with_the_scans_on_the_fixture_worlds() {
+    for file in WORLDS {
+        let (world, size) = busy_world(file, 11.0);
+        assert!(world.buildings.iter().any(|b| b.city_id.is_some()), "{file}");
+        lookups_agree_with_scans(&world, size, 7);
+    }
+}
+
+#[test]
+fn building_lookups_follow_buildings_added_removed_and_changing_city() {
+    use csp_sim::world_index::forget_building_lookups;
+    let (mut world, size) = busy_world(WORLDS[1], 12.0);
+    lookups_agree_with_scans(&world, size, 5);
+    // One more of a city's buildings, on a tile that already has one, with a new id.
+    let mut more = world.buildings.iter().find(|b| b.city_id.is_some()).expect("a city's").clone();
+    more.id = format!("b{}", world.next_id);
+    world.next_id += 1;
+    world.buildings.push(more);
+    lookups_agree_with_scans(&world, size, 5);
+    // The first building gone: every other stands one place earlier.
+    world.buildings.remove(0);
+    lookups_agree_with_scans(&world, size, 5);
+    // The tick turned.
+    world.tick += 1;
+    lookups_agree_with_scans(&world, size, 5);
+    // A building leaves its city in place, as `update_city_membership` does it.
+    let i = world.buildings.iter().position(|b| b.city_id.is_some()).expect("a city's");
+    world.buildings[i].city_id = None;
+    forget_building_lookups();
+    lookups_agree_with_scans(&world, size, 5);
+}

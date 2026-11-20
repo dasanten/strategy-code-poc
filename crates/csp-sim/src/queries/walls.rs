@@ -29,14 +29,18 @@ pub fn is_wall_or_gate(b: &Building) -> bool {
 /// The finished wall or tower standing on tile (x, y), if one does: what a resident there is up on
 /// (a gate is passed under). A tower covers its whole footprint.
 pub fn wall_or_tower_at(world: &WorldState, x: f64, y: f64) -> Option<&Building> {
-    world.buildings.iter().find(|b| {
-        crate::ruins::standing(b)
-            && match b.kind {
-                BuildingKind::Wall => b.x == x && b.y == y,
-                BuildingKind::Tower => covers(placed(b), x as i32, y as i32, MAP_SIZE),
-                _ => false,
-            }
-    })
+    // Only those on the tile are looked at, not every building of the world.
+    crate::world_index::building_indices_covering(world, x as i32, y as i32, MAP_SIZE)
+        .into_iter()
+        .map(|i| &world.buildings[i])
+        .find(|b| {
+            crate::ruins::standing(b)
+                && match b.kind {
+                    BuildingKind::Wall => b.x == x && b.y == y,
+                    BuildingKind::Tower => covers(placed(b), x as i32, y as i32, MAP_SIZE),
+                    _ => false,
+                }
+        })
 }
 
 /// Whether a resident is up (`CONTEXT.md`: Wall walk, High ground): on the wall walk, or a climber

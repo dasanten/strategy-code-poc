@@ -34,14 +34,9 @@ use crate::npc_scouts::knows_node;
 
 /// An NPC city's finished storages (`npcStorages`): where it trades and is paid.
 pub fn npc_storages<'w>(world: &'w WorldState, city: &City) -> Vec<&'w Building> {
-    world
-        .buildings
-        .iter()
-        .filter(|b| {
-            b.city_id.as_deref() == Some(city.id.as_str())
-                && b.kind == BuildingKind::Storage
-                && b.site.is_none()
-        })
+    crate::world_index::buildings_of_city(world, &city.id)
+        .filter(|(_, b)| b.kind == BuildingKind::Storage && b.site.is_none())
+        .map(|(_, b)| b)
         .collect()
 }
 
