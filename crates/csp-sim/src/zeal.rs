@@ -8,7 +8,9 @@
 //! nothing of it (ADR 0042): no script view or game API call reads it.
 
 use csp_shared::balance::{ZEAL_CAP_HOURS, ZEAL_PER_TICK};
-use csp_shared::world::WorldState;
+use std::collections::BTreeSet;
+
+use csp_shared::world::{ResidentOrder, WorldState};
 
 use crate::sight::InvariantViolation;
 
@@ -29,12 +31,31 @@ pub fn set_zeal(world: &mut WorldState, user_id: u64, hours: f64) {
 }
 
 /// One tick of filling: every pool that is not full gains `ZEAL_PER_TICK`, up to the cap, where it
-/// stops (`CONTEXT.md`: Zeal).
+/// stops (`CONTEXT.md`: Zeal). Not while the Player's Leader rallies the crew: the pool pauses for
+/// as long as the order runs, whether or not anyone works and it drains, and fills again from the
+/// moment it ends (Daniel, 2026-11-20).
 pub fn step_zeal(world: &mut WorldState) {
-    world.zeal.retain(|_, hours| {
-        *hours = (*hours + ZEAL_PER_TICK).min(ZEAL_CAP_HOURS);
+    let rallying = rallying_players(world);
+    world.zeal.retain(|user_id, hours| {
+        if !rallying.contains(user_id) {
+            *hours = (*hours + ZEAL_PER_TICK).min(ZEAL_CAP_HOURS);
+        }
         *hours < ZEAL_CAP_HOURS
     });
+}
+
+/// The accounts whose Leader holds the rally order now (`CONTEXT.md`: Rallying the crew).
+pub fn rallying_players(world: &WorldState) -> BTreeSet<u64> {
+    world
+        .realms
+        .iter()
+        .filter(|realm| {
+            world.residents.iter().any(|r| {
+                r.id == realm.leader_id && matches!(r.order, Some(ResidentOrder::Rally(_)))
+            })
+        })
+        .map(|realm| realm.user_id)
+        .collect()
 }
 
 /// Invariant (ADR 0004): a Player's Zeal is never below zero or above the cap.

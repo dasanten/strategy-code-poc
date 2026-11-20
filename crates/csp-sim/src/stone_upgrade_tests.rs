@@ -229,6 +229,7 @@ fn the_invariant_lets_an_upgrade_site_share_only_its_wooden_wall() {
     let i = world.buildings.len() - 1;
     world.buildings[i].x = 8.0;
     world.buildings[i].y = 8.0;
+    crate::world_index::forget_building_lookups();
     let all = broken(&world, &terrain);
     assert!(all.iter().any(|v| v.invariant == "buildings-in-place"), "{all:?}");
 }

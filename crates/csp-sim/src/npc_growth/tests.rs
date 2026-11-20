@@ -732,7 +732,9 @@ fn saving_for_its_founding_party_a_begun_smithy_waits_until_it_holds_the_partys_
     own_site(&mut v, "quarry", "quarry", (hx - 40.0, hy + 40.0), Some("stone"));
     let i = v.world.buildings.iter().position(|b| b.id == "quarry").unwrap();
     v.world.buildings[i].site = None;
-    let plenty = [(Good::Food, 400.0), (Good::Wood, 400.0), (Good::Stone, 400.0)];
+    // Iron in store, so the smithy can be finished and isn't stuck (#1487).
+    let plenty =
+        [(Good::Food, 400.0), (Good::Wood, 400.0), (Good::Stone, 400.0), (Good::Iron, 50.0)];
     set_stock(&mut v, &plenty);
     assert_eq!(build_at(&project(&v), BuildingKind::Smithy), (hx + 6.0, hy + 6.0));
     // Saving for its founding party, with its reserve and the party's Stone but not the smithy's
@@ -746,7 +748,10 @@ fn saving_for_its_founding_party_a_begun_smithy_waits_until_it_holds_the_partys_
     let kept = held(&npc_reserve(&v.world, &city), Good::Stone) + held(&party, Good::Stone);
     let smithy = held(&build_materials(BuildingKind::Smithy), Good::Stone);
     assert!(smithy > 0.0);
-    set_stock(&mut v, &[(Good::Food, 400.0), (Good::Wood, 400.0), (Good::Stone, kept)]);
+    set_stock(
+        &mut v,
+        &[(Good::Food, 400.0), (Good::Wood, 400.0), (Good::Stone, kept), (Good::Iron, 50.0)],
+    );
     let p = project(&v);
     assert!(!matches!(p, Some(CityProject::Build { building: BuildingKind::Smithy, .. })), "{p:?}");
     assert!(p.as_ref().is_none_or(|p| !waits_for_party(&v.world, &city, p)), "{p:?}");
@@ -763,11 +768,22 @@ fn saving_for_its_founding_party_a_begun_smithy_waits_until_it_holds_the_partys_
     plan.project = Some(smithy_project.clone());
     assert_eq!(npc_founding_materials_kept(&v.world).len(), 1);
     // With the smithy's Stone above the party's too, it goes on, and the invariant holds.
-    set_stock(&mut v, &[(Good::Food, 400.0), (Good::Wood, 400.0), (Good::Stone, kept + smithy)]);
+    set_stock(
+        &mut v,
+        &[
+            (Good::Food, 400.0),
+            (Good::Wood, 400.0),
+            (Good::Stone, kept + smithy),
+            (Good::Iron, 50.0),
+        ],
+    );
     assert_eq!(build_at(&project(&v), BuildingKind::Smithy), (hx + 6.0, hy + 6.0));
     assert_eq!(npc_founding_materials_kept(&v.world), []);
     // Not saving (its full wait over or never begun), it builds from them as before.
     v.world.city_plans.get_mut(&v.city).unwrap().full_since = None;
-    set_stock(&mut v, &[(Good::Food, 400.0), (Good::Wood, 400.0), (Good::Stone, kept)]);
+    set_stock(
+        &mut v,
+        &[(Good::Food, 400.0), (Good::Wood, 400.0), (Good::Stone, kept), (Good::Iron, 50.0)],
+    );
     assert_eq!(build_at(&project(&v), BuildingKind::Smithy), (hx + 6.0, hy + 6.0));
 }

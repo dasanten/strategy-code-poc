@@ -26,8 +26,8 @@ export function untilFull(zeal: number): string {
 
 /** About how long a pool holding `zeal` game hours lasts while a crew is rallied, in real time. */
 export function zealLasts(zeal: number): string {
-  // It drains a game hour an hour and goes on filling meanwhile.
-  const perTick = 1 / TICKS_PER_GAME_HOUR - ZEAL_CAP_HOURS / ZEAL_FILL_TICKS
+  // It drains a game hour an hour and doesn't fill while the rally runs (Daniel, 2026-11-20).
+  const perTick = 1 / TICKS_PER_GAME_HOUR
   const minutes = Math.ceil((Math.max(0, zeal) / perTick) * (TICK_MS / 60_000))
   if (minutes <= 1) return 'under a minute'
   return minutes < 60 ? `about ${minutes} min` : `about ${Math.round((minutes / 60) * 2) / 2} h`
@@ -35,7 +35,7 @@ export function zealLasts(zeal: number): string {
 
 /**
  * The meter for a pool holding `zeal` game hours of rallying (`CONTEXT.md`: Zeal); `draining`
- * while the Player's crew is rallied.
+ * while the Player's Leader rallies the crew, when it doesn't fill.
  */
 export function zealShown(zeal: number, draining = false): ZealShown {
   const share = Math.min(1, Math.max(0, zeal / ZEAL_CAP_HOURS))
@@ -46,7 +46,7 @@ export function zealShown(zeal: number, draining = false): ZealShown {
     return {
       share,
       label: `${percent} ↓`,
-      title: `Zeal: draining while your crew is rallied, lasts ${zealLasts(zeal)}. ${about}`,
+      title: `Zeal: not filling while your Leader rallies the crew; lasts ${zealLasts(zeal)} while the crew works. ${about}`,
       draining: true,
     }
   return {

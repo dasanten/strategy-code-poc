@@ -632,7 +632,13 @@ The shared language of the game. Domain terms only — no implementation details
   its storage (Crew food). With every workplace of a short good at its full crew and someone idle, it opens another, however many it has: on the nearest fitting node for what is dug or cut, in its area for what is processed. Food short with every farm at its full crew opens another farm even with nobody idle: its farmers come from those working for surplus and from its scouts first (Spare hands' work), and from other work only after them. A farm already begun is finished before another, and that new farm comes before anything else it has begun. While Food runs short that farm is the one thing it builds, besides a first farm. So a city builds the whole chain its land allows, one need at a time:
   weapons short means a smithy, which wants Iron, so a smelter, which wants ore, so a mine. A
   good it knows no node of stays short; the city buys it from its trader or a visiting trader,
-  or does without. With nothing short its spare hands still have work (Spare hands' work). When it has no room left inside its wall it grows its area
+  or does without. It doesn't begin a building whose materials it has no way to get (#1487,
+  Daniel 2026-11-20; what counts as a way, Daniel to confirm): a material can come if it holds
+  enough, if a finished workplace of its own makes it, if it knows a node of it (or, for a
+  processed good, of what goes into it), or if a Trade Org warehouse in its trader's reach sells
+  it; a visiting trader or a Player's offer doesn't count, as neither is sure to come. A building
+  it began before that rule and can't finish no longer comes before its other projects; it waits,
+  begun, until the material can come. With nothing short its spare hands still have work (Spare hands' work). When it has no room left inside its wall it grows its area
   by building on the edge, puts up a new wall 8 tiles further out on every side, with the gate in
   the same place, and only once every tile of the new wall is finished tears down the old one.
   Its residents stand on its walls and pass its gates as a realm's do. It keeps some soldiers by
@@ -1327,13 +1333,16 @@ The shared language of the game. Domain terms only — no implementation details
   whether the Player is online or not, up to a cap (balance numbers: about two real hours from
   empty to full), and a new Player starts with it full. It is the Player's, not the realm's: a
   Leader handover and a Leader death keep it. NPC cities and the Trade Organization have none.
-  The HUD shows how full it is. _Avoid:_ Drive (Driving is the carriage skill).
+  It doesn't fill while the Player's Leader is on the Rally the crew order, also in moments when
+  nobody there works and nothing drains; it fills again from the moment the rally ends (Daniel,
+  2026-11-20). The HUD shows how full it is. _Avoid:_ Drive (Driving is the carriage skill).
 - **Rallying the crew:** an order for the Leader alone, given by the Player by hand: never from
   a script or a queue (ADR 0042, the one exception to ADR 0002). The Leader has to be at a
   workplace or a construction site (At a building). While they stay there on that order, every
   resident of their realm working that workplace, or building, tearing down or repairing at that
   site, does so at three times their pace (a balance number), and the Player's Zeal drains; it
-  drains only while somebody is being rallied. The Leader does no work of their own meanwhile.
+  drains only while somebody is being rallied, and doesn't fill while the order runs. The Leader
+  does no work of their own meanwhile.
   Only work is faster: not walking, carrying, fetching, training or fighting. It ends when the
   Player stops it or gives the Leader another order, when the Leader leaves the building, is
   struck or goes Down, or when the Zeal is used up; whatever Zeal is left stays. The Leader's

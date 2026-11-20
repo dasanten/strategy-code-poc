@@ -501,6 +501,7 @@ fn leaves_one_that_someone_of_another_organization_has_taken_over() {
     let z2 = person(&mut s.world, "z2", "r2", "c2", ASHFORD.0 - 20.0, ASHFORD.1 + 20.0);
     work(&mut s.world.residents[z2], "f3");
     s.world.buildings.iter_mut().find(|b| b.id == "f3").unwrap().city_id = None;
+    crate::world_index::forget_building_lookups();
     run(&mut s, 6000, &heads_home(&p));
     assert!(standing(&s.world, "f3"));
     let wrecks = &s.world.punishments.iter().find(|x| x.id == p).unwrap().wrecks;

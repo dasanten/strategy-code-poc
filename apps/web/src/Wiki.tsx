@@ -2046,8 +2046,8 @@ export function Wiki() {
           you are online or not, from empty to full in about {num(zealFillRealHours())} real hours.
           A full pool holds {num(ZEAL_CAP_HOURS)} game hours of rallying, about{' '}
           {num(zealFullRealMinutes())} real minutes. A new Player starts with it full, and a Leader
-          handover or your Leader's death keeps it. The meter in the top bar shows how full it is,
-          and while it drains.
+          handover or your Leader's death keeps it. It doesn't fill while your Leader rallies the
+          crew. The meter in the top bar shows how full it is, and while it doesn't fill.
         </p>
         <p>
           <strong>Rally the crew</strong> is an order for your Leader alone. Stand them at a
@@ -2055,8 +2055,9 @@ export function Wiki() {
           everyone of your realm working there, or building, tearing down or repairing there, works
           at {num(RALLY_PACE)} times their pace, on top of their skill, Strength and Tools. Your
           Leader does no work of their own meanwhile. Zeal drains a game hour of rallying for every
-          game hour, only while somebody is being rallied, and goes on filling meanwhile; the
-          building's card says about how long it lasts. Only work is faster: not walking, carrying,
+          game hour, only while somebody is being rallied. It doesn't fill while the order runs,
+          even when nobody is at work, and fills again once the rally ends; the building's card
+          says about how long it lasts. Only work is faster: not walking, carrying,
           fetching, training or fighting.
         </p>
         <p>
@@ -3323,7 +3324,11 @@ export function Wiki() {
           weighed down. Without a workplace for that good, the city builds one: on the nearest
           fitting resource node it knows of, or a smelter, smithy or mint in its area like a house.
           With every workplace of another short good at its full crew and someone idle, it opens
-          another of them, however many it has.
+          another of them, however many it has. It doesn't begin a building whose materials it has
+          no way to get: a material it holds too little of must come from a workplace of its own, a
+          node it knows of, or a Trade Org warehouse within its trader's reach. A town with no iron
+          in reach builds no smithy, however much Iron its first stock held, and a building it can't
+          finish waits, begun, without holding up its other building.
         </p>
         <p>
           Those with nothing to do, those carrying a child and its children stand at a house of the
