@@ -1649,6 +1649,7 @@ impl<'a> ScriptBindings<'a> {
                     skip: &skip,
                     explored: self.ctx.explored,
                     in_sight: &in_sight,
+                    user_id: (!self.npc()).then_some(self.ctx.sender.user_id),
                 };
                 crate::gathering::gather_tile(world, self.ctx.terrain, &search)
                     .map_or(Json::Null, |(x, y)| json!({ "x": x, "y": y }))
