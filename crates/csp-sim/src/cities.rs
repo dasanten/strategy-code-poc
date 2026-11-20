@@ -17,6 +17,8 @@ use crate::queries::city_area::{city_membership, is_city_building};
 /// as an outpost storage. `size` is the map's.
 pub fn update_city_membership(world: &mut WorldState, size: i32) {
     let members = city_membership(world, size);
+    // Buildings change city in place below.
+    crate::world_index::forget_building_lookups();
     let realms: HashMap<String, Option<String>> =
         world.cities.iter().map(|c| (c.id.clone(), c.realm_id.clone())).collect();
     for b in &mut world.buildings {
@@ -103,6 +105,7 @@ pub fn found_city(world: &mut WorldState, hall: usize, realm_id: Option<&str>) -
         temperament,
     });
     world.buildings[hall].city_id = Some(id);
+    crate::world_index::forget_building_lookups();
     world.cities.len() - 1
 }
 
