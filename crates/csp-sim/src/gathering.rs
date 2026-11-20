@@ -12,19 +12,21 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{GATHER_REACH, PATCH_REGROW_DAYS, PATCH_REST_DAYS, PATCH_SIZE};
-use csp_shared::footprint::footprint_tiles;
+use csp_shared::footprint::{footprint_tiles, Placed};
+
 use csp_shared::terrain::{terrain_at, wrap, wrap_delta, Terrain, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    GatherOrder, Good, OrderEnded, OrderEndedKind, OrderRequest, Patch, Resident, ResidentOrder,
-    SkillName, Tile, WorldState,
+    GatherOrder, Good, OrderEnded, OrderEndedKind, OrderRequest, Patch, Remembered, Resident,
+    ResidentOrder, SkillName, Tile, WorldState,
 };
 
 use crate::invariants::violation;
+use crate::new_veins::vein_unseen_by;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::balance::{gather_output, skill_of, work_learned};
 use crate::queries::building::CARRYING_A_CHILD;
-use crate::queries::names::{good_of, placed};
+use crate::queries::names::{good_of, kind_name, placed};
 use crate::queries::residents::{can_work, carry_capacity, good_weight, stock_weight};
 use crate::queue::field_str as str_field;
 use crate::sight::InvariantViolation;
@@ -121,6 +123,9 @@ pub struct TileSearch<'a> {
     pub explored: &'a dyn Fn(i32, i32) -> bool,
     /// Whether the side sees a tile now.
     pub in_sight: &'a dyn Fn(i32, i32) -> bool,
+    /// The Player searching, by account (`Realm::user_id`): out of their sight they know only what
+    /// they last saw there (`CONTEXT.md`: Last seen, #1488). `None` goes by the world as it is.
+    pub user_id: Option<u64>,
 }
 
 /// The tile a Gather task goes to next (`CONTEXT.md`: Gather): of the explored tiles within
@@ -136,20 +141,44 @@ pub fn gather_tile(
     let (on, _) = gathered_on(s.good)?;
     let size = terrain.size;
     let reach = GATHER_REACH as i32;
-    // What stands near, worked out once rather than for every tile.
+    // What stands near as far as the side knows, worked out once rather than for every tile: in
+    // its sight what stands there now; out of it the buildings a Player last saw there and the
+    // nodes of their explored land, not those that came into being since (#1488).
+    let near = |x: f64, y: f64, by: i32| {
+        wrap_delta(s.from.0, x as i32, size).abs() <= reach + by
+            && wrap_delta(s.from.1, y as i32, size).abs() <= reach + by
+    };
+    let sees = |&(x, y): &(i32, i32)| s.user_id.is_none() || (s.in_sight)(x, y);
     let mut taken: HashSet<(i32, i32)> = HashSet::new();
-    for b in &world.buildings {
-        let (dx, dy) =
-            (wrap_delta(s.from.0, b.x as i32, size), wrap_delta(s.from.1, b.y as i32, size));
-        if dx.abs() <= reach + 8 && dy.abs() <= reach + 8 {
-            taken.extend(footprint_tiles(placed(b), size));
+    for b in world.buildings.iter().filter(|b| near(b.x, b.y, 8)) {
+        taken.extend(footprint_tiles(placed(b), size).into_iter().filter(sees));
+    }
+    if let Some(user) = s.user_id {
+        for rb in world.last_seen.get(&user).into_iter().flatten().filter_map(|e| match e {
+            Remembered::Building(rb) => Some(rb),
+            Remembered::City(_) => None,
+        }) {
+            if near(rb.x, rb.y, 8) {
+                let at = Placed { kind: kind_name(rb.kind), x: rb.x as i32, y: rb.y as i32 };
+                taken.extend(
+                    footprint_tiles(at, size).into_iter().filter(|t| !(s.in_sight)(t.0, t.1)),
+                );
+            }
+        }
+        // A node that ran dry where the Player hasn't seen it gone is still there to them.
+        for d in world.dry_nodes.iter().filter(|d| near(d.x, d.y, 0)) {
+            let at = (d.x as i32, d.y as i32);
+            if !d.seen_gone_by.contains(&user) && !(s.in_sight)(at.0, at.1) {
+                taken.insert(at);
+            }
         }
     }
-    for n in &world.nodes {
-        let (dx, dy) =
-            (wrap_delta(s.from.0, n.x as i32, size), wrap_delta(s.from.1, n.y as i32, size));
-        if dx.abs() <= reach && dy.abs() <= reach {
-            taken.insert((n.x as i32, n.y as i32));
+    for n in world.nodes.iter().filter(|n| near(n.x, n.y, 0)) {
+        let at = (n.x as i32, n.y as i32);
+        let known =
+            s.user_id.is_none_or(|u| (s.in_sight)(at.0, at.1) || !vein_unseen_by(world, &n.id, u));
+        if known {
+            taken.insert(at);
         }
     }
     let mut best: Option<(i32, i32, i32)> = None; // distance², y, x

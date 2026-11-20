@@ -260,7 +260,14 @@ fn the_tile_search_skips_taken_built_and_seen_picked_over_tiles_and_keeps_to_its
         gather_tile(
             world,
             &t,
-            &TileSearch { good: Good::Wood, from: (20, 20), skip, explored: &all, in_sight: sight },
+            &TileSearch {
+                good: Good::Wood,
+                from: (20, 20),
+                skip,
+                explored: &all,
+                in_sight: sight,
+                user_id: None,
+            },
         )
     };
     assert_eq!(search(&world, &[], &all), Some((23, 20)));
@@ -271,17 +278,121 @@ fn the_tile_search_skips_taken_built_and_seen_picked_over_tiles_and_keeps_to_its
     world.buildings.push(building(json!({ "id": "rd", "kind": "road", "x": 23, "y": 19 })));
     assert_eq!(search(&world, &[], &all), Some((23, 21)));
     // Stone: no hills at all. Out of reach: nothing.
-    let stone =
-        TileSearch { good: Good::Stone, from: (20, 20), skip: &[], explored: &all, in_sight: &all };
+    let stone = TileSearch {
+        good: Good::Stone,
+        from: (20, 20),
+        skip: &[],
+        explored: &all,
+        in_sight: &all,
+        user_id: None,
+    };
     assert_eq!(gather_tile(&world, &t, &stone), None);
     // On this 64-tile map, which wraps, (55, 20) is 30 tiles from the strip either way.
     let far = (55, 20);
     assert!(30 > GATHER_REACH as i32);
-    let wood =
-        TileSearch { good: Good::Wood, from: far, skip: &[], explored: &all, in_sight: &all };
+    let wood = TileSearch {
+        good: Good::Wood,
+        from: far,
+        skip: &[],
+        explored: &all,
+        in_sight: &all,
+        user_id: None,
+    };
     assert_eq!(gather_tile(&world, &t, &wood), None);
     // Unexplored tiles are left out.
-    let unexplored =
-        TileSearch { good: Good::Wood, from: (20, 20), skip: &[], explored: &none, in_sight: &all };
+    let unexplored = TileSearch {
+        good: Good::Wood,
+        from: (20, 20),
+        skip: &[],
+        explored: &none,
+        in_sight: &all,
+        user_id: None,
+    };
     assert_eq!(gather_tile(&world, &t, &unexplored), None);
+}
+
+/// What a Player knows stands on a tile out of their sight is what they last saw there
+/// (`CONTEXT.md`: Last seen, #1488): a building raised since doesn't change the answer, one they
+/// last saw there is still left out, and a node that came into being since isn't known either.
+#[test]
+fn the_tile_search_knows_out_of_sight_only_what_the_player_last_saw() {
+    let t = terrain();
+    let mut world = create_world(&t, 1);
+    world.nodes.clear();
+    let all = |_: i32, _: i32| true;
+    let none = |_: i32, _: i32| false;
+    let search = |world: &WorldState, sight: &dyn Fn(i32, i32) -> bool| {
+        let s = TileSearch {
+            good: Good::Wood,
+            from: (20, 20),
+            skip: &[],
+            explored: &all,
+            in_sight: sight,
+            user_id: Some(7),
+        };
+        gather_tile(world, &t, &s)
+    };
+    // A road raised out of sight on the nearest explored forest tile: the answer stays.
+    let road = building(json!({ "id": "rd", "kind": "road", "x": 23, "y": 20 }));
+    world.buildings.push(road.clone());
+    assert_eq!(search(&world, &none), Some((23, 20)), "unseen, so unknown");
+    assert_eq!(search(&world, &all), Some((23, 19)), "in sight it is known");
+    // Last seen there: left out, out of sight too, even once it is gone.
+    let mut seen = serde_json::to_value(&road).unwrap();
+    seen["is"] = json!("building");
+    seen["seenAt"] = json!(0);
+    world.last_seen.insert(7, vec![serde_json::from_value(seen).unwrap()]);
+    assert_eq!(search(&world, &none), Some((23, 19)), "as last seen");
+    world.buildings.retain(|b| b.id != "rd");
+    assert_eq!(search(&world, &none), Some((23, 19)), "gone out of sight: still remembered");
+    assert_eq!(search(&world, &all), Some((23, 20)), "in sight it is seen gone");
+    // A node that came into being out of the Player's sight after they explored its tile.
+    world.last_seen.insert(7, vec![]);
+    world.nodes.push(
+        serde_json::from_value(json!({ "id": "v1", "kind": "forest", "x": 23, "y": 20 })).unwrap(),
+    );
+    world.new_veins.push(
+        serde_json::from_value(json!({ "id": "v1", "x": 23, "y": 20, "unseenBy": [7] })).unwrap(),
+    );
+    assert_eq!(search(&world, &none), Some((23, 20)), "a vein they haven't seen");
+    assert_eq!(search(&world, &all), Some((23, 19)));
+    // A side with no memory (an NPC city's) goes by the world.
+    let s = TileSearch {
+        good: Good::Wood,
+        from: (20, 20),
+        skip: &[],
+        explored: &all,
+        in_sight: &none,
+        user_id: None,
+    };
+    assert_eq!(gather_tile(&world, &t, &s), Some((23, 19)));
+}
+
+/// A gatherer whose tile turns out to be taken goes on to the next (#1488). Their Gather starts
+/// from a forest 80 tiles off, out of their sight (`SIGHT_RANGE` 48), where a road went down
+/// unseen: the tile search picks the road's tile; once it comes into sight on their way they
+/// pick the next one. (Standing on a tile, they see it, so the Gather task's answer to "something
+/// stands on this tile" is a safeguard it never reaches by itself.)
+#[test]
+fn a_gatherer_who_finds_their_tile_taken_goes_on_to_the_next() {
+    const BIG: i32 = 200;
+    let mut t = TerrainMap { size: BIG, tiles: vec![Terrain::Plains as u8; (BIG * BIG) as usize] };
+    for y in 18..23 {
+        for x in 100..103 {
+            t.tiles[(y * BIG + x) as usize] = Terrain::Forest as u8;
+        }
+    }
+    let mut s = setup(t, &["w1"], 50.0);
+    s.world.buildings.push(building(json!({ "id": "rd", "kind": "road", "x": 100, "y": 20 })));
+    assert!(acked(&give(&mut s, "w1", json!({ "good": "wood" }))));
+    let w1 = s.world.residents.iter_mut().find(|r| r.id == "w1").unwrap();
+    w1.script.as_mut().unwrap().memory.insert("start".into(), json!({ "x": 100, "y": 20 }));
+    run(&mut s, 5, |s| memory_at(s, "w1") == Some((100, 20)));
+    run(&mut s, 5_000, |s| {
+        matches!(resident(s, "w1").order, Some(ResidentOrder::Gather(_))) || !running(s, "w1")
+    });
+    assert!(running(&s, "w1"), "{:?}", logged(&s, "w1"));
+    let at = (resident(&s, "w1").x, resident(&s, "w1").y);
+    assert_ne!(at, (100.0, 20.0));
+    assert!((100.0..103.0).contains(&at.0) && (18.0..23.0).contains(&at.1), "{at:?}");
 }
