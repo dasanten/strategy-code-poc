@@ -302,6 +302,16 @@ fn a_town_that_knows_of_a_coal_node_wants_the_steel_kit_and_builds_mine_smelters
     use ResourceKind::{Coal, Forest, IronOre};
     let (mut world, terrain, city) = city_with(&NPC_TOWN, &[Forest, IronOre, Coal]);
     let home = npc_home(&world, &city).unwrap().clone();
+    // And a stone node, for its mines' Stone: a town begins no mine it can't get the Stone for
+    // (#1487).
+    world.nodes.push(ResourceNode {
+        id: "n-stone".into(),
+        kind: ResourceKind::Stone,
+        x: home.x - 60.0,
+        y: home.y,
+        richness: Default::default(),
+        stock: None,
+    });
     let c = city_of(&world, &city);
     assert!(npc_makes_steel(&world, c));
     assert_eq!(super::steel_only_with_coal(&world), []);
