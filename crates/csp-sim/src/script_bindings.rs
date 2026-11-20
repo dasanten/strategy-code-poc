@@ -1688,13 +1688,26 @@ impl<'a> ScriptBindings<'a> {
                 } else {
                     &[BuildingKind::Storage]
                 };
+                // A daughter whose storage doesn't stand yet fetches from its supplying mother's
+                // (`CONTEXT.md`: Founding; Daniel, 2026-11-19, #1379).
+                let mother = self
+                    .side
+                    .as_deref()
+                    .filter(|_| self.npc())
+                    .and_then(|side| crate::npc_founding::supplying_mother(world, side))
+                    .map(|c| c.id.clone());
+                let mothers = |b: &Building| {
+                    b.kind == BuildingKind::Storage
+                        && mother.is_some()
+                        && b.city_id.as_ref() == mother.as_ref()
+                };
                 let mut storages: Vec<&Building> = world
                     .buildings
                     .iter()
                     .filter(|b| {
                         kinds.contains(&b.kind)
                             && b.site.is_none()
-                            && self.own_building(b)
+                            && (self.own_building(b) || mothers(b))
                             && holds(b)
                     })
                     .collect();

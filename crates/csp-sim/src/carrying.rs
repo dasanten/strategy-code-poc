@@ -340,10 +340,22 @@ fn take(
         }
         _ => false,
     };
+    // A daughter's builder fetching from its supplying mother takes what the daughter lacks and
+    // Food, and steals nothing (`CONTEXT.md`: Founding; #1379).
+    let from_mother = match &a.spot {
+        GoodsSpot::Storage { storage_id } => crate::npc_founding::mother_fetch(
+            world,
+            world.residents[ri].city_id.as_deref(),
+            storage_id,
+        ),
+        _ => None,
+    };
+    let sold = sold || from_mother.is_some();
     let free = takeable_from(world, ri, &a.spot, &stock_of(world, source), sold);
     let mut taken = Stock::new();
     let tick = world.tick as f64;
     for (&good, &wanted) in &a.goods {
+        let wanted = from_mother.as_ref().map_or(wanted, |m| wanted.min(held(m, good)));
         let fit = units_that_fit(&world.residents[ri], good, tick);
         let units = wanted.min(held(&free, good)).min(fit);
         move_between(world, source, Holder::Resident(ri), good, units);

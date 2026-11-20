@@ -98,11 +98,21 @@ fn a_big_city_whose_vein_runs_dry_ends_a_season_working_the_next_node_no_idler_t
         // Its archers' Arrows are topped up to its reserve: forged from Iron that never stays, they
         // would be short all season and pull its hands from the mine onto other work.
         let arrows = held(&npc_reserve(&staged.world, staged.city()), Good::Arrows);
+        // Its Wood and Stone are topped up to a mine's above what it keeps for its founding party:
+        // saving for one, its building waits for them (#1379), and this run is about moving on.
+        let kept = crate::npc_founding::kept_from_walls(&staged.world, staged.city());
+        let mine_needs = crate::queries::building::build_materials(BuildingKind::Mine);
         let stock = staged.home_mut().stock.get_or_insert_with(Default::default);
         stock.insert(Good::IronOre, 0.0);
         stock.insert(Good::Iron, 0.0);
         if held(stock, Good::Arrows) < arrows {
             stock.insert(Good::Arrows, arrows);
+        }
+        for good in crate::npc_founding::PARTY_BUILD_GOODS {
+            let want = held(&kept, good) + held(&mine_needs, good);
+            if held(stock, good) < want {
+                stock.insert(good, want);
+            }
         }
         for _ in 0..TICKS_PER_GAME_DAY as usize {
             runner.step(&mut staged.world, &staged.terrain);

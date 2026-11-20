@@ -388,6 +388,10 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, _t| crate::npc_founding::founding_wave_sound(w),
         },
         Invariant {
+            name: "mother-fetch-sound",
+            check: |w, _t| crate::npc_founding::mother_fetch_sound(w),
+        },
+        Invariant {
             name: "starting-sites-sound",
             check: |w, _t| crate::player_start::starting_sites_sound(w),
         },
@@ -429,6 +433,10 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant {
             name: "npc-founding-stone-kept",
             check: |w, _t| crate::npc_plan::npc_founding_stone_kept(w),
+        },
+        Invariant {
+            name: "npc-founding-materials-kept",
+            check: |w, _t| crate::npc_plan::npc_founding_materials_kept(w),
         },
         Invariant {
             name: "npc-wall-stone-set-aside",

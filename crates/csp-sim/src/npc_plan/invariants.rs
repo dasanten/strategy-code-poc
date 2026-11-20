@@ -433,6 +433,34 @@ pub fn npc_founding_stone_kept(world: &WorldState) -> Vec<InvariantViolation> {
     out
 }
 
+/// Invariant `npc-founding-materials-kept` (`CONTEXT.md`: Full city; Daniel, 2026-11-19, #1379):
+/// a plan made this tick by a city keeping Wood or Stone for its founding party's load (saving for
+/// it, or its daughter lacking the rest: `kept_for_party`) has no project that would spend
+/// the party's Wood or Stone (`waits_for_party`): farms, lumber camps and quarries aside, its
+/// building waits until it holds them above its reserve and the party's.
+pub fn npc_founding_materials_kept(world: &WorldState) -> Vec<InvariantViolation> {
+    let mut out = Vec::new();
+    let tick = world.tick as f64;
+    for (city_id, plan) in &world.city_plans {
+        if plan.planned_at != tick {
+            continue;
+        }
+        let Some(project) = &plan.project else { continue };
+        let Some(city) = world.cities.iter().find(|c| &c.id == city_id) else { continue };
+        if crate::npc_founding::waits_for_party(world, city, project) {
+            out.push(violation(
+                "npc-founding-materials-kept",
+                format!(
+                    "{city_id} saves for its founding party and plans {project:?} from the \
+                     party's Wood or Stone"
+                ),
+                vec![city_id.clone()],
+            ));
+        }
+    }
+    out
+}
+
 /// Invariant `npc-called-home-sound` (`CONTEXT.md`: Founding; Daniel, 2026-11-18, #1379): a plan
 /// made this tick calls hands home (`called_home`) only while its city saves for its founding
 /// party with its site picked, and those it calls home leave the workplace they were called from

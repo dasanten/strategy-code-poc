@@ -15,8 +15,8 @@ use csp_shared::footprint::is_at;
 use csp_shared::terrain::{wrap, wrap_distance, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    Building, BuildingKind, City, CityJob, CityJobKind, CityPlan, DropOrder, Good, GoodsSpot,
-    PickUpOrder, ResidentOrder, Stock, Task, Tile, WalkOrder, WorldState,
+    Building, BuildingKind, City, CityJob, CityJobKind, CityPlan, CityProject, DropOrder, Good,
+    GoodsSpot, PickUpOrder, ResidentOrder, Stock, Task, Tile, WalkOrder, WorldState,
 };
 use serde_json::json;
 
@@ -164,18 +164,87 @@ pub fn saving_to_found(world: &WorldState, city: &City) -> bool {
             .is_some_and(|p| p.full_since.is_some() && founding_party(Some(p)).is_empty())
 }
 
-/// What an NPC city's walls and repairs leave in its storages (`CONTEXT.md`: Full city): its
-/// reserve and, while it saves for its founding party (`saving_to_found`), the party's Stone on
-/// top (Daniel, 2026-11-18, #1379: walls and repairs kept spending it, so no city held it).
+/// The founding party's materials that an NPC city's building leaves alone while it saves for the
+/// party (`CONTEXT.md`: Full city; Daniel, 2026-11-19, #1379).
+pub const PARTY_BUILD_GOODS: [Good; 2] = [Good::Wood, Good::Stone];
+
+/// The Wood and Stone of its founding party's load that an NPC city's building leaves alone
+/// (`CONTEXT.md`: Full city; Daniel, 2026-11-19, #1379): while it saves for the party
+/// (`saving_to_found`), the party's; once its daughter stands, what that still lacks of the rest
+/// of the load (`daughter_lacks`), until its storage stands. None while neither, or when nothing
+/// is lacked. Before this, Fallowby's begun smithy took each load of Stone its quarry brought home
+/// after its daughter Oakhurst stood, so Oakhurst never got the Stone for its storage, had
+/// neither storage nor farm, and its people starved at their far lumber camp.
+pub fn kept_for_party(world: &WorldState, city: &City) -> Option<Stock> {
+    let load = if saving_to_found(world, city) {
+        founding_materials(Some(npc_founding_party_size(
+            city_residents(world, &city.id).len() as f64
+        )))
+    } else {
+        let plan = world.city_plans.get(&city.id)?;
+        let daughter = daughter_supplied(world, plan, &city.id)?;
+        daughter_lacks(world, &daughter.id)?
+    };
+    let kept: Stock = PARTY_BUILD_GOODS
+        .into_iter()
+        .map(|good| (good, held(&load, good)))
+        .filter(|(_, n)| *n > 0.0)
+        .collect();
+    (!kept.is_empty()).then_some(kept)
+}
+
+/// What an NPC city's building and repairs leave in its storages (`CONTEXT.md`: Full city): its
+/// reserve and the Wood and Stone of its founding party's load on top (`kept_for_party`; Daniel,
+/// 2026-11-18 and 2026-11-19, #1379: walls, repairs and its workshops kept spending them, so no
+/// city held them).
 pub fn kept_from_walls(world: &WorldState, city: &City) -> Stock {
     let mut kept = npc_reserve(world, city);
-    if saving_to_found(world, city) {
-        let party = founding_materials(Some(npc_founding_party_size(
-            city_residents(world, &city.id).len() as f64,
-        )));
-        *kept.entry(Good::Stone).or_insert(0.0) += held(&party, Good::Stone);
+    for (good, n) in kept_for_party(world, city).unwrap_or_default() {
+        *kept.entry(good).or_insert(0.0) += n;
     }
     kept
+}
+
+/// Whether a project of an NPC city waits for its founding party (`CONTEXT.md`: Full city; Daniel,
+/// 2026-11-19, #1379): while the city keeps Wood or Stone for the party's load (`kept_for_party`:
+/// saving for it, or its daughter lacking the rest of it), a building that needs Wood or Stone it
+/// doesn't hold above its reserve and the party's (`kept_from_walls`) waits. Farms, lumber camps and
+/// quarries go ahead. A wall or gate counts a builder's trip, a few tiles' worth. Before this,
+/// Larkspur's quarry brought its Stone home load by load, and a begun smelter, mine, smithy and mint
+/// took each one, so it never held its party's.
+pub fn waits_for_party(world: &WorldState, city: &City, project: &CityProject) -> bool {
+    use crate::queries::building::{build_materials_of, materials_needed};
+    use csp_shared::balance::NPC_WALL_TILES_PER_TRIP;
+    let CityProject::Build { building, x, y, material } = project else { return false };
+    if matches!(building, BuildingKind::Farm | BuildingKind::LumberCamp | BuildingKind::Quarry)
+        || kept_for_party(world, city).is_none()
+    {
+        return false;
+    }
+    let wall = matches!(building, BuildingKind::Wall | BuildingKind::Gate);
+    let need = if wall {
+        build_materials_of(*building, *material)
+            .into_iter()
+            .map(|(g, n)| (g, n * NPC_WALL_TILES_PER_TRIP))
+            .collect()
+    } else {
+        match crate::npc_growth::project_site(world, *building, *material, *x, *y) {
+            Some(site) => materials_needed(site),
+            None => build_materials_of(*building, *material),
+        }
+    };
+    let need: Stock = need.into_iter().filter(|(g, _)| PARTY_BUILD_GOODS.contains(g)).collect();
+    if need.is_empty() {
+        return false;
+    }
+    // A wall may spend the Stone its reserve sets aside for it (Epic 113); anything else only what
+    // lies above its reserve and the party's.
+    if wall {
+        return !holds_for_walls(world, city, &need);
+    }
+    let stock = npc_city_stock(world, city);
+    let kept = kept_from_walls(world, city);
+    !need.iter().all(|(good, n)| held(&stock, *good) - held(&kept, *good) >= *n)
 }
 
 /// Whether the city's storages hold `goods` for its walls: above what its repairs leave there
@@ -474,6 +543,84 @@ pub fn daughter_supplied<'w>(
         .cities
         .iter()
         .find(|c| Some(&c.id) == hall.city_id.as_ref() && c.id != mother && c.realm_id.is_none())
+}
+
+/// The mother that still supplies a daughter with the rest of its founding party's load
+/// (`daughter_supplied`), while the daughter's storage doesn't stand (`daughter_lacks`).
+pub fn supplying_mother<'w>(world: &'w WorldState, daughter: &str) -> Option<&'w City> {
+    daughter_lacks(world, daughter)?;
+    world.cities.iter().find(|c| {
+        c.id != daughter
+            && world
+                .city_plans
+                .get(&c.id)
+                .and_then(|p| daughter_supplied(world, p, &c.id))
+                .is_some_and(|d| d.id == daughter)
+    })
+}
+
+/// Whether a daughter's supplying mother holds any of `need` that the daughter lacks, for its
+/// builders to fetch (`mother_fetch`): they take part in a site that lacks only that.
+pub fn mother_holds(world: &WorldState, daughter: Option<&str>, need: &Stock) -> bool {
+    let Some(daughter) = daughter else { return false };
+    let Some(mother) = supplying_mother(world, daughter) else { return false };
+    let Some(lacks) = daughter_lacks(world, daughter) else { return false };
+    world.buildings.iter().any(|b| {
+        b.city_id.as_ref() == Some(&mother.id)
+            && b.kind == BuildingKind::Storage
+            && b.site.is_none()
+            && need.keys().any(|g| held(&lacks, *g) > 0.0 && held_in(b.stock.as_ref(), *g) >= 1.0)
+    })
+}
+
+/// What a daughter's resident may take from a storage of its supplying mother (`CONTEXT.md`:
+/// Founding; Daniel, 2026-11-19, #1379): its builders fetch what it lacks of the party's load from
+/// there, with Food for the way, and that is no theft. None for any other storage or resident.
+/// Before this, Oakhurst's mother had no hands to send after it, so Oakhurst never got the
+/// materials for its storage, built no farm, and starved.
+pub fn mother_fetch(world: &WorldState, city_id: Option<&str>, storage_id: &str) -> Option<Stock> {
+    let daughter = city_id?;
+    let mother = supplying_mother(world, daughter)?;
+    world.buildings.iter().find(|b| {
+        b.id == storage_id
+            && b.kind == BuildingKind::Storage
+            && b.site.is_none()
+            && b.city_id.as_ref() == Some(&mother.id)
+    })?;
+    let mut goods = daughter_lacks(world, daughter)?;
+    goods.insert(Good::Food, f64::INFINITY);
+    Some(goods)
+}
+
+/// The storage of another NPC city a resident of an NPC city is fetching from, if any: theirs to
+/// take from only as `mother_fetch` allows.
+pub fn fetching_elsewhere(world: &WorldState, i: usize) -> Option<&str> {
+    let r = &world.residents[i];
+    let Some(ResidentOrder::Fetch(o)) = &r.order else { return None };
+    let csp_shared::world::GoodsPlace::Storage { storage_id } = &o.from else { return None };
+    let city = r.city_id.as_deref()?;
+    if !world.cities.iter().any(|c| c.id == city && c.realm_id.is_none()) {
+        return None;
+    }
+    let b = world.buildings.iter().find(|b| &b.id == storage_id)?;
+    (b.kind == BuildingKind::Storage && b.city_id.as_deref().is_some_and(|c| c != city))
+        .then_some(storage_id.as_str())
+}
+
+/// Ends the fetches of an NPC city's residents from its mother's storage once she no longer
+/// supplies it (`mother_fetch`): the daughter lacks nothing more of the party's load, or its storage
+/// stands. They would take what isn't theirs (#1379: a Food fetch under way as the last load went
+/// home).
+pub fn end_stale_mother_fetches(world: &mut WorldState, people: &[usize]) {
+    for &i in people {
+        let stale = fetching_elsewhere(world, i).is_some_and(|storage_id| {
+            mother_fetch(world, world.residents[i].city_id.as_deref(), storage_id).is_none()
+        });
+        if stale {
+            crate::storing::end_order(world, i, Some("not ours to take from".into()));
+            world.residents[i].script = None;
+        }
+    }
 }
 
 /// What a daughter still lacks of the rest of its founding party's load (`CONTEXT.md`: Founding;
@@ -1218,7 +1365,7 @@ pub fn npc_cities_have_halls(world: &WorldState) -> Vec<InvariantViolation> {
 mod invariants;
 pub use invariants::{
     founding_parties_sound, founding_party_sets_out_loaded, founding_site_clear,
-    founding_wave_sound, full_wait_sound,
+    founding_wave_sound, full_wait_sound, mother_fetch_sound,
 };
 #[cfg(test)]
 mod tests;

@@ -773,7 +773,14 @@ The shared language of the game. Domain terms only — no implementation details
   reserve (a balance number); while full, its farmers work to win that back as they do its
   reserve (Daniel, 2026-11-18, #1379). While it saves for its party (its full wait running, no party of its out),
   its walls and repairs spend only the Stone above its reserve and the party's Stone (Daniel,
-  2026-11-18, #1379): they kept spending it, so no city held it. Its walls still spend the Stone
+  2026-11-18, #1379): they kept spending it, so no city held it. Nor does any of its building
+  spend the Wood and Stone the party needs (Daniel, 2026-11-19, #1379): a site that needs them
+  waits until it holds them above its reserve and the party's, while its farms and the workplaces
+  for Wood and Stone go ahead, and meanwhile it builds whatever else it wants that doesn't wait; begun
+  workshops took each load its quarry brought home. The same
+  holds once its daughter stands, for the Wood and Stone the daughter still lacks of the party's
+  load, until its storage stands (#1379: a begun smithy took the Stone its daughter's storage
+  needed, and the daughter starved). Its walls still spend the Stone
   its reserve sets aside for them (NPC reserve). Its workplaces come first too (Daniel, 2026-11-16): its spare hands'
   work (Spare hands' work: road crew, scouting, its workplaces for surplus) comes before gathering
   for the party, and only the hands left over gather. Those gathering them are still spare hands
@@ -795,9 +802,12 @@ The shared language of the game. Domain terms only — no implementation details
   carriers after it with the rest of the load (Daniel, 2026-11-19, #1438), as hands come free,
   taken like the party: while the town hall is going up they join the party; once the daughter
   stands they take what it still lacks of the party's materials, become its residents and walk
-  to it, until its storage stands (from then it gathers what it lacks like any city). Like the
-  party's extra carriers they stay with the daughter (decided by the second-wave session, closest
-  to the existing rule; Daniel to confirm). A hand called home leaves the workplace far out it
+  to it, until its storage stands (from then it gathers what it lacks like any city). Until then
+  the daughter's own builders fetch what it lacks from the mother's storage too, with Food for the
+  way, and that is no theft (Daniel, 2026-11-19, #1379: a mother with no hands to send left its
+  daughter with no storage and so no farm, and its people starved). Like the
+  party's extra carriers they stay with the daughter (Daniel, 2026-11-19,
+  #1379). A hand called home leaves the workplace far out it
   was called from. One too full of what they carry for their own Food puts down at the storage what crowds it
   out first, so nobody sets out without it (#1379). The daughter is an
   ordinary NPC city with a name from the game; then its storage, a farm and a house. Until its

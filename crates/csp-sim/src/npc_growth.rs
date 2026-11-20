@@ -209,6 +209,8 @@ pub fn can_do_more(
     let need = materials_needed(site);
     pick(Some(&r.carried), &need).is_some()
         || pick(storage.and_then(|s| s.stock.as_ref()), &need).is_some()
+        // A daughter's builders fetch from its supplying mother (`CONTEXT.md`: Founding; #1379).
+        || crate::npc_founding::mother_holds(world, r.city_id.as_deref(), &need)
 }
 
 /// Whether a resident is building (by the Build default or not), tearing down or delivering
@@ -485,8 +487,35 @@ pub fn next_project(
             return Some(CityProject::TearDown { building_id: old });
         }
     }
-    let want = wanted(world, city, home, terrain, rings.as_ref())?;
-    Some(materials_first(world, city, home, terrain, rings.as_ref(), want, &mut HashSet::new()))
+    // What it wants most of what doesn't wait for its founding party's Wood and Stone (`CONTEXT.md`:
+    // Full city; #1379: a mine waiting on the party's Stone kept a big city from its wooden inner
+    // ring, which it had the Wood for).
+    let first = |want: CityProject| {
+        materials_first(world, city, home, terrain, rings.as_ref(), want, &mut HashSet::new())
+    };
+    let ok =
+        |p: &CityProject| !crate::npc_founding::waits_for_party(world, city, &first(p.clone()));
+    if let Some(want) = wanted(world, city, home, terrain, rings.as_ref(), &ok) {
+        return Some(first(want));
+    }
+    // While it keeps Wood or Stone for its founding party's load (saving for it, or its daughter
+    // lacking the rest), a building that would spend them
+    // waits (`CONTEXT.md`: Full city; Daniel, 2026-11-19, #1379): the workplace for a material the
+    // party lacks instead, if it has none, else nothing, so its hands gather them.
+    crate::npc_founding::founding_lacks(world, city, Some(home), terrain.size)
+        .into_iter()
+        .filter_map(|short| {
+            chain_project(
+                world,
+                city,
+                home,
+                terrain,
+                rings.as_ref(),
+                short.good,
+                &mut HashSet::new(),
+            )
+        })
+        .find(|p| !crate::npc_founding::waits_for_party(world, city, p))
 }
 
 /// How many of a city's adults build at once (`npcBuilders`): `NPC_BUILDERS` for each step of an
@@ -731,6 +760,7 @@ fn wanted(
     home: &Building,
     terrain: &TerrainMap,
     rings: Option<&Rings>,
+    ok: &dyn Fn(&CityProject) -> bool,
 ) -> Option<CityProject> {
     let size = terrain.size;
     let own: HashSet<&String> = city.workplace_ids.iter().flatten().collect();
@@ -765,7 +795,9 @@ fn wanted(
     let first = first_ring();
     let plan = rings.unwrap_or(&first);
     if let Some(b) = begun.filter(|b| b.kind == BuildingKind::Farm) {
-        return Some(build(b.kind, (b.x as i32, b.y as i32)));
+        if ok(&build(b.kind, (b.x as i32, b.y as i32))) {
+            return Some(build(b.kind, (b.x as i32, b.y as i32)));
+        }
     }
     // Its Food short of its reserve, or of the surplus that comes before its founding party's
     // materials, with every farm full: another farm, whether or not anyone is idle, and before any
@@ -773,26 +805,36 @@ fn wanted(
     // farm it needed as it grew, and Ashford sat at its reserve on two farms).
     if farms_full(world, city) && wants_food(world, city, home, size) {
         if let Some(p) = at(BuildingKind::Farm, farm_tile(world, home, terrain, Some(plan))) {
-            return Some(p);
+            if ok(&p) {
+                return Some(p);
+            }
         }
     }
     if let Some(b) = begun {
-        return Some(build(b.kind, (b.x as i32, b.y as i32)));
+        if ok(&build(b.kind, (b.x as i32, b.y as i32))) {
+            return Some(build(b.kind, (b.x as i32, b.y as i32)));
+        }
     }
     if let Some(t) = wall_site {
         let site = world.buildings.iter().find(|b| Some(&b.id) == t.site.as_ref()).expect("a site");
-        let p = build(site.kind, (site.x as i32, site.y as i32));
-        return Some(with_material(p, site.material));
+        let p = with_material(build(site.kind, (site.x as i32, site.y as i32)), site.material);
+        if ok(&p) {
+            return Some(p);
+        }
     }
     // A stone site begun over a wooden wall goes on first, as any begun wall (`CONTEXT.md`: Wood
     // or stone).
     if let Some(p) = stone_upgrade_project(world, city, home, size, true) {
-        return Some(p);
+        if ok(&p) {
+            return Some(p);
+        }
     }
     // So does a tower begun (`CONTEXT.md`: Tower).
     if let Some(p) = crate::npc_towers::tower_project(world, city, home, Some(terrain), size, true)
     {
-        return Some(p);
+        if ok(&p) {
+            return Some(p);
+        }
     }
     if city.trade_org.is_none() {
         // A daughter starts with its town hall alone.
@@ -807,12 +849,16 @@ fn wanted(
                 BuildingKind::Storage,
                 house_tile(world, city, home, terrain, Some(plan), BuildingKind::Storage),
             ) {
-                return Some(p);
+                if ok(&p) {
+                    return Some(p);
+                }
             }
         }
         if !has(BuildingKind::Farm) {
             if let Some(p) = at(BuildingKind::Farm, farm_tile(world, home, terrain, Some(plan))) {
-                return Some(p);
+                if ok(&p) {
+                    return Some(p);
+                }
             }
         }
         if !has(BuildingKind::House) {
@@ -820,13 +866,17 @@ fn wanted(
                 BuildingKind::House,
                 house_tile(world, city, home, terrain, Some(plan), BuildingKind::House),
             ) {
-                return Some(p);
+                if ok(&p) {
+                    return Some(p);
+                }
             }
         }
     }
     if farmers_dont_fit(world, city) {
         if let Some(p) = at(BuildingKind::Farm, farm_tile(world, home, terrain, rings)) {
-            return Some(p);
+            if ok(&p) {
+                return Some(p);
+            }
         }
     }
     if has_food_surplus(world, city) && free_housing(world, &city.id) <= 0.0 {
@@ -834,7 +884,9 @@ fn wanted(
             BuildingKind::House,
             house_tile(world, city, home, terrain, rings, BuildingKind::House),
         ) {
-            return Some(p);
+            if ok(&p) {
+                return Some(p);
+            }
         }
     }
     if city.trade_org.is_none() {
@@ -842,20 +894,26 @@ fn wanted(
             if let Some(p) =
                 at(BuildingKind::Stable, stable_tile(world, city, home, terrain, rings))
             {
-                return Some(p);
+                if ok(&p) {
+                    return Some(p);
+                }
             }
         }
         for good in short_goods(world, city, size, None) {
             if let Some(chain) =
                 chain_project(world, city, home, terrain, rings, good, &mut HashSet::new())
             {
-                return Some(chain);
+                if ok(&chain) {
+                    return Some(chain);
+                }
             }
         }
         if let Some(another) = another_workplace(world, city, home, terrain, rings)
             .filter(|p| may_begin_project(world, city, home, terrain, p))
         {
-            return Some(another);
+            if ok(&another) {
+                return Some(another);
+            }
         }
     }
     if let Some(next) = ring.iter().find(|t| !t.done) {
@@ -868,8 +926,13 @@ fn wanted(
             && crate::npc_founding::saving_to_found(world, city)
             && !crate::npc_founding::holds_for_walls(world, city, &crate::npc_stone_walls::trip());
         if !waits {
-            let p = build(next.kind, (next.x, next.y));
-            return Some(with_material(p, stone.then_some(WallMaterial::Stone)));
+            let p = with_material(
+                build(next.kind, (next.x, next.y)),
+                stone.then_some(WallMaterial::Stone),
+            );
+            if ok(&p) {
+                return Some(p);
+            }
         }
     }
     // Lacking nothing else, its wall up, the workplace for a founding material it has none for
@@ -878,22 +941,30 @@ fn wanted(
         if let Some(chain) =
             chain_project(world, city, home, terrain, rings, short.good, &mut HashSet::new())
         {
-            return Some(chain);
+            if ok(&chain) {
+                return Some(chain);
+            }
         }
     }
     if let Some(second) = second_workplace(world, city, home, terrain)
         .filter(|p| may_begin_project(world, city, home, terrain, p))
     {
-        return Some(second);
+        if ok(&second) {
+            return Some(second);
+        }
     }
     if wants_training_ground(world, city, size) {
         let t = house_tile(world, city, home, terrain, rings, BuildingKind::TrainingGround);
         if let Some(p) = at(BuildingKind::TrainingGround, t) {
-            return Some(p);
+            if ok(&p) {
+                return Some(p);
+            }
         }
     }
     if let Some(dead) = tear_down_dead_workplace(world, city) {
-        return Some(dead);
+        if ok(&dead) {
+            return Some(dead);
+        }
     }
     if let Some(r) = rings {
         let inner = InnerRings {
@@ -904,7 +975,9 @@ fn wanted(
         if let Some(p) =
             inner_wall_project(world, city, home, terrain, &inner, npc_builders(world, city))
         {
-            return Some(p);
+            if ok(&p) {
+                return Some(p);
+            }
         }
     }
     // Last, a town upgrades its wall to stone (`CONTEXT.md`: Wood or stone): the outer ring, then
@@ -912,14 +985,18 @@ fn wanted(
     // working it for the Stone.
     let expanding = rings.is_none_or(|r| r.expanding);
     if let Some(p) = stone_upgrade_project(world, city, home, size, expanding) {
-        return Some(p);
+        if ok(&p) {
+            return Some(p);
+        }
     }
     // With its outer wall all of stone, a tower by each gate, then at its corners, as it can
     // spare the Stone (`CONTEXT.md`: Tower).
     let towers =
         crate::npc_towers::tower_project(world, city, home, Some(terrain), size, expanding);
     if let Some(p) = towers {
-        return Some(p);
+        if ok(&p) {
+            return Some(p);
+        }
     }
     let wants_tower_stone = || crate::npc_towers::wants_stone_for_towers(world, city, home, size);
     if (wants_stone_for_walls(world, city) || wants_tower_stone())

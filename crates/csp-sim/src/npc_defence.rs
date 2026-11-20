@@ -766,12 +766,18 @@ fn upgrade_soldiers(
     let sb = &world.buildings[st];
     let (sx, sy) = (sb.x, sb.y);
     let to_store = |o: &Option<ResidentOrder>| matches!(o, Some(ResidentOrder::WalkTo(w)) if w.target.x == sx && w.target.y == sy);
+    // A trader's escort keeps with them (`CONTEXT.md`: Escort): not sent home for gear (#1379:
+    // Thornbury's escort, just at the warehouse 495 tiles out, walked home for a new shield, and
+    // its trader stood waiting for it until they starved).
+    let escorts = crate::npc_escort::escorts_out(world, &city.id);
     let free: Vec<usize> = soldiers
         .iter()
         .copied()
         .filter(|&i| {
             let r = &world.residents[i];
-            r.script.is_none() && (r.order.is_none() || to_store(&r.order))
+            r.script.is_none()
+                && (r.order.is_none() || to_store(&r.order))
+                && !escorts.contains(&r.id)
         })
         .collect();
     let at_store = |world: &WorldState, i: usize| {

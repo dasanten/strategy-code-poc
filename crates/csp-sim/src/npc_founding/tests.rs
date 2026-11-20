@@ -1498,6 +1498,176 @@ fn once_founded_it_sends_what_its_daughter_still_lacks_after_it_until_its_storag
 }
 
 #[test]
+fn while_its_daughter_lacks_the_rest_of_the_load_its_building_leaves_that_wood_and_stone_alone() {
+    // #1379 (Daniel, 2026-11-19: none of its building spends the Wood and Stone the party needs):
+    // Fallowby's begun smithy took each load of Stone its quarry brought home after Oakhurst
+    // stood, so Oakhurst never got its storage and its people starved.
+    use super::{kept_for_party, kept_from_walls, waits_for_party};
+    use crate::npc_plan::npc_founding_materials_kept;
+    use crate::queries::building::build_materials;
+    use csp_shared::world::CityProject;
+    let days = npc_full_days(110.0);
+    let mut t = full_for(110, days);
+    t.plan_city();
+    assert!(!t.party().is_empty());
+    let site = t.plan().founding_site.expect("a site");
+    let (_, daughter) = hall_and_city(&mut t.world, site.x, site.y);
+    let city = t.city.clone();
+    assert_eq!(found_daughter(&mut t.world, &city), Some(daughter.clone()));
+    let lacks = super::daughter_lacks(&t.world, &daughter).expect("no storage yet");
+    let stone = held(&lacks, Good::Stone);
+    assert!(stone > 0.0, "{lacks:?}");
+
+    // It keeps the Wood and Stone its daughter lacks on top of its reserve.
+    let c = t.city().clone();
+    let kept = kept_for_party(&t.world, &c).expect("its daughter lacks some");
+    assert_eq!(held(&kept, Good::Stone), stone);
+    assert_eq!(held(&kept, Good::Wood), held(&lacks, Good::Wood));
+    let reserve = npc_reserve(&t.world, &c);
+    assert_eq!(
+        held(&kept_from_walls(&t.world, &c), Good::Stone),
+        held(&reserve, Good::Stone) + stone
+    );
+
+    // A smithy waits while it holds no more Stone than that, and the invariant catches a plan
+    // that builds it; with the smithy's Stone on top, it goes ahead.
+    let home = t.home();
+    let smithy = CityProject::Build {
+        building: BuildingKind::Smithy,
+        x: home.x + 6.0,
+        y: home.y + 6.0,
+        material: None,
+    };
+    let wood = held(&reserve, Good::Wood) + held(&kept, Good::Wood) + 100.0;
+    let need = held(&build_materials(BuildingKind::Smithy), Good::Stone);
+    t.home_stock().insert(Good::Wood, wood);
+    t.home_stock().insert(Good::Stone, held(&reserve, Good::Stone) + stone);
+    assert!(waits_for_party(&t.world, &c, &smithy));
+    let tick = t.world.tick as f64;
+    t.plan_mut().planned_at = tick;
+    t.plan_mut().project = Some(smithy.clone());
+    assert_eq!(npc_founding_materials_kept(&t.world).len(), 1);
+    t.home_stock().insert(Good::Stone, held(&reserve, Good::Stone) + stone + need);
+    assert!(!waits_for_party(&t.world, &c, &smithy));
+    assert_eq!(npc_founding_materials_kept(&t.world), []);
+
+    // Once its daughter's storage stands it keeps nothing for it.
+    t.home_stock().insert(Good::Stone, held(&reserve, Good::Stone) + stone);
+    let mut storage = crate::test_support::building(
+        "dstore",
+        BuildingKind::Storage,
+        Some(&daughter),
+        site.x + 4.0,
+        site.y,
+    );
+    storage.site = None;
+    t.world.buildings.push(storage);
+    assert_eq!(kept_for_party(&t.world, &c), None);
+    assert!(!waits_for_party(&t.world, &c, &smithy));
+}
+
+#[test]
+fn a_daughter_whose_storage_doesnt_stand_fetches_what_it_lacks_from_its_mother_without_theft() {
+    // #1379 (Daniel, 2026-11-19): Fallowby had no hands to send after Oakhurst, so Oakhurst never
+    // got the materials for its storage, went for a lumber camp 122 tiles out, built no farm and
+    // starved. Its own builders fetch them from its mother instead.
+    use super::{mother_fetch, supplying_mother};
+    use crate::carrying::{resolve_carrying, CarryAction, CarryKind};
+    use csp_shared::world::{CityProject, GoodsSpot};
+    let days = npc_full_days(110.0);
+    let mut t = full_for(110, days);
+    t.plan_city();
+    let site = t.plan().founding_site.expect("a site");
+    let (_, daughter) = hall_and_city(&mut t.world, site.x, site.y);
+    let city = t.city.clone();
+    assert_eq!(found_daughter(&mut t.world, &city), Some(daughter.clone()));
+    let lacks = super::daughter_lacks(&t.world, &daughter).expect("no storage yet");
+    let (wood, stone) = (held(&lacks, Good::Wood), held(&lacks, Good::Stone));
+    assert!(wood > 0.0 && stone > 0.0, "{lacks:?}");
+    assert_eq!(supplying_mother(&t.world, &daughter).map(|c| c.id.clone()), Some(city.clone()));
+
+    // With a forest beside it and its mother holding none of it, the daughter goes for a lumber
+    // camp first.
+    let home = t.home();
+    node(&mut t.world, &mut t.terrain, ResourceKind::Forest, site.x + 30.0, site.y);
+    for good in [Good::Wood, Good::Stone] {
+        t.home_stock().insert(good, 0.0);
+    }
+    let d = t.world.cities.iter().find(|c| c.id == daughter).unwrap().clone();
+    let hall = npc_home(&t.world, &daughter).expect("its town hall").clone();
+    let storage_first = |t: &Town| {
+        let p = crate::npc_growth::next_project(&t.world, &d, &hall, &t.terrain);
+        matches!(p, Some(CityProject::Build { building: BuildingKind::Storage, .. }))
+    };
+    assert!(!storage_first(&t));
+    // Its mother holding it, its storage comes first: its builders fetch the materials there.
+    t.home_stock().insert(Good::Wood, wood + 100.0);
+    t.home_stock().insert(Good::Stone, stone + 100.0);
+    t.home_stock().insert(Good::Iron, 50.0);
+    t.home_stock().insert(Good::Food, 200.0);
+    assert!(storage_first(&t));
+    // Its builders take part in a site that lacks only what the mother holds.
+    let need = Stock::from([(Good::Stone, 5.0), (Good::Iron, 5.0)]);
+    assert!(super::mother_holds(&t.world, Some(&daughter), &need));
+    let iron = Stock::from([(Good::Iron, 5.0)]);
+    assert!(!super::mother_holds(&t.world, Some(&daughter), &iron), "not lacked");
+
+    // One of its residents at the mother's storage takes what it lacks and Food, nothing else, and
+    // steals nothing.
+    let allowed = mother_fetch(&t.world, Some(&daughter), &home.id).expect("from its mother");
+    assert_eq!(held(&allowed, Good::Stone), stone);
+    assert_eq!(held(&allowed, Good::Iron), 0.0);
+    let i = t.world.residents.iter().position(|r| r.city_id.as_deref() == Some(&daughter)).unwrap();
+    let r = &mut t.world.residents[i];
+    (r.x, r.y, r.carried, r.order, r.script) = (home.x, home.y, Stock::new(), None, None);
+    let rid = r.id.clone();
+    let take = CarryAction {
+        kind: CarryKind::Take,
+        resident_id: rid,
+        spot: GoodsSpot::Storage { storage_id: home.id.clone() },
+        goods: Stock::from([(Good::Stone, stone + 5.0), (Good::Iron, 2.0), (Good::Food, 3.0)]),
+    };
+    let crimes = t.world.crimes.len();
+    resolve_carrying(&mut t.world, &[take], t.terrain.size);
+    let carried = &t.world.residents[i].carried;
+    assert_eq!(held(carried, Good::Stone), stone, "{carried:?}");
+    assert_eq!(held(carried, Good::Iron), 0.0);
+    assert_eq!(held(carried, Good::Food), 3.0);
+    assert_eq!(t.world.crimes.len(), crimes);
+    // Fetching there is sound while its storage doesn't stand.
+    t.world.residents[i].order = Some(ResidentOrder::Fetch(csp_shared::world::FetchOrder {
+        goods: [(Good::Stone, Some(1.0))].into_iter().collect(),
+        from: csp_shared::world::GoodsPlace::Storage { storage_id: home.id.clone() },
+        phase: csp_shared::world::FetchPhase::Walking,
+        path: None,
+        progress: 0.0,
+    }));
+    assert_eq!(super::mother_fetch_sound(&t.world), []);
+
+    // Another city's resident there gets no such leave, nor does the daughter once its storage
+    // stands, and the invariant catches its fetch.
+    assert_eq!(mother_fetch(&t.world, Some(&city), &home.id), None);
+    let mut storage = crate::test_support::building(
+        "dstore",
+        BuildingKind::Storage,
+        Some(&daughter),
+        site.x + 4.0,
+        site.y,
+    );
+    storage.site = None;
+    t.world.buildings.push(storage);
+    assert_eq!(supplying_mother(&t.world, &daughter), None);
+    assert_eq!(mother_fetch(&t.world, Some(&daughter), &home.id), None);
+    assert_eq!(super::mother_fetch_sound(&t.world).len(), 1);
+    assert!(!super::mother_holds(&t.world, Some(&daughter), &need));
+    // Its NPC step ends that fetch, so they take nothing that isn't theirs.
+    let all: Vec<usize> = (0..t.world.residents.len()).collect();
+    super::end_stale_mother_fetches(&mut t.world, &all);
+    assert_eq!(t.world.residents[i].order, None);
+    assert_eq!(super::mother_fetch_sound(&t.world), []);
+}
+
+#[test]
 fn keeping_a_founding_site_with_no_wait_and_no_hall_there_breaks_founding_wave_sound() {
     let mut t = full_for(30, NPC_FULL_DAYS);
     let tick = t.world.tick as f64;

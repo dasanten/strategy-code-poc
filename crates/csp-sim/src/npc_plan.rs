@@ -973,7 +973,7 @@ fn can_take_part(world: &WorldState, city: &City, i: usize, project: &CityProjec
     need.keys().any(|g| {
         held(&world.residents[i].carried, *g) > 0.0
             || held_in(storage.and_then(|s| s.stock.as_ref()), *g) > 0.0
-    })
+    }) || crate::npc_founding::mother_holds(world, Some(&city.id), &need)
 }
 
 /// Whether a city's project is finished, or can't go on (`projectDone`).
@@ -1020,9 +1020,9 @@ pub fn trade_org_sends_no_one(world: &WorldState) -> Vec<InvariantViolation> {
 mod invariants;
 pub(crate) use invariants::violation;
 pub use invariants::{
-    city_plans_sound, npc_called_home_sound, npc_farmers_kept, npc_founding_stone_kept,
-    npc_leaves_dry_workplaces, npc_spare_hands_work, npc_surplus_capped, npc_wall_stone_set_aside,
-    npc_workplaces_bounded,
+    city_plans_sound, npc_called_home_sound, npc_farmers_kept, npc_founding_materials_kept,
+    npc_founding_stone_kept, npc_leaves_dry_workplaces, npc_spare_hands_work, npc_surplus_capped,
+    npc_wall_stone_set_aside, npc_workplaces_bounded,
 };
 
 #[cfg(test)]

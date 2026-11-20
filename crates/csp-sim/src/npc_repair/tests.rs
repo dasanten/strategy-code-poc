@@ -216,8 +216,8 @@ fn the_invariant_catches_a_trade_org_building_nearly_a_ruin() {
 
 #[test]
 fn a_city_saving_for_its_founding_party_repairs_from_stone_above_the_partys_too() {
-    // #1379 (Daniel, 2026-11-18): its walls and repairs kept spending the party's Stone, so no
-    // city held it and none founded a daughter.
+    // #1379 (Daniel, 2026-11-18 and 2026-11-19): its walls, repairs and workshops kept spending the
+    // party's Stone and Wood, so no city held them and none founded a daughter.
     use crate::npc_founding::founding_materials;
     use crate::queries::city::city_residents;
     use crate::queries::npc_trade::npc_founding_party_size;
@@ -245,13 +245,15 @@ fn a_city_saving_for_its_founding_party_repairs_from_stone_above_the_partys_too(
     }
     v.world.buildings[s].stock = Some(stock.clone());
     assert!(repair_due(&v.world, &c, Some(s), false));
-    // Saving for its founding party, it leaves the party's Stone too.
+    // Saving for its founding party, it leaves the party's Stone and Wood too.
     v.world.city_plans.get_mut(&city).unwrap().full_since = Some(0.0);
     assert!(!repair_due(&v.world, &c, Some(s), false));
     let party = founding_materials(Some(npc_founding_party_size(
         city_residents(&v.world, &city).len() as f64,
     )));
-    *stock.entry(Good::Stone).or_insert(0.0) += held(&party, Good::Stone);
+    for good in [Good::Stone, Good::Wood] {
+        *stock.entry(good).or_insert(0.0) += held(&party, good);
+    }
     v.world.buildings[s].stock = Some(stock);
     assert!(repair_due(&v.world, &c, Some(s), false));
 }

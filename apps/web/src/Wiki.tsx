@@ -3541,8 +3541,12 @@ export function Wiki() {
           while they do. Food, Wood and Stone come first, Food its surplus too: only once it holds{' '}
           {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus cap past its reserve, and while
           full its farmers work to win that back as they do its reserve. While it saves for its
-          party, its walls and repairs spend only the Stone above its reserve and the party's Stone,
-          and its walls the Stone its reserve sets aside for them.
+          party, none of its building spends the party's Wood and Stone: walls, repairs and other
+          buildings wait until it holds what they need above its reserve and the party's, but its
+          farms, lumber camps and quarries go ahead, and meanwhile it builds whatever else it wants
+          that doesn't wait. The same holds once its daughter stands, for
+          the Wood and Stone the daughter still lacks of the party's load, until its storage
+          stands. Its walls may spend the Stone its reserve sets aside for them.
           Its workplaces come first as well: its spare hands go on a road crew, scout and work at
           its workplaces for surplus, and only those left over gather for the party. Past{' '}
           {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less for each{' '}
@@ -3567,8 +3571,9 @@ export function Wiki() {
           sets out once it holds the town hall's materials and its Food, and the city sends a
           second wave of carriers after it with the rest, as hands come free: while the town hall
           is going up they join the party, and once the daughter stands they carry what it still
-          lacks to it, until its storage stands. Like the party, they stay as the daughter's
-          residents. Hands sent back from far workplaces leave them, and none of them goes back to
+          lacks to it, until its storage stands. Until then the daughter's own builders also
+          fetch what it lacks from the mother's storage, with Food for the way, and that is no
+          theft. Like the party, they stay as the daughter's residents. Hands sent back from far workplaces leave them, and none of them goes back to
           work there while called home. One too full for their own Food puts
           down what crowds it out at the storage first, so nobody sets out without it. The party builds the town hall, which founds the daughter: an NPC city of
           its own with a name from the game. It then builds its storage, a farm and a house, and

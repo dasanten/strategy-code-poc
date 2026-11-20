@@ -152,3 +152,20 @@ pub fn founding_wave_sound(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
+
+/// Invariant `mother-fetch-sound` (`CONTEXT.md`: Founding; Daniel, 2026-11-19, #1379): an NPC
+/// city's resident fetches from another city's storage only as the builder of a daughter whose
+/// storage doesn't stand yet, from its supplying mother (`mother_fetch`).
+pub fn mother_fetch_sound(world: &WorldState) -> Vec<InvariantViolation> {
+    let mut out = Vec::new();
+    for (i, r) in world.residents.iter().enumerate() {
+        let Some(storage_id) = super::fetching_elsewhere(world, i) else { continue };
+        if super::mother_fetch(world, r.city_id.as_deref(), storage_id).is_none() {
+            let city = r.city_id.as_deref().unwrap_or_default();
+            let message =
+                format!("{} of {city} fetches from {storage_id}, a storage not theirs", r.id);
+            out.push(violation("mother-fetch-sound", message, vec![r.id.clone()]));
+        }
+    }
+    out
+}

@@ -22,7 +22,9 @@ use crate::queries::names::held;
 use crate::queries::warehouse::stock_floor;
 
 /// What an NPC city has towards a building's materials: its finished storage's stock, or with no
-/// storage yet (a daughter) what its people carry.
+/// storage yet (a daughter) what its people carry and what its supplying mother's storages hold,
+/// which its builders fetch from there (`CONTEXT.md`: Founding; Daniel, 2026-11-19, #1379:
+/// Oakhurst went for a lumber camp 122 tiles out instead, and starved).
 pub fn materials_at_hand(world: &WorldState, city: &City) -> Stock {
     let storage = world.buildings.iter().find(|b| {
         b.city_id.as_ref() == Some(&city.id) && b.kind == BuildingKind::Storage && b.site.is_none()
@@ -34,6 +36,17 @@ pub fn materials_at_hand(world: &WorldState, city: &City) -> Stock {
     for r in world.residents.iter().filter(|r| r.city_id.as_ref() == Some(&city.id)) {
         for (good, n) in &r.carried {
             *out.entry(*good).or_insert(0.0) += n;
+        }
+    }
+    if let Some(mother) = crate::npc_founding::supplying_mother(world, &city.id) {
+        for b in world.buildings.iter().filter(|b| {
+            b.city_id.as_ref() == Some(&mother.id)
+                && b.kind == BuildingKind::Storage
+                && b.site.is_none()
+        }) {
+            for (good, n) in b.stock.iter().flatten() {
+                *out.entry(*good).or_insert(0.0) += n;
+            }
         }
     }
     out
