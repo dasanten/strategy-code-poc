@@ -157,20 +157,11 @@ pub fn founding_wave_sound(world: &WorldState) -> Vec<InvariantViolation> {
 /// city's resident fetches from another city's storage only as the builder of a daughter whose
 /// storage doesn't stand yet, from its supplying mother (`mother_fetch`).
 pub fn mother_fetch_sound(world: &WorldState) -> Vec<InvariantViolation> {
-    use csp_shared::world::{BuildingKind, GoodsPlace, ResidentOrder};
     let mut out = Vec::new();
-    for r in &world.residents {
-        let Some(ResidentOrder::Fetch(o)) = &r.order else { continue };
-        let GoodsPlace::Storage { storage_id } = &o.from else { continue };
-        let Some(city) = r.city_id.as_deref() else { continue };
-        if !world.cities.iter().any(|c| c.id == city && c.realm_id.is_none()) {
-            continue;
-        }
-        let Some(b) = world.buildings.iter().find(|b| &b.id == storage_id) else { continue };
-        if b.kind != BuildingKind::Storage || b.city_id.as_deref().is_none_or(|c| c == city) {
-            continue;
-        }
-        if super::mother_fetch(world, Some(city), storage_id).is_none() {
+    for (i, r) in world.residents.iter().enumerate() {
+        let Some(storage_id) = super::fetching_elsewhere(world, i) else { continue };
+        if super::mother_fetch(world, r.city_id.as_deref(), storage_id).is_none() {
+            let city = r.city_id.as_deref().unwrap_or_default();
             let message =
                 format!("{} of {city} fetches from {storage_id}, a storage not theirs", r.id);
             out.push(violation("mother-fetch-sound", message, vec![r.id.clone()]));

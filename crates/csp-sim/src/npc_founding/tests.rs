@@ -1660,6 +1660,11 @@ fn a_daughter_whose_storage_doesnt_stand_fetches_what_it_lacks_from_its_mother_w
     assert_eq!(mother_fetch(&t.world, Some(&daughter), &home.id), None);
     assert_eq!(super::mother_fetch_sound(&t.world).len(), 1);
     assert!(!super::mother_holds(&t.world, Some(&daughter), &need));
+    // Its NPC step ends that fetch, so they take nothing that isn't theirs.
+    let all: Vec<usize> = (0..t.world.residents.len()).collect();
+    super::end_stale_mother_fetches(&mut t.world, &all);
+    assert_eq!(t.world.residents[i].order, None);
+    assert_eq!(super::mother_fetch_sound(&t.world), []);
 }
 
 #[test]

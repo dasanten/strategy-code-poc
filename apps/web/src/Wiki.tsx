@@ -3541,7 +3541,8 @@ export function Wiki() {
           full its farmers work to win that back as they do its reserve. While it saves for its
           party, none of its building spends the party's Wood and Stone: walls, repairs and other
           buildings wait until it holds what they need above its reserve and the party's, but its
-          farms, lumber camps and quarries go ahead. The same holds once its daughter stands, for
+          farms, lumber camps and quarries go ahead, and meanwhile it builds whatever else it wants
+          that doesn't wait. The same holds once its daughter stands, for
           the Wood and Stone the daughter still lacks of the party's load, until its storage
           stands. Its walls may spend the Stone its reserve sets aside for them.
           Its workplaces come first as well: its spare hands go on a road crew, scout and work at

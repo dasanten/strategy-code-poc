@@ -592,6 +592,37 @@ pub fn mother_fetch(world: &WorldState, city_id: Option<&str>, storage_id: &str)
     Some(goods)
 }
 
+/// The storage of another NPC city a resident of an NPC city is fetching from, if any: theirs to
+/// take from only as `mother_fetch` allows.
+pub fn fetching_elsewhere(world: &WorldState, i: usize) -> Option<&str> {
+    let r = &world.residents[i];
+    let Some(ResidentOrder::Fetch(o)) = &r.order else { return None };
+    let csp_shared::world::GoodsPlace::Storage { storage_id } = &o.from else { return None };
+    let city = r.city_id.as_deref()?;
+    if !world.cities.iter().any(|c| c.id == city && c.realm_id.is_none()) {
+        return None;
+    }
+    let b = world.buildings.iter().find(|b| &b.id == storage_id)?;
+    (b.kind == BuildingKind::Storage && b.city_id.as_deref().is_some_and(|c| c != city))
+        .then_some(storage_id.as_str())
+}
+
+/// Ends the fetches of an NPC city's residents from its mother's storage once she no longer
+/// supplies it (`mother_fetch`): the daughter lacks nothing more of the party's load, or its storage
+/// stands. They would take what isn't theirs (#1379: a Food fetch under way as the last load went
+/// home).
+pub fn end_stale_mother_fetches(world: &mut WorldState, people: &[usize]) {
+    for &i in people {
+        let stale = fetching_elsewhere(world, i).is_some_and(|storage_id| {
+            mother_fetch(world, world.residents[i].city_id.as_deref(), storage_id).is_none()
+        });
+        if stale {
+            crate::storing::end_order(world, i, Some("not ours to take from".into()));
+            world.residents[i].script = None;
+        }
+    }
+}
+
 /// What a daughter still lacks of the rest of its founding party's load (`CONTEXT.md`: Founding;
 /// Daniel, 2026-11-19, #1438): the party's materials (`founding_materials`, for its residents) but
 /// its town hall's, beyond what its residents carry, its sites have and its storages hold. None

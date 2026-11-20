@@ -75,6 +75,9 @@ pub fn step_npc_cities(
             );
         }
     }
+    // Once every city has planned, so a mother that stopped supplying this tick counts.
+    let all: Vec<usize> = (0..world.residents.len()).collect();
+    crate::npc_founding::end_stale_mother_fetches(world, &all);
     plan_ms
 }
 

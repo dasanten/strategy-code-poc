@@ -775,7 +775,8 @@ The shared language of the game. Domain terms only — no implementation details
   2026-11-18, #1379): they kept spending it, so no city held it. Nor does any of its building
   spend the Wood and Stone the party needs (Daniel, 2026-11-19, #1379): a site that needs them
   waits until it holds them above its reserve and the party's, while its farms and the workplaces
-  for Wood and Stone go ahead; begun workshops took each load its quarry brought home. The same
+  for Wood and Stone go ahead, and meanwhile it builds whatever else it wants that doesn't wait; begun
+  workshops took each load its quarry brought home. The same
   holds once its daughter stands, for the Wood and Stone the daughter still lacks of the party's
   load, until its storage stands (#1379: a begun smithy took the Stone its daughter's storage
   needed, and the daughter starved). Its walls still spend the Stone
