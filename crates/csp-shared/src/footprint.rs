@@ -67,7 +67,7 @@ pub fn may_cover(bx: i32, by: i32, x: i32, y: i32, size: i32) -> bool {
 }
 
 /// The largest side in `FOOTPRINT`.
-const LARGEST_SIDE: i32 = {
+pub const LARGEST_SIDE: i32 = {
     let mut largest = 0;
     let mut i = 0;
     while i < FOOTPRINT.0.len() {

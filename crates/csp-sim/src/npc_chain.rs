@@ -5,8 +5,6 @@
 //! cities run the same chain for their warehouses, whose stock floor is their reserve. Queries
 //! only: nothing moves.
 
-use std::collections::HashSet;
-
 use csp_shared::balance::{MAP_SIZE, NPC_SURPLUS_CAP};
 use csp_shared::world::{Building, BuildingKind, City, CityProject, Good, Stock, WorldState};
 
@@ -18,6 +16,7 @@ use crate::queries::building::{
 use crate::queries::names::{good_name, held, held_in};
 use crate::queries::npc_trade::{npc_city_stock, npc_needs_scale, npc_reserve, NPC_SMITHY_WEAPON};
 use crate::queries::warehouse::{stock_floor, warehouse_keeps};
+use crate::world_index::{building_index, buildings_of_city};
 
 /// The workplace that processes goods into one the chain wants, by that good (`PROCESSED_BY`).
 pub fn processed_by(good: Good) -> Option<BuildingKind> {
@@ -51,17 +50,13 @@ pub fn chain_good(world: &WorldState, b: &Building) -> Option<Good> {
 /// (`ownWorkplaces`): its farms (and other buildings of its by `cityId`) and those in its
 /// `workplaceIds`.
 pub fn own_workplace_indices(world: &WorldState, city: &City) -> Vec<usize> {
-    let own: HashSet<&String> = city.workplace_ids.iter().flatten().collect();
-    world
-        .buildings
-        .iter()
-        .enumerate()
-        .filter(|(_, b)| {
-            (b.city_id.as_ref() == Some(&city.id) || own.contains(&b.id))
-                && max_workers(b.kind).is_some()
-        })
-        .map(|(i, _)| i)
-        .collect()
+    // Its own by `cityId`, then those it works by id, in the world's order as one scan gives them.
+    let mut own: Vec<usize> = buildings_of_city(world, &city.id).map(|(i, _)| i).collect();
+    own.extend(city.workplace_ids.iter().flatten().filter_map(|id| building_index(world, id)));
+    own.retain(|&i| max_workers(world.buildings[i].kind).is_some());
+    own.sort_unstable();
+    own.dedup();
+    own
 }
 
 /// The city's own workplaces, finished or begun (`ownWorkplaces`).

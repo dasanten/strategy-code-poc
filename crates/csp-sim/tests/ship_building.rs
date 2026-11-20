@@ -254,9 +254,12 @@ mod invariants {
         assert!(broken(&world).is_empty(), "{:?}", broken(&world));
         world.buildings.pop();
         world.buildings.push(site("ss", BuildingKind::Ship, 19.0, 5.0));
+        // Another site in the last one's place, with no new id to show it.
+        csp_sim::world_index::forget_building_lookups();
         assert_eq!(broken(&world), ["ss is a ship site away from the Sea"]);
         world.buildings.pop();
         world.buildings.push(site("ss", BuildingKind::Ship, 19.0, 9.0));
+        csp_sim::world_index::forget_building_lookups();
         assert_eq!(broken(&world), ["ss is a ship site off any haven"]);
     }
 }

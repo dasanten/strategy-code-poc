@@ -25,7 +25,7 @@ use crate::npc_chain::{holds_batch, own_workplaces, project_needs};
 use crate::npc_founding::{founding_materials, full_but_materials};
 use crate::npc_growth::wall_rings;
 use crate::pathfinding::{PathResult, Point};
-use crate::queries::building::{build_materials, road_tiles};
+use crate::queries::building::{build_materials, is_road_at, road_tiles};
 use crate::queries::city::{in_city_area, is_city_building};
 use crate::queries::goods::carried_food;
 use crate::queries::names::{held, held_in, placed};
@@ -123,14 +123,13 @@ fn next_tile(
     size: i32,
     taken: &HashSet<(i32, i32)>,
 ) -> Option<((i32, i32), usize)> {
-    let built = road_tiles(world, size);
     let mut tile = None;
     let mut left = 0;
     let all = std::iter::once(streets).chain(roads.iter().map(|r| r.tiles.as_slice()));
     for tiles in all {
         for t in tiles {
             let at = (t.0 as i32, t.1 as i32);
-            if built.contains(&tile_index(size, at.0, at.1)) {
+            if is_road_at(world, at.0, at.1, size) {
                 continue;
             }
             left += 1;
@@ -146,8 +145,8 @@ fn next_tile(
 fn area_tiles(world: &WorldState, city_id: &str, size: i32) -> HashSet<usize> {
     let m = CITY_AREA_MARGIN as i32;
     let mut tiles = HashSet::new();
-    for b in &world.buildings {
-        if b.city_id.as_deref() != Some(city_id) || !is_city_building(b) {
+    for (_, b) in crate::world_index::buildings_of_city(world, city_id) {
+        if !is_city_building(b) {
             continue;
         }
         for (x, y) in footprint_tiles(placed(b), size) {

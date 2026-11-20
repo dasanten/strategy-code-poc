@@ -8,7 +8,7 @@ use csp_shared::balance::{
     RECIPES, TEARDOWN_MATERIALS_RETURNED, TEARDOWN_WORK_SHARE, TRAINING_GROUND_MAX_TRAINEES,
     WORKPLACE_MAX_WORKERS,
 };
-use csp_shared::footprint::{covers, footprint_tiles, is_at, may_cover, Placed, FOOTPRINT};
+use csp_shared::footprint::{covers, footprint_tiles, is_at, Placed, FOOTPRINT};
 use csp_shared::terrain::{
     is_passable_terrain, terrain_at, tile_index, touches_sea, touches_water, wrap, wrap_delta,
     Terrain, TerrainMap,
@@ -21,6 +21,7 @@ use csp_shared::world::{
 use super::balance::{build_work, carry_capacity};
 use super::names::{good_name, good_of, held, kind_name, placed};
 use super::residents::{can_work, good_weight, stock_weight};
+use crate::world_index::{building_indices_covering, building_indices_on};
 
 /// Kinds that may share a tile with a building (`SHARES_A_TILE`): roads, carriage sites, boat
 /// sites and ship sites.
@@ -35,17 +36,24 @@ pub const KEEPS_GOODS: [BuildingKind; 4] =
 /// stands, if one does (`buildingAt`): the first in the world's order, roads and carriage sites
 /// aside.
 pub fn building_index_at(world: &WorldState, x: i32, y: i32, size: i32) -> Option<usize> {
-    world.buildings.iter().position(|b| {
-        // Nearly all are far off: their footprint needn't be worked out (T89.6).
-        may_cover(b.x as i32, b.y as i32, x, y, size)
-            && covers(placed(b), x, y, size)
-            && !SHARES_A_TILE.contains(&b.kind)
-    })
+    // Only those on the tile are looked at, not every building of the world.
+    building_indices_covering(world, x, y, size)
+        .into_iter()
+        .find(|&i| !SHARES_A_TILE.contains(&world.buildings[i].kind))
 }
 
 /// The building or construction site whose footprint covers (x, y) (`buildingAt`).
 pub fn building_at(world: &WorldState, x: i32, y: i32, size: i32) -> Option<&Building> {
     building_index_at(world, x, y, size).map(|i| &world.buildings[i])
+}
+
+/// Whether a finished road lies on tile (x, y): whether [`road_tiles`] holds it, without making
+/// the set of every road of the world to ask of one tile.
+pub fn is_road_at(world: &WorldState, x: i32, y: i32, size: i32) -> bool {
+    building_indices_on(world, x, y, size).into_iter().any(|i| {
+        let b = &world.buildings[i];
+        b.kind == BuildingKind::Road && b.site.is_none()
+    })
 }
 
 /// The tiles with a finished road (`roadTiles`), as tile indices.

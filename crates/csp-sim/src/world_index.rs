@@ -15,8 +15,8 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
-use csp_shared::footprint::footprint_tiles;
-use csp_shared::terrain::tile_index;
+use csp_shared::footprint::{covers, footprint_tiles, LARGEST_SIDE};
+use csp_shared::terrain::{tile_index, wrap};
 use csp_shared::world::{Building, Carriage, Horse, Resident, WorldState};
 
 use crate::queries::building::{road_tiles, SHARES_A_TILE};
@@ -284,4 +284,176 @@ pub fn world_index<'s>(
         *slot = Some(WorldIndex::new(world, size));
     }
     slot.as_ref().expect("just built")
+}
+
+// ---------------------------------------------------------------------------------------------
+// Buildings by city and by tile.
+//
+// Most of a grown world's buildings are roads of no city, and a tick asks for a city's buildings,
+// or for what stands on a tile, thousands of times: scanning `world.buildings` for each answer
+// was most of a tick. These lookups read the list in one pass and keep where things stand while
+// the tick, the list (where it is and how long) and `next_id` stay the same: a building added
+// takes a new id, and one removed shortens the list. A building's kind, site and ruin are read
+// from the world each time, never from here.
+//
+// Two changes show in none of that: a building's `city_id` set in place (`update_city_membership`,
+// `found_city`) and, in tests, a building moved in place or swapped for another with no new id.
+// Whoever does either calls [`forget_building_lookups`]. Debug builds compare every answer with
+// the scan it replaces and panic on a difference, so a test that needs the call says so.
+
+/// What a building lookup was read from.
+type LookupStamp = (u64, usize, usize, u64, i32);
+
+fn lookup_stamp(world: &WorldState, size: i32) -> LookupStamp {
+    (world.tick, world.buildings.as_ptr() as usize, world.buildings.len(), world.next_id, size)
+}
+
+/// Where each city's buildings stand in `world.buildings`.
+#[derive(Default)]
+struct BuildingsByCity {
+    stamp: Option<LookupStamp>,
+    of: rustc_hash::FxHashMap<Box<str>, Rc<[u32]>>,
+}
+
+/// No building: the end of a tile's chain in [`BuildingsByTile`].
+const NO_BUILDING: u32 = u32::MAX;
+
+/// Where the buildings stand in `world.buildings` by north-west tile, on a map of the stamp's
+/// size.
+#[derive(Default)]
+struct BuildingsByTile {
+    stamp: Option<LookupStamp>,
+    /// The first building in the world's order whose north-west tile this is.
+    first: rustc_hash::FxHashMap<(i32, i32), u32>,
+    /// For the building at each position, the next one with the same north-west tile.
+    next: Vec<u32>,
+}
+
+thread_local! {
+    static BUILDINGS_BY_CITY: RefCell<BuildingsByCity> = RefCell::default();
+    static BUILDINGS_BY_TILE: RefCell<BuildingsByTile> = RefCell::default();
+}
+
+/// Forgets where the world's buildings stand, for a step that changes a building's `city_id` or
+/// place without adding or removing one (see above).
+pub fn forget_building_lookups() {
+    BUILDINGS_BY_CITY.with(|l| l.borrow_mut().stamp = None);
+    BUILDINGS_BY_TILE.with(|l| l.borrow_mut().stamp = None);
+}
+
+/// What to do about an answer that differs from the scan's, for the debug check's message.
+#[cfg(debug_assertions)]
+const STALE: &str = "changed in place since the building lookups were read: \
+     call world_index::forget_building_lookups() after changing it";
+
+/// The city's buildings with where they stand in `world.buildings`, sites and ruins included, in
+/// the world's order: what `world.buildings.iter().enumerate().filter(|(_, b)| b.city_id == city_id)`
+/// gives, without going through the buildings of every other city and of none.
+pub fn buildings_of_city<'w, 'c>(
+    world: &'w WorldState,
+    city_id: &'c str,
+) -> impl Iterator<Item = (usize, &'w Building)> + use<'w, 'c> {
+    let stamp = lookup_stamp(world, 0);
+    let positions: Rc<[u32]> = BUILDINGS_BY_CITY.with(|l| {
+        let mut l = l.borrow_mut();
+        if l.stamp != Some(stamp) {
+            let mut of: rustc_hash::FxHashMap<&str, Vec<u32>> = Default::default();
+            for (i, b) in world.buildings.iter().enumerate() {
+                if let Some(id) = &b.city_id {
+                    of.entry(id.as_str()).or_default().push(i as u32);
+                }
+            }
+            l.of = of.into_iter().map(|(id, at)| (id.into(), at.into())).collect();
+            l.stamp = Some(stamp);
+        }
+        l.of.get(city_id).cloned().unwrap_or_else(|| Rc::from(Vec::new()))
+    });
+    #[cfg(debug_assertions)]
+    {
+        let scan = world.buildings.iter().enumerate();
+        let scan = scan.filter(|(_, b)| b.city_id.as_deref() == Some(city_id)).map(|(i, _)| i);
+        assert!(
+            positions.iter().map(|&i| i as usize).eq(scan),
+            "the buildings of {city_id} {STALE}"
+        );
+    }
+    (0..positions.len()).filter_map(move |n| {
+        let i = positions[n] as usize;
+        let b = world.buildings.get(i)?;
+        (b.city_id.as_deref() == Some(city_id)).then_some((i, b))
+    })
+}
+
+/// Where in `world.buildings` the buildings stand that `on` holds for, of those whose north-west
+/// tile is one of `tiles` on a map `size` across, in the world's order.
+fn building_indices_from(
+    world: &WorldState,
+    size: i32,
+    tiles: impl Iterator<Item = (i32, i32)>,
+    on: impl Fn(&Building) -> bool,
+) -> Vec<usize> {
+    let stamp = lookup_stamp(world, size);
+    let mut found = BUILDINGS_BY_TILE.with(|l| {
+        let mut l = l.borrow_mut();
+        if l.stamp != Some(stamp) {
+            let BuildingsByTile { first, next, .. } = &mut *l;
+            first.clear();
+            next.clear();
+            next.resize(world.buildings.len(), NO_BUILDING);
+            // Backwards, so each tile's chain starts at its first building.
+            for (i, b) in world.buildings.iter().enumerate().rev() {
+                let tile = (wrap(b.x as i32, size), wrap(b.y as i32, size));
+                if let Some(after) = first.insert(tile, i as u32) {
+                    next[i] = after;
+                }
+            }
+            l.stamp = Some(stamp);
+        }
+        let mut found = Vec::new();
+        for (x, y) in tiles {
+            let tile = (wrap(x, size), wrap(y, size));
+            let mut i = l.first.get(&tile).copied().unwrap_or(NO_BUILDING);
+            while i != NO_BUILDING {
+                if world.buildings.get(i as usize).is_some_and(&on) {
+                    found.push(i as usize);
+                }
+                i = l.next.get(i as usize).copied().unwrap_or(NO_BUILDING);
+            }
+        }
+        found
+    });
+    found.sort_unstable();
+    found.dedup();
+    found
+}
+
+/// Where in `world.buildings` the buildings stand whose north-west tile is (x, y) on a map `size`
+/// across, sites and ruins included, in the world's order.
+pub fn building_indices_on(world: &WorldState, x: i32, y: i32, size: i32) -> Vec<usize> {
+    let on = |b: &Building| {
+        wrap(b.x as i32, size) == wrap(x, size) && wrap(b.y as i32, size) == wrap(y, size)
+    };
+    let found = building_indices_from(world, size, std::iter::once((x, y)), on);
+    #[cfg(debug_assertions)]
+    {
+        let scan = world.buildings.iter().enumerate().filter(|(_, b)| on(b)).map(|(i, _)| i);
+        assert!(found.iter().copied().eq(scan), "a building on ({x}, {y}) {STALE}");
+    }
+    found
+}
+
+/// Where in `world.buildings` the buildings stand whose footprint covers (x, y), sites and ruins
+/// included, in the world's order: what scanning with `covers` finds. A footprint runs east and
+/// south from its north-west tile, so only the tiles up to the largest side north-west of (x, y)
+/// can hold one.
+pub fn building_indices_covering(world: &WorldState, x: i32, y: i32, size: i32) -> Vec<usize> {
+    let on = |b: &Building| covers(placed(b), x, y, size);
+    let tiles = (0..LARGEST_SIDE).flat_map(|dy| (0..LARGEST_SIDE).map(move |dx| (x - dx, y - dy)));
+    let found = building_indices_from(world, size, tiles, on);
+    #[cfg(debug_assertions)]
+    {
+        let scan = world.buildings.iter().enumerate().filter(|(_, b)| on(b)).map(|(i, _)| i);
+        assert!(found.iter().copied().eq(scan), "a building over ({x}, {y}) {STALE}");
+    }
+    found
 }
