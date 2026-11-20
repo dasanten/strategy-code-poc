@@ -12,6 +12,7 @@ use super::js_round;
 use super::names::{kind_name, placed};
 use super::residents::hunger_factor;
 use super::standing::standing_of;
+use crate::world_index::buildings_of_city;
 
 /// A city's town hall, if it stands (`townHallOf`).
 pub fn town_hall_of<'w>(world: &'w WorldState, city: &City) -> Option<&'w Building> {
@@ -84,10 +85,8 @@ pub fn is_city_building(b: &Building) -> bool {
 /// `CITY_AREA_MARGIN` of the footprint of one of its finished city buildings, the footprints
 /// included. `size` is the map's.
 pub fn in_city_area(world: &WorldState, city_id: &str, x: i32, y: i32, size: i32) -> bool {
-    world.buildings.iter().any(|b| {
-        is_city_building(b)
-            && b.city_id.as_deref() == Some(city_id)
-            && near_footprint(placed(b), (x, y), CITY_AREA_MARGIN as i32, size)
+    buildings_of_city(world, city_id).any(|(_, b)| {
+        is_city_building(b) && near_footprint(placed(b), (x, y), CITY_AREA_MARGIN as i32, size)
     })
 }
 
@@ -112,15 +111,9 @@ pub fn is_outpost_storage(b: &Building) -> bool {
 
 /// Food in a city's finished storages that is not set aside for an offer (`storedFood`).
 pub fn stored_food(world: &WorldState, city: &City) -> f64 {
-    world
-        .buildings
-        .iter()
-        .filter(|b| {
-            b.city_id.as_ref() == Some(&city.id)
-                && b.kind == BuildingKind::Storage
-                && b.site.is_none()
-        })
-        .map(|b| {
+    buildings_of_city(world, &city.id)
+        .filter(|(_, b)| b.kind == BuildingKind::Storage && b.site.is_none())
+        .map(|(_, b)| {
             super::names::held(
                 &super::offers::free_stock(world, &b.id, b.stock.as_ref()),
                 csp_shared::world::Good::Food,

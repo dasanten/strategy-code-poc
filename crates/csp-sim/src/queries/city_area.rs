@@ -21,6 +21,7 @@ use super::goods::free_stock;
 use super::names::{held, kind_name, placed};
 use super::residents::is_armed;
 use super::standing::TRADE_ORG;
+use crate::world_index::buildings_of_city;
 
 /// Kinds of city building (`CITY_BUILDINGS`, `CONTEXT.md`: City building): what a city is made
 /// of. Farms, workplaces and stables are not.
@@ -224,10 +225,8 @@ pub fn near_city_area(
     size: i32,
 ) -> bool {
     let reach = (CITY_AREA_MARGIN + tiles) as i32;
-    world.buildings.iter().any(|b| {
-        is_city_building(b)
-            && b.city_id.as_deref() == Some(city_id)
-            && near_footprint(placed(b), (x as i32, y as i32), reach, size)
+    buildings_of_city(world, city_id).any(|(_, b)| {
+        is_city_building(b) && near_footprint(placed(b), (x as i32, y as i32), reach, size)
     })
 }
 
@@ -273,11 +272,9 @@ pub fn city_area_tiles(world: &WorldState, city_id: &str, size: i32) -> Vec<(i32
 
 /// How many residents a city's finished buildings house (`housingRoom`).
 pub fn housing_room(world: &WorldState, city_id: &str) -> f64 {
-    world
-        .buildings
-        .iter()
-        .filter(|b| b.city_id.as_deref() == Some(city_id) && b.site.is_none())
-        .fold(0.0, |room, b| room + HOUSING_ROOM.get(kind_name(b.kind)).unwrap_or(0.0))
+    buildings_of_city(world, city_id)
+        .filter(|(_, b)| b.site.is_none())
+        .fold(0.0, |room, (_, b)| room + HOUSING_ROOM.get(kind_name(b.kind)).unwrap_or(0.0))
 }
 
 /// A city's free housing (`freeHousing`): its room minus its residents. Can be below 0.
@@ -337,7 +334,8 @@ fn occupation_of(world: &WorldState, city: &City, size: i32) -> Option<(String, 
     let mut occupier: Option<String> = None;
     let mut residents = Vec::new();
     for (i, r) in world.residents.iter().enumerate() {
-        if !is_armed(&r.carried) || !is_at((r.x as i32, r.y as i32), placed(hall), size) {
+        // Where they stand first: few are at the hall, and whether one is armed takes longer.
+        if !is_at((r.x as i32, r.y as i32), placed(hall), size) || !is_armed(&r.carried) {
             continue;
         }
         if defends_city(world, city, r, size) {
