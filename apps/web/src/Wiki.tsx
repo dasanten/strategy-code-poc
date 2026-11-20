@@ -3324,7 +3324,11 @@ export function Wiki() {
           weighed down. Without a workplace for that good, the city builds one: on the nearest
           fitting resource node it knows of, or a smelter, smithy or mint in its area like a house.
           With every workplace of another short good at its full crew and someone idle, it opens
-          another of them, however many it has.
+          another of them, however many it has. It doesn't begin a building whose materials it has
+          no way to get: a material it holds too little of must come from a workplace of its own, a
+          node it knows of, or a Trade Org warehouse within its trader's reach. A town with no iron
+          in reach builds no smithy, however much Iron its first stock held, and a building it can't
+          finish waits, begun, without holding up its other building.
         </p>
         <p>
           Those with nothing to do, those carrying a child and its children stand at a house of the

@@ -4,10 +4,11 @@
 //!
 //! The upgrade is the last use of its Stone (beyond its reserve, after its roads and other
 //! projects), and a town's ring is long (a ring 22 tiles out has 176 tiles, 704 Stone): it builds
-//! its quarry first, so its gate goes stone in its third game month and near a third of its outer
-//! wall within a game season (55 of 176 when measured, with its wooden ring's repairs and its
-//! founding party's Stone kept while it is full), the rest over the next. Hills past its land keep
-//! it from founding a daughter (#1379), which would leave it a village.
+//! its quarry first, so its gate goes stone early and over half of its outer wall within a game
+//! season (93 of 176 when measured, with its wooden ring's repairs and its founding party's Stone
+//! kept while it is full; 53 before #1487, when a smithy it began about day 72 for want of Iron it
+//! could never get stopped the wall there), the rest over the next. Hills past its land keep it
+//! from founding a daughter (#1379), which would leave it a village.
 
 use csp_shared::balance::NPC_TOWN;
 use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR};
@@ -27,12 +28,15 @@ use crate::world::create_world;
 /// A game season: a quarter of the game year.
 const SEASON_DAYS: usize = (TICKS_PER_GAME_YEAR / TICKS_PER_GAME_DAY / 4.0) as usize;
 
-/// The game day by which its gate is of stone (day 64 when measured, on dev too, with Hills past
-/// its land; day 27 on open plains before a full town saved its founding party's Stone, #1379).
+/// The game day by which its gate is of stone (day 5 when measured with #1487 and on dev before
+/// it, its first wall tile day 9, with Epic 113's starting stock; day 64 before Epic 113, with
+/// Hills past its land; day 27 on open plains before a full town saved its founding party's Stone,
+/// #1379).
 const GATE_BY_DAY: usize = 70;
 
-/// The share of its outer wall of stone at the end of the season (30% when measured with Hills
-/// past its land and the Stone it sets aside for its wall never short, Epic 113; 31% before it;
+/// The share of its outer wall of stone at the end of the season (53% when measured once a town
+/// no longer begins a smithy it can't get the Iron for, #1487; 30% before it, with Hills past its
+/// land and the Stone it sets aside for its wall never short, Epic 113; 31% before that;
 /// 40% on open plains before #1379; 62% before its wooden walls decayed, Epic 97:
 /// once worn their repairs take a Wood a tile, Wood its quarry and upgrade then wait on).
 const SHARE_BY_SEASON: f64 = 0.3;
