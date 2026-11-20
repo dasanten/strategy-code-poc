@@ -439,6 +439,10 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, _t| crate::npc_plan::npc_founding_materials_kept(w),
         },
         Invariant {
+            name: "npc-wall-stone-set-aside",
+            check: |w, _t| crate::npc_plan::npc_wall_stone_set_aside(w),
+        },
+        Invariant {
             name: "npc-surplus-capped",
             check: |w, _t| crate::npc_plan::npc_surplus_capped(w),
         },

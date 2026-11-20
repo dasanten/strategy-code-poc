@@ -2,14 +2,18 @@
 //! NPC city): once a town, holding Stone beyond its reserve, a city upgrades its outer wall's gate
 //! first, then that wall tile by tile, nearest the gate first; its inner ring follows once the
 //! outer one is stone. Villages, starting cities and the Trade Organization's stay as they are.
-//! The upgrade takes Stone beyond its reserve only, last of a town's projects and while its road
-//! crew is in: with no quarry it builds one, and its spare hands work it for the Stone. While it
-//! saves for its founding party, beyond that party's Stone as well (#1379).
+//! The upgrade takes Stone beyond its reserve, last of a town's projects and while its road crew
+//! is in: with no quarry it builds one, and its spare hands work it for the Stone. While it saves
+//! for its founding party, beyond that party's Stone as well (#1379). While it builds or upgrades
+//! its wall in stone its reserve sets Stone aside for it, which only its walls spend, its party's
+//! Stone counting only above it (`wall_stone_set_aside`, Epic 113).
 
-use csp_shared::balance::{NPC_STONE_WALL_RESIDENTS, NPC_WALL_TILES_PER_TRIP};
+use csp_shared::balance::{
+    NPC_STONE_WALL_RESIDENTS, NPC_WALL_STONE_SET_ASIDE_TILES, NPC_WALL_TILES_PER_TRIP,
+};
 use csp_shared::terrain::wrap_delta;
 use csp_shared::world::{
-    Building, BuildingKind, City, CityJobKind, CityProject, Stock, WallMaterial, WorldState,
+    Building, BuildingKind, City, CityJobKind, CityProject, Good, Stock, WallMaterial, WorldState,
 };
 
 use crate::npc_founding::{holds_for_walls, saving_to_found};
@@ -100,6 +104,23 @@ pub fn trip() -> Stock {
 /// The Stone of one tile of stone wall.
 fn one_tile() -> Stock {
     build_materials_of(BuildingKind::Wall, Some(WallMaterial::Stone))
+}
+
+/// The Stone a town sets aside in its reserve for its wall (`CONTEXT.md`: NPC reserve, Wood or
+/// stone; Daniel, 2026-11-19, Epic 113): `NPC_WALL_STONE_SET_ASIDE_TILES` tiles of stone wall's
+/// worth while it builds or upgrades its wall in stone (a wooden wall or gate of its left, or a
+/// stone one begun), so its roads, repairs and trade don't use up the Stone the wall needs. Its
+/// walls spend it (`holds_for_walls`). Nothing for a village or a Player's or Trade Org city.
+pub fn wall_stone_set_aside(world: &WorldState, city: &City) -> f64 {
+    let walling = world.buildings.iter().any(|b| {
+        b.city_id.as_ref() == Some(&city.id)
+            && is_wall(b)
+            && (b.site.is_none() != is_stone(b.kind, b.material))
+    });
+    if !walling || !is_npc_town(world, city) {
+        return 0.0;
+    }
+    NPC_WALL_STONE_SET_ASIDE_TILES * one_tile().get(&Good::Stone).copied().unwrap_or(0.0)
 }
 
 /// Whether a town has a wooden wall or gate left to upgrade, so wants Stone for it: a quarry

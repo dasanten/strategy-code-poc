@@ -21,7 +21,14 @@ use crate::queues::tests::resident;
 use crate::test_world::{city_terrain, world_with_city};
 use crate::world::create_world;
 
+/// A frozen fixture's world, its residents aged by today's childhood (Epic 113).
 fn fixture(name: &str) -> WorldState {
+    let mut world = frozen(name);
+    crate::fixture_ages::residents_aged_as_today(&mut world);
+    world
+}
+
+fn frozen(name: &str) -> WorldState {
     let path = format!("{}/fixtures/sight/{name}.json", env!("CARGO_MANIFEST_DIR"));
     let text = std::fs::read_to_string(path).expect("the sight fixtures are in git");
     let mut value: serde_json::Value = serde_json::from_str(&text).expect("a fixture is JSON");

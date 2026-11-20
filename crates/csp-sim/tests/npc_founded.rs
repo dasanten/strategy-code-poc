@@ -17,8 +17,10 @@ use common::{assert_same_json, fixtures};
 
 #[test]
 fn founds_npc_cities_as_typescript_does() {
-    let want: Value =
+    let mut want: Value =
         serde_json::from_str(include_str!("../src/npc/founded.json")).expect("founded.json");
+    // Its residents aged by today's childhood (Epic 113), as founded at tick 0.
+    csp_sim::fixture_ages::json_aged_as_today(&mut want["residents"], 0.0);
     let tiles = std::fs::read(fixtures().join("terrain/7-1024.bin")).expect("the map");
     let terrain = TerrainMap { size: 1024, tiles };
     let mut world = create_world(&terrain, 7);

@@ -569,8 +569,9 @@ The shared language of the game. Domain terms only — no implementation details
     one stands, and can be defended, until the stone one is finished and replaces it. A Build line
     of wall is of wood or stone; a stone line also upgrades the wooden tiles on its way. Starting
     cities' walls are wooden. An NPC city upgrades its wall to stone once it is a town and holds
-    Stone beyond its reserve (and its founding party's while it saves for one: Full city), gate
-    first.
+    a builder's trip of Stone it may spend: the Stone its reserve sets aside for its wall (NPC
+    reserve), and beyond that what it holds beyond its reserve (and its founding party's while it
+    saves for one: Full city), gate first.
 - **Tower:** a 2×2 building, of wood or stone, standing in a wall's line or alone. It closes the
   way like a wall, and its top is part of the wall walk wherever a wall tile touches it. Up on it
   a resident sees further than up on a wall, which grows the Player's Sight, and archers reach
@@ -641,7 +642,13 @@ The shared language of the game. Domain terms only — no implementation details
   Player's sight.
 - **NPC reserve:** what an NPC city keeps of each good it can use, and never sells: Food for
   some game days for all its residents, and what its stable lacks for its horses (Feeding the
-  stable; the stable's Food counts); Wood and Stone for its next house and some wall, more as it grows; weapons
+  stable; the stable's Food counts); Wood and Stone for its next house and some wall, more as it grows,
+  and while a town builds or upgrades its wall in stone, Stone set aside for that wall (a balance
+  number of tiles' worth; Daniel, 2026-11-19, Epic 113): its roads, repairs and trade leave it, its
+  founding party's Stone counts only above it, and only its walls spend it, so the building for its
+  growing population doesn't use up the Stone its wall needs. It never makes the city short: its
+  spare hands refill it working for surplus, so its walls spending it don't pull them off other
+  work; weapons
   for the soldiers it keeps by its size, and the Iron and Wood to forge them (a city that knows of a
   coal node wants a steel Sword, Armour and Shield for each soldier instead of a spear, forged in that
   order, and keeps them, their Steel and Wood, the Iron and Coal for that Steel and the Iron ore for
@@ -765,7 +772,8 @@ The shared language of the game. Domain terms only — no implementation details
   for Wood and Stone go ahead; begun workshops took each load its quarry brought home. The same
   holds once its daughter stands, for the Wood and Stone the daughter still lacks of the party's
   load, until its storage stands (#1379: a begun smithy took the Stone its daughter's storage
-  needed, and the daughter starved). Its workplaces come first too (Daniel, 2026-11-16): its spare hands'
+  needed, and the daughter starved). Its walls still spend the Stone
+  its reserve sets aside for them (NPC reserve). Its workplaces come first too (Daniel, 2026-11-16): its spare hands'
   work (Spare hands' work: road crew, scouting, its workplaces for surplus) comes before gathering
   for the party, and only the hands left over gather. Those gathering them are still spare hands
   for its full wait. A dip below the reserve only restarts that time if it lasts longer than a game
@@ -1440,8 +1448,8 @@ The shared language of the game. Domain terms only — no implementation details
   including money, so nobody walks around with a fortune in their pocket.
 - **Pairing:** two adult residents of the same city set to have children (a Player order, or on
   its own in NPC cities). Each pair has one child at most. The only way, besides integrating,
-  that residents come into being. Once 10 game days have passed since they paired (3 game days
-  are agreed for Epic 113 but not built yet: #1459 waits for Daniel), and their city
+  that residents come into being. Once 5 game days (2 real hours) have passed since they paired
+  (Daniel, 2026-11-19, Epic 113), and their city
   has free housing and a food surplus, one partner, chosen at random,
   starts **Carrying** the child; the other keeps working as before.
 - **Carrying:** a partner carrying a child can't work for 10 game days (4 real hours); then the
@@ -1474,11 +1482,9 @@ The shared language of the game. Domain terms only — no implementation details
   comes: no free housing, no food surplus, or the realm is too big. Only the owning Player sees
   it.
 - **Aging:** residents grow old; their stats decline late in life, and they die of old age at
-  around 60 game years. Children age faster: each year of age up to 14 takes 10 game days
-  (4 real hours), so a child is grown after about 140 game days (~56 real hours); from 14 on, a
-  year of age is a game year. Agreed with Daniel on 2026-11-19 for Epic 113 but not built yet:
-  4 game days a year, so grown after about 56 game days (~22 real hours). It waits for Daniel
-  (#1459): with it, a growing NPC town never upgrades its wall to stone.
+  around 60 game years. Children age faster: each year of age up to 14 takes 4 game days
+  (about 1.6 real hours), so a child is grown after about 56 game days (~22 real hours); from 14
+  on, a year of age is a game year (Daniel, 2026-11-19, Epic 113).
 - **Hunger:** each resident eats a fixed amount of Food per game day, more on hard terrain and
   less with high Endurance. An empty hunger meter costs health; without food a resident goes
   Down after about 5 game days (2 real hours), and dies if nobody revives them. While the meter

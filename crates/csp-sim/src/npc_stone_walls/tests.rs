@@ -131,34 +131,58 @@ fn a_village_with_spare_stone_stays_wooden() {
 }
 
 #[test]
-fn a_town_upgrades_only_from_a_trips_stone_beyond_its_reserve_and_never_runs_short_for_it() {
+fn a_town_sets_stone_aside_in_its_reserve_for_its_wall_and_upgrades_from_it() {
+    // Epic 113 (Daniel, 2026-11-19): growing faster, a town's roads and founding party took all its
+    // Stone and its wall never went stone.
     let mut t = Town::new();
     assert!(wants_stone_for_walls(&t.world, t.city()));
-    // Holding its reserve's Stone and no more, it waits; the upgrade makes it short of nothing, so
-    // no other project waits on it.
+    let aside = wall_stone_set_aside(&t.world, t.city());
+    assert_eq!(aside, 2.0 * trip());
     let reserve = npc_reserve(&t.world, t.city()).get(&Good::Stone).copied().unwrap_or(0.0);
+    assert!(reserve >= aside);
     let i = t
         .world
         .buildings
         .iter()
         .position(|b| b.city_id.as_ref() == Some(&t.city) && b.kind == BuildingKind::Storage)
         .unwrap();
+    // Holding its reserve but for less than a trip of its set-aside, it waits. That makes it short
+    // of nothing: its hands refill the set-aside working for surplus, not off other work.
     let mut stock = npc_reserve(&t.world, t.city());
-    stock.insert(Good::Stone, reserve);
+    stock.insert(Good::Stone, reserve - aside + trip() - 1.0);
     t.world.buildings[i].stock = Some(stock.clone());
     assert!(!short_goods(&t.world, t.city(), t.terrain.size, None).contains(&Good::Stone));
     assert_eq!(t.upgrade(), None);
-    // A trip's Stone beyond its reserve: the gate goes stone.
-    stock.insert(Good::Stone, reserve + trip());
+    // A trip of its set-aside: the gate goes stone, though it has no Stone beyond its reserve.
+    stock.insert(Good::Stone, reserve - aside + trip());
     t.world.buildings[i].stock = Some(stock);
     assert_eq!(at(&t.upgrade()).0, BuildingKind::Gate);
-    // All of stone: nothing more wanted for it.
+    // All of stone: nothing more wanted for it, and nothing set aside.
     let ids: Vec<String> = t.walls().iter().map(|b| b.id.clone()).collect();
     for id in ids {
         t.set_stone(&id);
     }
     assert!(!wants_stone_for_walls(&t.world, t.city()));
+    assert_eq!(wall_stone_set_aside(&t.world, t.city()), 0.0);
     assert_eq!(t.upgrade(), None);
+}
+
+#[test]
+fn a_village_and_a_stone_walled_town_set_no_stone_aside() {
+    let v = village(None);
+    assert_eq!(wall_stone_set_aside(&v.world, v.city()), 0.0);
+    // A stone site begun over its wooden gate still counts as building its wall in stone.
+    let mut t = Town::new();
+    let ids: Vec<String> = t.walls().iter().map(|b| b.id.clone()).collect();
+    for id in ids {
+        t.set_stone(&id);
+    }
+    assert_eq!(wall_stone_set_aside(&t.world, t.city()), 0.0);
+    let gate = t.gate();
+    let i = t.world.buildings.iter().position(|b| b.id == gate.id).unwrap();
+    t.world.buildings[i].site =
+        Some(csp_shared::world::ConstructionSite { delivered: Stock::new(), work: 0.0 });
+    assert_eq!(wall_stone_set_aside(&t.world, t.city()), 2.0 * trip());
 }
 
 #[test]
@@ -274,7 +298,7 @@ fn a_town_saving_for_its_founding_party_upgrades_only_from_stone_beyond_the_part
     // #1379 (Daniel, 2026-11-18): its walls and repairs kept spending the party's Stone, so no
     // city held it and none founded a daughter.
     use crate::npc_founding::founding_materials;
-    use crate::npc_plan::{npc_founding_stone_kept, plan_city};
+    use crate::npc_plan::{npc_founding_stone_kept, npc_wall_stone_set_aside, plan_city};
     use crate::queries::city::city_residents;
     use crate::queries::names::held;
     use crate::queries::npc_trade::npc_founding_party_size;
@@ -289,14 +313,23 @@ fn a_town_saving_for_its_founding_party_upgrades_only_from_stone_beyond_the_part
         .unwrap();
     let mut stock = npc_reserve(&t.world, t.city());
     let reserve = held(&stock, Good::Stone);
+    // Its reserve holds the Stone it sets aside for its wall (Epic 113).
+    let aside = wall_stone_set_aside(&t.world, t.city());
+    assert!(aside >= trip(), "{aside}");
     stock.insert(Good::Stone, reserve + trip());
     t.world.buildings[i].stock = Some(stock.clone());
     let gate = t.gate();
     assert_eq!(at(&t.upgrade()).0, BuildingKind::Gate);
-    // Saving for its founding party, a trip beyond its reserve is the party's: it waits.
+    // Saving for its founding party, a trip beyond its reserve is the party's, but the Stone set
+    // aside in its reserve is the wall's: it goes on from that.
     t.world.city_plans.get_mut(&city).unwrap().full_since = Some(0.0);
+    assert_eq!(at(&t.upgrade()).0, BuildingKind::Gate);
+    // With less than a trip of its set-aside left it waits: the party's Stone counts only above
+    // its whole reserve, so the next Stone quarried refills the set-aside first.
+    stock.insert(Good::Stone, reserve - aside + trip() - 1.0);
+    t.world.buildings[i].stock = Some(stock.clone());
     assert_eq!(t.upgrade(), None);
-    // The invariant catches a plan that starts the gate from the party's Stone.
+    // The invariant catches a plan that starts the gate without a trip its walls may spend.
     let plan = t.world.city_plans.get_mut(&city).unwrap();
     plan.planned_at = t.world.tick as f64;
     plan.project = Some(CityProject::Build {
@@ -306,6 +339,7 @@ fn a_town_saving_for_its_founding_party_upgrades_only_from_stone_beyond_the_part
         material: STONE,
     });
     assert_eq!(npc_founding_stone_kept(&t.world).len(), 1);
+    assert_eq!(npc_wall_stone_set_aside(&t.world).len(), 1);
     // A trip beyond the party's Stone too: it goes on, and the invariant holds.
     let party = founding_materials(Some(npc_founding_party_size(
         city_residents(&t.world, &city).len() as f64,
@@ -314,6 +348,7 @@ fn a_town_saving_for_its_founding_party_upgrades_only_from_stone_beyond_the_part
     t.world.buildings[i].stock = Some(stock);
     assert_eq!(at(&t.upgrade()).0, BuildingKind::Gate);
     assert_eq!(npc_founding_stone_kept(&t.world), []);
+    assert_eq!(npc_wall_stone_set_aside(&t.world), []);
     // Once its party sets out it saves no more: back to its reserve alone.
     let stock = t.world.buildings[i].stock.as_mut().unwrap();
     stock.insert(Good::Stone, reserve + trip());

@@ -164,6 +164,7 @@ import {
   NPC_BUILDERS,
   NPC_INNER_WALL_REACH,
   NPC_STONE_WALL_RESIDENTS,
+  NPC_WALL_STONE_SET_ASIDE_TILES,
   NPC_ROAD_CREW,
   NPC_ROAD_LONGEST,
   NPC_CITY_MIN_DISTANCE,
@@ -3449,9 +3450,13 @@ export function Wiki() {
           NPC city upgrades its wall to <strong>stone</strong> (see{' '}
           <a href="#transport">Upgrading to stone</a>): its outer gate first, then that wall tile by
           tile, nearest the gate first, and its inner ring once the outer one is all stone. It does
-          this last of all its projects, from Stone beyond its reserve: a tile at a time once it
-          holds a builder's trip of it above its reserve, while its road crew is in and its wall is
-          not moving out. A town with none builds a quarry for it, and its spare hands work it. A
+          this last of all its projects. While it does, its reserve sets aside the Stone of{' '}
+          {num(NPC_WALL_STONE_SET_ASIDE_TILES)} tiles of stone wall for it: its roads, repairs and
+          trade leave that Stone, a founding party's Stone counts only above it, and only its walls
+          spend it. It never counts as short: its spare hands refill it working for surplus, so the
+          wall doesn't pull them off other work. It upgrades a tile at a time once it holds a builder's trip of Stone it may
+          spend, from what it sets aside or beyond its reserve, while its road crew is in and its
+          wall is not moving out. A town with none builds a quarry for it, and its spare hands work it. A
           new outer wall it puts up when it grows is of stone once its old one was. Villages,
           starting cities and the Trade Organization's cities stay wooden.
         </p>
@@ -3533,7 +3538,8 @@ export function Wiki() {
           buildings wait until it holds what they need above its reserve and the party's, but its
           farms, lumber camps and quarries go ahead. The same holds once its daughter stands, for
           the Wood and Stone the daughter still lacks of the party's load, until its storage
-          stands. Its workplaces come first as well: its spare hands go on a road crew, scout and work at
+          stands. Its walls may spend the Stone its reserve sets aside for them.
+          Its workplaces come first as well: its spare hands go on a road crew, scout and work at
           its workplaces for surplus, and only those left over gather for the party. Past{' '}
           {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less for each{' '}
           {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}. A dip

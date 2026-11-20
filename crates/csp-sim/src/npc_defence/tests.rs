@@ -1102,8 +1102,18 @@ mod tools {
         ] {
             stock.insert(g, n);
         }
+        // The village's pair, paired long enough that one partner carries from the first tick, so the
+        // city plans its work without them from the start (a pair waits only `PAIRING_WAIT_DAYS`,
+        // Epic 113): one hand fewer, so the run takes 9 game days.
+        let citizens = p.citizens();
+        let (a, b) = (citizens[0], citizens[1]);
+        let since = p.world.tick as f64 - csp_shared::balance::PAIRING_WAIT_TICKS;
+        for (i, partner) in [(a, b), (b, a)] {
+            let partner_id = p.world.residents[partner].id.clone();
+            p.world.residents[i].pair = Some(csp_shared::world::Pair { partner_id, since });
+        }
         let mut runner = Runner::new(&p.terrain);
-        p.run(&mut runner, 6 * DAY);
+        p.run(&mut runner, 9 * DAY);
         let made: f64 = p
             .citizens()
             .iter()

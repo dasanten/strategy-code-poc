@@ -316,6 +316,12 @@ pub fn npc_reserve(world: &WorldState, city: &City) -> Stock {
     add(&mut reserve, materials("house"), steps);
     add(&mut reserve, materials("wall"), NPC_TRADE.reserve_wall_stretches * steps);
     add(&mut reserve, [("stone", NPC_TRADE.reserve_stone_per_step)], steps - 1.0);
+    // A town building or upgrading its wall in stone sets Stone aside for it (Epic 113): its
+    // roads, repairs and trade leave it, and only its walls spend it (`holds_for_walls`).
+    let aside = crate::npc_stone_walls::wall_stone_set_aside(world, city);
+    if aside > 0.0 {
+        *reserve.entry(Good::Stone).or_insert(0.0) += aside;
+    }
     let tick = world.tick as f64;
     let residents: Vec<&Resident> = city_residents(world, &city.id)
         .into_iter()
