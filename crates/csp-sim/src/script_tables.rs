@@ -2809,7 +2809,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &["good", "from", "skip?"],
         cost: 20.0,
-        description: "The tile to gather `good` (\"wood\", \"food\" or \"stone\") on next: of the tiles my Player has explored within the gathering reach of `from` (the Wiki’s Gathering section says how far), something with `x` and `y`, whose terrain gives it (Forest, or Hills for stone) with nothing built on it and no node, the nearest to `from` that isn’t picked over as far as I can see. One out of sight may be picked over all the same. With `skip`, a list of things with `x` and `y`, none of those tiles. Null with none.",
+        description: "The tile to gather `good` (\"wood\", \"food\" or \"stone\") on next: of the tiles my Player has explored within the gathering reach of `from` (the Wiki’s Gathering section says how far), something with `x` and `y`, whose terrain gives it (Forest, or Hills for stone) with nothing built on it and no node as far as I know (in sight, or as I last saw it), the nearest to `from` that isn’t picked over as far as I can see. One out of sight may be picked over or built on all the same. With `skip`, a list of things with `x` and `y`, none of those tiles. Null with none.",
         returns: ScriptType::View("tile"),
     },
     ScriptBinding {
@@ -6536,7 +6536,7 @@ if (walkThere(tile)) { return }
 let problem = gather(params.good)
 if (problem == null) {
   wait() // until my hands are full or the patch is gone
-} else if (problem == "picked over") {
+} else if (problem == "picked over" || problem == "something stands on this tile") {
   memory.at = null // I see it now: the next tile
 } else {
   end("can't gather " + params.good + " here: " + problem)

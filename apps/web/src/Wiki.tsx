@@ -2101,7 +2101,9 @@ export function Wiki() {
           isn’t picked over as far as they can see, gathers until their hands are full or the patch
           is gone, and goes on to the next tile; with a full load they store it at their{' '}
           <code>storage</code>, else the nearest storage of your realm, and come back. Several
-          gatherers take different tiles. With no such tile left in reach they store what they carry
+          gatherers take different tiles. Out of sight they go by what you last saw there: a tile
+          someone built on since looks free until it comes into sight, and then they pick the next
+          one. With no such tile left in reach they store what they carry
           and end, saying why. The usual food params work as in Work. In a script,{' '}
           <code>gather(good)</code> gathers on the tile you stand on, and a tile’s{' '}
           <code>pickedOver</code> says whether its patch is gone.
