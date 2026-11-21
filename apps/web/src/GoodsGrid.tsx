@@ -21,7 +21,7 @@ const NAME_STAYS_MS = 1500
  * (`CONTEXT.md`: Art style) its pixel art, where the good has some.
  */
 export function GoodIcon({ good }: { good: Good }) {
-  const style = useSyncExternalStore(onArtStyle, artStyle)
+  const style = useSyncExternalStore(onArtStyle, artStyle, artStyle)
   const slice = style === 'pixel' ? PIXEL_GOOD[good] : undefined
   const rect = slice === undefined ? undefined : pixelSlice('goods', slice)
   if (rect) {

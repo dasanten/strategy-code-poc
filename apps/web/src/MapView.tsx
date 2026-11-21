@@ -317,7 +317,7 @@ export function MapView({
   const overviewRef = useRef<(overview: Uint8Array | null) => void>(() => {})
   const redrawRef = useRef<() => void>(() => {})
   // The art style (`CONTEXT.md`: Art style): picked in the legend, the map drawn again at once.
-  const style = useSyncExternalStore(onArtStyle, artStyle)
+  const style = useSyncExternalStore(onArtStyle, artStyle, artStyle)
   useEffect(() => onArtStyle(() => redrawRef.current()), [])
   const motionRef = useRef<(world: MapWorld) => void>(() => {})
   const forgetRef = useRef<(chunks: readonly number[]) => void>(() => {})
