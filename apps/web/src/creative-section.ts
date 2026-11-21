@@ -30,32 +30,36 @@ export interface CreativeOffer {
   finish?: { buildingId: string; label: string; title: string }
 }
 
-/** The creative actions for a card's building and the carriage on its tile, if any. */
+/**
+ * The creative actions for a card's building and the carriage on its tile, if any. `shared` are
+ * the buildings on the tile that share it (`SHARES_A_TILE`: road, carriage, boat, ship, ram and
+ * catapult), which the card's building never is: a site among them is finished now too.
+ */
 export function creativeOffer(
   building: Pick<Building, 'id' | 'kind' | 'site'> | undefined,
   carriage: Pick<Carriage, 'id'> | undefined,
   buildingName: string,
+  shared: readonly Pick<Building, 'id' | 'kind' | 'site'>[] = [],
 ): CreativeOffer {
   const holders: CreativeHolder[] = []
   if (building && !building.site && KEEPS_GOODS.includes(building.kind)) {
     holders.push({ id: building.id, label: `The ${buildingName}` })
   }
   if (carriage) holders.push({ id: carriage.id, label: 'The carriage' })
-  const finish = !building
-    ? undefined
-    : building.site
+  const site = building?.site ? building : shared.find((b) => b.site)
+  const finish = site
+    ? {
+        buildingId: site.id,
+        label: 'Finish now',
+        title: 'Build the site now, and the rest of any road or wall line building on it',
+      }
+    : building?.kind === 'trainingGround'
       ? {
           buildingId: building.id,
-          label: 'Finish now',
-          title: 'Build the site now, and the rest of any road or wall line building on it',
+          label: 'Finish trainings now',
+          title: 'Every trainee here trains as far as the teacher takes them, and stops',
         }
-      : building.kind === 'trainingGround'
-        ? {
-            buildingId: building.id,
-            label: 'Finish trainings now',
-            title: 'Every trainee here trains as far as the teacher takes them, and stops',
-          }
-        : undefined
+      : undefined
   return { holders, finish }
 }
 

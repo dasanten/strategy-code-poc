@@ -2982,7 +2982,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 const { x, y } = selectedTile
                 const carriage = world.carriages.find((k) => k.x === x && k.y === y)
                 const name = tileBuilding ? BUILDING_NAMES[tileBuilding.kind].toLowerCase() : ''
-                const offer = creativeOffer(tileBuilding, carriage, name)
+                const shared = world.buildings.filter(
+                  (b) => SHARES_A_TILE.includes(b.kind) && covers(b, x, y, world.map.size),
+                )
+                const offer = creativeOffer(tileBuilding, carriage, name, shared)
                 const cities = creativeCities(knownCities, world.home.realmId)
                 const tileCity = knownCities.find((c) =>
                   inCityArea({ buildings: knownBuildings }, c, x, y, world.map.size),
@@ -2993,7 +2996,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 return (
                   <>
                     {offersAnything(offer) && (
-                      <CreativeSection key={`${tileBuilding?.id}/${carriage?.id}`} offer={offer} />
+                      <CreativeSection
+                        key={`${tileBuilding?.id}/${carriage?.id}/${offer.finish?.buildingId}`}
+                        offer={offer}
+                      />
                     )}
                     <CreativeAddSection
                       key={`${x},${y}`}

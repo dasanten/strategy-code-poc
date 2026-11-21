@@ -25,6 +25,25 @@ describe('the Creative section of a card', () => {
     expect(offersAnything(creativeOffer(house, undefined, 'house'))).toBe(false)
   })
 
+  it('finishes a site sharing the tile: a ram, a boat on a haven, a road', () => {
+    const site = { delivered: {}, work: 0 }
+    const ram = { id: 'r1', kind: 'ram' as const, site }
+    expect(creativeOffer(undefined, undefined, '', [ram]).finish).toMatchObject({
+      buildingId: 'r1',
+      label: 'Finish now',
+    })
+    const haven = { id: 'h1', kind: 'haven' as const }
+    const boat = { id: 'v1', kind: 'boat' as const, site }
+    const onHaven = creativeOffer(haven, undefined, 'haven', [boat])
+    expect(onHaven.finish?.buildingId).toBe('v1')
+    expect(onHaven.holders).toEqual([{ id: 'h1', label: 'The haven' }])
+    const road = { id: 'd1', kind: 'road' as const, site }
+    expect(creativeOffer(undefined, undefined, '', [road]).finish?.buildingId).toBe('d1')
+    // A finished road or ship on the tile offers nothing.
+    const built = { id: 'd2', kind: 'road' as const }
+    expect(offersAnything(creativeOffer(undefined, undefined, '', [built]))).toBe(false)
+  })
+
   it("finishes a training ground's trainings", () => {
     const ground = { id: 'g1', kind: 'trainingGround' as const }
     expect(creativeOffer(ground, undefined, 'training ground').finish?.label).toBe(
