@@ -15,7 +15,8 @@ use csp_server::db::open_db;
 use csp_server::monitoring::LogSink;
 use csp_server::realtime::{
     Realtime, RealtimeOptions, TickView, COUNTS_FROM_VERSION, MIN_PROTOCOL_VERSION,
-    PROTOCOL_VERSION, WS_CLOSE_LOGGED_OUT, WS_CLOSE_TOO_MANY_REQUESTS, WS_CLOSE_UPDATED,
+    PROTOCOL_VERSION, WS_CLOSE_LOGGED_OUT, WS_CLOSE_RELOAD, WS_CLOSE_TOO_MANY_REQUESTS,
+    WS_CLOSE_UPDATED,
 };
 use csp_server::server::{Game, GameThread, TickSettings};
 use csp_shared::terrain::{Terrain, TerrainMap};
@@ -564,6 +565,7 @@ fn the_client_speaks_the_servers_protocol_version_and_knows_its_close_code() {
         "apps/web/src/shared/protocol.ts names another PROTOCOL_VERSION than the server's"
     );
     assert!(has(format!("export const WS_CLOSE_UPDATED = {WS_CLOSE_UPDATED}")));
+    assert!(has(format!("export const WS_CLOSE_RELOAD = {WS_CLOSE_RELOAD}")));
 }
 
 // --------------------------------------------------------------------------------- the world
@@ -1207,4 +1209,29 @@ async fn tells_a_client_of_the_counts_version_how_much_of_each_chunk_is_explored
     let welcome = old.next("welcome").await;
     assert!(welcome.get("exploredCounts").is_none());
     assert!(welcome["exploredChunks"].as_array().is_some_and(|l| !l.is_empty()));
+}
+
+// ------------------------------------------------------------------------------- checkpoints
+
+/// Restoring a checkpoint swaps the world whole (`CONTEXT.md`: Creative mode): every open tab is
+/// told to reload, and one that connects again is welcomed into the restored world.
+#[tokio::test(flavor = "multi_thread")]
+async fn tells_every_socket_to_reload_when_a_checkpoint_is_restored() {
+    let s = start(StartOptions::default()).await;
+    let mut a = connect(&s).await;
+    a.next("welcome").await;
+    let mut b = connect(&s).await;
+    b.next("welcome").await;
+    let saved = s.game.run(|g, _| g.world.clone()).await.unwrap();
+    let saved_tick = saved.tick;
+    s.tick().await;
+    s.tick().await;
+    let restored = s.game.run(move |g, conn| g.restore(conn, saved)).await.unwrap();
+    restored.unwrap();
+    assert_eq!(a.close_code().await, WS_CLOSE_RELOAD);
+    assert_eq!(b.close_code().await, WS_CLOSE_RELOAD);
+    assert_eq!(s.realtime.socket_count(), 0);
+    let mut again = connect(&s).await;
+    let welcome = again.next("welcome").await;
+    assert_eq!(welcome["tick"], json!(saved_tick), "the restored world's tick");
 }

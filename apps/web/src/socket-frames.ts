@@ -2,6 +2,7 @@
 // gzipped JSON, small ones as text; and what a close code means for the tab.
 import {
   WS_CLOSE_LOGGED_OUT,
+  WS_CLOSE_RELOAD,
   WS_CLOSE_TOO_MANY_REQUESTS,
   WS_CLOSE_UPDATED,
 } from './shared/protocol.js'
@@ -41,6 +42,8 @@ export function inArrivalOrder(
 export type OnClose =
   /** The game was updated since the tab loaded: show the Reload dialog, do not reconnect. */
   | 'updated'
+  /** A creative server restored a checkpoint: the world was swapped, load the page again. */
+  | 'reload'
   /** The session ended: the login screen. */
   | 'loggedOut'
   /** It sent too much: reconnect after a wait. */
@@ -50,6 +53,7 @@ export type OnClose =
 
 export function onClose(code: number): OnClose {
   if (code === WS_CLOSE_UPDATED) return 'updated'
+  if (code === WS_CLOSE_RELOAD) return 'reload'
   if (code === WS_CLOSE_LOGGED_OUT) return 'loggedOut'
   if (code === WS_CLOSE_TOO_MANY_REQUESTS) return 'throttled'
   return 'reconnect'

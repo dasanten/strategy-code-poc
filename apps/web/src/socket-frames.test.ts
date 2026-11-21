@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { frameText, inArrivalOrder, onClose, type Frame } from './socket-frames.js'
 import {
   WS_CLOSE_LOGGED_OUT,
+  WS_CLOSE_RELOAD,
   WS_CLOSE_TOO_MANY_REQUESTS,
   WS_CLOSE_UPDATED,
 } from './shared/protocol.js'
@@ -65,6 +66,7 @@ describe('onClose', () => {
   it('shows the Reload dialog when the game was updated, and reconnects on any other close', () => {
     expect(onClose(WS_CLOSE_UPDATED)).toBe('updated')
     expect(onClose(WS_CLOSE_LOGGED_OUT)).toBe('loggedOut')
+    expect(onClose(WS_CLOSE_RELOAD)).toBe('reload')
     expect(onClose(WS_CLOSE_TOO_MANY_REQUESTS)).toBe('throttled')
     for (const code of [1000, 1001, 1006, 1011, 4000]) expect(onClose(code)).toBe('reconnect')
   })

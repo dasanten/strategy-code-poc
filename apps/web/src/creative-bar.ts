@@ -62,3 +62,12 @@ export function gameSpan(ticks: number): string {
   ].filter(Boolean)
   return parts.length > 0 ? parts.join(' ') : '0 min'
 }
+
+/** The longest checkpoint name the server takes, in characters. */
+export const CHECKPOINT_NAME_MAX = 60
+
+/** A checkpoint's name as the server stores it (trimmed), or `undefined` if it refuses it. */
+export function checkpointName(name: string): string | undefined {
+  const trimmed = name.trim()
+  return trimmed.length > 0 && [...trimmed].length <= CHECKPOINT_NAME_MAX ? trimmed : undefined
+}

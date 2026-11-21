@@ -68,6 +68,9 @@ pub const WS_CLOSE_LOGGED_OUT: u16 = 4001;
 /// (ADR 0034): the client shows "The game was updated" with a Reload button instead of
 /// reconnecting.
 pub const WS_CLOSE_UPDATED: u16 = 4426;
+/// The close code of every socket when a creative server restores a checkpoint (`CONTEXT.md`:
+/// Creative mode): the world was swapped whole, so the client loads the page again at once.
+pub const WS_CLOSE_RELOAD: u16 = 4205;
 /// The protocol version this server speaks (ADR 0034). A client names the version it speaks with
 /// the query flag `v` when it connects (`/ws?v=2`); one that names none speaks version 0, the
 /// protocol from before versions. Raise it when a message changes shape.
@@ -1098,6 +1101,16 @@ impl Realtime {
             // A realm with no socket left starts afresh when one connects again.
             out_of_sight.retain(|realm, _| remembered_now.contains_key(realm));
         });
+    }
+
+    /// Closes every socket with [`WS_CLOSE_RELOAD`]: the world was swapped for a checkpoint
+    /// (`CONTEXT.md`: Creative mode), so every client loads the page again.
+    pub fn reload_all(&self) {
+        let mut hub = self.hub();
+        for (_, s) in hub.sessions.drain(..) {
+            let _ = s.out.send(Outgoing::Close(WS_CLOSE_RELOAD, "world restored"));
+        }
+        hub.clients.clear();
     }
 
     /// Closes every socket (`close`).

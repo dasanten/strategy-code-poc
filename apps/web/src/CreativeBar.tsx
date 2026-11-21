@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import type { CreativeState, SkipProgress, SkipUnit } from '@csp/shared-types'
+import type { Checkpoint, CreativeState, SkipProgress, SkipUnit } from '@csp/shared-types'
 import { api, ApiFailure } from './api.js'
 import {
+  CHECKPOINT_NAME_MAX,
+  checkpointName,
   CREATIVE_SPEEDS,
   creativeRunning,
   SKIP_UNITS,
@@ -100,6 +102,7 @@ export function CreativeBar({ tick }: { tick: number | undefined }) {
           </span>
           <span className="hud-creative-status">{creativeRunning(state.paused, state.speed)}</span>
           <SkipAhead skip={state.skip} busy={busy} act={act} />
+          <Checkpoints tick={tick} busy={busy} act={act} />
         </>
       )}
       {error && <span className="hud-creative-error">{error}</span>}
@@ -171,6 +174,119 @@ function SkipAhead({
         ))}
       </select>
     </form>
+  )
+}
+
+/**
+ * The Checkpoints menu (`CONTEXT.md`: Creative mode): save the world under a name, and list the
+ * checkpoints with their game time to restore or delete. Restoring swaps the world whole and
+ * every open tab, this one too, loads again.
+ */
+function Checkpoints({
+  tick,
+  busy,
+  act,
+}: {
+  tick: number | undefined
+  busy: boolean
+  act: (call: () => Promise<CreativeState>) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [list, setList] = useState<Checkpoint[]>()
+  const [name, setName] = useState('')
+  const [working, setWorking] = useState(false)
+  const [error, setError] = useState<string>()
+
+  useEffect(() => {
+    if (!open) return
+    let live = true
+    api
+      .checkpoints()
+      .then((l) => live && setList(l))
+      .catch((e: unknown) => live && setError(message(e)))
+    return () => {
+      live = false
+    }
+  }, [open])
+
+  const change = (call: () => Promise<Checkpoint[]>, after?: () => void) => {
+    setWorking(true)
+    call()
+      .then((l) => {
+        setList(l)
+        setError(undefined)
+        after?.()
+      })
+      .catch((e: unknown) => setError(message(e)))
+      .finally(() => setWorking(false))
+  }
+
+  const valid = checkpointName(name)
+  const disabled = busy || working
+  return (
+    <details
+      className="hud-creative-checkpoints"
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+    >
+      <summary>Checkpoints</summary>
+      <div className="hud-creative-checkpoints-panel">
+        <form
+          aria-label="Save a checkpoint"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (valid !== undefined) change(() => api.saveCheckpoint(valid), () => setName(''))
+          }}
+        >
+          <input
+            type="text"
+            value={name}
+            maxLength={CHECKPOINT_NAME_MAX}
+            placeholder={tick !== undefined ? formatGameTime(tick) : 'Name'}
+            aria-label="Checkpoint name"
+            onChange={(e) => setName(e.target.value)}
+          />
+          <button
+            type="submit"
+            disabled={disabled || valid === undefined}
+            title="Save the world as it is now; a checkpoint of the same name is replaced"
+          >
+            Save
+          </button>
+        </form>
+        {list?.length === 0 && <p className="hud-creative-status">No checkpoints yet.</p>}
+        {list && list.length > 0 && (
+          <ul aria-label="Checkpoints">
+            {list.map((c) => (
+              <li key={c.id}>
+                <span className="hud-creative-checkpoint-name">{c.name}</span>
+                <span className="hud-creative-status">{formatGameTime(c.tick)}</span>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  title="Swap the whole world for this checkpoint; every open tab loads again"
+                  onClick={() => {
+                    if (window.confirm(`Restore “${c.name}”? The world as it is now is lost.`)) {
+                      act(() => api.restoreCheckpoint(c.id))
+                    }
+                  }}
+                >
+                  Restore
+                </button>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => change(() => api.deleteCheckpoint(c.id))}
+                >
+                  Delete
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {error && <p className="hud-creative-error">{error}</p>}
+      </div>
+    </details>
   )
 }
 

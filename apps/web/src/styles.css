@@ -2747,6 +2747,9 @@ button.residents-row.selected:hover {
    (`CONTEXT.md`: Creative mode): its dashed border marks it as a testing tool, never play. */
 .hud-creative-bar {
   pointer-events: auto;
+  /* Above the notices after it, so the Checkpoints menu opens over them. */
+  position: relative;
+  z-index: 6;
   max-width: 100%;
   box-sizing: border-box;
   display: flex;
@@ -2801,6 +2804,59 @@ button.residents-row.selected:hover {
 }
 .hud-creative-skip progress {
   width: 120px;
+}
+/* Checkpoints: a menu that opens under the bar, to save the world by name and restore it. */
+.hud-creative-checkpoints {
+  position: relative;
+}
+.hud-creative-checkpoints summary {
+  cursor: pointer;
+}
+.hud-creative-checkpoints-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
+  width: min(380px, 90vw);
+  box-sizing: border-box;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--ui-bar);
+  backdrop-filter: blur(8px);
+  border: 1px dashed var(--ui-line);
+  border-radius: 10px;
+}
+.hud-creative-checkpoints-panel form {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+}
+.hud-creative-checkpoints-panel input {
+  flex: 1;
+  min-width: 0;
+}
+.hud-creative-checkpoints-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hud-creative-checkpoints-panel li {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 6px;
+}
+.hud-creative-checkpoint-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.hud-creative-checkpoints-panel p {
+  margin: 0;
 }
 /* The realm bar along the bottom of the map in realm control mode (`CONTEXT.md`: Realm order). */
 .hud-realm-bar {

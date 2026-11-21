@@ -309,6 +309,8 @@ export function useWorld(onLoggedOut: () => void) {
         const then = onClose(ev.code)
         // The game was updated since this tab loaded: the Player reloads, it does not reconnect.
         if (then === 'updated') return setStatus('updated')
+        // A creative server restored a checkpoint: the whole world changed, so load it afresh.
+        if (then === 'reload') return location.reload()
         // The server closed it for sending too much: wait before trying again.
         if (then === 'throttled') {
           setStatus('throttled')

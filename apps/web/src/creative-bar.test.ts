@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CHECKPOINT_NAME_MAX,
+  checkpointName,
   CREATIVE_SPEEDS,
   creativeRunning,
   gameSpan,
@@ -44,5 +46,14 @@ describe('skip ahead', () => {
     expect(skipLine({ done: 0, total: 120 })).toBe('Skipping ahead: 0 min of 2 h (0%)')
     expect(gameSpan(2 * 1440 + 61)).toBe('2 days 1 h 1 min')
     expect(skipShare({ done: 5, total: 0 })).toBe(1)
+  })
+})
+
+describe('checkpoint names', () => {
+  it('are trimmed and take one to sixty characters, as the server does', () => {
+    expect(checkpointName('  before the fight ')).toBe('before the fight')
+    expect(checkpointName('   ')).toBeUndefined()
+    expect(checkpointName('x'.repeat(CHECKPOINT_NAME_MAX))).toBe('x'.repeat(60))
+    expect(checkpointName('x'.repeat(61))).toBeUndefined()
   })
 })
