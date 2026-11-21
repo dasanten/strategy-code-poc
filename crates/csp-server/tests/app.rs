@@ -347,12 +347,14 @@ async fn keeps_players_out_of_admin_routes() {
 
 // -------------------------------------------------------------------------------- creative mode
 
-const CREATIVE_ROUTES: [(&str, &str); 5] = [
+const CREATIVE_ROUTES: [(&str, &str); 7] = [
     ("GET", "/api/admin/creative"),
     ("POST", "/api/admin/creative/pause"),
     ("POST", "/api/admin/creative/resume"),
     ("POST", "/api/admin/creative/step"),
     ("POST", "/api/admin/creative/speed"),
+    ("POST", "/api/admin/creative/skip"),
+    ("POST", "/api/admin/creative/skip/cancel"),
 ];
 
 #[tokio::test]
@@ -411,6 +413,43 @@ async fn lets_only_admins_use_the_time_controls_on_a_creative_server() {
     let refused = call(&app, "POST", "/api/admin/creative/speed", Some(&admin), Some(bad)).await;
     assert_eq!(refused.status, StatusCode::BAD_REQUEST);
     assert_eq!(controls.state().speed, csp_server::creative::CreativeSpeed::X60);
+}
+
+#[tokio::test]
+async fn starts_one_skip_ahead_at_a_time_and_cancels_it() {
+    let db = Db::new();
+    let controls = Arc::new(csp_server::creative::TimeControls::new());
+    let mut opts = db.opts();
+    opts.creative = Some(Arc::clone(&controls));
+    let app = build_app(opts);
+    create_admin(&db.conn(), Some("Daniel"), Some("admin password")).unwrap();
+    let admin = login_as(&app, "Daniel", "admin password").await;
+    let skip =
+        |body: Value| call(&app, "POST", "/api/admin/creative/skip", Some(&admin), Some(body));
+
+    for bad in [
+        json!({ "amount": 0, "unit": "hours" }),
+        json!({ "amount": 421, "unit": "days" }),
+        json!({ "amount": 2, "unit": "weeks" }),
+        json!({ "amount": -1, "unit": "days" }),
+    ] {
+        let res = skip(bad.clone()).await;
+        assert_eq!(res.status, StatusCode::BAD_REQUEST, "{bad}");
+        assert_eq!(res.error(), "invalid-input");
+    }
+    let started = skip(json!({ "amount": 2, "unit": "days" })).await;
+    assert_eq!(
+        started.json(),
+        json!({ "paused": false, "speed": "normal", "skip": { "done": 0, "total": 2880 } })
+    );
+    let again = skip(json!({ "amount": 1, "unit": "hours" })).await;
+    assert_eq!(again.status, StatusCode::BAD_REQUEST, "one at a time");
+    let state = call(&app, "GET", "/api/admin/creative", Some(&admin), None).await;
+    assert_eq!(state.json()["skip"], json!({ "done": 0, "total": 2880 }));
+
+    let cancelled = call(&app, "POST", "/api/admin/creative/skip/cancel", Some(&admin), None).await;
+    assert_eq!(cancelled.json(), json!({ "paused": false, "speed": "normal" }));
+    assert_eq!(controls.state().skip, None);
 }
 
 // ------------------------------------------------------------------------------------- sessions

@@ -2788,6 +2788,20 @@ button.residents-row.selected:hover {
 .hud-creative-error {
   flex: 1 1 100%;
 }
+/* Skip ahead: amount and unit, or while it runs its progress and Cancel. */
+.hud-creative-skip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+}
+.hud-creative-skip input {
+  width: 4.5em;
+}
+.hud-creative-skip progress {
+  width: 120px;
+}
 /* The realm bar along the bottom of the map in realm control mode (`CONTEXT.md`: Realm order). */
 .hud-realm-bar {
   position: absolute;

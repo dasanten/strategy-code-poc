@@ -8,7 +8,7 @@ use std::{
 use csp_server::scripts::{create_script, game_defaults};
 use csp_server::{
     auth::{create_admin, create_session, find_user_by_name},
-    creative::{CreativeSpeed, TimeControls, FAST_BROADCAST_GAP},
+    creative::{CreativeSpeed, TimeControls, FAST_BROADCAST_GAP, MAX_SKIP_TICKS},
     db::open_db,
     monitoring::LogSink,
     server::{tick_loop, Game, GameThread, TickSettings},
@@ -292,5 +292,88 @@ async fn creative_time_controls_pause_step_and_speed_up_the_loop() {
         },
     );
     tokio::join!(run, drive);
+    thread.stop().await.unwrap();
+}
+
+/// A paused game on its thread with creative time controls.
+fn paused_creative_game() -> (GameThread<FakeLog>, Arc<TimeControls>) {
+    let thread =
+        GameThread::spawn(|| Ok((open_db(":memory:", None)?, game(FakeLog::default()))), SETTINGS)
+            .unwrap();
+    let controls = Arc::new(TimeControls::new());
+    controls.pause();
+    (thread, controls)
+}
+
+/// The creative tick loop at the game's one-second tick, until `stopped` resolves.
+async fn creative_loop(
+    thread: &GameThread<FakeLog>,
+    controls: &Arc<TimeControls>,
+    stopped: tokio::sync::oneshot::Receiver<()>,
+) {
+    let stop = async {
+        let _ = stopped.await;
+    };
+    let (period, day) = (Duration::from_millis(1000), Duration::from_secs(3600));
+    tick_loop(thread, period, day, None, Some(Arc::clone(controls)), stop).await;
+}
+
+/// Waits until no skip ahead runs.
+async fn skip_ended(controls: &TimeControls) {
+    let mut clock = controls.subscribe();
+    tokio::time::timeout(Duration::from_secs(20), clock.wait_for(|c| c.skip.is_none()))
+        .await
+        .expect("the skip ends")
+        .unwrap();
+}
+
+#[tokio::test]
+async fn skipping_a_game_day_runs_the_same_1440_ticks_as_the_normal_loop() {
+    let conn = open_db(":memory:", None).unwrap();
+    let mut normal = game(FakeLog::default());
+    for _ in 0..1440 {
+        normal.tick(&conn, SETTINGS);
+    }
+    let (thread, controls) = paused_creative_game();
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let drive = async {
+        assert!(controls.skip(1440));
+        skip_ended(&controls).await;
+        let (skipped, holding) =
+            thread.run(|g, _| (g.world.clone(), g.broadcasts.holding)).await.unwrap();
+        assert_eq!(skipped.tick, 1440);
+        assert!(skipped == normal.world, "the skipped world equals the normally ticked one");
+        assert!(!holding, "the sockets are told again once it ends");
+        // Paused before, paused after.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(tick_of(&thread).await, 1440);
+        assert!(controls.state().paused);
+        let _ = stop.send(());
+    };
+    tokio::join!(creative_loop(&thread, &controls, stopped), drive);
+    thread.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn a_cancelled_skip_stops_between_ticks() {
+    let (thread, controls) = paused_creative_game();
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let drive = async {
+        assert!(controls.skip(MAX_SKIP_TICKS));
+        let mut clock = controls.subscribe();
+        clock.wait_for(|c| c.skip.is_some_and(|s| s.done >= 10)).await.unwrap();
+        controls.cancel_skip();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let stopped_at = tick_of(&thread).await;
+        assert!((10..MAX_SKIP_TICKS).contains(&stopped_at), "{stopped_at}");
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(tick_of(&thread).await, stopped_at, "no tick after the cancel");
+        assert!(!thread.run(|g, _| g.broadcasts.holding).await.unwrap());
+        // A step still runs exactly one tick afterwards.
+        controls.step().await;
+        assert_eq!(tick_of(&thread).await, stopped_at + 1);
+        let _ = stop.send(());
+    };
+    tokio::join!(creative_loop(&thread, &controls, stopped), drive);
     thread.stop().await.unwrap();
 }

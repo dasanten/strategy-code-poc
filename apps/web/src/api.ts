@@ -21,6 +21,7 @@ import type {
   ApiError,
   ClientFirstDayLine,
   CreateScriptRequest,
+  CreativeSkipRequest,
   CreativeSpeed,
   CreativeSpeedRequest,
   CreativeState,
@@ -128,6 +129,9 @@ export const api = {
   creativeStep: () => call<CreativeState>('POST', `${CREATIVE_PATH}/step`),
   creativeSpeed: (speed: CreativeSpeed) =>
     call<CreativeState>('POST', `${CREATIVE_PATH}/speed`, { speed } satisfies CreativeSpeedRequest),
+  creativeSkip: (request: CreativeSkipRequest) =>
+    call<CreativeState>('POST', `${CREATIVE_PATH}/skip`, request),
+  creativeSkipCancel: () => call<CreativeState>('POST', `${CREATIVE_PATH}/skip/cancel`),
   // The script library: saving keeps every version; one without syntax errors becomes active.
   scripts: () => call<ScriptSummary[]>('GET', '/api/scripts'),
   script: (id: number) => call<ScriptDetail>('GET', `/api/scripts/${id}`),
