@@ -9,6 +9,16 @@ import {
   paintedCellsInUse,
   paintedImage,
 } from './art.js'
+import {
+  PIXEL_FILES,
+  isDrawn,
+  packSlices,
+  pixelArt,
+  pixelTint,
+  type PixelSheet,
+  type SliceRect,
+} from './pixel-art.js'
+import { PIXEL_SLICES } from './pixel-slices.js'
 
 /** Pixels per symbol in the atlas: enough for the largest token at the closest zoom. */
 export const ATLAS_CELL = 96
@@ -49,7 +59,88 @@ export async function loadAtlas(): Promise<Atlas> {
   )
   await addPaintedSheet(atlas)
   await addPaintedImages(atlas)
+  await addPixelArt(atlas)
   return atlas
+}
+
+/** How many pixels of its own edge surround each pixel art slice in the atlas. */
+const PIXEL_PAD = 8
+/** How wide the pixel art's texture is; its slices are packed in rows. */
+const PIXEL_ATLAS_WIDTH = 512
+
+/** An exported sheet's image as a canvas with its pixels, if the file is there. */
+async function sheetPixels(file: string) {
+  const url = PIXEL_FILES[file]
+  if (!url) return undefined
+  const img = new Image()
+  img.src = url
+  await img.decode()
+  const canvas = document.createElement('canvas')
+  canvas.width = img.naturalWidth
+  canvas.height = img.naturalHeight
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+  ctx.drawImage(img, 0, 0)
+  const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  return { canvas, width: canvas.width, pixels: data }
+}
+
+/**
+ * Adds the pixel art (`pixel-art.ts`, ADR 0043): every slice with something drawn in it, and the
+ * part of it on the sheet's tint layer, packed into one texture. It is drawn crisp when scaled up
+ * and smooth when scaled down, each slice with its own edge repeated around it so that pieces
+ * that join, like walls and roads, show no seam.
+ */
+async function addPixelArt(atlas: Map<string, Texture>) {
+  const cuts: { key: string; from: HTMLCanvasElement; rect: SliceRect }[] = []
+  for (const name of Object.keys(PIXEL_SLICES) as PixelSheet[]) {
+    const sheet = PIXEL_SLICES[name]
+    const art = await sheetPixels(`${name}.png`)
+    if (!art) continue
+    const tint = sheet.tint ? await sheetPixels(`${name}-tint.png`) : undefined
+    for (const [slice, rect] of Object.entries(sheet.slices) as [string, SliceRect][]) {
+      const key = pixelArt(name, slice)
+      if (isDrawn(art.pixels, art.width, rect)) cuts.push({ key, from: art.canvas, rect })
+      if (tint && isDrawn(tint.pixels, tint.width, rect))
+        cuts.push({ key: pixelTint(key), from: tint.canvas, rect })
+    }
+  }
+  if (cuts.length === 0) return
+  const packed = packSlices(
+    cuts.map((c) => [c.rect[2], c.rect[3]] as const),
+    PIXEL_ATLAS_WIDTH,
+    PIXEL_PAD,
+  )
+  const canvas = document.createElement('canvas')
+  canvas.width = packed.width
+  canvas.height = packed.height
+  const ctx = canvas.getContext('2d')!
+  ctx.imageSmoothingEnabled = false
+  const P = PIXEL_PAD
+  cuts.forEach(({ from, rect: [sx, sy, w, h] }, i) => {
+    const [x, y] = packed.at[i]!
+    // The edge rows and columns and the corner pixels stretched outwards, then the slice itself.
+    ctx.drawImage(from, sx, sy, w, 1, x, y - P, w, P)
+    ctx.drawImage(from, sx, sy + h - 1, w, 1, x, y + h, w, P)
+    ctx.drawImage(from, sx, sy, 1, h, x - P, y, P, h)
+    ctx.drawImage(from, sx + w - 1, sy, 1, h, x + w, y, P, h)
+    ctx.drawImage(from, sx, sy, 1, 1, x - P, y - P, P, P)
+    ctx.drawImage(from, sx + w - 1, sy, 1, 1, x + w, y - P, P, P)
+    ctx.drawImage(from, sx, sy + h - 1, 1, 1, x - P, y + h, P, P)
+    ctx.drawImage(from, sx + w - 1, sy + h - 1, 1, 1, x + w, y + h, P, P)
+    ctx.drawImage(from, sx, sy, w, h, x, y, w, h)
+  })
+  const source = new CanvasSource({
+    resource: canvas,
+    autoGenerateMipmaps: true,
+    magFilter: 'nearest',
+    minFilter: 'linear',
+    mipmapFilter: 'linear',
+  })
+  cuts.forEach(({ key, rect }, i) => {
+    const [x, y] = packed.at[i]!
+    const frame = new Rectangle(x, y, rect[2], rect[3])
+    atlas.set(key, new Texture({ source, frame, label: key }))
+  })
 }
 
 /** Adds the painted images that are files of their own (`PAINTED_BUILDING_IMAGE`), each a texture. */

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Application, Container, Graphics, Sprite, Texture, TilingSprite } from 'pixi.js'
 import { CHUNK_SIZE, Terrain, UNEXPLORED, chunksAcross, wrap } from './shared/terrain.js'
 import { PATCH_SIZE, TERRAIN_SPEED } from '@csp/balance'
@@ -121,6 +121,29 @@ import {
   type WallTile,
 } from './map/wall-tile.js'
 import { isStone } from './shared/building.js'
+import {
+  ART_STYLES,
+  ART_STYLE_NAMES,
+  artStyle,
+  onArtStyle,
+  setArtStyle,
+  type ArtStyle,
+} from './map/art-style.js'
+import {
+  PIXEL_PILE,
+  ROAD_PIECES,
+  pixelBuilding,
+  pixelGate,
+  pixelNode,
+  pixelRoad,
+  pixelTint,
+  pixelWall,
+} from './map/pixel-art.js'
+
+/** The band between roads that join corner to corner in pixel art, in the road pieces' colour. */
+const PIXEL_ROAD_COLOR = 0xc28569
+/** How strongly the owner's colour washes the tile under a wall or gate drawn in pixel art. */
+const PIXEL_WALL_WASH = 0.3
 import { drawPlans, plannedBuilding } from './map/plans.js'
 import { drawPlaces, pickedPlaces } from './map/places.js'
 import { drawMarks, drawPickPreview, type MapMark } from './map/preview-draw.js'
@@ -293,6 +316,9 @@ export function MapView({
   const keepTerrainForRef = useRef(keepTerrainFor)
   const overviewRef = useRef<(overview: Uint8Array | null) => void>(() => {})
   const redrawRef = useRef<() => void>(() => {})
+  // The art style (`CONTEXT.md`: Art style): picked in the legend, the map drawn again at once.
+  const style = useSyncExternalStore(onArtStyle, artStyle, artStyle)
+  useEffect(() => onArtStyle(() => redrawRef.current()), [])
   const motionRef = useRef<(world: MapWorld) => void>(() => {})
   const forgetRef = useRef<(chunks: readonly number[]) => void>(() => {})
   /** Hands the known nodes to `onNodesLoaded` again, once the Player learns some are gone. */
@@ -946,7 +972,7 @@ export function MapView({
         for (const n of nodes[i] ?? []) {
           if (built.has(`${n.x},${n.y}`) || gone(n.x, n.y)) continue
           const [sx, sy] = tileToScreen(cam, view, mapSize, n.x + 0.5, n.y + 0.5)
-          drawNode(tokens, n.kind, sx, sy, r)
+          drawNode(tokens, n.kind, sx, sy, r, cam.scale)
         }
       }
 
@@ -1425,6 +1451,16 @@ export function MapView({
             ×
           </button>
           {look === 'fill' ? <RegionLegend region={world.region} /> : <Legend />}
+          <label className="art-style">
+            Art style
+            <select value={style} onChange={(e) => setArtStyle(e.target.value as ArtStyle)}>
+              {ART_STYLES.map((s) => (
+                <option key={s} value={s}>
+                  {ART_STYLE_NAMES[s]}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       ) : (
         <button type="button" className="map-legend-button" onClick={() => toggleLegend(true)}>
@@ -1708,8 +1744,23 @@ const LAST_SEEN_FADE = 0.4
 const lastSeenEmblemsOf = (world: MapWorld): readonly CityEmblem[] =>
   world.lastSeen && !world.admin ? cityEmblems(world.lastSeen, viewerOf(world), world.map.size) : []
 
-/** A resource node as a token: a dark diamond with the glyph in the node's colour. */
-function drawNode(tokens: TokenLayer, kind: ResourceKind, x: number, y: number, r: number) {
+/**
+ * A resource node as a token: a dark diamond with the glyph in the node's colour; in the Pixel
+ * art style its image over the whole tile, `tile` pixels across.
+ */
+function drawNode(
+  tokens: TokenLayer,
+  kind: ResourceKind,
+  x: number,
+  y: number,
+  r: number,
+  tile: number,
+) {
+  const art = pixelNode(kind)
+  if (artStyle() === 'pixel' && tokens.has(art)) {
+    tokens.place(art, x, y, tile)
+    return
+  }
   tokens.place(BASE_ART.diamond, x, y, (r * 24) / 11)
   tokens.place(NODE_ART[kind], x, y, r * 1.15, NODE_GLYPH_COLORS[kind])
 }
@@ -1796,10 +1847,21 @@ function drawStructures(
   const w = roadWidth(tile)
   const inSight = ([sx, sy]: readonly number[]) =>
     sx! > -tile && sy! > -tile && sx! < view.width + tile && sy! < view.height + tile
+  // The Pixel art style (`CONTEXT.md`: Art style) draws what has pixel art with it, and the rest
+  // as the Painted style does; Tokens leaves the painted sprites out too.
+  const pixel = artStyle() === 'pixel'
+  const paintedToo = artStyle() !== 'tokens'
+  const has = tokens.has
+  // Roads in pixel art are a piece per tile, turned to its neighbours (`pixelRoad`); only joins
+  // corner to corner, which the pieces don't have, stay a band.
+  const pixelRoads = pixel && ROAD_PIECES.every(has)
   for (const site of [false, true]) {
-    const style = { color: ROAD_COLOR, alpha: (site ? 0.4 : 1) * fade }
+    const style = {
+      color: pixelRoads ? PIXEL_ROAD_COLOR : ROAD_COLOR,
+      alpha: (site ? 0.4 : 1) * fade,
+    }
     let dots = false
-    for (const r of roads.values()) {
+    for (const r of pixelRoads ? [] : roads.values()) {
       const c = centre(cam, view, size, r)
       if (faintRoad(r) === site && inSight(c)) {
         under.circle(c[0], c[1], w / 2)
@@ -1813,6 +1875,7 @@ function drawStructures(
       const [sx, sy] = centre(cam, view, size, r)
       if (!inSight([sx, sy])) continue
       for (const [dx, dy] of roadJoins(r.x, r.y, (x, y) => !!roadAt(x, y))) {
+        if (pixelRoads && (dx === 0 || dy === 0)) continue
         const next = roadAt(r.x + dx, r.y + dy)
         if (next && (faintRoad(r) || faintRoad(next)) === site) {
           under.moveTo(sx, sy).lineTo(sx + dx * tile, sy + dy * tile)
@@ -1821,6 +1884,17 @@ function drawStructures(
       }
     }
     if (joins) under.stroke({ ...style, width: w })
+  }
+  for (const r of pixelRoads ? roads.values() : []) {
+    const [sx, sy] = centre(cam, view, size, r)
+    if (!inSight([sx, sy])) continue
+    const art = pixelRoad({
+      left: !!roadAt(r.x - 1, r.y),
+      right: !!roadAt(r.x + 1, r.y),
+      up: !!roadAt(r.x, r.y - 1),
+      down: !!roadAt(r.x, r.y + 1),
+    })
+    tokens.place(art.key, sx, sy, tile, 0xffffff, (faintRoad(r) ? 0.4 : 1) * fade, art.rotation)
   }
 
   const cityById = new Map(cities.map((c) => [c.id, c]))
@@ -1835,23 +1909,43 @@ function drawStructures(
   const walls = structures.walls
   const wallAt = (x: number, y: number) => walls.has(`${(x + size) % size},${(y + size) % size}`)
   const wallTiles = new Map<string, WallTile[]>()
+  const pixelGates = new Set<Building>()
   for (const b of buildings) {
     if (b.kind !== 'wall' && b.kind !== 'gate') continue
     const [sx, sy] = tileToScreen(cam, view, size, b.x, b.y)
     if (!near(sx + tile / 2, sy + tile / 2)) continue
-    // 1: a stone wall, 2: a stone gate, whose token covers the middle of its tile.
-    const stone = isStone(b.kind, b.material) ? (b.kind === 'gate' ? 2 : 1) : 0
+    const sides = wallSides(b.x, b.y, wallAt)
+    const ofStone = isStone(b.kind, b.material)
     // A ruined wall or gate is a gap (`CONTEXT.md`: Ruin): only its trace shows.
-    const key = `${relationshipColor(relOf(b))},${(b.site ? 0.35 : isRuin(b) ? 0.15 : 1) * fade},${stone}`
+    const alpha = (b.site ? 0.35 : isRuin(b) ? 0.15 : 1) * fade
+    // In pixel art a wall is a piece turned to its neighbours, a gate its image open or closed.
+    const art = !pixel
+      ? undefined
+      : b.kind === 'gate'
+        ? { key: pixelGate(ofStone, Boolean(b.closed), sides), rotation: 0 }
+        : pixelWall(ofStone, sides)
+    const drawn = art !== undefined && has(art.key)
+    if (drawn) {
+      tokens.place(art.key, sx + tile / 2, sy + tile / 2, tile, 0xffffff, alpha, art.rotation)
+      if (b.kind === 'gate') pixelGates.add(b)
+    }
+    // 1: a stone wall, 2: a stone gate, whose token covers the middle of its tile, 3: drawn in
+    // pixel art, with only a wash of the owner's colour under it.
+    const look = drawn ? 3 : ofStone ? (b.kind === 'gate' ? 2 : 1) : 0
+    const key = `${relationshipColor(relOf(b))},${alpha},${look}`
     const list = wallTiles.get(key) ?? []
     wallTiles.set(key, list)
-    list.push({ sx, sy, ...wallSides(b.x, b.y, wallAt) })
+    list.push({ sx, sy, ...sides })
   }
   for (const [key, list] of wallTiles) {
-    const [color, alpha, stone] = key.split(',').map(Number) as [number, number, number]
+    const [color, alpha, look] = key.split(',').map(Number) as [number, number, number]
+    if (look === 3) {
+      drawWallTiles(under, list, tile, color, alpha * PIXEL_WALL_WASH, 0)
+      continue
+    }
     drawWallTiles(under, list, tile, color, alpha)
-    if (stone === 1) drawStoneMarks(under, list, tile, alpha)
-    if (stone === 2) drawStoneFrames(under, list, tile, alpha)
+    if (look === 1) drawStoneMarks(under, list, tile, alpha)
+    if (look === 2) drawStoneFrames(under, list, tile, alpha)
   }
 
   // Buildings as icon tokens over their footprint (`CONTEXT.md`: Footprint): a plate in the
@@ -1860,29 +1954,34 @@ function drawStructures(
   // greyed (`CONTEXT.md`: Ruin).
   const r = tokenRadius(tile)
   for (const b of buildings) {
-    if (b.kind === 'road' || b.kind === 'wall') continue
+    if (b.kind === 'road' || b.kind === 'wall' || pixelGates.has(b)) continue
     const side = FOOTPRINT[b.kind]
     const [sx, sy] = tileToScreen(cam, view, size, b.x, b.y)
     const [cx, cy] = [sx + (side * tile) / 2, sy + (side * tile) / 2]
     if (!near(cx - (side - 1) * tile, cy - (side - 1) * tile) && !near(cx, cy)) continue
     const rel = relOf(b)
     const ruin = isRuin(b)
-    const painted = paintedBuildingArt(b.kind, Boolean(b.site))
+    const pixelKey = pixel
+      ? pixelBuilding(b.kind, Boolean(b.site), isStone(b.kind, b.material))
+      : undefined
+    const inPixel = pixelKey !== undefined && has(pixelKey)
+    const painted = inPixel
+      ? pixelKey
+      : paintedToo
+        ? paintedBuildingArt(b.kind, Boolean(b.site))
+        : undefined
     if (painted !== undefined) {
-      // Painted art (`docs/art.md`): the building, or its site, filling its whole footprint over
-      // a plate in the owner's colour.
+      // Painted or pixel art (`docs/art.md`): the building, or its site, filling its whole
+      // footprint over a plate in the owner's colour; in pixel art, what is on the tint layer in
+      // that colour too.
       under
         .rect(sx, sy, side * tile, side * tile)
         .fill({ color: relationshipColor(rel), alpha: 0.18 * fade })
         .stroke({ width: 1.5, color: relationshipColor(rel), alpha: 0.8 * fade })
-      tokens.place(
-        painted,
-        cx,
-        cy,
-        side * tile,
-        ruin ? RUIN_TINT : 0xffffff,
-        (ruin ? 0.6 : 1) * fade,
-      )
+      const alpha = (ruin ? 0.6 : 1) * fade
+      tokens.place(painted, cx, cy, side * tile, ruin ? RUIN_TINT : 0xffffff, alpha)
+      if (inPixel)
+        tokens.place(pixelTint(painted), cx, cy, side * tile, relationshipColor(rel), alpha)
       continue
     }
     const alpha = (b.site ? 0.45 : ruin ? 0.3 : 1) * fade
@@ -1937,6 +2036,10 @@ function drawStructures(
   for (const p of piles) {
     // A small heap in the tile's lower corner, so a building on the tile still shows.
     const [sx, sy] = tileToScreen(cam, view, size, p.x, p.y)
+    if (pixel && has(PIXEL_PILE)) {
+      tokens.place(PIXEL_PILE, sx + tile * 0.72, sy + tile * 0.72, tile * 0.55)
+      continue
+    }
     over
       .poly([
         sx + tile * 0.55,
