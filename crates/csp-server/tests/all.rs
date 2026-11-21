@@ -30,6 +30,8 @@ mod first_day;
 mod horse_offer;
 #[path = "map_tools.rs"]
 mod map_tools;
+#[path = "new_world.rs"]
+mod new_world;
 #[path = "npc_alliances.rs"]
 mod npc_alliances;
 #[path = "realtime.rs"]

@@ -4,7 +4,7 @@
 //! Laying a post out is `found_npc_city` with a warehouse beside its storage, and finding its site
 //! is `npc_site_fits` (`npc-cities.ts`).
 
-use csp_shared::balance::{NpcCitySize, TRADING_POST, TRADING_POST_REGION};
+use csp_shared::balance::{NpcCitySize, NPC_CITY_MIN_DISTANCE, TRADING_POST, TRADING_POST_REGION};
 use csp_shared::footprint::{covers, footprint_tiles, Placed, FOOTPRINT};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
@@ -259,20 +259,21 @@ pub fn find_trading_post_site(
     ground: Option<&Ground>,
 ) -> Option<(i32, i32)> {
     let middle = (region.x + region.width / 2.0, region.y + region.height / 2.0);
-    find_trading_post_site_where(world, terrain, region, middle, ground, true, &|_, _| true)
+    let apart = Some(NPC_CITY_MIN_DISTANCE);
+    find_trading_post_site_where(world, terrain, region, middle, ground, apart, &|_, _| true)
 }
 
 /// `find_trading_post_site` nearest `middle` (the tile a post's middle is wanted on) rather than
 /// the region's, and only where `allowed` lets a post's top-left wall tile be: on the land, a
-/// heartland's or frontier land clear of the starting sites and ways (`land_sites`). With `apart` false it
-/// keeps no distance from other cities (`SiteWorld::players_only`).
+/// heartland's or frontier land clear of the starting sites and ways (`land_sites`). It keeps
+/// `apart` tiles from every city's town hall; with none, no distance (`SiteWorld::players_only`).
 pub fn find_trading_post_site_where(
     world: &WorldState,
     terrain: &TerrainMap,
     region: &Region,
     middle: (f64, f64),
     ground: Option<&Ground>,
-    apart: bool,
+    apart: Option<f64>,
     allowed: &dyn Fn(i32, i32) -> bool,
 ) -> Option<(i32, i32)> {
     let made;
@@ -299,7 +300,10 @@ pub fn find_trading_post_site_where(
     }
     candidates.sort_by(|a, b| a.1.total_cmp(&b.1));
     let kind = post_size();
-    let among = if apart { SiteWorld::new(world) } else { SiteWorld::players_only(world) };
+    let among = match apart {
+        Some(d) => SiteWorld::new(world).keeping(d),
+        None => SiteWorld::players_only(world),
+    };
     candidates
         .into_iter()
         .find(|&((x, y), _)| {

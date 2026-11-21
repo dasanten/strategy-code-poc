@@ -58,6 +58,29 @@ cargo run -p csp-server --bin csp-admin -- invite          # prints an invite co
 
 Admins can also create invite codes and reset passwords in the client.
 
+### A small test world (creative mode)
+
+The full map takes half an hour to generate. For testing on your own machine, make a small world
+in seconds with the same generator (terrain, NPC cities, the Trade Organization and a trading
+post, fewer of each), into a database of its own (`CONTEXT.md`: Creative mode, Test worlds):
+
+```sh
+cargo run --release -p csp-server --bin csp-admin -- new-world --db data/test-world.db
+cargo run --release -p csp-server --bin csp-admin -- new-world --db data/small.db --size 640 --seed 7
+```
+
+`--size` is 640 to 5760 tiles in steps of 64 (768 without it); `--seed` is random without it. It
+never writes over a database that exists, and refuses a seed whose small world has no room for the
+Trade Org HQ, a trading post or an NPC city (it says so: try another seed or size). Then
+start a creative server on it, with an admin of your own in it:
+
+```sh
+DB_PATH=data/test-world.db cargo run -p csp-server --bin csp-admin -- create Daniel
+DB_PATH=data/test-world.db CREATIVE=1 pnpm dev
+```
+
+(In PowerShell: `$env:DB_PATH = 'data/test-world.db'; $env:CREATIVE = '1'; pnpm dev`.)
+
 Other scripts:
 
 ```sh
