@@ -359,6 +359,18 @@ impl<L: LogSink> Game<L> {
         health
     }
 
+    /// A skip ahead's end, done or cancelled: its ticks were not broadcast, so the sockets get
+    /// one full update of the world as it stands, with every chunk explored meanwhile.
+    pub fn end_skip(&mut self) {
+        let grown = self.broadcasts.flush(std::time::Instant::now());
+        if let Some(rt) = self.realtime.as_ref() {
+            let explored = self.explored.lock().unwrap_or_else(|e| e.into_inner());
+            let view = TickView { territory: self.territory.current.as_ref(), explored: &explored };
+            let map: &TerrainMap = &self.terrain;
+            rt.broadcast_tick(&self.world, map, &mut self.scratch, &grown, view, now_ms());
+        }
+    }
+
     /// The daily jobs: expired sessions go, the script library is checked, and a backup is
     /// written when there is a backup dir.
     pub fn daily(&mut self, conn: &Connection, backup_dir: Option<&Path>) {
@@ -657,6 +669,11 @@ async fn clock_changed(clock: &mut Option<tokio::sync::watch::Receiver<Clock>>) 
 /// runs but the steps asked for, one each; at ×10 or ×60 the period is that much shorter; at max
 /// the ticks run back to back. At ×60 and max the sockets are told at most every
 /// [`crate::creative::FAST_BROADCAST_GAP`] ([`BroadcastPace`]), so clients can follow.
+///
+/// A skip ahead runs its ticks back to back, one `game.tick()` at a time so the jobs between
+/// ticks (the HTTP side's) still get their turn and a cancel stops it between two ticks. No other
+/// tick runs meanwhile, none of its ticks is broadcast, and at its end (done or cancelled) the
+/// sockets get one full update; the world then runs, or stays paused, as before.
 pub async fn tick_loop<L: LogSink + 'static>(
     game: &GameThread<L>,
     period: Duration,
@@ -671,8 +688,9 @@ pub async fn tick_loop<L: LogSink + 'static>(
     let mut daily = tokio::time::interval_at(tokio::time::Instant::now() + day, day);
     tokio::pin!(stop);
     loop {
-        let step = clock.step_waiting();
-        let running = !clock.paused;
+        let skip = clock.skip;
+        let step = skip.is_none() && clock.step_waiting();
+        let running = skip.is_none() && !clock.paused;
         tokio::select! {
             biased;
             _ = &mut stop => break,
@@ -687,7 +705,23 @@ pub async fn tick_loop<L: LogSink + 'static>(
                     let gap = changed.speed.broadcast_gap();
                     game.run(move |g, _| g.broadcasts.gap = gap).await;
                 }
+                match (clock.skip, changed.skip) {
+                    (None, Some(_)) => {
+                        game.run(|g, _| g.broadcasts.holding = true).await;
+                    }
+                    (Some(_), None) => {
+                        game.run(|g, _| g.end_skip()).await;
+                        schedule = changed.speed.period(period).map(tick_schedule);
+                    }
+                    _ => {}
+                }
                 clock = changed;
+            }
+            _ = std::future::ready(()), if skip.is_some() => {
+                game.tick().await;
+                if let (Some(c), Some(s)) = (&controls, skip) {
+                    c.skip_ticked(s.id);
+                }
             }
             _ = std::future::ready(()), if step => {
                 game.tick().await;

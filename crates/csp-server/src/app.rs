@@ -51,7 +51,8 @@ use crate::auth::{
     SessionSockets, SessionUser, SESSION_DAYS,
 };
 use crate::creative::{
-    CreativeAction, CreativeDone, CreativeSpeedRequest, CreativeState, TimeControls,
+    CreativeAction, CreativeDone, CreativeSkipRequest, CreativeSpeedRequest, CreativeState,
+    TimeControls,
 };
 use crate::first_day::{
     dismiss_first_day, mark_first_day, read_first_day, FirstDayLine, FIRST_DAY_DISMISS_PATH,
@@ -1361,6 +1362,36 @@ async fn creative_act(
     Ok(Json(done))
 }
 
+/// Starts a skip ahead of `amount` game hours or days, up to a game year; answers at once, and
+/// the state's `skip` shows its progress until it ends. One at a time.
+async fn creative_skip(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    body: Bytes,
+) -> ApiResult<Json<CreativeState>> {
+    let controls = user.creative(&state)?;
+    let ticks = serde_json::from_slice::<CreativeSkipRequest>(&body)
+        .ok()
+        .and_then(CreativeSkipRequest::ticks)
+        .ok_or_else(|| {
+            fail(ApiErrorCode::InvalidInput, "Skip ahead 1 game hour up to a game year.")
+        })?;
+    if !controls.skip(ticks) {
+        return Err(fail(ApiErrorCode::InvalidInput, "A skip ahead is already running."));
+    }
+    Ok(Json(controls.state()))
+}
+
+/// Cancels the skip ahead: it stops after the tick it is running.
+async fn creative_skip_cancel(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Json<CreativeState>> {
+    let controls = user.creative(&state)?;
+    controls.cancel_skip();
+    Ok(Json(controls.state()))
+}
+
 /// Fastify's answer to a route it doesn't have, without the built client.
 async fn no_route(method: Method, uri: axum::http::Uri) -> Response {
     let message =
@@ -1432,7 +1463,9 @@ pub fn build_app(opts: AppOptions) -> Router {
         .route(&format!("{CREATIVE_PATH}/resume"), post(creative_resume))
         .route(&format!("{CREATIVE_PATH}/step"), post(creative_step))
         .route(&format!("{CREATIVE_PATH}/speed"), post(creative_speed))
-        .route(CREATIVE_ACT_PATH, post(creative_act));
+        .route(CREATIVE_ACT_PATH, post(creative_act))
+        .route(&format!("{CREATIVE_PATH}/skip"), post(creative_skip))
+        .route(&format!("{CREATIVE_PATH}/skip/cancel"), post(creative_skip_cancel));
     if state.game.is_some() {
         api = api
             .route("/api/terrain/{cx}/{cy}", get(terrain_chunk))
