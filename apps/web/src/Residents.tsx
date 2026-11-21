@@ -2354,6 +2354,7 @@ export function ResidentCard({
   onGivePlan,
   onDraftQueue,
   addStep,
+  creative,
   collapsed = false,
 }: {
   /** The condition of their gear comes for your own residents only (`CONTEXT.md`: Wear). */
@@ -2574,6 +2575,8 @@ export function ResidentCard({
   onRename: (name: string, realmName?: string) => void
   /** Closes the card. */
   onClose: () => void
+  /** The Creative section, for an admin on a creative server (`CreativeResidentActions`). */
+  creative?: ReactNode
   /** The open tab and panel, kept by the caller so they stay from one selected unit to the next. */
   sections: CardSections<ActionId>
   onSections: (sections: CardSections<ActionId>) => void
@@ -3504,6 +3507,7 @@ export function ResidentCard({
               : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
         </p>
       )}
+      {creative}
     </SelectionCard>
   )
 }

@@ -5,16 +5,24 @@
 mod build_common;
 
 use build_common::*;
-use csp_shared::balance::{BUILD_MATERIALS, CARRIAGE_CAPACITY};
-use csp_shared::terrain::TerrainMap;
+use csp_shared::balance::{ADULT_AGE, BUILD_MATERIALS, CARRIAGE_CAPACITY, LIFESPAN_MIN};
+use csp_shared::terrain::{Terrain, TerrainMap};
+use csp_shared::time::TICKS_PER_GAME_YEAR;
 use csp_shared::world::{
-    Building, BuildingKind, Carriage, Good, ResidentOrder, Stat, Stock, WorldState,
+    Building, BuildingKind, Carriage, Good, HorseStats, RealmEventWhat, ResidentOrder, SkillName,
+    Stat, StatRecord, Stock, WorldState,
 };
-use csp_sim::creative::{finish_now, give_goods, take_goods, CREATIVE_ACTIONS};
+use csp_sim::creative::{
+    add_horse, add_resident, finish_now, give_goods, grow_up, heal, kill, take_goods, ResidentPick,
+    CREATIVE_ACTIONS,
+};
+use csp_sim::horses::HORSE_NAMES;
 use csp_sim::orders::order_kinds;
 use csp_sim::queries::balance::training_gain;
 use csp_sim::queries::building::road_at;
+use csp_sim::queries::residents::{age_in_years, can_work};
 use csp_sim::script_tables::{ARMY_SCRIPT_API, SCRIPT_API};
+use csp_sim::survival::go_down;
 use serde_json::json;
 
 /// Realm r1 (Player 7) with its city c1 (town hall on (10, 10)) and its resident w1 on (x, y).
@@ -209,4 +217,159 @@ fn no_creative_action_is_an_order_kind_or_a_script_call() {
         assert!(SCRIPT_API.iter().all(|b| b.name != name), "{name} is in the script API");
         assert!(ARMY_SCRIPT_API.iter().all(|b| b.name != name), "{name} is in the army API");
     }
+}
+
+#[test]
+fn an_added_resident_joins_the_picked_city_with_the_picked_age_stats_and_skills() {
+    let (mut world, terrain, _) = city_world(4.0, 4.0);
+    world.tick = 5_000;
+    let pick = ResidentPick {
+        age: Some(20.0),
+        stats: Some(StatRecord { strength: 25.0, endurance: 3.0, agility: 12.0, intellect: 1.0 }),
+        skills: [(SkillName::Mining, 2.5), (SkillName::Farming, 0.0)].into_iter().collect(),
+    };
+    let id = add_resident(&mut world, &terrain, "c1", (7.0, 8.0), &pick).unwrap();
+    let r = world.residents.iter().find(|r| r.id == id).unwrap();
+    assert_eq!((r.owner.as_deref(), r.city_id.as_deref()), (Some("r1"), Some("c1")));
+    assert_eq!((r.x, r.y), (7.0, 8.0));
+    close(age_in_years(r.born_at, world.tick as f64), 20.0);
+    assert_eq!(r.stats.strength, Stat { base: 25.0, trained: 0.0 });
+    assert_eq!(r.stats.intellect.base, 1.0);
+    // A skill picked at none is no skill at all.
+    assert_eq!(r.skills.iter().collect::<Vec<_>>(), vec![(&SkillName::Mining, &2.5)]);
+    assert!(r.order.is_none() && r.carried.is_empty() && r.health == 100.0);
+    assert_eq!(r.game_name, Some(true));
+    let first = r.name.clone();
+    assert_sound(&world, &terrain);
+
+    // Nothing picked: drawn as a starting city's resident, and named apart from the first.
+    let other = add_resident(&mut world, &terrain, "c1", (7.0, 8.0), &ResidentPick::default());
+    let other = world.residents.iter().find(|r| r.id == other.clone().unwrap()).unwrap();
+    assert!(can_work(other.born_at, world.tick as f64));
+    assert_ne!(other.name, first);
+    assert_sound(&world, &terrain);
+}
+
+#[test]
+fn an_added_resident_or_horse_joins_an_npc_city_as_its_own() {
+    let terrain = plains(24);
+    let mut world = empty_world(&terrain);
+    add_city(&mut world, "n1", None, 18.0, 18.0);
+    let id = add_resident(&mut world, &terrain, "n1", (16.0, 16.0), &ResidentPick::default());
+    let r = world.residents.iter().find(|r| Some(&r.id) == id.as_ref().ok()).unwrap();
+    assert_eq!((r.owner.as_deref(), r.city_id.as_deref()), (None, Some("n1")));
+    let horse = add_horse(&mut world, &terrain, "n1", (16.0, 17.0), None, None).unwrap();
+    let h = world.horses.iter().find(|h| h.id == horse).unwrap();
+    assert_eq!((h.realm_id.as_deref(), h.city_id.as_deref()), (None, Some("n1")));
+    assert_sound(&world, &terrain);
+}
+
+#[test]
+fn an_added_horse_has_the_picked_age_and_stats() {
+    let (mut world, terrain, _) = city_world(4.0, 4.0);
+    world.tick = 9_000;
+    let stats = HorseStats { speed: 20.0, strength: 2.0, endurance: 11.0 };
+    let id = add_horse(&mut world, &terrain, "c1", (6.0, 6.0), Some(4.0), Some(stats.clone()));
+    let h = world.horses.iter().find(|h| Some(&h.id) == id.as_ref().ok()).unwrap();
+    assert_eq!(h.stats, stats);
+    assert_eq!((h.realm_id.as_deref(), h.city_id.as_deref()), (Some("r1"), None));
+    close((world.tick as f64 - h.born_at) / TICKS_PER_GAME_YEAR, 4.0);
+    assert_eq!((h.x, h.y, h.health, h.hunger), (6.0, 6.0, 100.0, 100.0));
+    assert!(HORSE_NAMES.contains(&h.name.as_str()));
+    assert_sound(&world, &terrain);
+}
+
+#[test]
+fn what_cannot_be_added_is_refused_and_changes_nothing() {
+    let (mut world, mut terrain, _) = city_world(4.0, 4.0);
+    terrain.tiles[(3 * terrain.size + 3) as usize] = Terrain::Sea as u8;
+    let before = world.clone();
+    let bad_stats = StatRecord { strength: 1.5, endurance: 3.0, agility: 3.0, intellect: 3.0 };
+    let too_much = [(SkillName::Mining, 1e9)].into_iter().collect();
+    let picks = [
+        ResidentPick { age: Some(-1.0), ..Default::default() },
+        ResidentPick { age: Some(LIFESPAN_MIN), ..Default::default() },
+        ResidentPick { stats: Some(bad_stats), ..Default::default() },
+        ResidentPick { skills: too_much, ..Default::default() },
+    ];
+    for pick in &picks {
+        assert!(add_resident(&mut world, &terrain, "c1", (5.0, 5.0), pick).is_err(), "{pick:?}");
+    }
+    let none = ResidentPick::default();
+    assert!(add_resident(&mut world, &terrain, "nowhere", (5.0, 5.0), &none).is_err());
+    assert!(add_resident(&mut world, &terrain, "c1", (3.0, 3.0), &none).is_err(), "on the sea");
+    assert!(add_resident(&mut world, &terrain, "c1", (-1.0, 3.0), &none).is_err());
+    let lame = HorseStats { speed: 0.0, strength: 5.0, endurance: 5.0 };
+    assert!(add_horse(&mut world, &terrain, "c1", (5.0, 5.0), None, Some(lame)).is_err());
+    assert!(add_horse(&mut world, &terrain, "c1", (5.0, 5.0), Some(99.0), None).is_err());
+    assert!(add_horse(&mut world, &terrain, "c1", (3.0, 3.0), None, None).is_err());
+    assert_eq!(world, before);
+}
+
+#[test]
+fn heal_ends_down_and_wounds() {
+    let (mut world, terrain, _) = city_world(4.0, 4.0);
+    resident(&mut world, "w2", 5.0, 5.0);
+    at(&mut world, "w1").health = 35.0;
+    assert_eq!(heal(&mut world, "w1"), Ok("Name w1 is healed.".into()));
+    assert_eq!(at(&mut world, "w1").health, 100.0);
+    assert!(heal(&mut world, "w1").is_err(), "a well resident is not hurt");
+
+    go_down(&mut world, 1);
+    assert!(at(&mut world, "w2").down_until.is_some());
+    heal(&mut world, "w2").unwrap();
+    let r = at(&mut world, "w2");
+    assert_eq!((r.health, r.down_until), (100.0, None));
+    assert_sound(&world, &terrain);
+    assert!(heal(&mut world, "nobody").is_err());
+}
+
+#[test]
+fn grow_up_makes_a_child_an_adult_as_if_the_years_had_passed() {
+    let (mut world, terrain, _) = city_world(4.0, 4.0);
+    world.tick = 100_000;
+    let pick = ResidentPick { age: Some(3.0), ..Default::default() };
+    let child = add_resident(&mut world, &terrain, "c1", (5.0, 5.0), &pick).unwrap();
+    let tick = world.tick as f64;
+    assert!(!can_work(at(&mut world, &child).born_at, tick));
+    grow_up(&mut world, &child).unwrap();
+    let r = at(&mut world, &child);
+    assert!(can_work(r.born_at, tick));
+    close(age_in_years(r.born_at, tick), ADULT_AGE);
+    assert!(grow_up(&mut world, &child).is_err(), "grown already");
+    let grown = world.events.iter().any(
+        |e| matches!(&e.what, RealmEventWhat::GrownUp { resident_id, .. } if *resident_id == child),
+    );
+    assert!(grown, "the realm log says the child has grown up");
+    assert_sound(&world, &terrain);
+}
+
+#[test]
+fn kill_is_a_normal_death_and_a_killed_leader_follows_the_leader_death_rules() {
+    // A resident: gone, what they carried on the ground.
+    let (mut world, terrain, _) = city_world(4.0, 4.0);
+    resident(&mut world, "w2", 5.0, 5.0);
+    world.residents[1].city_id = Some("c1".into());
+    world.residents[1].carried.insert(Good::Wood, 3.0);
+    kill(&mut world, "w2", terrain.size).unwrap();
+    assert!(world.residents.iter().all(|r| r.id != "w2"));
+    assert!(world.piles.iter().any(|p| p.x == 5.0 && p.y == 5.0));
+    assert_eq!(world.realms.len(), 1);
+    assert_sound(&world, &terrain);
+
+    // The Leader with an heir: the heir takes over and the realm goes on.
+    resident(&mut world, "w3", 6.0, 6.0);
+    world.residents[1].city_id = Some("c1".into());
+    world.realms[0].heir_id = Some("w3".into());
+    kill(&mut world, "w1", terrain.size).unwrap();
+    assert_eq!(world.realms[0].leader_id, "w3");
+    assert_sound(&world, &terrain);
+
+    // The Leader without one: the realm ends and its city is self-managed.
+    let said = kill(&mut world, "w3", terrain.size).unwrap();
+    assert!(said.contains("realm has ended"), "{said}");
+    assert!(world.realms.is_empty());
+    assert!(world.cities[0].realm_id.is_none());
+    assert_sound(&world, &terrain);
+    assert!(kill(&mut world, "w3", terrain.size).is_err());
 }

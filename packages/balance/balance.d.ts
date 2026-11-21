@@ -210,6 +210,8 @@ export interface Balance {
   }
   readonly HORSE_START_AGE_MIN: number
   readonly HORSE_START_AGE_MAX: number
+  readonly CREATIVE_STAT_MAX: number
+  readonly CREATIVE_HORSE_AGE_MAX: number
   readonly HORSE_SPEED_EFFECT: number
   readonly HORSE_SPEED_LIMIT: number
   readonly HORSE_STRENGTH_EFFECT: number

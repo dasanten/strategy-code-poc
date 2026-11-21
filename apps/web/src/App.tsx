@@ -71,7 +71,14 @@ import { isWallOrGate } from './shared/walls.js'
 import { CreativeBar } from './CreativeBar.js'
 import { showsCreativeBar } from './creative-bar.js'
 import { CreativeSection } from './CreativeSection.js'
-import { creativeOffer, offersAnything } from './creative-section.js'
+import {
+  creativeCities,
+  creativeOffer,
+  defaultCreativeCity,
+  offersAnything,
+} from './creative-section.js'
+import { CreativeAddSection, CreativeResidentActions } from './CreativeResidents.js'
+import { inCityArea } from './shared/city.js'
 import { isAt, covers } from './shared/footprint.js'
 import { targetParam } from './shared/default-scripts.js'
 import { HORSE_GRANT_HORSES, PASSENGER_WEIGHT } from '@csp/balance'
@@ -2941,18 +2948,42 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               )
             }
             creative={
-              // Admins on a creative server act on any realm's building or carriage by hand.
+              // Admins on a creative server act on any realm's building, carriage and Residents
+              // by hand, and add Residents and horses on the tile.
               showsCreativeBar(account) &&
               (() => {
-                const carriage = world.carriages.find(
-                  (k) => k.x === selectedTile.x && k.y === selectedTile.y,
-                )
+                const { x, y } = selectedTile
+                const carriage = world.carriages.find((k) => k.x === x && k.y === y)
                 const name = tileBuilding ? BUILDING_NAMES[tileBuilding.kind].toLowerCase() : ''
                 const offer = creativeOffer(tileBuilding, carriage, name)
+                const cities = creativeCities(knownCities, world.home.realmId)
+                const tileCity = knownCities.find((c) =>
+                  inCityArea({ buildings: knownBuildings }, c, x, y, world.map.size),
+                )
+                const here = world.residents.filter(
+                  (r) => Math.floor(r.x) === x && Math.floor(r.y) === y,
+                )
                 return (
-                  offersAnything(offer) && (
-                    <CreativeSection key={`${tileBuilding?.id}/${carriage?.id}`} offer={offer} />
-                  )
+                  <>
+                    {offersAnything(offer) && (
+                      <CreativeSection key={`${tileBuilding?.id}/${carriage?.id}`} offer={offer} />
+                    )}
+                    <CreativeAddSection
+                      key={`${x},${y}`}
+                      x={x}
+                      y={y}
+                      cities={cities}
+                      defaultCityId={defaultCreativeCity(
+                        cities,
+                        tileCity?.id,
+                        world.home.cityId ?? undefined,
+                      )}
+                    >
+                      {here.map((r) => (
+                        <CreativeResidentActions key={r.id} resident={r} tick={world.tick} named />
+                      ))}
+                    </CreativeAddSection>
+                  </>
                 )
               })()
             }
@@ -3143,6 +3174,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             <ResidentCard
               key={selected.id}
               resident={selected}
+              creative={
+                showsCreativeBar(account) && (
+                  <CreativeResidentActions resident={selected} tick={world.tick} />
+                )
+              }
               arrivesIn={arrivesIn || undefined}
               leaderId={world.home.leaderId}
               cities={knownCities}

@@ -6,21 +6,19 @@ import { GOOD_LABELS } from './goods-grid.js'
 
 const GOODS = Object.keys(GOOD_LABELS) as Good[]
 
-/**
- * The Creative section on a building's or carriage's card (`CONTEXT.md`: Creative mode): give or
- * take goods and finish now, by hand, for any realm. Shown only to admins on a server started
- * with `CREATIVE=1`; the server refuses every other caller. What it changes shows with the next
- * tick (step a paused world to see it).
- */
-export function CreativeSection({ offer }: { offer: CreativeOffer }) {
-  const [holderId, setHolderId] = useState(offer.holders[0]?.id)
-  const [good, setGood] = useState<Good>('wood')
-  const [amount, setAmount] = useState('100')
-  const [busy, setBusy] = useState(false)
-  const [said, setSaid] = useState<{ text: string; error?: boolean }>()
-  const holder = offer.holders.find((h) => h.id === holderId) ?? offer.holders[0]
-  const units = creativeAmount(amount)
+/** What the last creative action said: its line, or why it was refused. */
+export interface CreativeSaidLine {
+  text: string
+  error?: boolean
+}
 
+/**
+ * Sends creative actions from a card's Creative section and keeps what the last one said. The
+ * server does it between ticks and runs every invariant after it; what broke is said as an error.
+ */
+export function useCreativeAct() {
+  const [busy, setBusy] = useState(false)
+  const [said, setSaid] = useState<CreativeSaidLine>()
   const act = (action: CreativeAction) => {
     setBusy(true)
     api
@@ -39,6 +37,32 @@ export function CreativeSection({ offer }: { offer: CreativeOffer }) {
       .catch((e: unknown) => setSaid({ text: message(e), error: true }))
       .finally(() => setBusy(false))
   }
+  return { busy, said, act }
+}
+
+/** What the last creative action said, under the section's buttons. */
+export function CreativeSaid({ said }: { said: CreativeSaidLine | undefined }) {
+  if (!said) return null
+  return (
+    <p className={`small ${said.error ? 'card-creative-error' : 'muted'}`} role="status">
+      {said.text}
+    </p>
+  )
+}
+
+/**
+ * The Creative section on a building's or carriage's card (`CONTEXT.md`: Creative mode): give or
+ * take goods and finish now, by hand, for any realm. Shown only to admins on a server started
+ * with `CREATIVE=1`; the server refuses every other caller. What it changes shows with the next
+ * tick (step a paused world to see it).
+ */
+export function CreativeSection({ offer }: { offer: CreativeOffer }) {
+  const [holderId, setHolderId] = useState(offer.holders[0]?.id)
+  const [good, setGood] = useState<Good>('wood')
+  const [amount, setAmount] = useState('100')
+  const { busy, said, act } = useCreativeAct()
+  const holder = offer.holders.find((h) => h.id === holderId) ?? offer.holders[0]
+  const units = creativeAmount(amount)
 
   return (
     <section className="card-creative" aria-label="Creative">
@@ -105,11 +129,7 @@ export function CreativeSection({ offer }: { offer: CreativeOffer }) {
           {offer.finish.label}
         </button>
       )}
-      {said && (
-        <p className={`small ${said.error ? 'card-creative-error' : 'muted'}`} role="status">
-          {said.text}
-        </p>
-      )}
+      <CreativeSaid said={said} />
     </section>
   )
 }

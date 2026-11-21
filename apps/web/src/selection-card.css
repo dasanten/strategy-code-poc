@@ -1035,3 +1035,20 @@ button.card-list-row:hover {
 .card-creative-error {
   color: var(--ui-warn);
 }
+.card-creative-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.card-creative-field input {
+  width: 5.5em;
+}
+.card-creative-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+.card-creative-add summary {
+  cursor: pointer;
+}

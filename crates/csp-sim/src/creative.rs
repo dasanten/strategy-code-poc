@@ -8,25 +8,41 @@
 //!   the trainings at a training ground. Each ends as it would at normal speed: the site becomes
 //!   its building through [`finish_site_by`], and the orders on it go on or end as after the last
 //!   tick of work.
+//! - **Residents and horses:** add a Resident (age, stats and skills picked) or a horse to a realm
+//!   on a tile; heal a Resident, grow a child up, or kill one by a normal death.
 
-use csp_shared::balance::MAP_SIZE;
-use csp_shared::footprint::is_at;
-use csp_shared::terrain::TerrainMap;
-use csp_shared::world::{
-    BuildingKind, Good, ResidentOrder, Stock, TrainingSubject, WallMaterial, WorldState,
+use csp_shared::balance::{
+    ticks_for_age, ADULT_AGE, CREATIVE_HORSE_AGE_MAX, CREATIVE_STAT_MAX, LIFESPAN_MIN, MAP_SIZE,
+    MAX_HEALTH, SKILL_MAX,
 };
+use csp_shared::footprint::is_at;
+use csp_shared::terrain::{is_passable_terrain, terrain_at, TerrainMap};
+use csp_shared::time::TICKS_PER_GAME_YEAR;
+use csp_shared::world::{
+    BuildingKind, DeathCause, Good, HorseStats, RealmEventWhat, ResidentOrder, SkillName, Stat,
+    StatRecord, Stock, TrainingSubject, WallMaterial, WorldState,
+};
+use indexmap::IndexMap;
 
 use crate::building::{building_part, finish_site_by, lay_out_site, orders_follow_sites};
 use crate::cities::update_city_membership;
-use crate::queries::balance::training_gain;
+use crate::events::record_event;
+use crate::horses::{new_horse, NewHorse};
+use crate::names::resident_names_taken;
+use crate::queries::balance::{skill_value, training_gain};
 use crate::queries::building::{
     build_problem_for, construction_index_at, is_stone, line_building, line_kind_at, materials_of,
     teacher_at, work_of, TerrainLookup, KEEPS_GOODS,
 };
 use crate::queries::carriages::carriage_capacity;
 use crate::queries::goods::take_out;
+use crate::queries::js_round;
 use crate::queries::names::placed;
+use crate::queries::residents::can_work;
 use crate::queries::residents::{good_weight, stock_weight};
+use crate::random::{hash_str, new_id, Mulberry32};
+use crate::residents::{new_resident, NewResident};
+use crate::survival::die_all;
 use crate::training::learn;
 
 /// The most ticks of training [`finish_now`] runs for one trainee: far more than any training
@@ -297,4 +313,195 @@ fn train_to_the_end(
 
 /// The creative actions as the server's creative route names them: none is an order kind or a
 /// script call.
-pub const CREATIVE_ACTIONS: [&str; 3] = ["giveGoods", "takeGoods", "finishNow"];
+pub const CREATIVE_ACTIONS: [&str; 8] =
+    ["giveGoods", "takeGoods", "finishNow", "addResident", "addHorse", "heal", "growUp", "kill"];
+
+/// Who a creative Resident or horse joins: a city and its realm. A Player's city gives them to its
+/// realm; an NPC city, trading post or the Trade Organization's HQ keeps them as its own (no
+/// realm, that city), as its residents and horses are.
+fn joining(world: &WorldState, city_id: &str) -> Result<(Option<String>, String), String> {
+    let city = world.cities.iter().find(|c| c.id == city_id).ok_or("No such city.")?;
+    Ok((city.realm_id.clone(), city.id.clone()))
+}
+
+/// The tile `(x, y)`, if it is on the map and passable.
+fn standing_tile(terrain: &TerrainMap, x: f64, y: f64) -> Result<(f64, f64), String> {
+    let (tx, ty) = (x.floor(), y.floor());
+    let on_map = |v: f64| v.is_finite() && v >= 0.0 && v < f64::from(terrain.size);
+    if !on_map(tx) || !on_map(ty) {
+        return Err("That tile is off the map.".into());
+    }
+    if !is_passable_terrain(terrain_at(terrain, tx as i32, ty as i32)) {
+        return Err("Nobody can stand on that tile.".into());
+    }
+    Ok((tx, ty))
+}
+
+/// What an admin picks for a new Resident: an age in game years, base stats and skills. What is
+/// left out is drawn as for a starting city's resident (skills: none).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ResidentPick {
+    pub age: Option<f64>,
+    pub stats: Option<StatRecord<f64>>,
+    pub skills: IndexMap<SkillName, f64>,
+}
+
+/// Adds a Resident on the tile `(x, y)` to the city `city_id` and its realm (`CONTEXT.md`:
+/// Creative mode): drawn as a starting city's resident is, then given what `pick` picks, with a
+/// game-given name no living resident of that realm has. They join like a newcomer, standing idle
+/// with nothing on them. Answers their id.
+pub fn add_resident(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    city_id: &str,
+    (x, y): (f64, f64),
+    pick: &ResidentPick,
+) -> Result<String, String> {
+    let (owner, city_id) = joining(world, city_id)?;
+    let (x, y) = standing_tile(terrain, x, y)?;
+    if let Some(age) = pick.age {
+        if !(age.is_finite() && (0.0..LIFESPAN_MIN).contains(&age)) {
+            return Err(format!("Pick an age from 0 to under {LIFESPAN_MIN} game years."));
+        }
+    }
+    if let Some(s) = &pick.stats {
+        let all = [s.strength, s.endurance, s.agility, s.intellect];
+        if !all.iter().all(|v| v.fract() == 0.0 && (1.0..=CREATIVE_STAT_MAX).contains(v)) {
+            return Err(format!("Stats are whole numbers from 1 to {CREATIVE_STAT_MAX}."));
+        }
+    }
+    for (&skill, &v) in &pick.skills {
+        let most = skill_value(&SKILL_MAX, skill);
+        if !(v.is_finite() && (0.0..=most).contains(&v)) {
+            return Err(format!("{skill:?} goes from 0 to {most}."));
+        }
+    }
+    let id = new_id("r", &mut world.next_id);
+    let mut taken = resident_names_taken(world, owner.as_deref(), Some(&city_id));
+    let mut rand = Mulberry32::new(f64::from(hash_str(&format!("{}:{id}", world.seed))));
+    let tick = world.tick as f64;
+    let place =
+        NewResident { id: &id, owner: owner.as_deref(), city_id: Some(&city_id), x, y, tick };
+    let mut r = new_resident(&mut || rand.next(), &place, Some(&mut taken));
+    if let Some(age) = pick.age {
+        r.born_at = tick - js_round(ticks_for_age(age));
+    }
+    if let Some(s) = &pick.stats {
+        let stat = |base: f64| Stat { base, trained: 0.0 };
+        r.stats = StatRecord {
+            strength: stat(s.strength),
+            endurance: stat(s.endurance),
+            agility: stat(s.agility),
+            intellect: stat(s.intellect),
+        };
+    }
+    r.skills = pick.skills.iter().filter(|(_, v)| **v > 0.0).map(|(k, v)| (*k, *v)).collect();
+    world.residents.push(r);
+    Ok(id)
+}
+
+/// Adds a horse on the tile `(x, y)` to the city `city_id` and its realm (`CONTEXT.md`: Creative
+/// mode): drawn as a new horse is, then given the `age` and `stats` picked; a name from the horse
+/// pool, full hunger and health. A Player's horse belongs to its realm (no city), an NPC city's to
+/// the city. Answers its id.
+pub fn add_horse(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    city_id: &str,
+    (x, y): (f64, f64),
+    age: Option<f64>,
+    stats: Option<HorseStats>,
+) -> Result<String, String> {
+    let (realm_id, city_id) = joining(world, city_id)?;
+    let (x, y) = standing_tile(terrain, x, y)?;
+    if let Some(age) = age {
+        if !(age.is_finite() && (0.0..=CREATIVE_HORSE_AGE_MAX).contains(&age)) {
+            return Err(format!(
+                "Pick a horse's age from 0 to {CREATIVE_HORSE_AGE_MAX} game years."
+            ));
+        }
+    }
+    if let Some(s) = &stats {
+        let all = [s.speed, s.strength, s.endurance];
+        if !all.iter().all(|v| v.fract() == 0.0 && (1.0..=CREATIVE_STAT_MAX).contains(v)) {
+            return Err(format!("Horse stats are whole numbers from 1 to {CREATIVE_STAT_MAX}."));
+        }
+    }
+    let id = new_id("horse", &mut world.next_id);
+    let mut rand = Mulberry32::new(f64::from(hash_str(&format!("{}:{id}", world.seed))));
+    let tick = world.tick as f64;
+    let city_id = if realm_id.is_some() { None } else { Some(city_id) };
+    let fields = NewHorse { id: id.clone(), realm_id, city_id, x, y, tick };
+    let mut h = new_horse(&mut || rand.next(), fields);
+    if let Some(age) = age {
+        h.born_at = tick - js_round(age * TICKS_PER_GAME_YEAR);
+    }
+    if let Some(s) = stats {
+        h.stats = s;
+    }
+    world.horses.push(h);
+    Ok(id)
+}
+
+fn resident_at(world: &WorldState, id: &str) -> Result<usize, String> {
+    world.residents.iter().position(|r| r.id == id).ok_or_else(|| "No such resident.".into())
+}
+
+/// Heals the resident `id` (`CONTEXT.md`: Creative mode): their wounds close, and a Down resident
+/// wakes and stands idle, at full health. Their hunger meter is left as it is: a starving one still
+/// needs food.
+pub fn heal(world: &mut WorldState, id: &str) -> Result<String, String> {
+    let i = resident_at(world, id)?;
+    let r = &mut world.residents[i];
+    let down = r.down_until.is_some();
+    if !down && r.health >= MAX_HEALTH {
+        return Err(format!("{} is not hurt.", r.name));
+    }
+    r.health = MAX_HEALTH;
+    r.down_until = None;
+    let name = r.name.clone();
+    if down {
+        let what = RealmEventWhat::Woke {
+            resident_id: r.id.clone(),
+            name: name.clone(),
+            by: "an admin".into(),
+        };
+        let owner = r.owner.clone();
+        record_event(world, owner.as_deref(), what);
+        return Ok(format!("{name} woke, healed."));
+    }
+    Ok(format!("{name} is healed."))
+}
+
+/// Grows the child `id` up now (`CONTEXT.md`: Creative mode), as if the years had passed: they are
+/// `ADULT_AGE`, and their Player's realm log says they have grown up, as aging would.
+pub fn grow_up(world: &mut WorldState, id: &str) -> Result<String, String> {
+    let i = resident_at(world, id)?;
+    let tick = world.tick as f64;
+    let r = &mut world.residents[i];
+    if can_work(r.born_at, tick) {
+        return Err(format!("{} is grown already.", r.name));
+    }
+    r.born_at = tick - ticks_for_age(ADULT_AGE);
+    let (owner, name) = (r.owner.clone(), r.name.clone());
+    let what = RealmEventWhat::GrownUp { resident_id: r.id.clone(), name: name.clone() };
+    record_event(world, owner.as_deref(), what);
+    Ok(format!("{name} has grown up."))
+}
+
+/// Kills the resident `id` (`CONTEXT.md`: Creative mode) by a normal death, killed by nobody:
+/// what they carry drops, their realm log says so, and a Leader's death follows the Leader death
+/// rules (their heir takes over, or the realm ends).
+pub fn kill(world: &mut WorldState, id: &str, size: i32) -> Result<String, String> {
+    let i = resident_at(world, id)?;
+    let name = world.residents[i].name.clone();
+    let leader = world.realms.iter().any(|x| x.leader_id == id);
+    let (_, ended) = die_all(world, &[id.to_string()], DeathCause::Killed, size, None);
+    // A drifter on the way is gone with them, as the next tick would drop them.
+    world.drifters.retain(|d| d.resident_id != id);
+    Ok(match (leader, ended.is_empty()) {
+        (false, _) => format!("{name} is dead."),
+        (true, true) => format!("{name}, the Leader, is dead; the heir takes over."),
+        (true, false) => format!("{name}, the Leader, is dead; the realm has ended."),
+    })
+}
