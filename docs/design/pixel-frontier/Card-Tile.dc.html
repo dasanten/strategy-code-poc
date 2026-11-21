@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tile cards, docked on the right</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui" style="width: 1440px; height: 1180px; box-sizing: border-box; padding: 20px; background: var(--steel); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start">
+
+<div class="col" style="gap: 16px">
+<section class="pn"><div class="hd"><span class="dot"></span><span class="grow">Ashford quarry</span><button class="btn sm sq dk" aria-label="Close the card"><span class="ic s16 i-x" aria-hidden="true"></span></button></div>
+<div class="sec"><span class="b">Yours</span><span>Hills · speed ~70% · food 130% · Tile 2240, 1702</span><span>Makes Stone · 14 in its pile</span>
+<button class="btn sm fill" aria-expanded="true">About the quarry</button>
+<div class="well" style="padding: 6px 8px">Makes Stone, from its node. Teaches Mining. Up to 4 workers. Footprint 2 × 2 tiles. Built from 20 Wood and about 3 game days of one resident's work.</div></div>
+<div class="sec"><span class="fx"><span class="lb grow">Workers</span><span class="mono">2 / 4</span></span>
+<div class="fx"><a href="Main.dc.html" class="b grow" style="color: var(--navy)">Hale</a><span class="mt hp" style="width: 50px"><i style="width: 90%"></i></span><span class="mt fd" style="width: 50px"><i style="width: 54%"></i></span></div>
+<div class="fx"><span class="grow">A resident of Mirefield</span><span class="mono mu">? · ?</span></div></div>
+<div class="sec"><button class="btn fill">Send Bram here<span class="k">W</span></button><span class="mu">Close this card to go back to Bram.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="dot"></span><span class="grow">House site</span></div>
+<div class="sec"><span class="b">Yours</span><div class="fx"><span class="mt grow"><i style="width: 38%"></i></span><span class="mono">38% of the work done</span></div><span>Delivered 20 Wood, 10 Stone · still needs 10 Wood</span><span class="mu">Being torn down · 20% done, when someone tears it down.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="ic i-ironore" aria-hidden="true"></span><span class="grow">Iron ore node</span></div>
+<div class="sec"><span class="b">Nobody's</span><span>Mountain · speed ~35% · food 200% · Tile 2301, 1650</span><span>A mine can be built here. Needs 30 Wood, 10 Stone.</span><span>Makes Iron ore · teaches Mining. Up to 4 workers · about 6 Iron ore each a game day.</span>
+<button class="btn pri fill">Build a mine here<span class="k">B</span></button></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Open ground</span></div>
+<div class="sec"><span>Plains · speed 100% · food 100% · Tile 2198, 1804</span><span>On the ground: 6 Wood, 2 Food</span><span class="mu">Pick one of your residents to send them here.</span></div></section>
+</div>
+
+<div class="col" style="gap: 16px">
+<section class="pn"><div class="hd"><span class="dot"></span><span class="grow">Ashford town hall</span></div>
+<div class="sec"><span class="b">Yours</span><span>Room for 12 residents · Ashford: 8 residents · 4 free housing</span><span>Food for 11 game days</span>
+<div class="well bad" style="padding: 6px 8px; border-color: var(--blood)">Occupied by the realm of Mire, 2 game days left</div>
+<button class="btn fill">Open Ashford in Cities<span class="k">C</span></button>
+<button class="btn fill on" aria-expanded="true">Rename the city…<span class="k">N</span></button>
+<label class="fld"><span class="lb">New city name</span><input class="in" value="Ashford"></label>
+<span class="mu">Others go on knowing it by its old name until they see it again.</span>
+<button class="btn pri">Rename</button></div></section>
+
+<section class="pn"><div class="hd"><span class="dot"></span><span class="grow">Ashford gate</span><span class="chip g">Open</span></div>
+<div class="sec"><span class="b">Yours</span><span>Lets your realm and allies through always, everyone else only while open.</span><button class="btn fill">Close the gate<span class="k">O</span></button></div></section>
+
+<section class="pn"><div class="hd"><span class="dot"></span><span class="grow">Ashford storage</span><span class="mono" style="font-size: 12px">1,240 kg</span></div>
+<div class="sec">
+<div class="fx"><span class="ic s16 i-food" aria-hidden="true"></span><span class="grow">Food</span><span class="mono">412</span></div>
+<div class="fx"><span class="ic s16 i-wood" aria-hidden="true"></span><span class="grow">Wood</span><span class="mono">96</span></div>
+<div class="fx"><span class="ic s16 i-stone" aria-hidden="true"></span><span class="grow">Stone</span><span class="mono">40</span></div>
+<div class="fx"><span class="ic s16 i-coins" aria-hidden="true"></span><span class="grow">Coins</span><span class="mono">73</span></div>
+<span class="mu">Empty: "Nothing in it". Out of sight: "Holds …" as last seen.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="dot" style="background: var(--trade)"></span><span class="grow">Saltmarket warehouse</span></div>
+<div class="sec"><span class="b">Trade Organization</span><span>Buys and sells here.</span><button class="btn gold fill">Trade here<span class="k">T</span></button></div></section>
+
+<section class="pn"><div class="hd"><span class="dot"></span><span class="grow">Ashford house</span></div>
+<div class="sec"><span>Room for 4 residents · Ashford: 8 residents · 4 free housing</span></div></section>
+</div>
+
+<div class="col" style="gap: 16px">
+<section class="pn"><div class="hd"><span class="dot"></span><span class="grow">Ashford stable</span></div>
+<div class="sec"><span class="fx"><span class="lb grow">Horses (yours)</span><span class="mono">3 · 1 hungry</span></span>
+<div class="fx"><a href="Side-Horses.dc.html" class="b grow" style="color: var(--navy)">Bramble</a><span class="mono mu">12/8/10 · 5 y</span><span class="mt fd" style="width: 44px"><i style="width: 80%"></i></span></div>
+<div class="fx"><a href="Side-Horses.dc.html" class="b grow" style="color: var(--navy)">Soot</a><span class="mono mu">10/11/9 · 7 y</span><span class="mt fd" style="width: 44px"><i style="width: 70%"></i></span></div>
+<div class="fx"><a href="Side-Horses.dc.html" class="b grow" style="color: var(--navy)">Pip</a><span class="mono mu">9/9/12 · 3 y</span><span class="mt hp" style="width: 44px"><i style="width: 20%"></i></span></div>
+<span>Room for 3 more horses</span>
+<div class="fx"><span class="ic s16 i-food" aria-hidden="true"></span><span class="grow">Food 36 · about 6 game days for its horses</span></div><span class="mt fd"><i style="width: 60%"></i></span>
+<span>Breeding paused: 55% of the way to a foal · Bramble and Soot</span>
+<button class="btn fill on" aria-expanded="true">Rename a horse…<span class="k">N</span></button>
+<div class="fx"><select class="in grow" aria-label="Horse"><option>Pip</option></select><input class="in grow" aria-label="New name" value="Pip"><button class="btn pri">Rename</button></div></div></section>
+
+<section class="pn"><div class="hd"><span class="ic i-cart" aria-hidden="true"></span><span class="grow">Carriage (yours)</span><span class="mono" style="font-size: 12px">120 / 300 kg</span></div>
+<div class="sec"><span>Pulled by Bramble · Speed 12, Strength 8, Endurance 10 · Food on board for 4 game days</span>
+<span>Passengers: <a href="Main.dc.html" style="color: var(--navy)">Odo</a>, <a href="Main.dc.html" style="color: var(--navy)">Mara</a> · 110 kg of it people</span>
+<div class="fx wrap" style="gap: 4px"><span class="chip"><span class="ic s16 i-ironore" aria-hidden="true"></span>30 Iron ore</span><span class="chip"><span class="ic s16 i-food" aria-hidden="true"></span>12 Food</span></div>
+<button class="btn fill">Unhitch horse<span class="k">U</span></button>
+<span class="mu">Others see only: empty, lightly, half, heavily or fully loaded.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="ic i-horse" aria-hidden="true"></span><span class="grow">2 horses</span></div>
+<div class="sec"><span class="b">Yours · loose</span><div class="fx"><span class="b grow">Wren</span><span class="mono mu">11/9/9 · 4 y</span><span class="mt fd" style="width: 44px"><i style="width: 35%"></i></span></div><div class="fx"><span class="b grow">Flint</span><span class="mono mu">8/12/10 · 9 y</span><span class="mt fd" style="width: 44px"><i style="width: 64%"></i></span></div></div></section>
+</div>
+
+<div class="col" style="gap: 16px">
+<section class="pn"><div class="hd"><span class="dot" style="background: var(--other)"></span><span class="grow">Army</span></div>
+<div class="sec"><span class="b">Another realm</span><span>6 soldiers · 2 unarmed</span><span>Garrick · armed: sword, shield</span><span class="mu">How they fare is hidden: only their own realm and its allies see hunger and health.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="dot"></span><span class="grow">Ashford training ground</span></div>
+<div class="sec"><span class="b">Edda teaches Combat</span><span>Ana trains: 3.2 of 5.0</span><span>Odo trains: 5.0 of 5.0, waiting</span><span class="mu">One teacher, up to 6 trainees. Empty: "Nobody teaches here yet".</span></div></section>
+
+<section class="pn" style="opacity: .8"><div class="hd" style="background: var(--slate)"><span class="dot" style="background: var(--npc)"></span><span class="grow">Dunmoor storage</span><span class="chip d">last seen</span></div>
+<div class="sec"><span class="b">Last seen: day 118, 09:40 (13 days ago)</span><span class="lb">As last seen</span><span>NPC city · held 220 Food, 40 Wood</span><span>Sold Food at 3 Coins, bought Iron at 9 Coins</span><span class="mu">Nothing can be done with a building out of sight.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="dot" style="background: var(--npc)"></span><span class="grow">Dunmoor town hall</span></div>
+<div class="sec"><span class="b">NPC city</span><div class="well" style="padding: 6px 8px">Occupied by you, 3 game days left</div><div class="fx"><span class="mt grow"><i style="width: 40%; background: var(--gold)"></i></span><span class="mono">2 of 5 game days · about 1 h 12 min</span></div><span class="mu">Capturing takes holding the town hall without a break.</span></div></section>
+
+<section class="pn"><div class="hd" style="background: var(--blood)"><span class="grow">Order turned down</span></div>
+<div class="sec"><span>Order turned down: no way there for a carriage.</span><span class="mu">Errors show on the card they belong to, in this strip.</span></div></section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

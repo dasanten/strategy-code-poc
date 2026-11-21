@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin, Accounts and Directives</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui" style="width: 1440px; height: 900px; display: flex; flex-direction: column; background: var(--steel)">
+<header class="fx" style="height: 48px; padding: 0 12px; gap: 12px; background: var(--night); color: #fff; border-bottom: 2px solid var(--ink); flex: none">
+<span class="ic s24 i-key" aria-hidden="true"></span><span class="px t18" style="color: var(--cyan)">Code Strategy admin</span>
+<div class="fx" role="tablist" style="gap: 4px; margin-left: 12px"><a class="btn sm dk" role="tab" href="Admin-Map.dc.html">Map</a><button class="btn sm on" role="tab" aria-selected="true">Accounts</button><button class="btn sm on" role="tab" aria-selected="true">Directives</button></div>
+<span class="grow"></span>
+<a class="btn sm dk" href="Main.dc.html">Back to the game</a><span style="color: var(--mist)">daniel</span><button class="btn sm dk">Log out</button>
+</header>
+<div style="display: grid; grid-template-columns: 400px minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 16px; flex: 1 1 0; min-height: 0; align-items: start">
+
+<section class="pn"><div class="hd">Accounts</div>
+<div class="sec"><span class="px t16">Invite codes</span><button class="btn pri">New invite code</button>
+<div class="well mono" style="padding: 8px">K7QF-93MD-2XWA<br>P2LH-61TR-8VNC</div><span class="mu">Newest first.</span></div>
+<div class="sec"><span class="px t16">Reset a password</span>
+<label class="fld"><span class="lb">Player</span><input class="in" value="harrow_m"></label>
+<label class="fld"><span class="lb">New password</span><input class="in" type="password" value="xxxxxxxxxxxx"></label>
+<button class="btn">Reset password</button>
+<div class="well ok" style="padding: 8px">New password set for harrow_m; they were logged out everywhere.</div></div>
+<div class="sec" style="background: var(--paper)"><span class="lb">Not an admin</span><span>Only admins can open the admin panel.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Admin directives in force</span><span class="mono" style="font-size: 12px">1</span></div>
+<div class="sec"><span class="mu">The Trade Organization treats the target as one to punish until every goal is met or you lift it. Every Player sees the target, the reason and the goals; only admins see who gave it and how far it has come.</span></div>
+<div class="sec"><span class="fx"><span class="grow"><span class="b t16">Mire and its alliance</span><br>farming new Players <span class="mu">(by daniel, day 124, 19:02)</span></span><button class="btn sm dng">Lift</button></span>
+<span class="lb">Goals</span>
+<div class="fx"><span class="cb"></span><span class="grow">Mirefield destroyed</span><span class="mu">not yet</span></div>
+<div class="fx"><span class="cb"></span><span class="grow">40% of its soldiers killed</span><span class="mt" style="width: 120px"><i style="width: 58%; background: var(--red)"></i></span><span class="mono">7 of 12 killed</span></div>
+<span class="lb">Buying off</span>
+<div class="fx wrap"><span class="grow">Bought off for 500 Coins.</span><input class="in mono" style="width: 90px" value="500" aria-label="Price in Coins"><button class="btn sm">Set price</button><button class="btn sm">Don't allow</button></div>
+<span class="mu">Without a price: "Not for sale." and Allow buying off. Without goals: "No goals: it ends only when lifted."</span></div>
+<div class="sec" style="background: var(--paper)"><span class="mu">With none: "No directive is in force."</span><span class="ok">Directive given against Mire.</span></div></section>
+
+<section class="pn"><div class="hd">Give a directive</div>
+<form class="sec">
+<div class="fx" style="align-items: flex-end"><label class="fld grow"><span class="lb">Target</span><select class="in"><option>Mire (realm)</option><option>Choose…</option><option>Dunmoor (NPC city)</option></select></label><label class="fx" style="height: 30px"><span class="cb on"></span>With its alliance</label></div>
+<label class="fld"><span class="lb">Reason</span><input class="in" value="farming new Players"></label>
+<div class="fx" style="align-items: flex-end"><label class="fx" style="height: 30px"><span class="cb on"></span>Can be bought off</label><label class="fld grow"><span class="lb">Price in Coins</span><input class="in mono" value="500"></label></div>
+<fieldset class="col" style="margin: 0; padding: 10px; border: 2px solid var(--tan)"><legend class="lb" style="padding: 0 4px">Goals (all must be met)</legend>
+<div class="fx"><span class="grow">Mirefield destroyed</span><button class="btn sm" type="button">Remove</button></div>
+<div class="fx"><span class="grow">40% of its soldiers killed</span><button class="btn sm" type="button">Remove</button></div>
+<div class="fx"><select class="in grow" aria-label="Goal kind"><option>Soldiers killed</option><option>A city destroyed</option><option>Share of its soldiers killed</option></select><input class="in mono" style="width: 80px" value="10" aria-label="Soldiers"><button class="btn" type="button">Add goal</button></div>
+<span class="mu">A city destroyed asks for one of the target's cities. Changing the target clears the goals.</span></fieldset>
+<button class="btn dng lg" type="button">Give directive</button>
+</form></section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

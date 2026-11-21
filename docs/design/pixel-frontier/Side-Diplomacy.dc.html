@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sidebar, Diplomacy: Demands and Direct offers</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<aside class="ui pn col" style="width: 420px; height: 1240px; gap: 0">
+<div class="hd"><span class="ic i-scroll" aria-hidden="true"></span><span class="grow">Diplomacy</span></div>
+<div class="tabs" role="tablist" style="flex-wrap: wrap"><a class="tab" role="tab" href="Side-Contracts.dc.html">Contracts</a><button class="tab on" role="tab" aria-selected="true">Demands <span class="dot" style="background: var(--red)"></span></button><button class="tab" role="tab">Direct offers <span class="dot" style="background: var(--red)"></span></button><a class="tab" role="tab" href="Side-Alliance.dc.html">Alliance</a><a class="tab" role="tab" href="Side-Standing.dc.html">Standing</a></div>
+
+<div class="rw grp"><span class="lb grow">Demands · sent to you</span><span class="mono">1</span></div>
+<div class="sec"><span class="b">The realm of Mire demands 200 Coins</span><span>"Pay, or we take Stonewick."</span><span class="bad">Lapses in 2 game days</span><span class="mu">Ignoring it does nothing by itself.</span>
+<label class="fld"><span class="lb">How</span><select class="in"><option>Set aside for them to fetch</option><option>Send by Transfer, I pay the fee</option></select></label>
+<label class="fld"><span class="lb">At</span><select class="in"><option>The storage at (2216, 1790) in Ashford</option></select></label>
+<div class="fx"><button class="btn pri grow">Accept</button><button class="btn grow">Decline</button></div></div>
+<div class="rw grp"><span class="lb grow">Sent by you</span><span class="mono">1</span></div>
+<div class="sec"><span class="b">You demand Dunmoor of Dunmoor (NPC city)</span><span class="mu">The answer comes within a game hour.</span></div>
+<div class="sec" style="background: var(--paper)"><span class="px t16">Send a demand</span>
+<label class="fld"><span class="lb">To</span><select class="in"><option>Send to…</option><option>The realm of Mire</option><option>Dunmoor (NPC city)</option><option>The Trade Organization</option></select></label>
+<div class="fx" role="radiogroup" aria-label="What" style="gap: 4px"><button class="btn sm grow" role="radio" aria-checked="false">A city</button><button class="btn sm grow on" role="radio" aria-checked="true">Goods or Coins</button></div>
+<div class="fx"><select class="in grow" aria-label="Good"><option>Coins</option></select><input class="in mono" style="width: 70px" value="200" aria-label="Units"><button class="btn sq" aria-label="Remove"><span class="ic s16 i-x" aria-hidden="true"></span></button></div>
+<button class="btn sm" style="align-self: flex-start">Add a good</button>
+<label class="fld"><span class="lb">Note</span><input class="in" placeholder="Give the city back, or we attack."></label>
+<label class="fx">Deadline<input class="in mono" style="width: 56px" value="3">game days</label>
+<button class="btn pri">Send</button></div>
+
+<div class="rw grp" style="border-top: 2px solid var(--ink)"><span class="lb grow">Direct offers · sent to you</span><span class="mono">1</span></div>
+<div class="sec"><span class="b">The realm of Harrow offers: 40 Iron for 120 Food</span><span>Fetch it in person at the storage at (2610, 1402) in Harrowgate.</span><span class="mu">Lapses in 4 game days</span>
+<div class="fx"><label class="fld grow"><span class="lb">Trader</span><select class="in"><option>Ana · their hands</option></select></label><label class="fld" style="width: 80px"><span class="lb">Times</span><input class="in mono" value="1"></label></div>
+<div class="fx" style="gap: 4px"><button class="btn sm pri grow">Accept</button><button class="btn sm">Show on map</button><button class="btn sm">Decline</button></div></div>
+<div class="rw grp"><span class="lb grow">Sent by you</span><span class="mono">1</span></div>
+<div class="sec"><span>To the realm of Harrow: gives 60 Wood, wants 20 Stone · Lapses in 6 game days</span><button class="btn sm" style="align-self: flex-start">Take down</button></div>
+<div class="sec" style="background: var(--paper)"><span class="px t16">Send a direct offer</span>
+<label class="fld"><span class="lb">To</span><select class="in"><option>The realm of Harrow</option></select></label>
+<label class="fld"><span class="lb">How</span><select class="in"><option>In person, at a storage of mine</option><option>Carried by the Trade Org, I pay the fee</option><option>Carried by the Trade Org, fee split</option></select></label>
+<div class="fx" style="align-items: flex-end"><label class="fld grow"><span class="lb">Gives</span><span class="fx"><input class="in mono" style="width: 56px" value="60"><select class="in grow" aria-label="Good given"><option>Wood</option></select></span></label><label class="fld grow"><span class="lb">Wants</span><span class="fx"><input class="in mono" style="width: 56px" value="20"><select class="in grow" aria-label="Good wanted"><option>Stone</option></select></span></label></div>
+<div class="fx"><label class="fx">Times<input class="in mono" style="width: 56px" value="1"></label><span class="grow"></span><button class="btn pri">Send</button></div>
+<span class="mu">Only they can accept it. Empty: "You have no finished storage to set goods aside at."</span></div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":420,"height":1240}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

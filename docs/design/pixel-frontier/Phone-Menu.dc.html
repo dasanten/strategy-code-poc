@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone, menu</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui map" style="width: 390px; height: 844px; position: relative; overflow: hidden; font-size: 15px; background-size: 1440px 900px; background-position: -560px -160px">
+<div style="position: absolute; inset: 0; background: rgba(24,20,37,.6)"></div>
+<header class="bar fx" style="position: absolute; left: 0; top: 0; right: 0; height: 48px; padding: 0 2px 0 0; gap: 8px; border-width: 0 0 2px">
+<a class="btn lg sq on" aria-label="Menu" aria-expanded="true" href="Phone-Map.dc.html" style="border-width: 0 2px 0 0"><span class="ic i-x" aria-hidden="true"></span></a>
+<span class="px t16 grow" style="color: var(--gold)">Realm of Ashford</span>
+<span class="mono" style="font-size: 12px">Y2 · D131 · 14:20</span>
+<span class="chip g">live</span>
+</header>
+
+<nav class="pn col" aria-label="Menu" style="position: absolute; left: 0; top: 48px; width: 320px; bottom: 0; border-width: 0 2px 0 0; gap: 0">
+<div class="fx" style="padding: 10px; gap: 12px; background: var(--paper); border-bottom: 2px solid var(--ink)">
+<span class="fx mono" style="gap: 4px"><span class="ic i-food" role="img" aria-label="Food"></span>412</span>
+<span class="fx mono" style="gap: 4px"><span class="ic i-wood" role="img" aria-label="Wood"></span>96</span>
+<span class="fx mono" style="gap: 4px"><span class="ic i-stone" role="img" aria-label="Stone"></span>40</span>
+<span class="fx mono" style="gap: 4px"><span class="ic i-coins" role="img" aria-label="Coins"></span>73</span>
+</div>
+<div class="fx" style="padding: 8px 10px; gap: 8px; border-bottom: 2px solid var(--tan)"><span class="ic i-crown" aria-hidden="true"></span><span class="grow">Leader <span class="b">Edda</span> · home city Ashford</span></div>
+<div class="fx" style="padding: 8px 10px; gap: 6px; border-bottom: 2px solid var(--tan)"><button class="btn lg gold grow">3 idle</button><button class="btn lg dng grow">2 hungry</button></div>
+<a class="rw" href="Phone-Card.dc.html" style="min-height: 52px; color: inherit; text-decoration: none"><span class="ic s24 i-person" aria-hidden="true"></span><span class="grow b">Residents</span><span class="mono mu">12</span></a>
+<a class="rw" href="Side-Horses.dc.html" style="min-height: 52px; color: inherit; text-decoration: none"><span class="ic s24 i-horse" aria-hidden="true"></span><span class="grow b">Horses</span><span class="mono mu">6</span></a>
+<a class="rw" href="Side-Armies.dc.html" style="min-height: 52px; color: inherit; text-decoration: none"><span class="ic s24 i-banner" aria-hidden="true"></span><span class="grow b">Armies</span><span class="mono mu">2</span></a>
+<a class="rw" href="Side-Contracts.dc.html" style="min-height: 52px; color: inherit; text-decoration: none"><span class="ic s24 i-scroll" aria-hidden="true"></span><span class="grow b">Contracts</span><span class="chip y">1 offer</span></a>
+<a class="rw" href="Side-Alliance.dc.html" style="min-height: 52px; color: inherit; text-decoration: none"><span class="ic s24 i-ally" aria-hidden="true"></span><span class="grow b">Alliance</span><span class="mono mu">Northern Pact</span></a>
+<a class="rw" href="Side-Standing.dc.html" style="min-height: 52px; color: inherit; text-decoration: none"><span class="ic s24 i-medal" aria-hidden="true"></span><span class="grow b">Standing</span><span class="chip y">1 asks to join</span></a>
+<a class="rw" href="Side-Cities.dc.html" style="min-height: 52px; color: inherit; text-decoration: none"><span class="ic s24 i-city" aria-hidden="true"></span><span class="grow b">Cities</span><span class="mono mu">4 in sight</span></a>
+<a class="rw" href="Scripts.dc.html" style="min-height: 52px; color: inherit; text-decoration: none"><span class="ic s24 i-code" aria-hidden="true"></span><span class="grow b">Scripts</span><span class="chip r">1 error</span></a>
+<a class="rw" href="Side-Log.dc.html" style="min-height: 52px; color: inherit; text-decoration: none"><span class="ic s24 i-book" aria-hidden="true"></span><span class="grow b">Realm log</span><span class="chip r">4 new</span></a>
+<span class="grow"></span>
+<div class="fx" style="padding: 10px; gap: 6px; border-top: 2px solid var(--ink); background: var(--paper)"><a class="btn lg grow" href="Wiki.dc.html">Wiki</a><button class="btn lg grow">Settings</button><button class="btn lg grow">Log out</button></div>
+<div class="mu" style="padding: 0 10px 10px; background: var(--paper)">Signed in as daniel. Each tab opens full width under the top bar.</div>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

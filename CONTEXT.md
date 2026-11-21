@@ -2130,6 +2130,25 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
 - **Tick:** one step of the world, one per second.
 - **Realm log:** what happened in a Player's realm (residents going hungry, deaths, Food
   spoiling), shown only to that Player, also what happened while they were offline.
+- **Screen:** how the game screen is laid out (ADR 0044, replacing the layout of ADR 0008 and
+  0012; built in Epic 119, and until it is on `dev` the entries here that say drawer, tool rail or
+  card top right describe the old layout). The map fills the screen, with four fixed places over
+  it. The **top bar** (control mode, realm, clock, goods, Leader, Zeal, heir). The **sidebar** on
+  the left: one tab each for what the tool rail's drawers held, in the same groups and order
+  (People, Diplomacy, Realm), one open at a time, folding to its strip of tabs. The **command
+  bar** along the bottom: the card of whatever is picked (a resident, a group, an army), its
+  header on the left and its tabs beside it, and in realm control mode the realm bar in its place;
+  the minimap and the map's buttons sit at its right end. The **dock** on the right: tile cards,
+  the who-list and the realm order cards, so a tile and a resident can be open together. A panel
+  an order opens (Goods, Build, Haul route, …) opens above the command bar. The Script library is
+  a screen of its own over the map, the **script workshop**. On a phone the command bar is the
+  bottom sheet (peek, half, full) and the sidebar is the menu, as before. Only the UI: every
+  order, list and form stays what it was.
+- **Pixel frontier:** the look of the whole UI (ADR 0044): panels, buttons and type drawn like
+  Daniel's pixel art, in its palette, with hard edges and no rounded corners or blur. One look for
+  every Player; the Art style picks only how the map and the goods icons are drawn. A UI icon
+  (a sidebar tab, an order, a mark) comes from the `ui` sheet of `art/pixel`, and one not drawn
+  yet shows a placeholder drawn in code.
 - **Resident card:** what the UI shows for a picked resident (and, laid out the same, a group or
   an army): a header that always shows (name, Doing, hunger and health, what they carry) and one
   open tab under it: Orders, Queue, Stats or Script. Orders are grouped by kind (Move, Work &
@@ -2140,8 +2159,9 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   reasons.
 - **Art style:** how the map and the goods icons are drawn, picked by the Player in the map's
   legend and remembered per browser (ADR 0043): **Tokens** (line art only), **Painted** (painted
-  sprites where there are some, tokens otherwise; the default) or **Pixel** (Daniel's pixel art,
-  and the Painted look for whatever has none yet). It changes nothing in the world. In Pixel,
+  sprites where there are some, tokens otherwise) or **Pixel** (Daniel's pixel art, and the
+  Painted look for whatever has none yet; the default since ADR 0044, for whoever hasn't picked
+  one). It changes nothing in the world. In Pixel,
   walls and roads join their neighbours, a gate shows open or closed, a carriage shows with or
   without its hitched horse, and up close a resident wears their equipped armour, shield and
   weapon.

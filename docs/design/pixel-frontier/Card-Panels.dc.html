@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Order panels that open above the command bar</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui" style="width: 1440px; height: 1180px; box-sizing: border-box; padding: 20px; background: var(--steel); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start">
+
+<div class="col" style="gap: 16px">
+<section class="pn"><div class="hd"><span class="grow">Goods</span><span class="mono" style="font-size: 12px">12 / 30 kg</span><span class="k" style="margin: 0">G</span></div>
+<div class="sec"><span class="fx"><span class="lb grow">Carrying</span><button class="btn sm">Store all</button></span><span class="mu">Store all: at the nearest storage, keeping their own Food.</span>
+<div class="fx" style="gap: 4px"><span class="ic s16 i-wood" aria-hidden="true"></span><span class="grow">Wood · 4</span><input class="in mono" style="width: 44px; height: 24px" value="4" aria-label="Units of Wood"><button class="btn sm">Drop</button><button class="btn sm">Store</button><button class="btn sm">Deliver</button><button class="btn sm">Load</button></div>
+<div class="fx" style="gap: 4px"><span class="ic s16 i-food" aria-hidden="true"></span><span class="grow">Food · 2</span><input class="in mono" style="width: 44px; height: 24px" value="2" aria-label="Units of Food"><button class="btn sm">Drop</button><button class="btn sm">Store</button><button class="btn sm">Load</button></div>
+<span class="mu">Deliver also reads "Deliver to carriage site" or "Deliver to road" where one is here.</span></div>
+<div class="sec"><span class="fx"><span class="lb grow">Here</span><span class="mu">takes as much as fits</span></span>
+<span class="b">In the storage</span>
+<div class="fx" style="gap: 4px"><span class="ic s16 i-stone" aria-hidden="true"></span><span class="grow">Stone · 40</span><input class="in mono" style="width: 44px; height: 24px" value="10" aria-label="Units of Stone"><button class="btn sm">Pick up</button></div>
+<div class="fx" style="gap: 4px"><span class="ic s16 i-sword" aria-hidden="true"></span><span class="grow">Sword · 2</span><input class="in mono" style="width: 44px; height: 24px" value="1" aria-label="Units of Sword"><button class="btn sm">Pick up</button></div>
+<span class="b">On the ground</span><span class="mu">Nothing.</span>
+<span class="b">On the carriage · 120 / 300 kg · no horse hitched</span>
+<div class="fx" style="gap: 4px"><span class="ic s16 i-ironore" aria-hidden="true"></span><span class="grow">Iron ore · 30</span><input class="in mono" style="width: 44px; height: 24px" value="6" aria-label="Units of Iron ore"><button class="btn sm">Pick up</button></div>
+<span class="mu">Other lists: In the stable, Delivered to the site, to the carriage site, to the road site. Children handle Food only.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Relocate</span><span style="font-size: 12px">from Ashford</span><span class="k" style="margin: 0">V</span></div>
+<div class="sec"><span>Bram walks there and moves in on stepping into its area, if it still has free housing then. Moving ends a pair.</span>
+<select class="in" aria-label="City"><option>Pick a city…</option><option>Stonewick · 2 free housing</option><option disabled>Harlow · no free housing</option></select>
+<button class="btn pri">Relocate</button></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Make Leader</span><span class="k" style="margin: 0">L</span></div>
+<div class="sec"><span>Hand your realm to Bram? Edda stays on as an ordinary resident.</span>
+<div class="fx"><button class="btn gold grow">Make Bram Leader</button><button class="btn">Cancel</button></div></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Rename</span><span style="font-size: 12px">free, at once</span><span class="k" style="margin: 0">N</span></div>
+<div class="sec"><label class="fld"><span class="lb">New name</span><input class="in" value="Bram"></label>
+<label class="fld"><span class="lb">Realm name</span><input class="in" placeholder="Leader of an unnamed realm only"></label>
+<button class="btn pri">Rename</button></div></section>
+</div>
+
+<div class="col" style="gap: 16px">
+<section class="pn"><div class="hd"><span class="grow">Build</span><span style="font-size: 12px">Stone node</span><span class="k" style="margin: 0">B</span></div>
+<div class="sec">
+<div class="fx" style="align-items: flex-start"><span class="grow"><span class="b">Quarry</span><br><span class="mu">Makes Stone from its node. Needs 20 Wood and about 3 game days of one resident's work.</span></span><button class="btn sm pri">Build quarry</button></div>
+<div class="fx" style="align-items: flex-start"><span class="grow"><span class="b">House</span><br><span class="mu">Room for 4 residents. Needs 30 Wood, 10 Stone and about 4 game days.</span></span><button class="btn sm off" disabled>Build house</button></div>
+<span class="bad">Not here: only a node's workplace covers a node.</span>
+<div class="fx" style="align-items: flex-start"><span class="grow"><span class="b">Road</span><br><span class="mu">Faster walking and driving. Needs 2 Stone; four times the work on Mountain.</span></span><button class="btn sm">Build road</button></div>
+<div class="fx" style="align-items: flex-start"><span class="grow"><span class="b">Carriage</span> <span class="mu">at the stable</span><br><span class="mu">Needs 40 Wood, 5 Iron and about 5 game days.</span></span><button class="btn sm">Build carriage</button></div>
+<span class="mu">Every kind is listed: town hall, house, storage, wall, gate, farm, stable, training ground, smelter, mint, smithy, mine, quarry, lumber camp.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Construction site</span><span style="font-size: 12px">House</span></div>
+<div class="sec"><div class="fx"><span class="lb" style="width: 44px">Work</span><span class="mt grow"><i style="width: 38%"></i></span><span class="mono">38% · about 14 min (1 game day)</span></div>
+<div class="fx"><span class="ic s16 i-wood" aria-hidden="true"></span><span class="grow">Wood</span><span class="mono">20 / 30</span></div>
+<div class="fx"><span class="ic s16 i-stone" aria-hidden="true"></span><span class="grow">Stone</span><span class="mono">10 / 10</span></div>
+<button class="btn pri">Help build</button></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Tear down</span><span style="font-size: 12px">Ashford mine</span><span class="k" style="margin: 0">T</span></div>
+<div class="sec"><div class="fx"><span class="lb">Torn down</span><span class="mt hp grow"><i style="width: 20%"></i></span><span class="mono">20%</span></div>
+<span>Takes about 1 game day of one resident's work and leaves 10 Wood, 4 Stone on the tile.</span>
+<button class="btn dng">Tear down the mine</button></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Walls</span><span style="font-size: 12px">break or climb</span><span class="k" style="margin: 0">C</span></div>
+<div class="sec"><div class="fx"><span class="grow">Breaking the wall at 2190, 1780</span><span class="mt hp" style="width: 80px"><i style="width: 35%"></i></span></div>
+<select class="in" aria-label="Wall or gate"><option>Wall at 2190, 1780 · 2 tiles · 35% broken</option><option>Gate at 2190, 1786 · 5 tiles · 0% broken</option></select>
+<div class="fx"><button class="btn dng grow">Break</button><button class="btn grow off" disabled>Climb</button></div>
+<span class="mu">Climb only right next to it. A climber can't defend themselves.</span></div></section>
+</div>
+
+<div class="col" style="gap: 16px">
+<section class="pn"><div class="hd"><span class="grow">Haul route</span><span class="chip y">on a route</span><span class="k" style="margin: 0">H</span></div>
+<div class="sec"><span class="lb">To the other stop</span>
+<div class="fx wrap" style="gap: 4px"><button class="btn sm on">Food</button><button class="btn sm">Wood</button><button class="btn sm">Stone</button><button class="btn sm off" disabled>Iron ore</button><button class="btn sm">Iron</button><button class="btn sm">Gold ore</button><button class="btn sm">Coins</button><button class="btn sm">Spear</button><button class="btn sm">Sword</button><button class="btn sm">Shield</button><button class="btn sm">Armour</button></div>
+<span class="lb">Back from there</span>
+<div class="fx wrap" style="gap: 4px"><button class="btn sm off" disabled>Food</button><button class="btn sm">Wood</button><button class="btn sm">Stone</button><button class="btn sm on">Iron ore</button><button class="btn sm">Iron</button><button class="btn sm">Gold ore</button><button class="btn sm">Coins</button></div>
+<span class="mu">A good goes one way only.</span>
+<label class="fx">Food kept for the horse<input class="in mono" style="width: 56px; height: 24px" value="10"></label>
+<button class="btn pri">Pick the other stop</button></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Ashford smithy</span><span class="mono" style="font-size: 12px">2 / 4 workers</span><span class="k" style="margin: 0">E</span></div>
+<div class="sec"><span>Held by your realm.</span>
+<div class="fx"><span class="ic i-spear" aria-hidden="true"></span><span class="grow"><span class="b">Spear</span> · 1 Iron, 2 Wood</span><button class="btn sm">Make instead</button></div>
+<div class="fx"><span class="ic i-sword" aria-hidden="true"></span><span class="grow"><span class="b">Sword</span> · 3 Iron, 1 Wood</span><button class="btn sm on">Making…</button></div>
+<div class="fx"><span class="ic i-shield" aria-hidden="true"></span><span class="grow"><span class="b">Shield</span> · 1 Iron, 3 Wood</span><button class="btn sm">Make instead</button></div>
+<div class="fx"><span class="ic i-armour" aria-hidden="true"></span><span class="grow"><span class="b">Armour</span> · 5 Iron</span><button class="btn sm">Make instead</button></div>
+<span class="mu">Other workplaces show one button, Work here, with the output per game day. Holding reads "Nobody holds it", "Held by another realm" or "shared".</span></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Teach</span><span class="mono" style="font-size: 12px">3 / 6 trainees</span><span class="k" style="margin: 0">Y</span></div>
+<div class="sec"><span>Trainees here learn the subject while you teach, never past your own value.</span>
+<select class="in" aria-label="Subject"><optgroup label="Stats"><option>Strength</option><option>Endurance</option><option>Agility</option><option>Intellect</option></optgroup><optgroup label="Skills"><option>Combat</option><option>Driving</option><option>Mining</option></optgroup></select>
+<div class="fx"><button class="btn pri grow">Teach</button><button class="btn grow">Train<span class="k">I</span></button></div></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Run script</span><span class="k" style="margin: 0">X</span></div>
+<div class="sec"><span>Runs <span class="b">Work</span> · version 4</span>
+<select class="in" aria-label="Script"><option>Pick a script…</option><option>Mine run · v7</option><option>Work · v4</option></select>
+<button class="btn pri">Run script</button></div></section>
+</div>
+
+<div class="col" style="gap: 16px">
+<section class="pn"><div class="hd"><span class="grow">Breed horses</span><span style="font-size: 12px">3 of yours here</span></div>
+<div class="sec"><div class="fx"><span class="lb" style="width: 40px">Foal</span><span class="mt bl grow"><i style="width: 55%"></i></span><span class="mono">about 1 h (4 game days)</span></div>
+<span class="mu">Tend two fed horses for 10 game days; the foal gets their average stats, give or take 1.</span>
+<label class="fx"><span class="cb on"></span><span class="grow"><span class="b">Bramble</span> · 12/8/10 · 5 years · fed, healthy</span></label>
+<label class="fx"><span class="cb on"></span><span class="grow"><span class="b">Soot</span> · 10/11/9 · 7 years · fed, healthy</span></label>
+<label class="fx"><span class="cb"></span><span class="grow"><span class="b">Pip</span> · 9/9/12 · 3 years · hungry</span></label>
+<button class="btn pri">Carry on with these two</button></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Pairing</span><span class="k" style="margin: 0">P</span></div>
+<div class="sec"><span class="mu">One child per pair; pair again for another.</span>
+<select class="in" aria-label="Partner"><option>Pick a partner…</option><option>Ana · 19 years</option><option>Hale · 36 years</option></select>
+<button class="btn pri">Pair</button></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Attack</span><span style="font-size: 12px">fights with a sword</span><span class="k" style="margin: 0">A</span></div>
+<div class="sec"><select class="in" aria-label="Whom"><option>Garrick · 6 tiles · armed</option><option>A resident of Mirefield · 9 tiles</option></select>
+<span class="bad">Attacking another organization is a crime if a witness brings the news home.</span>
+<button class="btn dng">Attack</button></div></section>
+
+<section class="pn" role="dialog" aria-label="Start Work"><div class="hd" style="background: var(--pine)"><span class="grow">Start Work</span></div>
+<div class="sec"><span class="mu">Shown before a script with params starts.</span>
+<div class="fx"><span class="mono b grow">workplace</span><span>the one they stand on</span><button class="btn sm">Pick</button></div>
+<div class="fx"><span class="mono b grow">storage</span><span>none picked</span><button class="btn sm">Pick</button></div>
+<div class="fx"><span class="mono b grow">foodAt</span><input class="in mono" style="width: 56px; height: 24px" value="3"></div>
+<div class="fx"><span class="mono b grow">foodTake</span><input class="in mono" style="width: 56px; height: 24px" value="12"></div>
+<div class="fx"><button class="btn grow">Cancel</button><button class="btn pri grow">Start</button></div></div></section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

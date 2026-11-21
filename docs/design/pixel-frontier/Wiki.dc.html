@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Code Strategy Wiki</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}a{color:#124e89}a:hover{color:#181425}</style>
+</helmet>
+<div class="ui" style="min-height: 100vh; background: var(--parch); font-size: 15px; line-height: 1.55">
+<header class="bar fx wrap" style="padding: 8px 16px; gap: 8px 16px; border-width: 0 0 2px">
+<span class="ic s32 i-book" aria-hidden="true"></span>
+<span class="px t22" style="color: var(--gold)">Code Strategy Wiki</span>
+<span class="grow" style="min-width: 0"></span>
+<input class="in" style="flex: 1 1 220px; max-width: 360px" placeholder="Find a rule, a number, an API call" aria-label="Find in the Wiki">
+<a class="btn dk" href="Main.dc.html">To the game</a>
+</header>
+
+<div style="max-width: 1200px; margin: 0 auto; padding: 24px 16px; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+<nav aria-label="Contents" class="pn" style="flex: 1 1 240px; max-width: 100%">
+<div class="hd">Contents</div>
+<ol class="col" style="margin: 0; padding: 10px 10px 10px 34px; gap: 3px">
+<li><a href="#controls">Controls</a></li>
+<li><a href="#queues">Queues</a></li>
+<li><a href="#time">Time &amp; map</a></li>
+<li><a href="#terrain" class="b">Terrain &amp; walking</a></li>
+<li><a href="#residents">Residents &amp; stats</a></li>
+<li><a href="#training">Training</a></li>
+<li><a href="#food">Food &amp; hunger</a></li>
+<li><a href="#work">Workplaces &amp; output</a></li>
+<li><a href="#building">Building &amp; tearing down</a></li>
+<li><a href="#transport">Carrying &amp; transport</a></li>
+<li><a href="#how-to-trade">How to trade</a></li>
+<li><a href="#trade">Trade &amp; prices</a></li>
+<li><a href="#standing">Standing &amp; reactions</a></li>
+<li><a href="#combat">Combat &amp; walls</a></li>
+<li><a href="#territory">Territory</a></li>
+<li><a href="#language">Script language</a></li>
+<li><a href="#api">Game API</a></li>
+<li><a href="#params">Script parameters</a></li>
+<li><a href="#scripts">Scripting budgets</a></li>
+<li><a href="#examples">Example scripts</a></li>
+</ol>
+</nav>
+
+<main class="col" style="flex: 999 1 560px; min-width: 0; gap: 24px">
+<p style="margin: 0; font-size: 17px">The game's rules and numbers, the same for everyone. Every figure here comes from the game's current balance, so you can plan with it. It never tells anything about the world's current state.</p>
+
+<section id="time" class="pn">
+<div class="hd"><a href="#time" style="color: inherit; text-decoration: none" class="grow">Time &amp; map</a><span class="mono" style="font-size: 12px">#time</span></div>
+<div class="sec" style="padding: 14px 16px">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 10px">
+<div class="well" style="padding: 10px"><div class="px t28">1 s</div>one game minute</div>
+<div class="well" style="padding: 10px"><div class="px t28">24 min</div>one game day</div>
+<div class="well" style="padding: 10px"><div class="px t28">1 week</div>one game year of 420 game days</div>
+<div class="well" style="padding: 10px"><div class="px t28">12 h</div>to walk once around the map, unloaded, on flat land</div>
+</div>
+<p style="margin: 0">The map is a rectangle whose opposite sides join: walk off the east side and you come back in from the west. It has no edge and no centre.</p>
+</div></section>
+
+<section id="terrain" class="pn">
+<div class="hd"><a href="#terrain" style="color: inherit; text-decoration: none" class="grow">Terrain &amp; walking</a><span class="mono" style="font-size: 12px">#terrain</span></div>
+<div class="sec" style="padding: 14px 16px">
+<p style="margin: 0">Terrain sets how fast residents move across a tile and how much food they burn there, compared with Plains. Agility softens the speed penalty, Endurance the food penalty.</p>
+<div style="overflow-x: auto"><table class="tb" style="min-width: 520px"><thead><tr><th>Terrain</th><th class="n">Speed</th><th class="n">Food</th><th>Notes</th></tr></thead><tbody>
+<tr><td><span class="fx"><span class="dot" style="background: #63c74d"></span>Plains</span></td><td class="n">100%</td><td class="n">100%</td><td>Farmland</td></tr>
+<tr><td><span class="fx"><span class="dot" style="background: #3e8948"></span>Forest</span></td><td class="n">~70%</td><td class="n">100%</td><td>Wood</td></tr>
+<tr><td><span class="fx"><span class="dot" style="background: #e8b796"></span>Hills</span></td><td class="n">~70%</td><td class="n">130%</td><td>Stone, some ore</td></tr>
+<tr><td><span class="fx"><span class="dot" style="background: #8b9bb4"></span>Mountain</span></td><td class="n">~35%</td><td class="n">200%</td><td>Ore-rich; no carriages except on a road</td></tr>
+<tr><td><span class="fx"><span class="dot" style="background: #0099db"></span>Lake</span></td><td class="n">impassable</td><td class="n">—</td><td>Small inland water</td></tr>
+<tr><td><span class="fx"><span class="dot" style="background: #124e89"></span>Sea</span></td><td class="n">impassable</td><td class="n">—</td><td>A few large bodies of water</td></tr>
+<tr><td><span class="fx"><span class="dot" style="background: #ead4aa"></span>Road</span></td><td class="n">~130%</td><td class="n">100%</td><td>Built by Players on top of passable land</td></tr>
+</tbody></table></div>
+<p style="margin: 0">A diagonal step is about 1.41 times as far as a straight one, and can't squeeze between two corners.</p>
+</div></section>
+
+<section id="api" class="pn">
+<div class="hd"><a href="#api" style="color: inherit; text-decoration: none" class="grow">Game API</a><span class="mono" style="font-size: 12px">#api</span></div>
+<div class="sec" style="padding: 14px 16px">
+<div style="overflow-x: auto"><table class="tb" style="min-width: 520px"><thead><tr><th>Call</th><th class="n">Cost</th><th>Answers</th><th>What it does</th></tr></thead><tbody>
+<tr><td class="mono">store(place)</td><td class="n">[COST]</td><td>—</td><td>Hands over to the built-in Store order.</td></tr>
+<tr><td class="mono">fetch(goods, place)</td><td class="n">[COST]</td><td>—</td><td>Hands over to the built-in Fetch order.</td></tr>
+<tr><td class="mono">wait()</td><td class="n">[COST]</td><td>—</td><td>Not run again until the current order ends or the resident is struck.</td></tr>
+<tr><td class="mono">end(reason)</td><td class="n">[COST]</td><td>—</td><td>Ends the script and notes the reason in the realm log.</td></tr>
+</tbody></table></div>
+<div class="code" style="padding: 10px 12px"><span class="c">// Example scripts keep the workshop's colours</span>
+<span class="kw">if</span> (me.food &lt; params.foodAt) { fetch({ food: params.foodTake }) }</div>
+</div></section>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1180}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

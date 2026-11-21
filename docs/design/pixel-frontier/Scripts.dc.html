@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Script workshop</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui" style="width: 1440px; height: 900px; display: flex; flex-direction: column; background: var(--parch)">
+<header class="bar fx" style="height: 44px; padding: 0 10px; gap: 12px; border-width: 0 0 2px; flex: none">
+<a class="btn sm dk" href="Main.dc.html">« Back to the map<span class="k">Esc</span></a>
+<span class="ic s24 i-code" aria-hidden="true"></span><span class="px t18" style="color: var(--gold)">Script workshop</span>
+<span class="grow"></span>
+<span class="mono" style="color: var(--tan)">14 of 40 scripts</span>
+<a class="btn sm dk" href="Wiki.dc.html">Script language</a><a class="btn sm dk" href="Wiki.dc.html">Game API</a>
+</header>
+<div style="display: flex; flex: 1 1 0; min-height: 0">
+
+<nav aria-label="Script library" class="col" style="width: 270px; gap: 0; border-right: 2px solid var(--ink)">
+<div class="sec"><button class="btn pri fill"><span class="ic s16 i-plus" aria-hidden="true"></span>New script</button><input class="in" style="height: 26px" placeholder="Find a script" aria-label="Find a script"></div>
+<div class="rw grp"><span class="lb grow">Default scripts</span><span class="mono">9</span></div>
+<div class="rw sel"><span class="grow"><span class="b">Work</span><br><span class="mu">edited · v4 · game's default changed</span></span><span class="chip y">5 run it</span></div>
+<div class="rw"><span class="grow"><span class="b">Build</span><br><span class="mu">game's · v2</span></span><span class="chip">2</span></div>
+<div class="rw"><span class="grow"><span class="b">Build line</span><br><span class="mu">game's · v1</span></span></div>
+<div class="rw"><span class="grow"><span class="b">Tear down</span><br><span class="mu">game's · v1</span></span></div>
+<div class="rw"><span class="grow"><span class="b">Haul</span><br><span class="mu">game's · v3</span></span><span class="chip">1</span></div>
+<div class="rw"><span class="grow"><span class="b">Feed the stable</span><br><span class="mu">game's · v1</span></span></div>
+<div class="rw"><span class="grow"><span class="b">Breed horses</span><br><span class="mu">game's · v1</span></span></div>
+<div class="rw"><span class="grow"><span class="b">Train</span><br><span class="mu">game's · v1</span></span></div>
+<div class="rw"><span class="grow"><span class="b">Defend</span><br><span class="mu">game's · v1</span></span></div>
+<div class="rw grp"><span class="lb grow">Your scripts</span><span class="mono">5</span></div>
+<div class="rw"><span class="grow"><span class="b">Mine run</span><br><span class="mu">v7</span></span><span class="chip">1</span></div>
+<div class="rw"><span class="grow"><span class="b">Hold the pass</span><br><span class="mu">v3 · army</span></span></div>
+<div class="rw"><span class="grow"><span class="b">Flee to the hall</span><br><span class="bad">none active</span></span></div>
+</nav>
+
+<main class="grow col" style="gap: 0">
+<div class="fx wrap" style="padding: 8px 12px; gap: 8px; border-bottom: 2px solid var(--tan)">
+<span class="px t22">Work</span><span class="chip g">version 4 active</span><span class="chip y">edited by you · game's default changed</span>
+<span class="grow"></span>
+<button class="btn sm">Reset to default</button><button class="btn sm off" disabled title="Default scripts can't be renamed or deleted">Rename</button><button class="btn sm off" disabled>Delete</button>
+</div>
+<details open style="border-bottom: 2px solid var(--tan)"><summary class="b" style="padding: 6px 12px; cursor: pointer">The game's default has changed since you edited yours.</summary>
+<div class="code" style="margin: 0 12px 6px; padding: 6px 8px; font-size: 12px"><span class="e">- param foodAt: number = 2</span>
+<span style="background: var(--pine); color: #fff">+ param foodAt: number = 3 // get Food when carrying fewer units</span></div>
+<div class="mu" style="padding: 0 12px 8px">From the default you edited to the game's default now. Reset to default to take it.</div></details>
+<div class="code grow" style="padding: 10px 0; border-width: 0"><span class="ln">1</span><span class="kw">param</span> workplace: building <span class="c">// where to work. none: the one on their tile</span>
+<span class="ln">2</span><span class="kw">param</span> storage: storage   <span class="c">// where the output goes. none: the nearest storage</span>
+<span class="ln">3</span><span class="kw">param</span> foodAt: number = <span class="n">2</span>
+<span class="ln">4</span><span class="kw">param</span> foodTake: number = <span class="n">12</span>
+<span class="ln">5</span>
+<span class="ln">6</span><span class="c">// Runs once a tick for each resident running it.</span>
+<span class="ln">7</span><span class="kw">if</span> (needsFood()) { getFood() }
+<span class="ln">8</span><span class="kw">else if</span> (pileIsFull()) { carryLoad() }
+<span class="ln">9</span><span class="kw">else</span> { work(params.workplace) }
+<span class="ln">10</span>
+<span class="ln">11</span><span class="kw">fn</span> pileIsFull() {
+<span class="ln">12</span>  <span class="kw">let</span> place = params.workplace
+<span class="ln">13</span>  <span class="kw">if</span> (place == <span class="n">null</span>) { end(<span class="s">"no workplace on their tile"</span>) }
+<span class="ln">14</span>  <span class="kw">return</span> place.<span class="e">pile</span>.weight >= me.carryCapacity
+<span class="ln">15</span>}
+<span class="ln">16</span>
+<span class="ln">17</span><span class="kw">fn</span> carryLoad() {
+<span class="ln">18</span>  log(<span class="s">"carrying a load off"</span>)
+<span class="ln">19</span>  store(params.storage)
+<span class="ln">20</span>  wait()
+<span class="ln">21</span>}</div>
+<div class="pn" style="position: relative; margin: -150px 0 0 330px; width: 380px; z-index: 1"><div class="sec" style="gap: 2px"><span class="mono b">building.pileGoods</span><span class="mono mu">list of { good, units } · null when out of sight</span><span>What lies in the building's pile. Did you mean pileGoods?</span></div></div>
+<div class="fx" style="padding: 8px 12px; gap: 12px; border-top: 2px solid var(--ink); background: var(--paper); margin-top: 60px">
+<span class="grow"><span class="bad mono">14:16 unknown field "pile" on building</span><br><span class="mu">No syntax errors; 1 warning, marked. Warnings don't stop a version from running.</span></span>
+<span class="mono mu">Ctrl S</span><button class="btn pri">Save as version 5</button>
+</div>
+</main>
+
+<aside class="col" style="width: 310px; gap: 0; border-left: 2px solid var(--ink)">
+<div class="sec"><span class="fx"><span class="px t16 grow">History</span><span class="mono mu">5 of 30 versions</span></span><button class="btn sm">Delete older versions</button></div>
+<div class="rw"><span class="grow"><span class="b mono">v5</span> <span class="chip r">has errors</span><br><span class="mu">day 131, 13:55</span></span><button class="btn sm">Open</button><button class="btn sm">Delete</button></div>
+<div class="rw sel"><span class="grow"><span class="b mono">v4</span> <span class="chip g">active</span><br><span class="mu">day 129, 20:10</span></span><button class="btn sm">Open</button></div>
+<div class="rw"><span class="grow"><span class="b mono">v3</span> <span class="chip">saved</span><br><span class="mu">day 122, 08:31</span></span><button class="btn sm">Open</button><button class="btn sm">Make active</button><button class="btn sm sq" aria-label="Delete version 3"><span class="ic s16 i-x" aria-hidden="true"></span></button></div>
+<div class="rw"><span class="grow"><span class="b mono">v1</span> <span class="chip">game's default</span><br><span class="mu">day 98, 11:00</span></span><button class="btn sm">Open</button></div>
+<div class="sec"><span class="px t16">Who runs it</span>
+<span class="fx"><span class="grow">Hale · Working the quarry</span><span class="mono mu">38 / 200</span></span>
+<span class="fx"><span class="grow">Edda · Working the farm</span><span class="mono mu">22 / 200</span></span>
+<span class="fx"><span class="grow bad">Bram · error at line 14</span><span class="mono mu">3 min ago</span></span>
+<span class="mu">Steps used last tick against the step budget.</span></div>
+<div class="sec" style="background: var(--paper)"><span class="px t16">New script</span>
+<label class="fld"><span class="lb">Start from</span><select class="in"><optgroup label="Start"><option>Empty</option></optgroup><optgroup label="Your default scripts"><option>Copy of your Work</option></optgroup><optgroup label="Example scripts (Wiki)"><option>Haul (the game's default)</option></optgroup></select></label>
+<label class="fld"><span class="lb">Name</span><span class="fx"><input class="in grow" value="Work copy"><button class="btn pri">Create</button></span></label></div>
+</aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Log in, sign up, founding and realm ended</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui map" style="width: 1440px; height: 900px; position: relative; overflow: hidden">
+<div style="position: absolute; inset: 0; background: rgba(24,20,37,.55)"></div>
+<div style="position: absolute; left: 0; right: 0; top: 70px; text-align: center"><div class="px" style="font-size: 64px; line-height: 1; color: var(--gold); text-shadow: 4px 4px 0 var(--ink)">Code Strategy</div><div class="px t18" style="color: var(--paper); margin-top: 10px">One world. It keeps running while you sleep.</div></div>
+
+<div style="position: absolute; left: 60px; right: 60px; top: 220px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; align-items: start">
+
+<section class="pn" aria-label="Log in">
+<div class="tabs" role="tablist"><button class="tab on" role="tab" aria-selected="true">Log in</button><button class="tab" role="tab">Sign up</button></div>
+<form class="sec" style="padding: 16px; gap: 12px">
+<label class="fld"><span class="lb">Name</span><input class="in lg" autocomplete="username" value="daniel"></label>
+<label class="fld"><span class="lb">Password</span><input class="in lg" type="password" value="hunter2hunter2"></label>
+<div class="well bad" role="alert" style="padding: 8px; border-color: var(--blood)">Wrong name or password.</div>
+<button class="btn pri lg" type="button">Log in</button>
+<span>The game's rules and numbers: <a href="Wiki.dc.html" style="color: var(--navy)">Wiki</a></span>
+</form></section>
+
+<section class="pn" aria-label="Sign up">
+<div class="tabs" role="tablist"><button class="tab" role="tab">Log in</button><button class="tab on" role="tab" aria-selected="true">Sign up</button></div>
+<form class="sec" style="padding: 16px; gap: 12px">
+<label class="fld"><span class="lb">Name</span><input class="in lg" autocomplete="username"></label>
+<label class="fld"><span class="lb">Password</span><input class="in lg" type="password"><span class="mu">At least [MIN LENGTH] characters.</span></label>
+<label class="fld"><span class="lb">Invite code</span><input class="in lg mono"></label>
+<button class="btn pri lg" type="button">Create account</button>
+<span>The game's rules and numbers: <a href="Wiki.dc.html" style="color: var(--navy)">Wiki</a></span>
+</form></section>
+
+<section class="pn" aria-label="Found your realm">
+<div class="hd"><span class="ic s24 i-crown" aria-hidden="true"></span><span class="grow">Found your realm</span></div>
+<form class="sec" style="padding: 16px; gap: 12px">
+<span>Name your realm and your Leader. Others know your realm by its name, and it never changes.</span>
+<label class="fld"><span class="lb">Realm name</span><input class="in lg" value="Ashford"></label>
+<label class="fld"><span class="lb">Leader's name</span><input class="in lg" value="Edda"><span class="mu">A name from the game. Keep it or type your own.</span></label>
+<div class="well" style="padding: 8px">You start with about 8 residents, a walled starting city, a farm, a stable with two horses and a carriage.</div>
+<button class="btn gold lg" type="button">Found the realm</button>
+</form></section>
+
+<section class="pn" role="alertdialog" aria-label="Your realm has ended">
+<div class="hd" style="background: var(--blood)"><span class="ic s24 i-warn" aria-hidden="true"></span><span class="grow">Your realm has ended</span></div>
+<div class="sec" style="padding: 16px; gap: 12px">
+<span>Your Leader has died and your realm has ended. The realm log says what became of your cities. You start afresh with a new Leader and a new starting city.</span>
+<div class="well" style="padding: 8px"><span class="lb">From the realm log</span><br>Edda died: killed by Garrick of the realm of Mire.<br>Ashford is now a self-managed city at 2204, 1796.</div>
+<button class="btn pri lg">Start afresh</button>
+</div></section>
+</div>
+
+<div class="pn fx" style="position: absolute; left: 50%; bottom: 60px; transform: translateX(-50%); padding: 10px 16px"><span class="ic i-clock" aria-hidden="true"></span><span class="px t16">Waiting for the server…</span><span class="mu">shown over the map until the world arrives</span></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cities: lists, sections, swaps, debt, horse market, offers</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<aside class="ui pn col" style="width: 420px; height: 1240px; gap: 0">
+<div class="hd"><span class="ic i-city" aria-hidden="true"></span><span class="grow">Cities in sight</span><span class="mono" style="font-size: 12px">4 in sight</span></div>
+<div class="sec" style="background: #f6c9b8"><span class="bad">You owe the Trade Organization 120 Coins. A resident can pay at any of its warehouses.</span></div>
+
+<div class="rw grp"><span class="lb grow">Your cities</span><span class="mono">2</span></div>
+<div class="rw"><span class="dot"></span><span class="grow"><span class="b">Ashford</span> · 8/12 residents<br><span class="fx" style="gap: 6px; margin-top: 2px"><span class="ic s16 i-food" aria-hidden="true"></span><span class="mono">412</span><span class="ic s16 i-wood" aria-hidden="true"></span><span class="mono">96</span><span class="ic s16 i-stone" aria-hidden="true"></span><span class="mono">40</span><span class="ic s16 i-coins" aria-hidden="true"></span><span class="mono">73</span></span></span><span>▸</span></div>
+<div class="rw"><span class="dot"></span><span class="grow"><span class="b">Stonewick</span> · 3/4 residents</span><span>▸</span></div>
+
+<div class="rw grp"><span class="lb grow">Others in sight</span><span class="mono">2</span></div>
+<div class="rw sel"><span class="dot" style="background: var(--npc)"></span><span class="grow"><span class="b">Dunmoor</span> · NPC city</span><span>▾</span></div>
+
+<details open><summary class="rw grp" style="cursor: pointer"><span class="b grow">Overview</span></summary>
+<div class="sec"><span>14 residents in sight · housing for 20 · 1 town hall, 5 houses, 1 storage, 1 stable</span><span>Temperament: wary · Mood: arming</span><span class="mu">Reaction and Buying the city stay here.</span></div></details>
+
+<details open><summary class="rw grp" style="cursor: pointer"><span class="b grow">Trade</span><a href="Wiki.dc.html" style="color: var(--navy)">How to trade</a></summary>
+<div class="sec"><span>Standing with Dunmoor: good 22. Your last trade moved it +2.</span>
+<span class="px t16">Swap</span><span class="mu">Goods for goods at its storage, no Coins. Pick a rate to fill it in.</span>
+<div class="fx wrap" style="gap: 4px"><button class="btn sm on">3 Food → 1 Iron</button><button class="btn sm">2 Wood → 1 Stone</button></div>
+<div class="fx" style="align-items: flex-end"><label class="fld grow"><span class="lb">Want</span><select class="in"><option>Iron</option></select></label><label class="fld" style="width: 70px"><span class="lb">Units</span><input class="in mono" value="10"></label><label class="fld grow"><span class="lb">Give (40 held)</span><select class="in"><option>Food</option></select></label></div>
+<button class="btn pri">Swap 30 Food for 10 Iron</button></div>
+
+<div class="sec"><span class="px t16">Horse market · Stable at (2416, 1530)</span>
+<div class="fx"><span class="ic i-horse" aria-hidden="true"></span><span class="grow"><span class="b">Juniper</span> · 12/9/11 · 4 years</span><button class="btn sm gold">Buy Juniper for 160 coins</button></div>
+<span class="lb">Your horses</span>
+<div class="fx"><span class="ic i-horse" aria-hidden="true"></span><span class="grow"><span class="b">Flint</span> · 8/12/10 · 9 years</span><button class="btn sm">Sell Flint for 70 coins</button></div>
+<span class="mu">Trader: Ana · Ana holds 24 coins</span></div>
+
+<div class="sec"><span class="px t16">Wandering trader</span><span>It goes on in 2 game hours. Prices and trading as at a storage; with nobody of yours there, Send.</span></div>
+
+<div class="sec"><span class="px t16">Offers at the storage at (2410, 1522)</span>
+<div class="well" style="padding: 6px 8px"><span class="b">Gives 40 Iron, wants 120 Food</span> · 2 times left<br><span class="mu">A direct offer to you</span></div>
+<div class="fx"><label class="fld grow"><span class="lb">Trader</span><select class="in"><option>Ana</option></select></label><label class="fld" style="width: 70px"><span class="lb">Times</span><input class="in mono" value="1"></label><button class="btn pri" style="align-self: flex-end">Accept</button></div>
+<span class="mu">At your own storage: Take down, what is set aside, and Post offer. With none: "None standing."</span></div>
+
+<div class="sec"><span class="px t16">Paying debt</span><span class="mu">At a Trade Org warehouse.</span>
+<div class="fx" style="align-items: flex-end"><label class="fld grow"><span class="lb">Payer</span><select class="in"><option>Ana · their hands</option></select></label><label class="fld" style="width: 80px"><span class="lb">Coins</span><input class="in mono" value="24"></label></div>
+<button class="btn pri">Pay 24 of the 120 Coins you owe</button>
+<span class="mu">When the HQ has fallen: "The Trade Org HQ has fallen: no caravans run, so no deliveries or transfers."</span></div></details>
+
+<div class="rw grp"><span class="lb grow">Outpost storages</span><span class="mono">1</span></div>
+<div class="rw"><span class="ic i-box" aria-hidden="true"></span><span class="grow">Outpost storage at (2301, 1688) · 1 offer</span><span>▸</span></div>
+<div class="rw grp"><span class="lb grow">Last seen</span><span class="mono">2</span></div>
+<div class="rw" style="opacity: .8"><span class="dot" style="background: var(--other)"></span><span class="grow"><span class="b">Mirefield</span> · Seen 13 days ago</span><span>▸</span></div>
+<span class="grow"></span>
+<div class="sec"><span class="mu">Own cities also open Stock (a goods grid) and Gates. Opening a city centres and outlines it on the map.</span></div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":420,"height":1240}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

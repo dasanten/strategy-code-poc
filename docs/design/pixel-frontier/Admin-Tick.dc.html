@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin, Tick health and newer admin controls</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui" style="width: 1100px; height: 680px; display: flex; flex-direction: column; background: var(--steel)">
+<header class="fx" style="height: 48px; padding: 0 12px; gap: 12px; background: var(--night); color: #fff; border-bottom: 2px solid var(--ink); flex: none">
+<span class="ic s24 i-key" aria-hidden="true"></span><span class="px t18" style="color: var(--cyan)">Code Strategy admin</span>
+<div class="fx" role="tablist" style="gap: 4px; margin-left: 12px"><a class="btn sm dk" role="tab" href="Admin-Map.dc.html">Map</a><a class="btn sm dk" role="tab" href="Admin-Lists.dc.html">Accounts</a><a class="btn sm dk" role="tab" href="Admin-Lists.dc.html">Directives</a><button class="btn sm on" role="tab" aria-selected="true">Tick health</button></div>
+<span class="grow"></span><a class="btn sm dk" href="Main.dc.html">Back to the game</a><button class="btn sm dk">Log out</button>
+</header>
+<div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; padding: 16px; align-items: start">
+<section class="pn"><div class="hd"><span class="grow">Tick health</span><span class="mono" style="font-size: 12px">Fetched at 14:40:12</span></div>
+<div class="sec"><span class="mu">Fetched again every 10 s while this tab is open. A phase whose p95 is over [LIMIT] is marked slow.</span>
+<span class="px t16">Last minute · 60 ticks, 1 slow</span>
+<table class="tb"><thead><tr><th></th><th class="n">p50</th><th class="n">p95</th><th class="n">max</th></tr></thead><tbody><tr><td>Tick</td><td class="n">[ms]</td><td class="n">[ms]</td><td class="n">[ms]</td></tr><tr><td>Residents</td><td class="n">[n]</td><td class="n">[n]</td><td class="n">[n]</td></tr><tr><td>Script runs</td><td class="n">[n]</td><td class="n">[n]</td><td class="n">[n]</td></tr></tbody></table>
+<table class="tb"><thead><tr><th>Phase</th><th class="n">p50</th><th class="n">p95</th></tr></thead><tbody><tr><td class="bad">[slowest phase] (slow)</td><td class="n">[ms]</td><td class="n">[ms]</td></tr><tr><td>[phase]</td><td class="n">[ms]</td><td class="n">[ms]</td></tr></tbody></table>
+<span class="px t16">Last hour · 3,600 ticks, 4 slow</span><span class="mu">The same two tables. Before the first fetch: "Not fetched yet." On failure: "Could not fetch the tick health: …".</span></div></section>
+
+<div class="col" style="gap: 16px">
+<section class="pn"><div class="hd">Accounts · Offer horses again</div>
+<div class="sec"><span class="mu">Re-opens the Horse offer.</span><label class="fld"><span class="lb">Player (empty for every Player)</span><input class="in"></label><button class="btn">Offer horses again</button><span class="ok">3 Horse offers re-opened for every Player.</span></div></section>
+<section class="pn"><div class="hd">Admin map · land</div>
+<div class="sec"><div class="fx" style="gap: 4px"><button class="btn sm on">Show land</button><button class="btn sm">Show territory</button></div>
+<span>[n] Heartlands · Frontiers · Islands · [n] passes · [n] land bridges · [n] free starting sites · [n] taken starting sites</span>
+<span class="mu">Jump list gains wandering traders. The inspector gains a Wandering trader card (Doing, Load, tile, its loop of cities, crew) and, on a city, Threat and Danger places.</span></div></section>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1100,"height":680}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

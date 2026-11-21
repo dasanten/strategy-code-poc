@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin, Map with jump list and inspector</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui" style="width: 1440px; height: 900px; display: flex; flex-direction: column">
+<header class="fx" style="height: 48px; padding: 0 12px; gap: 12px; background: var(--night); color: #fff; border-bottom: 2px solid var(--ink); flex: none">
+<span class="ic s24 i-key" aria-hidden="true"></span><span class="px t18" style="color: var(--cyan)">Code Strategy admin</span>
+<div class="fx" role="tablist" style="gap: 4px; margin-left: 12px"><button class="btn sm on" role="tab" aria-selected="true">Map</button><a class="btn sm dk" role="tab" href="Admin-Lists.dc.html">Accounts</a><a class="btn sm dk" role="tab" href="Admin-Lists.dc.html">Directives</a></div>
+<span class="grow"></span>
+<span class="chip d">Nothing here gives orders, except admin directives</span>
+<a class="btn sm dk" href="Main.dc.html">Back to the game</a><span style="color: var(--mist)">daniel</span><button class="btn sm dk">Log out</button>
+</header>
+<div style="display: flex; flex: 1 1 0; min-height: 0">
+
+<aside class="col" style="width: 300px; gap: 0; background: var(--parch); border-right: 2px solid var(--ink)">
+<div class="sec"><input class="in" placeholder="Find an account, realm, city or army" aria-label="Find an account, realm, city or army"></div>
+<div class="rw grp"><span class="lb grow">Realms</span><span class="mono">3</span></div>
+<div class="rw sel"><span class="dot"></span><span class="grow"><span class="b">Ashford</span><br><span class="mu">daniel · Northern Pact</span></span></div>
+<div class="rw" style="padding-left: 30px"><span class="ic s16 i-crown" aria-hidden="true"></span><span class="grow">Edda <span class="mu">· Leader</span></span></div>
+<div class="rw" style="padding-left: 30px"><span class="ic s16 i-city" aria-hidden="true"></span><span class="grow">Ashford</span></div>
+<div class="rw" style="padding-left: 30px"><span class="ic s16 i-city" aria-hidden="true"></span><span class="grow">Stonewick</span></div>
+<div class="rw"><span class="dot" style="background: var(--red)"></span><span class="grow"><span class="b">Mire</span><br><span class="mu">account gone</span></span></div>
+<div class="rw"><span class="dot" style="background: var(--sky)"></span><span class="grow"><span class="b">Harrow</span><br><span class="mu">harrow_m · Northern Pact</span></span></div>
+<div class="rw grp"><span class="lb grow">NPC cities</span><span class="mono">12</span></div>
+<div class="rw"><span class="dot" style="background: var(--npc)"></span><span class="grow">Dunmoor <span class="mu">· self-managed · Northern Pact</span></span></div>
+<div class="rw"><span class="dot" style="background: var(--npc)"></span><span class="grow">Oakhollow <span class="mu">· self-managed</span></span></div>
+<div class="rw grp"><span class="lb grow">Trade Organization</span></div>
+<div class="rw"><span class="dot" style="background: var(--trade)"></span><span class="grow">Trade Org HQ <span class="mu">· HQ</span></span></div>
+<div class="rw"><span class="dot" style="background: var(--trade)"></span><span class="grow">Saltmarket <span class="mu">· trading post</span></span></div>
+<div class="rw"><span class="ic s16 i-cart" aria-hidden="true"></span><span class="grow">Saltmarket caravan <span class="mu">· caravan to the HQ</span></span></div>
+<div class="rw grp"><span class="lb grow">Armies</span></div>
+<div class="rw"><span class="ic s16 i-banner" aria-hidden="true"></span><span class="grow">North Guard <span class="mu">· Ashford</span></span></div>
+<div class="rw" style="opacity: .6"><span class="ic s16 i-banner" aria-hidden="true"></span><span class="grow">Lost band <span class="mu">· Nowhere on the map</span></span></div>
+</aside>
+
+<div class="map grow" style="position: relative; overflow: hidden">
+<div class="tag" style="left: 300px; top: 250px">Ashford · daniel</div>
+<div class="tk" style="left: 370px; top: 400px"><span class="ic i-crown" aria-hidden="true"></span></div>
+<div class="tk ot" style="left: 620px; top: 440px"><span class="ic i-sword" aria-hidden="true"></span><span class="cnt">6</span></div>
+<div class="tk tr sel" style="left: 520px; top: 180px"><span class="ic i-cart" aria-hidden="true"></span></div>
+<div class="tk np" style="left: 120px; top: 240px"><span class="ic i-person" aria-hidden="true"></span></div>
+<div class="pn col" style="position: absolute; left: 8px; top: 8px; padding: 4px; gap: 4px"><button class="btn sq" aria-label="Zoom in">+</button><button class="btn sq" aria-label="Zoom out">−</button><button class="btn on" aria-pressed="true">Territory</button></div>
+<div class="tag" style="left: 8px; bottom: 8px; top: auto; border-color: var(--paper); font-family: 'IBM Plex Mono', monospace; font-size: 12px">Road · 2231, 1712 · Trade Org caravan · middle zoom · reloads every 3 s</div>
+
+<section class="pn" style="position: absolute; right: 8px; top: 8px; width: 360px">
+<div class="hd" style="background: var(--night)"><span class="dot" style="background: var(--trade)"></span><span class="grow">Caravan to Saltmarket</span><span class="chip d">Caravan</span><button class="btn sm sq dk" aria-label="Close"><span class="ic s16 i-x" aria-hidden="true"></span></button></div>
+<div class="sec"><span class="b">Trade Organization</span>
+<table class="tb"><tbody>
+<tr><td class="lb">Doing</td><td>Delivery of 4 Iron to <a href="#" style="color: var(--navy)">Ashford</a>, for the realm of Ashford</td></tr>
+<tr><td class="lb">Trading post</td><td><a href="#" style="color: var(--navy)">Saltmarket</a></td></tr>
+<tr><td class="lb">Load</td><td class="mono">86 / 300 kg: 4 Iron, 40 Food, 22 Coins</td></tr>
+<tr><td class="lb">Horse</td><td>Hitched</td></tr>
+<tr><td class="lb">Driver</td><td><a href="#" style="color: var(--navy)">Corin</a></td></tr>
+<tr><td class="lb">Tile</td><td class="mono">2231, 1712</td></tr>
+<tr><td class="lb">Crew (4)</td><td><a href="#" style="color: var(--navy)">Corin</a>, <a href="#" style="color: var(--navy)">Aldous</a>, <a href="#" style="color: var(--navy)">Brenna</a>, <a href="#" style="color: var(--navy)">Ysolt</a></td></tr>
+</tbody></table>
+<span class="mu">A resident shows Health, Hunger, Stats, Carries, Doing, Script, City, Army; a city its residents, buildings, storage, gates and soldiers; a building its work done and what it holds.</span>
+<a class="btn dng" href="Admin-Lists.dc.html">Give directive against Mire…</a></div></section>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

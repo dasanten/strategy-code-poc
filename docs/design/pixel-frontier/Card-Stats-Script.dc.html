@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Command bar, Stats and Script tabs</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui" style="width: 1424px; height: 420px; display: flex; gap: 16px; background: var(--steel)">
+
+<section class="pn col" aria-label="Stats tab" style="width: 500px; gap: 0">
+<div class="tabs" role="tablist"><button class="tab" role="tab">Orders</button><button class="tab" role="tab">Queue · 3</button><button class="tab on" role="tab" aria-selected="true">Stats</button><button class="tab" role="tab">Script</button></div>
+<div class="sec">
+<div class="b">Adult · 24 years · Ashford · on horseback</div>
+<div>Paired with Ana. In about 3 h (7 game days), once the city has free housing and a food surplus, one of them starts carrying a child.</div>
+</div>
+<div class="sec"><span class="fx"><span class="px t16 grow">Stats</span><span class="mu">base + trained (cap)</span></span>
+<div class="fx"><span style="width: 78px">Strength</span><span class="mt grow"><i style="width: 50%; background: var(--clay)"></i><i style="width: 12%; background: var(--gold)"></i><i style="width: 13%; background: var(--steel)"></i></span><span class="mono" style="width: 92px; text-align: right">10 + 2.3 (5)</span></div>
+<div class="fx"><span style="width: 78px">Endurance</span><span class="mt grow"><i style="width: 40%; background: var(--clay)"></i><i style="width: 4%; background: var(--gold)"></i><i style="width: 16%; background: var(--steel)"></i></span><span class="mono" style="width: 92px; text-align: right">8 + 0.8 (4)</span></div>
+<div class="fx"><span style="width: 78px">Agility</span><span class="mt grow"><i style="width: 60%; background: var(--clay)"></i><i style="width: 0%; background: var(--gold)"></i><i style="width: 30%; background: var(--steel)"></i></span><span class="mono" style="width: 92px; text-align: right">12 + 0 (6)</span></div>
+<div class="fx"><span style="width: 78px">Intellect</span><span class="mt grow"><i style="width: 35%; background: var(--clay)"></i><i style="width: 17%; background: var(--gold)"></i><i style="width: 0%; background: var(--steel)"></i></span><span class="mono" style="width: 92px; text-align: right">7 + 3.5 (3.5)</span></div>
+<div class="fx mu" style="gap: 12px"><span class="fx" style="gap: 4px"><span class="dot" style="background: var(--clay)"></span>base</span><span class="fx" style="gap: 4px"><span class="dot" style="background: var(--gold)"></span>trained</span><span class="fx" style="gap: 4px"><span class="dot" style="background: var(--steel)"></span>room to the cap</span></div>
+</div>
+<div class="sec"><span class="px t16">Skills</span>
+<div class="fx wrap" style="gap: 4px"><span class="chip">Construction 41.2</span><span class="chip">Mining 18.0</span><span class="chip">Farming 9.6</span><span class="chip">Driving 3.4</span><span class="chip">Combat 1.1</span></div>
+<span class="mu">Skills not yet learned show as "None yet".</span></div>
+</section>
+
+<section class="pn col" aria-label="Script tab" style="flex: 1 1 0; gap: 0">
+<div class="tabs" role="tablist"><button class="tab" role="tab">Orders</button><button class="tab" role="tab">Queue · 3</button><button class="tab" role="tab">Stats</button><button class="tab on" role="tab" aria-selected="true">Script</button></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); flex: 1 1 0">
+<div class="col" style="gap: 0; border-right: 2px solid var(--tan)">
+<div class="sec"><span class="fx"><span class="grow">Runs <span class="b">Work</span> · version 4<br><span class="mu">edited by you</span></span><a class="btn sm" href="Scripts.dc.html">Edit</a></span>
+<div class="well" style="padding: 6px 8px">Waiting until the order ends · began 14:02<br><span class="mono">38 / 200 steps</span> last tick<span class="mt bl" style="margin-top: 4px"><i style="width: 19%"></i></span></div>
+<a class="btn sm dng why" href="Scripts.dc.html" style="width: 100%">Last error: unknown field "pile"<small>Line 14, column 9 · 3 min ago · opens the line in the workshop</small></a></div>
+<div class="sec"><label class="fld"><span class="lb">Defence script</span><select class="in"><option>Defend (default)</option><option>Flee to the hall</option></select></label><span class="mu">What they run when struck. Once it ends, they go on with what they were doing.</span></div>
+</div>
+<div class="col" style="gap: 0; border-right: 2px solid var(--tan)">
+<div class="sec"><span class="px t16">Params</span>
+<div class="col" style="gap: 2px"><span class="fx"><span class="b mono grow">workplace</span><span class="chip">building</span><button class="btn sm on">Pick</button><button class="btn sm">Clear</button></span><span class="mu">Where to work. Uses: Ashford quarry at 2240, 1702</span></div>
+<div class="col" style="gap: 2px"><span class="fx"><span class="b mono grow">storage</span><span class="chip">storage</span><button class="btn sm">Pick</button><button class="btn sm">Clear</button></span><span class="mu">Where the output goes. Uses: the nearest storage</span></div>
+<div class="col" style="gap: 2px"><span class="fx"><span class="b mono grow">foodAt</span><span class="chip">number</span><input class="in mono" style="width: 56px; height: 24px" placeholder="3" aria-label="foodAt"><button class="btn sm">Clear</button></span><span class="mu">Get Food when carrying fewer units. Uses: 3</span></div>
+<div class="col" style="gap: 2px"><span class="fx"><span class="b mono grow">foodTake</span><span class="chip">number</span><input class="in mono" style="width: 56px; height: 24px" value="12" aria-label="foodTake"><button class="btn sm">Clear</button></span><span class="mu">How much Food to take. Uses: 12</span></div>
+<span class="mu">Food is counted in units: a resident eats about 3 a game day.</span></div>
+</div>
+<div class="col" style="gap: 0">
+<div class="sec"><span class="px t16">Memory</span>
+<div class="code" style="padding: 6px 8px; font-size: 12px">role      <span class="s">"carrier"</span>
+trips     <span class="n">14</span>
+last      {
+  good    <span class="s">"stone"</span>
+  units   <span class="n">20</span>
+}</div></div>
+<div class="sec"><span class="px t16">Script log</span>
+<div class="col mono" style="gap: 2px; font-size: 12px"><span>14:02 carrying a load off</span><span>13:10 getting Food</span><span>12:44 carrying a load off</span></div></div>
+</div>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1424,"height":420}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

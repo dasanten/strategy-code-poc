@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sidebar, Realm log</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<aside class="ui pn col" style="width: 360px; height: 860px; gap: 0">
+<div class="hd"><span class="ic i-book" aria-hidden="true"></span><span class="grow">Realm log</span><span class="mono" style="font-size: 12px">214 events · 4 new</span></div>
+<div class="fx wrap" style="padding: 6px 8px; gap: 4px; border-bottom: 2px solid var(--tan)"><button class="btn sm on">All</button><button class="btn sm">People</button><button class="btn sm">Fights &amp; crime</button><button class="btn sm">Cities</button><button class="btn sm">Trade</button><button class="btn sm">Horses</button><button class="btn sm">Alliance</button><button class="btn sm">Scripts</button><button class="btn sm">Contracts</button></div>
+
+<div class="sec"><span class="lb">Open deliveries</span>
+<span class="fx"><span class="ic s16 i-cart" aria-hidden="true"></span><span class="grow">Delivery of 4 Iron to Ashford: a caravan is on it</span></span>
+<span class="fx"><span class="ic s16 i-cart" aria-hidden="true"></span><span class="grow">Pick-up of 20 Stone from Ashford: waiting for a caravan at the warehouse.</span></span></div>
+
+<div class="rw grp"><span class="lb grow">Since you were last here</span><span class="mono">4</span></div>
+<div class="rw" style="align-items: flex-start; background: #f6c9b8"><span class="mono" style="width: 44px">14:18</span><span class="grow"><span class="bad">Your town hall in Ashford is occupied by the realm of Mire.</span><br><button class="btn sm">Ashford · 2204, 1796</button></span></div>
+<div class="rw" style="align-items: flex-start; background: var(--sun)"><span class="mono" style="width: 44px">13:40</span><span class="grow">Odo is going hungry.<br><button class="btn sm">Odo · 2210, 1802</button></span></div>
+<div class="rw" style="align-items: flex-start; background: var(--sun)"><span class="mono" style="width: 44px">13:02</span><span class="grow">Ana skipped a queue step: the storage is gone.</span></div>
+<div class="rw" style="align-items: flex-start"><span class="mono" style="width: 44px">12:44</span><span class="grow">Bram stopped Work: no workplace on his tile.</span></div>
+
+<div class="rw grp"><span class="lb grow">Day 131</span></div>
+<div class="rw" style="align-items: flex-start"><span class="mono" style="width: 44px">09:15</span><span class="grow">A foal, Pip, was born in the stable of Ashford.<br><button class="btn sm">Stable · 2230, 1836</button></span></div>
+<div class="rw" style="align-items: flex-start"><span class="mono" style="width: 44px">07:30</span><span class="grow">Ana sold 20 Stone for 54 coins at the Saltmarket warehouse.</span></div>
+<div class="rw" style="align-items: flex-start; background: #f6c9b8"><span class="mono" style="width: 44px">03:12</span><span class="grow"><span class="bad">Wen died: killed by Garrick of the realm of Mire.</span><br><button class="btn sm">2301, 1688</button></span></div>
+
+<div class="rw grp"><span class="lb grow">Day 130</span></div>
+<div class="rw" style="align-items: flex-start"><span class="mono" style="width: 44px">22:05</span><span class="grow">The realm of Harrow joined the Northern Pact.</span></div>
+<div class="rw" style="align-items: flex-start; background: var(--sun)"><span class="mono" style="width: 44px">18:40</span><span class="grow">12 Food spoiled in the Ashford storage.</span></div>
+<div class="rw" style="align-items: flex-start"><span class="mono" style="width: 44px">11:20</span><span class="grow">Dunmoor accepted your contract: Odric and Wen for 21 days.</span></div>
+
+<span class="grow"></span>
+<div class="sec"><span class="mu">Newest first. Red is bad news, yellow a warning. A place button shows it on the map. With no events: "nothing yet".</span></div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":360,"height":860}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

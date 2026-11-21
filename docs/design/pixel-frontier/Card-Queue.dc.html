@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Command bar, Queue tab and planner</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<section class="ui pn" aria-label="Bram, Queue" style="width: 1424px; height: 420px; display: flex">
+<div class="col" style="width: 300px; padding: 10px; border-right: 2px solid var(--ink); gap: 6px">
+<div class="fx" style="align-items: flex-start">
+<div style="width: 64px; height: 64px; background: var(--ink); border: 4px solid var(--own); display: grid; place-items: center; flex: none"><span class="ic s48 i-person" aria-hidden="true"></span></div>
+<div class="grow"><div class="px t22">Bram</div><div class="b">Working the quarry: carrying 20 stone to the storage</div><div class="mu">Step 2 of 8 · about 9 min left (7 game hours)</div></div>
+</div>
+<div class="fx"><span class="lb" style="width: 52px">Health</span><span class="mt hp grow"><i style="width: 92%"></i></span><span class="mono">46 / 50</span></div>
+<div class="fx"><span class="lb" style="width: 52px">Hunger</span><span class="mt fd grow"><i style="width: 62%"></i></span><span class="mono">62% fed</span></div>
+<span class="grow"></span>
+<div class="well" style="padding: 8px">Work, haul, teach and train never end on their own: they need a duration unless they are the last step. A queue holds at most 40 steps.</div>
+</div>
+
+<div class="grow col" style="gap: 0">
+<div class="tabs" role="tablist"><button class="tab" role="tab">Orders</button><button class="tab on" role="tab" aria-selected="true">Queue · 8</button><button class="tab" role="tab">Stats</button><button class="tab" role="tab">Script</button><span class="grow"></span><button class="btn sm" style="margin-bottom: 4px">Fold to bar height</button></div>
+<div class="fx wrap" style="padding: 6px 8px; gap: 6px; border-bottom: 2px solid var(--tan)">
+<span class="px t16">Plan</span>
+<label class="fx" style="gap: 4px"><span class="cb on"></span>Loop</label>
+<span style="width: 2px; height: 20px; background: var(--tan)"></span>
+<button class="btn sm">Copy<span class="k">Ctrl C</span></button><button class="btn sm">Paste<span class="k">Ctrl V</span></button><button class="btn sm">Repeat</button>
+<span class="mu">2 picked · Shift+tap picks a range</span>
+<span class="grow"></span>
+<button class="btn sm">Save…</button><button class="btn sm">Load…</button>
+</div>
+<ol style="list-style: none; margin: 0; padding: 0; overflow: hidden" class="grow">
+<li class="rw"><span class="mono mu" style="width: 20px">1.</span><span class="grow">Walk to 2231, 1712</span><span class="chip g">done</span><button class="btn sm sq" aria-label="Move up">↑</button><button class="btn sm sq" aria-label="Move down">↓</button><button class="btn sm sq" aria-label="Remove"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+<li class="rw" style="background: var(--paper)"><span class="mono" style="width: 20px">2.</span><span class="grow"><span class="b">Work the quarry</span> <span class="chip y">now</span><br><span class="mu">Working the quarry: carrying 20 stone to the storage</span></span><label class="fx" style="gap: 4px">Duration<input class="in mono" style="width: 64px; height: 24px" value="720" aria-label="Duration in game minutes"></label><span class="mono mu">game min · 12 min real</span><button class="btn sm">Clear</button><button class="btn sm sq" aria-label="Move up">↑</button><button class="btn sm sq" aria-label="Move down">↓</button><button class="btn sm sq" aria-label="Remove"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+<li class="rw grp" style="min-height: 34px"><span class="ic s16 i-loop" aria-hidden="true"></span><label class="fx b" style="gap: 4px">Repeat ×<input class="in mono" style="width: 44px; height: 24px" value="3" aria-label="Repeat count"></label><span class="grow mu">2 steps each, 6 in all</span><button class="btn sm">Unwrap</button><button class="btn sm sq" aria-label="Move up">↑</button><button class="btn sm sq" aria-label="Move down">↓</button><button class="btn sm sq" aria-label="Remove the block and its steps"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+<li class="rw sel" style="padding-left: 34px"><span class="mono" style="width: 20px">3.</span><span class="grow">Fetch 20 stone from the storage</span><button class="btn sm sq" aria-label="Move up">↑</button><button class="btn sm sq" aria-label="Move down">↓</button><button class="btn sm sq" aria-label="Remove"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+<li class="rw sel" style="padding-left: 34px"><span class="mono" style="width: 20px">4.</span><span class="grow">Build a wall line from 2190, 1780 to 2190, 1800</span><button class="btn sm sq" aria-label="Move up">↑</button><button class="btn sm sq" aria-label="Move down">↓</button><button class="btn sm sq" aria-label="Remove"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+<li class="rw"><span class="mono mu" style="width: 20px">5.</span><span class="grow">Store what they carry at the storage<br><span class="bad">the storage is gone: it will be skipped</span></span><button class="btn sm sq" aria-label="Move up">↑</button><button class="btn sm sq" aria-label="Move down">↓</button><button class="btn sm sq" aria-label="Remove"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+<li class="rw"><span class="mono mu" style="width: 20px">6.</span><span class="grow">Run Mine run</span><label class="fx" style="gap: 4px">Duration<input class="in mono" style="width: 64px; height: 24px" placeholder="none" aria-label="Duration in game minutes"></label><button class="btn sm sq" aria-label="Move up">↑</button><button class="btn sm sq" aria-label="Move down">↓</button><button class="btn sm sq" aria-label="Remove"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+</ol>
+<div class="fx" style="padding: 6px 10px; border-top: 2px solid var(--tan)"><span class="grow">10 steps after repeats. Give makes their queue this plan, each repeat block that many copies.</span><button class="btn sm">Discard plan</button><button class="btn sm pri">Give</button></div>
+</div>
+
+<div class="col" style="width: 330px; border-left: 2px solid var(--ink); gap: 0">
+<div class="sec"><span class="fx"><span class="px t16 grow">Add step</span><span class="mu">picked on the map</span></span>
+<div class="fx wrap" style="gap: 4px">
+<button class="btn sm">Walk to</button><button class="btn sm">Drive the carriage</button><button class="btn sm">Mount a horse</button><button class="btn sm">Dismount</button><button class="btn sm">Board a carriage</button><button class="btn sm">Get off</button><button class="btn sm">Unhitch a horse</button><button class="btn sm">Work</button><button class="btn sm">Build</button><button class="btn sm">Tear down</button><button class="btn sm">Build line: road</button><button class="btn sm">Build line: wall</button><button class="btn sm">Feed the stable</button><button class="btn sm">Breed horses</button><button class="btn sm">Teach</button><button class="btn sm">Train</button><button class="btn sm">Store what they carry</button><button class="btn sm on">Fetch</button><button class="btn sm">Pick up</button><button class="btn sm">Put down</button><button class="btn sm">Haul route</button><button class="btn sm">Relocate</button><button class="btn sm">Run script</button>
+</div></div>
+<div class="sec" style="background: var(--paper)"><span class="fx"><span class="b grow">Add step: Fetch from the storage at 2216, 1790</span><button class="btn sm">Cancel</button></span>
+<div class="fx wrap" style="gap: 6px"><label class="fx" style="gap: 4px"><span class="ic s16 i-stone" aria-hidden="true"></span>Stone<input class="in mono" style="width: 52px; height: 24px" value="20"></label><label class="fx" style="gap: 4px"><span class="ic s16 i-wood" aria-hidden="true"></span>Wood<input class="in mono" style="width: 52px; height: 24px" value="0"></label><label class="fx" style="gap: 4px"><span class="ic s16 i-food" aria-hidden="true"></span>Food<input class="in mono" style="width: 52px; height: 24px" value="0"></label><button class="btn sm pri">Add</button></div></div>
+<div class="sec"><span class="lb">Saved queues · this browser</span>
+<span class="fx"><span class="grow"><span class="b">Mine run</span> <span class="mu">6 steps · day 120</span></span><button class="btn sm">Load</button><button class="btn sm">Delete</button></span>
+<span class="fx"><input class="in grow" style="height: 24px" placeholder="Name, such as Mine run" aria-label="Name of the saved queue"><button class="btn sm">Save</button></span></div>
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1424,"height":420}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

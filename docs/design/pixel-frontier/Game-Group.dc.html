@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Game screen, group picked</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui map" style="width: 1440px; height: 900px; position: relative; overflow: hidden">
+
+<div class="tag" style="left: 742px; top: 268px">Ashford</div>
+<!-- box-select rectangle -->
+<div style="position: absolute; left: 660px; top: 380px; width: 250px; height: 170px; border: 2px solid var(--gold); background: rgba(254,174,52,.12)"></div>
+<div class="tk sel" style="left: 702px; top: 492px"><span class="ic i-person" aria-hidden="true"></span></div>
+<div class="tk sel" style="left: 760px; top: 440px"><span class="ic i-person" aria-hidden="true"></span></div>
+<div class="tk sel" style="left: 820px; top: 500px"><span class="ic i-person" aria-hidden="true"></span><span class="cnt">2</span></div>
+<div class="tk sel" style="left: 866px; top: 410px"><span class="ic i-sword" aria-hidden="true"></span></div>
+<div class="tk al" style="left: 1040px; top: 300px"><span class="ic i-banner" aria-hidden="true"></span></div>
+<div class="tag" style="left: 1076px; top: 304px; border-color: var(--ally)">North Guard · 6</div>
+
+<header class="bar fx" style="position: absolute; left: 0; top: 0; right: 0; height: 44px; padding: 0 10px; gap: 12px; border-width: 0 0 2px">
+<span class="ic s24 i-crown" aria-hidden="true"></span>
+<span class="px t18" style="color: var(--gold)">Realm of Ashford</span>
+<span style="color: var(--tan)">Home city Ashford</span>
+<span class="fx mono" style="gap: 6px"><span class="ic s16 i-clock" aria-hidden="true"></span>Year 2 · Day 131 · 14:26</span>
+<span class="chip g">live</span>
+<span class="grow"></span>
+<span class="fx mono" style="gap: 4px"><span class="ic s16 i-food" role="img" aria-label="Food"></span>412</span>
+<span class="fx mono" style="gap: 4px"><span class="ic s16 i-wood" role="img" aria-label="Wood"></span>96</span>
+<span class="fx mono" style="gap: 4px"><span class="ic s16 i-stone" role="img" aria-label="Stone"></span>40</span>
+<span class="fx mono" style="gap: 4px"><span class="ic s16 i-coins" role="img" aria-label="Coins"></span>73</span>
+<button class="btn sm dk"><span class="ic s16 i-find" aria-hidden="true"></span>Find<span class="k">Ctrl K</span></button>
+<a class="btn sm dk" href="Wiki.dc.html">Wiki</a>
+<button class="btn sm dk">Log out</button>
+</header>
+
+<!-- group order report -->
+<div class="pn fx" role="status" style="position: absolute; left: 400px; top: 56px; width: 640px; padding: 8px 10px; background: var(--paper)">
+<span class="ic s24 i-warn" aria-hidden="true"></span>
+<span class="grow"><span class="b">Sent to 3 of 5.</span> Skipped Odo: children can't work. Skipped Mara: carrying a child.</span>
+<button class="btn sm" aria-label="Dismiss the group order's report">OK</button>
+</div>
+
+<nav aria-label="Tools" class="pn col" style="position: absolute; left: 8px; top: 52px; width: 48px; padding: 4px; gap: 4px; align-items: center">
+<button class="btn sq" aria-label="Residents"><span class="ic i-person" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Horses"><span class="ic i-horse" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Armies"><span class="ic i-banner" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Contracts"><span class="ic i-scroll" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Alliance"><span class="ic i-ally" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Standing"><span class="ic i-medal" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Cities"><span class="ic i-city" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Scripts"><span class="ic i-code" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Realm log"><span class="ic i-book" aria-hidden="true"></span></button>
+<button class="btn sq sm" aria-label="Unfold the sidebar">»</button>
+</nav>
+
+<!-- saved groups: Ctrl+1–9 saves, 1–9 picks, twice centres -->
+<div class="fx" aria-label="Saved groups" style="position: absolute; left: 8px; bottom: 280px; gap: 4px">
+<button class="btn sm on">1 · 5</button><button class="btn sm">2 · 3</button><button class="btn sm">3 · 8</button><button class="btn sm off">4</button><button class="btn sm off">5</button>
+<span class="tag" style="position: static; border-color: var(--paper); font-family: 'IBM Plex Sans', sans-serif; font-size: 12px">Ctrl+number saves the picked residents</span>
+</div>
+
+<section class="pn" aria-label="5 residents" style="position: absolute; left: 8px; right: 8px; bottom: 8px; height: 264px; display: flex">
+<div class="col" style="width: 300px; padding: 10px; border-right: 2px solid var(--ink); gap: 6px">
+<div class="fx" style="align-items: flex-start">
+<div style="width: 64px; height: 64px; background: var(--ink); border: 4px solid var(--own); display: grid; place-items: center; flex: none; position: relative"><span class="ic s48 i-person" aria-hidden="true"></span><span class="cnt" style="right: -8px; top: -8px">5</span></div>
+<div class="grow"><div class="px t22">5 residents</div><div class="b">3 busy, 2 idle</div></div>
+<button class="btn sm sq" aria-label="Close the card"><span class="ic s16 i-x" aria-hidden="true"></span></button>
+</div>
+<div>Bram, Ana, Tobin, Mara (27, Ashford) and Odo</div>
+<div class="fx wrap" style="gap: 4px"><button class="btn sm">Bram</button><button class="btn sm">Ana</button><button class="btn sm">Tobin</button><button class="btn sm">Mara</button><button class="btn sm">Odo</button></div>
+<div class="mu">Tap a name to narrow the pick to that resident.</div>
+</div>
+<div class="grow col" style="gap: 0">
+<div class="tabs" role="tablist"><button class="tab on" role="tab" aria-selected="true">Orders</button><button class="tab" role="tab">Queue</button><button class="tab" role="tab">Members · 5</button><button class="tab" role="tab">Script</button></div>
+<div class="grow" style="padding: 8px; display: grid; grid-template-columns: 2fr 2fr 1fr 1fr; gap: 10px">
+<div class="col" style="gap: 4px"><span class="lb">Move</span><div class="og og2">
+<button class="btn sm fill">Walk to<span class="k">W</span></button><button class="btn sm fill">Stop<span class="k">S</span></button>
+<button class="btn sm fill">Relocate…<span class="k">V</span></button><button class="btn sm fill">Drive carriages to<span class="k">D</span></button>
+<button class="btn sm fill">Board carriage…<span class="k">K</span></button><button class="btn sm fill">Haul route…<span class="k">H</span></button>
+<button class="btn sm fill off why" disabled>Mount horses<small>no free horse where they stand</small></button><button class="btn sm fill off why" disabled>Unhitch horses<small>no hitched horse where they stand</small></button>
+</div></div>
+<div class="col" style="gap: 4px"><span class="lb">Work &amp; build</span><div class="og og2">
+<button class="btn sm fill">Work<span class="k">E</span></button><button class="btn sm fill">Build<span class="k">B</span></button>
+<button class="btn sm fill">Build line: road<span class="k">R</span></button><button class="btn sm fill">Build line: wall<span class="k">Q</span></button>
+<button class="btn sm fill">Tear down<span class="k">T</span></button><button class="btn sm fill">Feed the stable<span class="k">F</span></button>
+<button class="btn sm fill off why" disabled>Teach… / Train<small>none of them is on a training ground</small></button><button class="btn sm fill off why" disabled>Breed horses…<small>none of them is in a stable</small></button>
+</div></div>
+<div class="col" style="gap: 4px"><span class="lb">Goods</span><div class="og">
+<button class="btn sm fill">Store<span class="k">G</span></button>
+<button class="btn sm fill">Store at…<span class="k">Z</span></button>
+<button class="btn sm fill">Fetch…<span class="k">J</span></button>
+<button class="btn sm fill">Drop all<span class="k">P</span></button>
+</div></div>
+<div class="col" style="gap: 4px"><span class="lb">Scripts</span><div class="og">
+<button class="btn sm fill">Run script…<span class="k">X</span></button>
+</div><span class="lb" style="margin-top: 4px">Other</span><div class="og">
+<button class="btn sm fill">Attack<span class="k">A</span></button>
+<button class="btn sm fill">Climb a wall<span class="k">C</span></button>
+</div></div>
+</div>
+<div class="fx mu" style="padding: 4px 10px; border-top: 2px solid var(--tan)">Right-click the map to walk them there. Hold Shift with any order to queue it.</div>
+</div>
+<div class="col" style="width: 236px; padding: 8px; border-left: 2px solid var(--ink); gap: 6px">
+<div class="fx"><span class="lb grow">Minimap</span><button class="btn sm sq" aria-label="Fold the minimap">–</button></div>
+<div class="map" style="height: 124px; border: 2px solid var(--ink); position: relative"><div style="position: absolute; left: 84px; top: 40px; width: 70px; height: 44px; border: 2px solid #fff"></div></div>
+<div class="fx" style="gap: 4px"><button class="btn sm sq" aria-label="Zoom in">+</button><button class="btn sm sq" aria-label="Zoom out">−</button><button class="btn sm sq" aria-label="Centre on my residents"><span class="ic s16 i-crown" aria-hidden="true"></span></button><button class="btn sm grow on" aria-pressed="true">Select</button><button class="btn sm grow">Region</button></div>
+<div class="fx" style="gap: 4px"><button class="btn sm grow">Legend</button><button class="btn sm grow">Settings</button></div>
+<div class="mono mu" style="font-size: 11px">Select: a drag boxes residents</div>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

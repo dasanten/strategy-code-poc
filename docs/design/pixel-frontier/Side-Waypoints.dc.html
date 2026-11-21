@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sidebar, Waypoints</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<aside class="ui pn col" style="width: 360px; height: 620px; gap: 0">
+<div class="hd"><span class="ic i-map" aria-hidden="true"></span><span class="grow">Waypoints</span><span class="mono" style="font-size: 12px">3</span></div>
+<div class="sec" style="background: var(--sun)"><span class="b">Pick a waypoint for the place the order waits for.</span></div>
+<div class="rw"><button class="btn sm grow" style="justify-content: flex-start" title="Show on the map">◆ North pass <span class="mono mu">(2301, 1650)</span></button><button class="btn sm pri">Pick</button><button class="btn sm">Rename</button><button class="btn sm">Remove</button></div>
+<div class="rw"><button class="btn sm grow" style="justify-content: flex-start" title="Show on the map">◆ Iron vein <span class="mono mu">(2410, 1522)</span></button><button class="btn sm pri">Pick</button><button class="btn sm">Rename</button><button class="btn sm">Remove</button></div>
+<div class="rw col" style="align-items: stretch; background: var(--paper)"><span class="fx"><span class="b grow">◆ Shore camp <span class="mono mu">(1904, 2210)</span></span></span><span class="fx"><input class="in grow" value="Shore camp" aria-label="Waypoint name"><button class="btn sm pri">Rename</button><button class="btn sm">Cancel</button></span></div>
+<span class="grow"></span>
+<div class="sec"><span class="mu">Only you see your waypoints. They show as pins on the map and dots on the minimap, and the pick banner has a Waypoints button. With none: "No waypoints yet. Right-click a tile on the map, or long-press it on a touch screen, to add one."</span></div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":360,"height":620}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
