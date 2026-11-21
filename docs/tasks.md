@@ -136,6 +136,11 @@ housing and a food surplus draws grown newcomers) and Zeal (116, ADR 0042: a poo
 spends by hand, the Leader rallying a crew to three times its pace), in that order. They don't
 depend on each other; 114 and 115 each bump the world format, in that order.
 
+**Agreed with Daniel on 2026-11-21:** Creative mode (Epic 117, ADR 0043: on a server started with
+`CREATIVE=1` only, an admin pauses, steps, speeds up and skips the world, uses creative actions on
+any realm, saves and restores checkpoints and makes small test worlds). Nothing else is open, so
+it goes next; it changes no rule of the live game.
+
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
@@ -253,6 +258,7 @@ I sleep.
 | 114 | [Gathering by hand](https://github.com/dasanten/strategy-code-poc/issues/1454) | ticketed |
 | 115 | [Drifters](https://github.com/dasanten/strategy-code-poc/issues/1455) | ticketed |
 | 116 | [Zeal](https://github.com/dasanten/strategy-code-poc/issues/1456) | ticketed |
+| 117 | [Creative mode](https://github.com/dasanten/strategy-code-poc/issues/1498) | ticketed |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

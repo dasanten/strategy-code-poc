@@ -1322,6 +1322,34 @@ The shared language of the game. Domain terms only — no implementation details
   admins can watch over it. That knowledge is the admin's, never their Player's: the game screen
   and their scripts still see only their Player's sight, and nothing in the admin panel acts in
   the world except admin directives.
+- **Creative mode** (Epic 117, ADR 0043, settled with Daniel on 2026-11-21): a way for admins to
+  test the game on their own machine without waiting. It exists only on a server started with
+  `CREATIVE=1`, which the live game never sets; without it, every creative route refuses, admin or
+  not. It is the one place where being an admin acts in the world, and it is for testing only,
+  never play. With it on, an admin gets:
+  - **Time controls**, for the whole world: **pause**, **step** one tick, a **speed** (normal, ×10,
+    ×60 or as fast as the machine allows) and **skip ahead** a number of game hours or days, shown
+    with its progress and cancellable. Every rule runs exactly as at normal speed, only sooner.
+    A server always starts running at normal speed.
+  - **Creative actions**, on any realm (the admin's own, other Players', NPC cities, the Trade
+    Organization) and on unowned tiles: give or take goods in a city's storage or a carriage;
+    **finish now** a building, a site, a road or wall line, or a training; add a Resident (age
+    and skills picked) or a horse to a realm on a tile; heal, grow a child up or kill a Resident;
+    move a Resident or a group to a tile at once (their way and work dropped, what they carry
+    kept; never onto a tile a Resident may not stand on, such as water without a vessel); and
+    **reveal**, which shows the admin the whole map in the game view, fog lifted, until switched
+    off (kept by the server per admin session, never in the world: it changes neither the
+    Player's sight nor what their scripts see). They are given by hand only: they are
+    no order kind and no script call (ADR 0002 stays whole for Players).
+  - **Checkpoints:** a named copy of the world saved and restored from the game view while the
+    server runs. Restoring pauses the world, swaps it whole and reloads every client; accounts are
+    kept.
+  - **Test worlds:** a new, small world made by the same generator as the live one (terrain, NPC
+    cities, Trade Organization and its posts, fewer of each), at a size and seed the admin picks,
+    into its own database, ready in seconds.
+  All of it shows only to admins on such a server: a **Creative bar** in the game view (time
+  controls and checkpoints) and a **Creative** section on tile, Resident and building cards.
+  Acting as another realm (giving its orders as if it were one's own) is left for later.
 - **Wiki:** the game's rules and numbers for Players, readable by anyone, logged in or not, apart
   from the game. It states the rules in plain words with the game's current balance numbers and
   what follows from them (how many residents one farmer feeds, what a worker's day is worth), so

@@ -143,6 +143,29 @@ pub const HEARTLAND_COUNT: f64 = 3.0;
 /// regions of roughly even size with the heartlands (about 1,100 tiles across on a full-size map).
 pub const FRONTIER_REGION_COUNT: f64 = 9.0;
 
+/// Below this share of `MAP_SIZE`'s side a map is a small test world (`CONTEXT.md`: Creative mode,
+/// Test worlds; under 864 tiles across): made by the same generator, with fewer regions
+/// (`SMALL_WORLD_HEARTLANDS`, `SMALL_WORLD_FRONTIERS`) and its NPC cities and trading posts closer
+/// together, so each region keeps room for a city.
+pub const SMALL_WORLD_SHARE: f64 = 0.15;
+
+/// The narrowest small test world, in tiles (`SMALL_WORLD_SHARE`): below it the Trade Org HQ's
+/// wide square seldom finds room on the frontier. Narrower maps are only made by tests, which keep
+/// the full region counts.
+pub const SMALL_WORLD_MIN_SIZE: i32 = 640;
+
+/// Heartlands on a small test world's mainland (`SMALL_WORLD_SHARE`).
+pub const SMALL_WORLD_HEARTLANDS: f64 = 1.0;
+
+/// Frontier regions on a small test world's mainland (`SMALL_WORLD_SHARE`).
+pub const SMALL_WORLD_FRONTIERS: f64 = 3.0;
+
+/// Whether a map of `size` tiles across is a small test world (`SMALL_WORLD_SHARE`,
+/// `SMALL_WORLD_MIN_SIZE`).
+pub fn is_small_world(size: i32) -> bool {
+    size >= SMALL_WORLD_MIN_SIZE && f64::from(size) < SMALL_WORLD_SHARE * f64::from(MAP_SIZE)
+}
+
 /// How wide the Mountain range or arm of the Sea along a border between two mainland regions is,
 /// in tiles, both sides together (`CONTEXT.md`: Region). A smaller map gets a narrower one.
 pub const REGION_BORDER_WIDTH: i32 = 12;
@@ -643,6 +666,13 @@ pub const AVERAGE_HORSE_STATS: HorseStatValues = HorseStatValues {
 pub const HORSE_START_AGE_MIN: f64 = 3.0;
 
 pub const HORSE_START_AGE_MAX: f64 = 8.0;
+
+/// The most a base stat picked for a Resident or horse added in creative mode can be (`CONTEXT.md`:
+/// Creative mode): well past any drawn one, to test the extremes.
+pub const CREATIVE_STAT_MAX: f64 = 30.0;
+
+/// The oldest a horse added in creative mode can be, in game years.
+pub const CREATIVE_HORSE_AGE_MAX: f64 = 30.0;
 
 /// How much faster a horse pulls its carriage for each point of Speed above average (slower below).
 pub const HORSE_SPEED_EFFECT: f64 = 0.04;
@@ -3243,6 +3273,10 @@ pub fn balance_json() -> Value {
     m.insert("ISLAND_OFFSHORE_SHARE".into(), json!(ISLAND_OFFSHORE_SHARE));
     m.insert("HEARTLAND_COUNT".into(), json!(HEARTLAND_COUNT));
     m.insert("FRONTIER_REGION_COUNT".into(), json!(FRONTIER_REGION_COUNT));
+    m.insert("SMALL_WORLD_SHARE".into(), json!(SMALL_WORLD_SHARE));
+    m.insert("SMALL_WORLD_MIN_SIZE".into(), json!(SMALL_WORLD_MIN_SIZE));
+    m.insert("SMALL_WORLD_HEARTLANDS".into(), json!(SMALL_WORLD_HEARTLANDS));
+    m.insert("SMALL_WORLD_FRONTIERS".into(), json!(SMALL_WORLD_FRONTIERS));
     m.insert("REGION_BORDER_WIDTH".into(), json!(REGION_BORDER_WIDTH));
     m.insert("PASS_WIDTH".into(), json!(PASS_WIDTH));
     m.insert("SEA_ARM_SHARE".into(), json!(SEA_ARM_SHARE));
@@ -3334,6 +3368,8 @@ pub fn balance_json() -> Value {
     m.insert("AVERAGE_HORSE_STATS".into(), to_value(AVERAGE_HORSE_STATS).expect("serialisable"));
     m.insert("HORSE_START_AGE_MIN".into(), json!(HORSE_START_AGE_MIN));
     m.insert("HORSE_START_AGE_MAX".into(), json!(HORSE_START_AGE_MAX));
+    m.insert("CREATIVE_STAT_MAX".into(), json!(CREATIVE_STAT_MAX));
+    m.insert("CREATIVE_HORSE_AGE_MAX".into(), json!(CREATIVE_HORSE_AGE_MAX));
     m.insert("HORSE_SPEED_EFFECT".into(), json!(HORSE_SPEED_EFFECT));
     m.insert("HORSE_SPEED_LIMIT".into(), json!(HORSE_SPEED_LIMIT));
     m.insert("HORSE_STRENGTH_EFFECT".into(), json!(HORSE_STRENGTH_EFFECT));

@@ -58,6 +58,33 @@ cargo run -p csp-server --bin csp-admin -- invite          # prints an invite co
 
 Admins can also create invite codes and reset passwords in the client.
 
+### A small test world (creative mode)
+
+The full map takes half an hour to generate. For testing on your own machine, make a small world
+in seconds with the same generator (terrain, NPC cities, the Trade Organization and a trading
+post, fewer of each), into a database of its own (`CONTEXT.md`: Creative mode, Test worlds):
+
+```sh
+cargo run --release -p csp-server --bin csp-admin -- new-world --db data/test-world.db
+cargo run --release -p csp-server --bin csp-admin -- new-world --db data/small.db --size 640 --seed 7
+```
+
+`--size` is 640 to 5760 tiles in steps of 64 (768 without it); `--seed` is random without it. It
+never writes over a database that exists, and refuses a seed whose small world has no room for the
+Trade Org HQ, a trading post or an NPC city (it says so: try another seed or size). Then
+start a creative server on it, with an admin of your own in it:
+
+```sh
+DB_PATH=data/test-world.db cargo run -p csp-server --bin csp-admin -- create Daniel
+DB_PATH=data/test-world.db CREATIVE=1 pnpm dev
+```
+
+(In PowerShell: `$env:DB_PATH = 'data/test-world.db'; $env:CREATIVE = '1'; pnpm dev`.)
+
+Skip ahead on the Creative bar runs ticks as fast as the machine allows, checking invariants at
+the live game's rate (0.1) even where every normal tick checks them all, as in development: a
+game day on a small world takes about 15 seconds.
+
 Other scripts:
 
 ```sh
@@ -100,7 +127,43 @@ Every test ignored for time runs each night on `dev` (ADR 0040), so none rots: t
 tests ignored as measurements) and appends pass or fail, the failing tests and the time to the
 nightly report. An ignore reason says how long the test takes alone in the dev profile.
 
-### The year run and its checkpoints
+### Testing locally with creative mode
+
+Creative mode (`CONTEXT.md`: Creative mode, ADR 0043) lets an admin test without waiting. It exists
+only on a server started with `CREATIVE=1` (in `.env` or the environment); never set it on the
+live server. Without it every creative route answers 404, admin or not.
+
+```sh
+CREATIVE=1 pnpm dev
+```
+
+Logged in as an admin, the game view shows the **Creative bar** under the top bar: pause and
+resume the whole world, **Step** one tick (it pauses first), and run at ×1, ×10, ×60 or **Max** (ticks
+back to back; the sockets are told at most ten times a second, so the client keeps up). Every rule
+runs as at normal speed, only sooner. Speed and pause live in the running server, not the world: a
+restart always starts running at ×1. On the full-size world a dev tick takes about 200 ms, most of
+it checking invariants every tick: `INVARIANT_SAMPLE_RATE=0.1` lets ×10 and Max run faster.
+
+The cards of buildings and carriages, any realm's, show admins a **Creative** section: give or take
+goods in a storage (warehouse, stable, haven) or a carriage, and **Finish now** a construction site
+(with the rest of any road or wall line building on it) or the trainings at a training ground. Each
+action runs between ticks, the invariants run once after it, and the change shows with the next tick
+(press Step on a paused world).
+
+Tile cards add a **Resident** (age, stats and skills picked, or left empty to be drawn) or a
+**horse** on the tile to a city and its realm (the tile's city, else your own), and every Resident
+on the tile, like the Resident card, has **Heal** (wounds close, a Down one wakes), **Grow up** (a
+child becomes an adult) and **Kill** (a normal death; a Leader's follows the Leader death rules).
+
+**Move** on a Resident's card, or on a group's, then a tile on the map: they stand there at once,
+their way and work dropped, what they carry kept (a rider's horse comes along). Water takes them
+only aboard a vessel of their realm with room there; a wall never.
+
+**Reveal** on the Creative bar shows your game view the whole map, fog lifted, every tile and
+thing as the admin map does, until you switch it off. It is kept by the server for your login
+session, never in the world: your sight and your scripts' stay as they are. Switching it reloads
+the game view.
+
 
 `npc_slow::game_year::the_new_world_runs_a_game_year_on_its_own` runs a generated world for a game
 year (about 50 min in release; ignored for time). It fails on the game day an NPC city starves out

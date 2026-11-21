@@ -38,15 +38,21 @@ fn journal(conn: &Connection) -> Vec<(i64, String, i64)> {
         .collect()
 }
 
+/// The migrations the TypeScript server knew (`0000` to `0008`), all in the fixture's journal;
+/// the Rust server's own come after them.
+const TS_MIGRATIONS: usize = 9;
+
 #[test]
-fn opens_a_typescript_database_and_runs_nothing() {
+fn opens_a_typescript_database_and_runs_only_the_rust_migrations() {
     let dir = tempfile::tempdir().unwrap();
     let path = fixture(dir.path());
     let before = journal(&Connection::open(&path).unwrap());
-    assert_eq!(before.len(), migrations::all().len());
+    assert_eq!(before.len(), TS_MIGRATIONS);
 
     let conn = open_db(&path, None).unwrap();
-    assert_eq!(journal(&conn), before);
+    let after = journal(&conn);
+    assert_eq!(after.len(), migrations::all().len());
+    assert_eq!(after[..TS_MIGRATIONS], before[..], "the TypeScript ones are not run again");
 
     let count = |sql: &str| -> i64 { conn.query_row(sql, [], |r| r.get(0)).unwrap() };
     assert_eq!(count("SELECT count(*) FROM users WHERE name = 'Mara' AND is_admin = 1"), 1);
@@ -57,6 +63,8 @@ fn opens_a_typescript_database_and_runs_nothing() {
     assert_eq!(count("SELECT diameter FROM terrain WHERE seed = 7"), 2);
     assert_eq!(count("SELECT length(data) FROM explored WHERE user_id = 1"), 1);
     assert_eq!(count("SELECT tick FROM world_saves"), 30);
+    // 0009 (Creative mode's checkpoints, ADR 0043).
+    assert_eq!(count("SELECT count(*) FROM checkpoints"), 0);
 }
 
 #[test]
@@ -72,15 +80,19 @@ fn sets_the_pragmas_of_the_typescript_server() {
 }
 
 #[test]
-fn an_empty_file_gets_the_typescript_schema_and_journal() {
+fn an_empty_file_gets_the_schema_and_journal_of_a_migrated_typescript_database() {
     let dir = tempfile::tempdir().unwrap();
     let ts = fixture(dir.path());
     let fresh = open_db(dir.path().join("fresh.db"), None).unwrap();
-    let ts = Connection::open(ts).unwrap();
-    assert_eq!(schema(&fresh), schema(&ts));
-    // Same hashes and timestamps, so the TypeScript migrator sees nothing to run.
+    let raw = Connection::open(&ts).unwrap();
+    // Same hashes and timestamps as the TypeScript's, so its migrator saw nothing to run.
     let rows =
         |j: Vec<(i64, String, i64)>| j.into_iter().map(|(_, h, c)| (h, c)).collect::<Vec<_>>();
+    assert_eq!(rows(journal(&fresh))[..TS_MIGRATIONS], rows(journal(&raw))[..]);
+    drop(raw);
+    // And the same schema as a TypeScript database once the Rust migrations ran on it.
+    let ts = open_db(&ts, None).unwrap();
+    assert_eq!(schema(&fresh), schema(&ts));
     assert_eq!(rows(journal(&fresh)), rows(journal(&ts)));
 }
 

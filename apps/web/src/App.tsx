@@ -68,6 +68,16 @@ import {
   wrap,
 } from './shared/terrain.js'
 import { isWallOrGate } from './shared/walls.js'
+import { CreativeBar } from './CreativeBar.js'
+import { showsCreativeBar } from './creative-bar.js'
+import { CreativeSection } from './CreativeSection.js'
+import { creativeCities, creativeOffer, creativeProblem, offersAnything } from './creative-section.js'
+import {
+  CreativeAddSection,
+  CreativeGroupMove,
+  CreativeResidentActions,
+} from './CreativeResidents.js'
+import { inCityArea } from './shared/city.js'
 import { isAt, covers } from './shared/footprint.js'
 import { targetParam } from './shared/default-scripts.js'
 import { HORSE_GRANT_HORSES, PASSENGER_WEIGHT } from '@csp/balance'
@@ -1084,6 +1094,26 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [dismissedVisits, setDismissedVisits] = useState<ReadonlySet<string>>(new Set())
 
   /**
+   * Moves residents to a tile at once (`CONTEXT.md`: Creative mode): a creative action, no order.
+   * Answers why it was refused or what it broke, or nothing; they show there with the next tick.
+   */
+  async function creativeMove(residentIds: string[], x: number, y: number) {
+    if (!world) return undefined
+    const size = world.map.size
+    try {
+      const done = await api.creativeAct({
+        action: 'moveResidents',
+        residentIds,
+        x: wrap(x, size),
+        y: wrap(y, size),
+      })
+      return creativeProblem(done)
+    } catch (e: unknown) {
+      return e instanceof Error ? e.message : String(e)
+    }
+  }
+
+  /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
    * carriage on their tile there, or, while picking a haul route's other stop, to haul between
    * their tile and that one, or, while picking a road's or wall's two ends, to build it along the
@@ -1143,6 +1173,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return
     }
     if (!selected) return
+    if (mode === 'creativeMove') {
+      setOrderError(await creativeMove([selected.id], x, y))
+      return
+    }
     // One of a siege machine's crew pushes it there (`CONTEXT.md`: Siege machine).
     if (mode === 'push' && pushing) {
       const order = { kind: 'push', residentId: selected.id, machineId: pushing, x, y }
@@ -1627,6 +1661,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const mode = groupPicking
     setGroupPicking(false)
     if (!world) return
+    if (mode === 'creativeMove') {
+      setGroupError(await creativeMove(group.map((r) => r.id), x, y))
+      return
+    }
     if (mode === 'build') {
       setGroupBuildAt({ x, y })
       return
@@ -2758,6 +2796,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       <DrawerEdge open={fullList ? undefined : openDrawer} />
       {/* Every notice in one lane under the top bar (`CONTEXT.md`: Notices). */}
       <NoticeLane phone={phone}>
+        {/* First in the lane under the top bar, so the notices stack below it. */}
+        {showsCreativeBar(account) && <CreativeBar tick={world?.tick} />}
         {laneNotices({
           pick: pick !== undefined,
           horseOffer: world?.horseOffer,
@@ -2933,6 +2973,44 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   onClear={(name) => void setWorkSettings(tileBuilding.id, { [name]: null })}
                 />
               )
+            }
+            creative={
+              // Admins on a creative server act on any realm's building, carriage and Residents
+              // by hand, and add Residents and horses on the tile.
+              showsCreativeBar(account) &&
+              (() => {
+                const { x, y } = selectedTile
+                const carriage = world.carriages.find((k) => k.x === x && k.y === y)
+                const name = tileBuilding ? BUILDING_NAMES[tileBuilding.kind].toLowerCase() : ''
+                const offer = creativeOffer(tileBuilding, carriage, name)
+                const cities = creativeCities(knownCities, world.home.realmId)
+                const tileCity = knownCities.find((c) =>
+                  inCityArea({ buildings: knownBuildings }, c, x, y, world.map.size),
+                )
+                const here = world.residents.filter(
+                  (r) => Math.floor(r.x) === x && Math.floor(r.y) === y,
+                )
+                return (
+                  <>
+                    {offersAnything(offer) && (
+                      <CreativeSection key={`${tileBuilding?.id}/${carriage?.id}`} offer={offer} />
+                    )}
+                    <CreativeAddSection
+                      key={`${x},${y}`}
+                      x={x}
+                      y={y}
+                      knownCities={cities}
+                      tileCityId={tileCity?.id}
+                      homeCityId={world.home.cityId ?? undefined}
+                      homeRealmId={world.home.realmId ?? undefined}
+                    >
+                      {here.map((r) => (
+                        <CreativeResidentActions key={r.id} resident={r} tick={world.tick} named />
+                      ))}
+                    </CreativeAddSection>
+                  </>
+                )
+              })()
             }
             realmOrders={
               // In realm control mode a building in sight starts the orders about it.
@@ -3121,6 +3199,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             <ResidentCard
               key={selected.id}
               resident={selected}
+              creative={
+                showsCreativeBar(account) && (
+                  <CreativeResidentActions
+                    resident={selected}
+                    tick={world.tick}
+                    move={{
+                      picking: picking === 'creativeMove',
+                      onPick: () =>
+                        setPicking((p) => (p === 'creativeMove' ? false : 'creativeMove')),
+                    }}
+                  />
+                )
+              }
               arrivesIn={arrivesIn || undefined}
               leaderId={world.home.leaderId}
               cities={knownCities}
@@ -3416,6 +3507,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             residents={group}
             seen={groupSeen}
             mapSize={world.map.size}
+            creative={
+              showsCreativeBar(account) && (
+                <CreativeGroupMove
+                  move={{
+                    picking: groupPicking === 'creativeMove',
+                    onPick: () =>
+                      setGroupPicking((p) => (p === 'creativeMove' ? false : 'creativeMove')),
+                  }}
+                />
+              )
+            }
             relocate={relocateForGroup(group)}
             cities={knownCities}
             scripts={scripts}

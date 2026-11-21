@@ -35,7 +35,7 @@ use csp_sim::admin_map::{
 use csp_sim::directives::{
     admin_directives, directive_target_choices, give_directive, lift_directive, set_directive_price,
 };
-use csp_sim::explored::{ExploredTerrain, MapTerrain};
+use csp_sim::explored::{ExploredTerrain, MapTerrain, REVEAL_USER};
 use csp_sim::orders::OrderQueue;
 use csp_sim::queries::player_land::{explored_in, player_land, LAND_PATH};
 use csp_sim::sight::SightTracker;
@@ -47,17 +47,30 @@ use ts_rs::TS;
 
 use crate::auth::{
     create_invite_code, create_session, delete_session, find_user_by_name, get_session_user,
-    log_in, now_ms, reset_password, sign_up, ApiErrorCode, AuthError, AuthFailure, LoginBackoff,
-    SessionSockets, SessionUser, SESSION_DAYS,
+    hash_token, log_in, now_ms, reset_password, sign_up, ApiErrorCode, AuthError, AuthFailure,
+    LoginBackoff, SessionSockets, SessionUser, SESSION_DAYS,
+};
+use crate::checkpoints::{
+    delete_checkpoint, list_checkpoints, load_checkpoint, save_checkpoint, Checkpoint,
+    CheckpointError, CheckpointSaveRequest,
+};
+use crate::creative::{
+    CreativeAction, CreativeDone, CreativeReveal, CreativeSkipRequest, CreativeSpeedRequest,
+    CreativeState, TimeControls,
 };
 use crate::first_day::{
     dismiss_first_day, mark_first_day, read_first_day, FirstDayLine, FIRST_DAY_DISMISS_PATH,
     FIRST_DAY_PATH,
 };
+use crate::log::log_event;
+use crate::monitoring::{ServerReporter, TracingLog};
 use crate::scripts::{
     activate_version, create_script, delete_older_versions, delete_script, delete_version,
     get_script, list_scripts, rename_script, reset_script, save_script, Defaults,
 };
+use csp_sim::invariants::check_all;
+use csp_sim::tick::TickReporter;
+use tracing::Level;
 
 /// The session cookie's name (`SESSION_COOKIE`).
 pub const SESSION_COOKIE: &str = "csp_session";
@@ -77,6 +90,10 @@ pub struct GameView<'a> {
     pub territory: Option<&'a csp_sim::queries::territory::Territory>,
 }
 
+/// A restore under way ([`GameHandle::restore`]): `None` if the game is gone, else whether the
+/// world was swapped.
+pub type Restoring<'a> = Pin<Box<dyn Future<Output = Option<Result<(), String>>> + Send + 'a>>;
+
 /// Work on the game between ticks.
 pub type GameJob = Box<dyn for<'a> FnOnce(GameView<'a>) + Send>;
 
@@ -90,6 +107,9 @@ pub trait GameHandle: Send + Sync + 'static {
     fn explored(&self) -> Arc<Mutex<ExploredTerrain>>;
     /// The map's terrain and what is made from it alone, read without any lock.
     fn map(&self) -> Arc<MapTerrain>;
+    /// Swaps the world whole for `world` between ticks (a checkpoint's, `CONTEXT.md`: Creative
+    /// mode) and tells every socket to reload; `None` if the game is gone.
+    fn restore(&self, world: WorldState) -> Restoring<'_>;
 }
 
 impl<L: crate::monitoring::LogSink + Send + Sync + 'static> GameHandle
@@ -122,6 +142,10 @@ impl<L: crate::monitoring::LogSink + Send + Sync + 'static> GameHandle
 
     fn map(&self) -> Arc<MapTerrain> {
         Arc::clone(&self.map)
+    }
+
+    fn restore(&self, world: WorldState) -> Restoring<'_> {
+        Box::pin(self.run(move |g, conn| g.restore(conn, world).map_err(|e| e.to_string())))
     }
 }
 
@@ -189,6 +213,9 @@ pub struct AppOptions {
     pub tick_health: Option<Arc<dyn Fn() -> Value + Send + Sync>>,
     /// The WebSocket hub, served at `WS_PATH` with the game; without it there are no sockets.
     pub realtime: Option<Arc<crate::realtime::Realtime>>,
+    /// Creative mode's time controls (ADR 0043), only on a server started with `CREATIVE=1`.
+    /// Without them every creative route refuses, admin or not.
+    pub creative: Option<Arc<TimeControls>>,
 }
 
 impl AppOptions {
@@ -207,6 +234,7 @@ impl AppOptions {
             defaults: crate::scripts::game_defaults(),
             tick_health: None,
             realtime: None,
+            creative: None,
         }
     }
 }
@@ -328,6 +356,7 @@ struct AppState {
     sockets: Option<Arc<dyn SessionSockets + Send + Sync>>,
     defaults: &'static Defaults,
     tick_health: Option<Arc<dyn Fn() -> Value + Send + Sync>>,
+    creative: Option<Arc<TimeControls>>,
 }
 
 type Shared = Arc<AppState>;
@@ -367,6 +396,16 @@ impl User {
             return Err(fail(ApiErrorCode::NotAdmin, "Admins only."));
         }
         Ok(user)
+    }
+
+    /// The creative guard (`CONTEXT.md`: Creative mode, ADR 0043): an admin on a server started
+    /// with `CREATIVE=1`, and the server's time controls. Without the flag it refuses everyone,
+    /// admins too, as if the route were not there.
+    fn creative<'s>(&self, state: &'s AppState) -> ApiResult<&'s Arc<TimeControls>> {
+        let controls =
+            state.creative.as_ref().ok_or_else(|| fail(ApiErrorCode::NotFound, "Not found."))?;
+        self.admin()?;
+        Ok(controls)
     }
 }
 
@@ -525,10 +564,17 @@ fn chunk_param(s: &str) -> Option<i32> {
 pub struct Account {
     name: String,
     is_admin: bool,
+    /// Whether this account has creative mode: an admin on a server started with `CREATIVE=1`
+    /// (`CONTEXT.md`: Creative mode), so the game view shows the Creative bar. Sent only when
+    /// true: everywhere else (and in the socket's welcome) the account has none.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[ts(optional, as = "Option<bool>")]
+    creative: bool,
 }
 
-fn public_account(u: &SessionUser) -> Account {
-    Account { name: u.name.clone(), is_admin: u.is_admin }
+fn public_account(state: &AppState, u: &SessionUser) -> Account {
+    let creative = u.is_admin && state.creative.is_some();
+    Account { name: u.name.clone(), is_admin: u.is_admin, creative }
 }
 
 /// The session cookie for a new session (`startSession`).
@@ -548,7 +594,7 @@ async fn start_session(
 ) -> ApiResult<Response> {
     let id = user.id;
     let token = state.db(move |conn| Ok(create_session(conn, id, now_ms())?)).await?;
-    let mut res = (status, Json(public_account(&user))).into_response();
+    let mut res = (status, Json(public_account(state, &user))).into_response();
     res.headers_mut().insert(header::SET_COOKIE, session_cookie(state, &token));
     Ok(res)
 }
@@ -616,8 +662,11 @@ async fn logout(State(state): State<Shared>, headers: HeaderMap) -> ApiResult<Re
     Ok(res)
 }
 
-async fn me(Extension(user): Extension<User>) -> ApiResult<Json<Account>> {
-    Ok(Json(public_account(user.logged_in()?)))
+async fn me(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Json<Account>> {
+    Ok(Json(public_account(&state, user.logged_in()?)))
 }
 
 async fn first_day_mark(
@@ -654,12 +703,27 @@ fn game_of(state: &AppState) -> ApiResult<&Arc<dyn GameHandle>> {
     state.game.as_ref().ok_or_else(|| fail(ApiErrorCode::NotFound, "Not found."))
 }
 
+/// Whose explored terrain a request reads (`CONTEXT.md`: Creative mode, reveal): the whole map
+/// for an admin's session that reveals it on a creative server, else the Player's own.
+fn explored_id(state: &AppState, user: &User, headers: &HeaderMap) -> ApiResult<u64> {
+    let u = user.logged_in()?;
+    let revealed = u.is_admin
+        && state.creative.is_some()
+        && state
+            .sockets
+            .as_ref()
+            .zip(session_token(headers))
+            .is_some_and(|(s, token)| s.reveals(&hash_token(&token)));
+    Ok(if revealed { REVEAL_USER } else { u.id as u64 })
+}
+
 async fn terrain_chunk(
     State(state): State<Shared>,
     Extension(user): Extension<User>,
     Path((cx, cy)): Path<(String, String)>,
+    headers: HeaderMap,
 ) -> ApiResult<Response> {
-    let id = user.logged_in()?.id as u64;
+    let id = explored_id(&state, &user, &headers)?;
     let game = game_of(&state)?;
     let chunk = match (chunk_param(&cx), chunk_param(&cy)) {
         (Some(cx), Some(cy)) => {
@@ -676,9 +740,10 @@ async fn terrain_chunk(
 async fn terrain_batch(
     State(state): State<Shared>,
     Extension(user): Extension<User>,
+    headers: HeaderMap,
     body: Bytes,
 ) -> ApiResult<Response> {
-    let id = user.logged_in()?.id as u64;
+    let id = explored_id(&state, &user, &headers)?;
     let game = game_of(&state)?;
     let b = JsonBody::parse(&body)?;
     let wanted = match b.get("chunks").and_then(Value::as_array) {
@@ -731,9 +796,10 @@ async fn terrain_batch(
 async fn land_route(
     State(state): State<Shared>,
     Extension(user): Extension<User>,
+    headers: HeaderMap,
     body: Bytes,
 ) -> ApiResult<Response> {
-    let id = user.logged_in()?.id as u64;
+    let id = explored_id(&state, &user, &headers)?;
     let game = game_of(&state)?;
     let b = JsonBody::parse(&body)?;
     let wanted: Option<std::collections::BTreeSet<u32>> = match b.get("chunks") {
@@ -1237,6 +1303,284 @@ async fn admin_tick_health(
     Ok(Json(summary()).into_response())
 }
 
+/// Where the Creative bar reads and sets the time controls (`CONTEXT.md`: Creative mode).
+pub const CREATIVE_PATH: &str = "/api/admin/creative";
+/// Where the Creative bar lists, saves, restores and deletes checkpoints.
+pub const CHECKPOINTS_PATH: &str = "/api/admin/creative/checkpoints";
+
+/// The time controls as they stand.
+async fn creative_state(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Json<CreativeState>> {
+    Ok(Json(user.creative(&state)?.state()))
+}
+
+/// Pauses the world: no tick runs until it is resumed or stepped.
+async fn creative_pause(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Json<CreativeState>> {
+    let controls = user.creative(&state)?;
+    controls.pause();
+    Ok(Json(controls.state()))
+}
+
+/// Runs the world again, at the speed set.
+async fn creative_resume(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Json<CreativeState>> {
+    let controls = user.creative(&state)?;
+    controls.resume();
+    Ok(Json(controls.state()))
+}
+
+/// Pauses the world and runs exactly one tick; answers once it has run.
+async fn creative_step(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Json<CreativeState>> {
+    let controls = user.creative(&state)?;
+    controls.step().await;
+    Ok(Json(controls.state()))
+}
+
+/// Sets the speed: normal, ×10, ×60 or max.
+async fn creative_speed(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    body: Bytes,
+) -> ApiResult<Json<CreativeState>> {
+    let controls = user.creative(&state)?;
+    let request: CreativeSpeedRequest = serde_json::from_slice(&body)
+        .map_err(|_| fail(ApiErrorCode::InvalidInput, "Speed must be normal, x10, x60 or max."))?;
+    controls.set_speed(request.speed);
+    Ok(Json(controls.state()))
+}
+
+/// Where the Creative sections of the cards send creative actions (`CONTEXT.md`: Creative mode).
+pub const CREATIVE_ACT_PATH: &str = "/api/admin/creative/act";
+
+/// Does one creative action (`CreativeAction`) on the world between ticks, as admin directives
+/// are given, then runs every invariant once and reports what it broke as a tick's (ADR 0004).
+/// The change reaches the clients with the next tick's broadcast.
+async fn creative_act(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    body: Bytes,
+) -> ApiResult<Json<CreativeDone>> {
+    user.creative(&state)?;
+    let admin = user.logged_in()?.name.clone();
+    let game = game_of(&state)?;
+    let action: CreativeAction = serde_json::from_slice(&body)
+        .map_err(|e| fail(ApiErrorCode::InvalidInput, format!("Not a creative action: {e}")))?;
+    let name = action.name();
+    let done = with_game(game.as_ref(), move |g| {
+        let message = action.apply(g.world, g.terrain)?;
+        let violations = check_all(g.world, g.terrain);
+        if !violations.is_empty() {
+            ServerReporter::new(TracingLog).invariant_violations(g.world, &violations);
+        }
+        let violations = violations.iter().map(|v| format!("{}: {}", v.invariant, v.message));
+        Ok::<_, String>(CreativeDone { message, violations: violations.collect() })
+    })
+    .await
+    .ok_or_else(game_gone)?
+    .map_err(|e| fail(ApiErrorCode::InvalidInput, e))?;
+    log_event(
+        Level::INFO,
+        &json!({ "admin": admin, "action": name }),
+        &format!("creative action {name}: {}", done.message),
+    );
+    Ok(Json(done))
+}
+
+/// The admin session's sockets and token hash, for its reveal (`CONTEXT.md`: Creative mode).
+fn reveal_session(
+    state: &AppState,
+    user: &User,
+    headers: &HeaderMap,
+) -> ApiResult<(Arc<dyn SessionSockets + Send + Sync>, String)> {
+    user.creative(state)?;
+    let sockets = state.sockets().ok_or_else(|| fail(ApiErrorCode::NotFound, "Not found."))?;
+    let token =
+        session_token(headers).ok_or_else(|| fail(ApiErrorCode::NotLoggedIn, "Not logged in."))?;
+    Ok((sockets, hash_token(&token)))
+}
+
+/// Whether this session reveals the whole map in the game view.
+async fn creative_reveal(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    headers: HeaderMap,
+) -> ApiResult<Json<CreativeReveal>> {
+    let (sockets, token_hash) = reveal_session(&state, &user, &headers)?;
+    Ok(Json(CreativeReveal { on: sockets.reveals(&token_hash) }))
+}
+
+/// Switches this session's reveal on or off (`CONTEXT.md`: Creative mode): kept by the server per
+/// session, never in the world, so neither the Player's sight nor what their scripts see changes.
+/// The session's game views load again with it.
+async fn creative_reveal_set(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<CreativeReveal>> {
+    let (sockets, token_hash) = reveal_session(&state, &user, &headers)?;
+    let request: CreativeReveal = serde_json::from_slice(&body)
+        .map_err(|_| fail(ApiErrorCode::InvalidInput, "Say whether reveal is on."))?;
+    if request.on {
+        // The whole map's terrain, ready before the game view asks for it.
+        let game = game_of(&state)?;
+        with_game(game.as_ref(), |g| g.explored.reveal_all()).await.ok_or_else(game_gone)?;
+    }
+    sockets.set_reveal(&token_hash, request.on);
+    Ok(Json(CreativeReveal { on: sockets.reveals(&token_hash) }))
+}
+
+/// Starts a skip ahead of `amount` game hours or days, up to a game year; answers at once, and
+/// the state's `skip` shows its progress until it ends. One at a time.
+async fn creative_skip(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    body: Bytes,
+) -> ApiResult<Json<CreativeState>> {
+    let controls = user.creative(&state)?;
+    let ticks = serde_json::from_slice::<CreativeSkipRequest>(&body)
+        .ok()
+        .and_then(CreativeSkipRequest::ticks)
+        .ok_or_else(|| {
+            fail(ApiErrorCode::InvalidInput, "Skip ahead 1 game hour up to a game year.")
+        })?;
+    if !controls.skip(ticks) {
+        return Err(fail(ApiErrorCode::InvalidInput, "A skip ahead is already running."));
+    }
+    Ok(Json(controls.state()))
+}
+
+/// Cancels the skip ahead: it stops after the tick it is running.
+async fn creative_skip_cancel(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Json<CreativeState>> {
+    let controls = user.creative(&state)?;
+    controls.cancel_skip();
+    Ok(Json(controls.state()))
+}
+
+/// The creative guard and the running game, for the checkpoint routes: without a game there is
+/// no world to save or restore.
+fn creative_game<'s>(
+    user: &User,
+    state: &'s AppState,
+) -> ApiResult<(&'s Arc<TimeControls>, &'s Arc<dyn GameHandle>)> {
+    let controls = user.creative(state)?;
+    let game = state.game.as_ref().ok_or_else(|| fail(ApiErrorCode::NotFound, "Not found."))?;
+    Ok((controls, game))
+}
+
+/// Every checkpoint, the newest first (`CONTEXT.md`: Creative mode, Checkpoints).
+async fn checkpoints_list(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Json<Vec<Checkpoint>>> {
+    creative_game(&user, &state)?;
+    Ok(Json(state.db(|conn| Ok(list_checkpoints(conn)?)).await?))
+}
+
+/// Saves the world as it is now under a name (one of the same name is replaced); answers every
+/// checkpoint. The world is turned into JSON between ticks, then stored off the game thread.
+async fn checkpoints_save(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    body: Bytes,
+) -> ApiResult<Json<Vec<Checkpoint>>> {
+    let (_, game) = creative_game(&user, &state)?;
+    let name = serde_json::from_slice::<CheckpointSaveRequest>(&body)
+        .ok()
+        .and_then(|r| r.name().map(str::to_owned))
+        .ok_or_else(|| {
+            let max = crate::checkpoints::CHECKPOINT_NAME_MAX;
+            fail(
+                ApiErrorCode::InvalidInput,
+                format!("Name the checkpoint (1 to {max} characters)."),
+            )
+        })?;
+    let (tick, json) = with_game(game.as_ref(), |g| (g.world.tick, serde_json::to_vec(&*g.world)))
+        .await
+        .ok_or_else(game_gone)?;
+    let json = json.map_err(|e| ApiFailure::Internal(e.to_string()))?;
+    let list = state
+        .db(move |conn| {
+            save_checkpoint(conn, &name, tick, &json)
+                .map_err(|e| ApiFailure::Internal(e.to_string()))?;
+            Ok(list_checkpoints(conn)?)
+        })
+        .await?;
+    Ok(Json(list))
+}
+
+/// Restores a checkpoint: pauses the world, swaps it whole (migrated if the checkpoint is of an
+/// older format), tells every client to reload, and runs the world again if it was running.
+/// Accounts are kept. A skip ahead under way is cancelled.
+async fn checkpoints_restore(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<CreativeState>> {
+    let (controls, game) = creative_game(&user, &state)?;
+    let id = u64::try_from(id_param(&id))
+        .map_err(|_| fail(ApiErrorCode::NotFound, "No such checkpoint."))?;
+    let was_paused = controls.state().paused;
+    controls.cancel_skip();
+    controls.pause();
+    let restored = restore_checkpoint(&state, game.as_ref(), id).await;
+    if !was_paused {
+        controls.resume();
+    }
+    restored?;
+    Ok(Json(controls.state()))
+}
+
+async fn restore_checkpoint(state: &AppState, game: &dyn GameHandle, id: u64) -> ApiResult<()> {
+    let seed = with_game(game, |g| g.world.seed).await.ok_or_else(game_gone)?;
+    let terrain = Arc::clone(game.map().terrain());
+    let world = state
+        .db(move |conn| {
+            load_checkpoint(conn, id, &terrain, seed).map_err(|e| match e {
+                CheckpointError::NotFound => fail(ApiErrorCode::NotFound, "No such checkpoint."),
+                CheckpointError::OtherWorld { .. } | CheckpointError::Format(_) => {
+                    fail(ApiErrorCode::InvalidInput, format!("Cannot restore it: {e}."))
+                }
+                CheckpointError::Saves(e) => ApiFailure::Internal(e.to_string()),
+            })
+        })
+        .await?;
+    game.restore(world).await.ok_or_else(game_gone)?.map_err(ApiFailure::Internal)
+}
+
+/// Deletes a checkpoint; answers every checkpoint left.
+async fn checkpoints_delete(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Vec<Checkpoint>>> {
+    creative_game(&user, &state)?;
+    let id = u64::try_from(id_param(&id))
+        .map_err(|_| fail(ApiErrorCode::NotFound, "No such checkpoint."))?;
+    let list = state
+        .db(move |conn| {
+            if !delete_checkpoint(conn, id)? {
+                return Err(fail(ApiErrorCode::NotFound, "No such checkpoint."));
+            }
+            Ok(list_checkpoints(conn)?)
+        })
+        .await?;
+    Ok(Json(list))
+}
+
 /// Fastify's answer to a route it doesn't have, without the built client.
 async fn no_route(method: Method, uri: axum::http::Uri) -> Response {
     let message =
@@ -1271,6 +1615,7 @@ pub fn build_app(opts: AppOptions) -> Router {
         sockets: opts.sockets,
         defaults: opts.defaults,
         tick_health: opts.tick_health,
+        creative: opts.creative,
     });
 
     let auth = Router::new()
@@ -1300,7 +1645,20 @@ pub fn build_app(opts: AppOptions) -> Router {
         .route("/api/scripts/{id}", get(scripts_get))
         .route("/api/admin/invites", post(admin_invites))
         .route("/api/admin/password", post(admin_password))
-        .route("/api/admin/tick-health", get(admin_tick_health));
+        .route("/api/admin/tick-health", get(admin_tick_health))
+        // Creative mode (ADR 0043): they refuse unless the server runs with `CREATIVE=1`.
+        .route(CREATIVE_PATH, get(creative_state))
+        .route(&format!("{CREATIVE_PATH}/pause"), post(creative_pause))
+        .route(&format!("{CREATIVE_PATH}/resume"), post(creative_resume))
+        .route(&format!("{CREATIVE_PATH}/step"), post(creative_step))
+        .route(&format!("{CREATIVE_PATH}/speed"), post(creative_speed))
+        .route(CREATIVE_ACT_PATH, post(creative_act))
+        .route(&format!("{CREATIVE_PATH}/skip"), post(creative_skip))
+        .route(&format!("{CREATIVE_PATH}/skip/cancel"), post(creative_skip_cancel))
+        .route(&format!("{CREATIVE_PATH}/reveal"), get(creative_reveal).post(creative_reveal_set))
+        .route(CHECKPOINTS_PATH, get(checkpoints_list).post(checkpoints_save))
+        .route(&format!("{CHECKPOINTS_PATH}/{{id}}"), delete(checkpoints_delete))
+        .route(&format!("{CHECKPOINTS_PATH}/{{id}}/restore"), post(checkpoints_restore));
     if state.game.is_some() {
         api = api
             .route("/api/terrain/{cx}/{cy}", get(terrain_chunk))

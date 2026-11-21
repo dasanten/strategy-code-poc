@@ -125,6 +125,7 @@ pub fn reset_world(
     let wipe = || -> rusqlite::Result<()> {
         let tx = conn.unchecked_transaction()?;
         tx.execute("DELETE FROM world_saves", [])?;
+        tx.execute("DELETE FROM checkpoints", [])?;
         tx.execute("DELETE FROM terrain", [])?;
         tx.execute("DELETE FROM explored", [])?;
         tx.execute("UPDATE users SET first_day_done = '', first_day_dismissed = 0", [])?;

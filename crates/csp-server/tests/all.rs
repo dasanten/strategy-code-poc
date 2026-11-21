@@ -16,6 +16,8 @@ mod app;
 mod auth;
 #[path = "bench.rs"]
 mod bench;
+#[path = "checkpoints.rs"]
+mod checkpoints;
 #[path = "db.rs"]
 mod db;
 #[path = "default_scripts.rs"]
@@ -30,6 +32,8 @@ mod first_day;
 mod horse_offer;
 #[path = "map_tools.rs"]
 mod map_tools;
+#[path = "new_world.rs"]
+mod new_world;
 #[path = "npc_alliances.rs"]
 mod npc_alliances;
 #[path = "realtime.rs"]

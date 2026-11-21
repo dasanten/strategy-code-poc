@@ -9,7 +9,7 @@
 //! phase ([`Realtime::broadcast_tick`]). The clients' state lives in the [`Realtime`] hub, which
 //! both sides reach.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::Write;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -21,7 +21,7 @@ use csp_shared::chunks::encode_explored_counts;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::protocol::{OrderRequest, Remembered};
 use csp_shared::world::WorldState;
-use csp_sim::explored::ExploredTerrain;
+use csp_sim::explored::{ExploredTerrain, REVEAL_USER};
 use csp_sim::last_seen::{
     last_seen_in_sight, last_seen_on_cadence, last_seen_out_of_sight, LastSeenState, OutOfSight,
     OutOfSightDiff,
@@ -38,7 +38,8 @@ use csp_sim::queries::region_map::{
 use csp_sim::queries::territory::Territory;
 use csp_sim::region_map::region_map_unsound;
 use csp_sim::sight::{
-    entities_in_sight, sent_inside_unseen, sent_out_of_sight, with_sight, InvariantViolation,
+    entities_in_sight, entities_revealed, sent_inside_unseen, sent_out_of_sight, with_sight,
+    InvariantViolation,
 };
 use csp_sim::starting_city::{found_starting_city_in, suggested_leader_name, FoundingNames};
 use csp_sim::tick::Scratch;
@@ -68,6 +69,9 @@ pub const WS_CLOSE_LOGGED_OUT: u16 = 4001;
 /// (ADR 0034): the client shows "The game was updated" with a Reload button instead of
 /// reconnecting.
 pub const WS_CLOSE_UPDATED: u16 = 4426;
+/// The close code of every socket when a creative server restores a checkpoint (`CONTEXT.md`:
+/// Creative mode): the world was swapped whole, so the client loads the page again at once.
+pub const WS_CLOSE_RELOAD: u16 = 4205;
 /// The protocol version this server speaks (ADR 0034). A client names the version it speaks with
 /// the query flag `v` when it connects (`/ws?v=2`); one that names none speaks version 0, the
 /// protocol from before versions. Raise it when a message changes shape.
@@ -176,10 +180,27 @@ struct Client {
     last_trader_visits: String,
     /// The Zeal the Player was last sent (`CONTEXT.md`: Zeal).
     last_zeal: f64,
+    /// Its session reveals the whole map (`CONTEXT.md`: Creative mode, reveal): it is sent
+    /// everything in the world and every tile, and nothing of Last seen, which is all in sight.
+    revealed: bool,
+}
+
+impl Client {
+    /// Whose explored terrain its map shows: the Player's, or the whole map when revealed.
+    fn explored_id(&self) -> u64 {
+        if self.revealed {
+            REVEAL_USER
+        } else {
+            self.user_id as u64
+        }
+    }
 }
 
 #[derive(Default)]
 struct Hub {
+    /// The sessions (by token hash) that reveal the whole map (`CONTEXT.md`: Creative mode): kept
+    /// here, never in the world, until switched off or the server stops.
+    revealed: HashSet<String>,
     next_id: u64,
     /// Every connected socket, whether or not its Player has a realm yet, in the order they came.
     sessions: indexmap::IndexMap<u64, Session>,
@@ -377,7 +398,7 @@ fn region_for(
     grown: &[usize],
 ) -> Option<RegionMap> {
     let cache = cache?;
-    let user_id = client.user_id as u64;
+    let user_id = client.explored_id();
     let is_explored = |x: i32, y: i32| explored.is_explored(user_id, x, y);
     let changes =
         cache.changed.as_ref().map(|(from, chunks)| RegionChanges { from: *from, chunks });
@@ -416,7 +437,7 @@ fn build_welcome(
     user_id: i64,
     account: &Value,
     first_day: Option<FirstDay>,
-    protocol: u32,
+    (protocol, revealed): (u32, bool),
 ) -> Option<Welcome> {
     let realm = world.realms.iter().find(|r| r.id == realm_id)?;
     let mut client = Client {
@@ -442,6 +463,7 @@ fn build_welcome(
         ),
         last_trader_visits: json_of(&trader_visits_to(world, &realm.id)),
         last_zeal: zeal_of(world, user_id as u64),
+        revealed,
     };
     // The view starts at the town hall of the realm's first city, or with the Leader if it has
     // none left.
@@ -452,12 +474,20 @@ fn build_welcome(
         .map(|b| (b.x, b.y))
         .or_else(|| leader.map(|r| (r.x, r.y)))
         .unwrap_or((0.0, 0.0));
-    let in_sight = entities_in_sight(world, index, Some(&realm.id), None);
+    // A reveal shows everything, so nothing is remembered out of sight.
+    let in_sight = if revealed {
+        entities_revealed(world, index, &realm.id)
+    } else {
+        entities_in_sight(world, index, Some(&realm.id), None)
+    };
     let entities = client.view.initial(&in_sight);
-    let remembered = last_seen_out_of_sight(world, index, user_id as u64);
-    let mut welcome_view = ClientView::new();
-    let last_seen = welcome_view.initial(&remembered);
-    client.last_seen_welcome = Some(welcome_view);
+    let mut last_seen = Vec::new();
+    if !revealed {
+        let remembered = last_seen_out_of_sight(world, index, user_id as u64);
+        let mut welcome_view = ClientView::new();
+        last_seen = welcome_view.initial(&remembered);
+        client.last_seen_welcome = Some(welcome_view);
+    }
     let (events, last) = events_json(world, user_id, 0);
     client.last_event_seq = last.unwrap_or(0);
     let diplomacy = diplomacy_of(world, size, &realm.id, &entities);
@@ -509,7 +539,7 @@ fn build_welcome(
     });
     let mut message = message;
     // Explored terrain: the chunks with their counts, or the plain list for an older client.
-    let user = user_id as u64;
+    let user = client.explored_id();
     if protocol >= COUNTS_FROM_VERSION {
         message["exploredCounts"] =
             json!(encode_explored_counts(view.explored.explored_counts(user)));
@@ -529,7 +559,8 @@ pub fn welcome_message(
     account: &Value,
     first_day: Option<FirstDay>,
 ) -> Option<Value> {
-    build_welcome(from, realm_id, user_id, account, first_day, PROTOCOL_VERSION).map(|w| w.message)
+    build_welcome(from, realm_id, user_id, account, first_day, (PROTOCOL_VERSION, false))
+        .map(|w| w.message)
 }
 
 impl Realtime {
@@ -587,6 +618,8 @@ impl Realtime {
     /// Closes the sockets of one session: called when it is logged out.
     pub fn disconnect_session(&self, token_hash: &str) {
         let mut hub = self.hub();
+        // A reveal ends with its session.
+        hub.revealed.remove(token_hash);
         let ended: Vec<u64> = hub
             .sessions
             .iter()
@@ -595,6 +628,38 @@ impl Realtime {
             .collect();
         for socket in ended {
             Self::end_session(&mut hub, socket);
+        }
+    }
+
+    /// Whether the session reveals the whole map (`CONTEXT.md`: Creative mode, reveal).
+    pub fn reveals(&self, token_hash: &str) -> bool {
+        self.hub().revealed.contains(token_hash)
+    }
+
+    /// Switches the session's reveal on or off: its sockets are closed with [`WS_CLOSE_RELOAD`],
+    /// so its game views load again and are welcomed with the whole map, or with the Player's
+    /// sight again. Nothing of it is in the world.
+    pub fn set_reveal(&self, token_hash: &str, on: bool) {
+        let mut hub = self.hub();
+        let changed = if on {
+            hub.revealed.insert(token_hash.to_string())
+        } else {
+            hub.revealed.remove(token_hash)
+        };
+        if !changed {
+            return;
+        }
+        let sockets: Vec<u64> = hub
+            .sessions
+            .iter()
+            .filter(|(_, s)| s.token_hash == token_hash)
+            .map(|(id, _)| *id)
+            .collect();
+        for socket in sockets {
+            if let Some(s) = hub.sessions.shift_remove(&socket) {
+                let _ = s.out.send(Outgoing::Close(WS_CLOSE_RELOAD, "reveal switched"));
+            }
+            hub.clients.shift_remove(&socket);
         }
     }
 
@@ -674,7 +739,7 @@ impl Realtime {
     ) {
         let Some(territory) = view.territory else { return };
         let Some(check) = self.sampled() else { return };
-        let user_id = client.user_id as u64;
+        let user_id = client.explored_id();
         let is_explored = |x: i32, y: i32| view.explored.is_explored(user_id, x, y);
         let violations =
             region_map_unsound(region, territory, size, &is_explored, &client.realm_id);
@@ -711,20 +776,33 @@ impl Realtime {
             let index = world_index(&mut g.scratch.index, g.world, size);
             g.sight.update(g.world, index, g.explored);
         }
+        let (protocol, revealed) = {
+            let hub = self.hub();
+            let session = hub.sessions.get(&socket);
+            let protocol = session.map_or(PROTOCOL_VERSION, |s| s.protocol);
+            (protocol, session.is_some_and(|s| hub.revealed.contains(&s.token_hash)))
+        };
+        if revealed {
+            g.explored.reveal_all();
+        }
         let world = &*g.world;
         let index = world_index(&mut g.scratch.index, world, size);
         let first_day = read_first_day(&self.db(), user_id).ok();
         let view = TickView { territory: g.territory, explored: &*g.explored };
         let parts = (world, size, index, view);
-        let protocol = self.hub().sessions.get(&socket).map_or(PROTOCOL_VERSION, |s| s.protocol);
-        let Some(welcome) = build_welcome(parts, realm_id, user_id, user, first_day, protocol)
+        let client_of = (protocol, revealed);
+        let Some(welcome) = build_welcome(parts, realm_id, user_id, user, first_day, client_of)
         else {
             return;
         };
-        self.check_sent(world, index, realm_id, &welcome.entities);
-        self.check_last_seen(world, g.terrain, &g.scratch.last_seen, realm_id, &welcome.last_seen);
-        if let Some(region) = &welcome.region {
-            self.check_region(world, size, view, &welcome.client, region);
+        // A reveal sends what lies outside the Player's sight on purpose: the checks are for theirs.
+        if !revealed {
+            self.check_sent(world, index, realm_id, &welcome.entities);
+            let cadence = &g.scratch.last_seen;
+            self.check_last_seen(world, g.terrain, cadence, realm_id, &welcome.last_seen);
+            if let Some(region) = &welcome.region {
+                self.check_region(world, size, view, &welcome.client, region);
+            }
         }
         // Their map is fresh from the next tick, not when the realm's turn comes round.
         g.scratch.last_seen.refresh_soon(realm_id);
@@ -946,43 +1024,59 @@ impl Realtime {
             let region_cache = region_cache.as_ref();
             for (socket, client) in clients.iter_mut() {
                 let Some(session) = sessions.get(socket) else { continue };
-                let in_sight = entities_in_sight(world, index, Some(&client.realm_id), Some(cache));
+                // A reveal is everything, apart from any realm's sight (`CONTEXT.md`: Creative
+                // mode): its scripts' sight and the sight checks stay the Player's own.
+                let in_sight = if client.revealed {
+                    entities_revealed(world, index, &client.realm_id)
+                } else {
+                    entities_in_sight(world, index, Some(&client.realm_id), Some(cache))
+                };
                 let diff = client.view.diff(&in_sight, &mut round);
-                self.check_sent(world, index, &client.realm_id, &diff.changed);
+                if !client.revealed {
+                    self.check_sent(world, index, &client.realm_id, &diff.changed);
+                }
                 let mut tick = Map::new();
                 tick.insert("type".into(), json!("tick"));
                 tick.insert("tick".into(), json!(world.tick));
                 let user_id = client.user_id as u64;
-                let shared = Arc::clone(
-                    remembered_now.entry(client.realm_id.clone()).or_insert_with(|| {
-                        Arc::new(match out_of_sight.get_mut(&client.realm_id) {
-                            Some(kept) => {
-                                kept.update(world, index, Some(&mut *cache), changes.get(&user_id))
-                            }
-                            None => {
-                                let kept =
-                                    OutOfSight::new(world, index, Some(&mut *cache), user_id);
-                                out_of_sight.insert(client.realm_id.clone(), kept);
-                                OutOfSightDiff::default()
-                            }
-                        })
-                    }),
-                );
-                // A socket's first tick after its welcome sends the difference from what the
-                // welcome sent; from then on it is in step with its realm's.
-                let own = client.last_seen_welcome.take().map(|mut welcome| {
-                    welcome.diff_alone(&Arc::new(last_seen_out_of_sight(world, index, user_id)))
-                });
-                let (changed, gone) = match &own {
-                    Some(own) => (&own.changed, &own.gone),
-                    None => (&shared.changed, &shared.gone),
-                };
-                self.check_last_seen(world, terrain, cadence, &client.realm_id, changed);
-                if !changed.is_empty() || !gone.is_empty() {
-                    tick.insert("lastSeen".into(), json!({ "changed": changed, "gone": gone }));
+                // Last seen is what lies out of sight: none of it while revealed.
+                if !client.revealed {
+                    let shared = Arc::clone(
+                        remembered_now.entry(client.realm_id.clone()).or_insert_with(|| {
+                            Arc::new(match out_of_sight.get_mut(&client.realm_id) {
+                                Some(kept) => kept.update(
+                                    world,
+                                    index,
+                                    Some(&mut *cache),
+                                    changes.get(&user_id),
+                                ),
+                                None => {
+                                    let kept =
+                                        OutOfSight::new(world, index, Some(&mut *cache), user_id);
+                                    out_of_sight.insert(client.realm_id.clone(), kept);
+                                    OutOfSightDiff::default()
+                                }
+                            })
+                        }),
+                    );
+                    // A socket's first tick after its welcome sends the difference from what the
+                    // welcome sent; from then on it is in step with its realm's.
+                    let own = client.last_seen_welcome.take().map(|mut welcome| {
+                        welcome.diff_alone(&Arc::new(last_seen_out_of_sight(world, index, user_id)))
+                    });
+                    let (changed, gone) = match &own {
+                        Some(own) => (&own.changed, &own.gone),
+                        None => (&shared.changed, &shared.gone),
+                    };
+                    self.check_last_seen(world, terrain, cadence, &client.realm_id, changed);
+                    if !changed.is_empty() || !gone.is_empty() {
+                        tick.insert("lastSeen".into(), json!({ "changed": changed, "gone": gone }));
+                    }
                 }
+                // A revealed map knows every tile already.
                 let grown: Vec<usize> = explored
                     .get(&(client.user_id as u64))
+                    .filter(|_| !client.revealed)
                     .map(|s| s.iter().copied().collect())
                     .unwrap_or_default();
                 // A client that keeps terrain by count gets the grown chunks' new counts too.
@@ -1100,6 +1194,16 @@ impl Realtime {
         });
     }
 
+    /// Closes every socket with [`WS_CLOSE_RELOAD`]: the world was swapped for a checkpoint
+    /// (`CONTEXT.md`: Creative mode), so every client loads the page again.
+    pub fn reload_all(&self) {
+        let mut hub = self.hub();
+        for (_, s) in hub.sessions.drain(..) {
+            let _ = s.out.send(Outgoing::Close(WS_CLOSE_RELOAD, "world restored"));
+        }
+        hub.clients.clear();
+    }
+
     /// Closes every socket (`close`).
     pub fn close(&self) {
         let mut hub = self.hub();
@@ -1153,6 +1257,12 @@ impl SessionSockets for Realtime {
     }
     fn disconnect_user(&self, user_id: i64) {
         Realtime::disconnect_user(self, user_id);
+    }
+    fn reveals(&self, token_hash: &str) -> bool {
+        Realtime::reveals(self, token_hash)
+    }
+    fn set_reveal(&self, token_hash: &str, on: bool) {
+        Realtime::set_reveal(self, token_hash, on);
     }
 }
 

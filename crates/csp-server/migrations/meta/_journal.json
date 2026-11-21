@@ -64,6 +64,13 @@
       "when": 1793634119752,
       "tag": "0008_first_day",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1795283526684,
+      "tag": "0009_checkpoints",
+      "breakpoints": true
     }
   ]
 }

@@ -24,6 +24,10 @@ export interface Balance {
   readonly ISLAND_OFFSHORE_SHARE: number
   readonly HEARTLAND_COUNT: number
   readonly FRONTIER_REGION_COUNT: number
+  readonly SMALL_WORLD_SHARE: number
+  readonly SMALL_WORLD_MIN_SIZE: number
+  readonly SMALL_WORLD_HEARTLANDS: number
+  readonly SMALL_WORLD_FRONTIERS: number
   readonly REGION_BORDER_WIDTH: number
   readonly PASS_WIDTH: number
   readonly SEA_ARM_SHARE: number
@@ -206,6 +210,8 @@ export interface Balance {
   }
   readonly HORSE_START_AGE_MIN: number
   readonly HORSE_START_AGE_MAX: number
+  readonly CREATIVE_STAT_MAX: number
+  readonly CREATIVE_HORSE_AGE_MAX: number
   readonly HORSE_SPEED_EFFECT: number
   readonly HORSE_SPEED_LIMIT: number
   readonly HORSE_STRENGTH_EFFECT: number

@@ -4,6 +4,10 @@
 
 use std::path::{Path, PathBuf};
 
+/// The share of ticks whose invariants the live game checks; a creative skip ahead checks no more
+/// (`crate::server::Game::invariant_sample_rate`).
+pub const LIVE_INVARIANT_SAMPLE_RATE: f64 = 0.1;
+
 /// Where Vite serves the client in development (`apps/web/vite.config.ts`).
 const DEV_ORIGINS: &str = "http://localhost:5173,http://127.0.0.1:5173";
 
@@ -61,6 +65,9 @@ pub struct Config {
     pub slow_tick_ms: f64,
     pub origins: Origins,
     pub realtime: RealtimeLimits,
+    /// Creative mode (`CONTEXT.md`: Creative mode, ADR 0043): on only when `CREATIVE=1`, which the
+    /// live deploy never sets. Off, every creative route refuses, admin or not.
+    pub creative: bool,
 }
 
 /// A variable that holds no number where one is needed. The TypeScript took it as `NaN` and
@@ -135,7 +142,7 @@ impl Config {
             sentry_dsn: non_empty("SENTRY_DSN"),
             invariant_sample_rate: number(
                 "INVARIANT_SAMPLE_RATE",
-                if is_production { 0.1 } else { 1.0 },
+                if is_production { LIVE_INVARIANT_SAMPLE_RATE } else { 1.0 },
             )?,
             slow_tick_ms: number("SLOW_TICK_MS", 800.0)?,
             origins: Origins { allowed, allow_missing: !is_production },
@@ -147,6 +154,7 @@ impl Config {
                 pending_orders_per_realm: 100,
                 compress_over_bytes: 8 * 1024,
             },
+            creative: var("CREATIVE").as_deref() == Some("1"),
         })
     }
 }
@@ -176,6 +184,7 @@ mod tests {
         assert_eq!(c.origins.allowed, vec!["http://localhost:5173", "http://127.0.0.1:5173"]);
         assert!(c.origins.allow_missing);
         assert_eq!(c.realtime.max_payload_bytes, 65536);
+        assert!(!c.creative);
     }
 
     #[test]
@@ -222,6 +231,15 @@ mod tests {
         let c = config(&[("BACKUP_DIR", ""), ("SENTRY_DSN", ""), ("SECURE_COOKIES", "")]).unwrap();
         assert_eq!((c.backup_dir, c.sentry_dsn), (None, None));
         assert!(!c.secure_cookies);
+    }
+
+    #[test]
+    fn turns_creative_mode_on_only_for_creative_1() {
+        assert!(config(&[("CREATIVE", "1")]).unwrap().creative);
+        for off in ["", "0", "true", "yes"] {
+            assert!(!config(&[("CREATIVE", off)]).unwrap().creative, "{off:?}");
+        }
+        assert!(!config(&[("NODE_ENV", "production")]).unwrap().creative);
     }
 
     #[test]

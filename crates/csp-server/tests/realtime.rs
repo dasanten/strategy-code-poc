@@ -15,7 +15,8 @@ use csp_server::db::open_db;
 use csp_server::monitoring::LogSink;
 use csp_server::realtime::{
     Realtime, RealtimeOptions, TickView, COUNTS_FROM_VERSION, MIN_PROTOCOL_VERSION,
-    PROTOCOL_VERSION, WS_CLOSE_LOGGED_OUT, WS_CLOSE_TOO_MANY_REQUESTS, WS_CLOSE_UPDATED,
+    PROTOCOL_VERSION, WS_CLOSE_LOGGED_OUT, WS_CLOSE_RELOAD, WS_CLOSE_TOO_MANY_REQUESTS,
+    WS_CLOSE_UPDATED,
 };
 use csp_server::server::{Game, GameThread, TickSettings};
 use csp_shared::terrain::{Terrain, TerrainMap};
@@ -564,6 +565,7 @@ fn the_client_speaks_the_servers_protocol_version_and_knows_its_close_code() {
         "apps/web/src/shared/protocol.ts names another PROTOCOL_VERSION than the server's"
     );
     assert!(has(format!("export const WS_CLOSE_UPDATED = {WS_CLOSE_UPDATED}")));
+    assert!(has(format!("export const WS_CLOSE_RELOAD = {WS_CLOSE_RELOAD}")));
 }
 
 // --------------------------------------------------------------------------------- the world
@@ -1207,4 +1209,100 @@ async fn tells_a_client_of_the_counts_version_how_much_of_each_chunk_is_explored
     let welcome = old.next("welcome").await;
     assert!(welcome.get("exploredCounts").is_none());
     assert!(welcome["exploredChunks"].as_array().is_some_and(|l| !l.is_empty()));
+}
+
+// ------------------------------------------------------------------------------- checkpoints
+
+/// Restoring a checkpoint swaps the world whole (`CONTEXT.md`: Creative mode): every open tab is
+/// told to reload, and one that connects again is welcomed into the restored world.
+#[tokio::test(flavor = "multi_thread")]
+async fn tells_every_socket_to_reload_when_a_checkpoint_is_restored() {
+    let s = start(StartOptions::default()).await;
+    let mut a = connect(&s).await;
+    a.next("welcome").await;
+    let mut b = connect(&s).await;
+    b.next("welcome").await;
+    let saved = s.game.run(|g, _| g.world.clone()).await.unwrap();
+    let saved_tick = saved.tick;
+    s.tick().await;
+    s.tick().await;
+    let restored = s.game.run(move |g, conn| g.restore(conn, saved)).await.unwrap();
+    restored.unwrap();
+    assert_eq!(a.close_code().await, WS_CLOSE_RELOAD);
+    assert_eq!(b.close_code().await, WS_CLOSE_RELOAD);
+    assert_eq!(s.realtime.socket_count(), 0);
+    let mut again = connect(&s).await;
+    let welcome = again.next("welcome").await;
+    assert_eq!(welcome["tick"], json!(saved_tick), "the restored world's tick");
+}
+
+// ----------------------------------------------------------------------------------- reveal
+
+/// How many tiles the Player has explored.
+async fn explored_tiles(s: &Server, user: u64) -> usize {
+    s.game.run(move |g, _| g.explored.lock().unwrap().explored_tiles(user)).await.unwrap()
+}
+
+/// The ids of a message's entities.
+fn entity_ids(v: &Value) -> Vec<String> {
+    v.as_array().unwrap().iter().map(|e| e["id"].as_str().unwrap().to_owned()).collect()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_revealing_session_is_sent_the_whole_world_and_the_players_own_sight_stays_theirs() {
+    let s = start(StartOptions::default()).await;
+    // A stranger across the (wrapping) map, out of the Player's sight.
+    s.world(|w| {
+        let mut far = w.residents[1].clone();
+        far.id = "far".into();
+        far.owner = Some("r2".into());
+        (far.x, far.y) = (74.0, 74.0);
+        w.residents.push(far);
+    })
+    .await;
+    let user = s.user_id as u64;
+    let mut a = connect(&s).await;
+    let welcome = a.next("welcome").await;
+    assert_eq!(entity_ids(&welcome["entities"]), ["a1", "a2"]);
+    let explored = explored_tiles(&s, user).await;
+
+    // Switched on: the session's sockets load again, and are welcomed with everything.
+    let session = hash_token(&s.token);
+    s.realtime.set_reveal(&session, true);
+    assert!(s.realtime.reveals(&session));
+    assert_eq!(a.close_code().await, WS_CLOSE_RELOAD);
+    let mut b = connect(&s).await;
+    let welcome = b.next("welcome").await;
+    assert_eq!(entity_ids(&welcome["entities"]), ["a1", "a2", "far"]);
+    let chunks = (128 / csp_shared::chunks::CHUNK_SIZE).pow(2) as usize;
+    assert_eq!(counts_of(&welcome["exploredCounts"]).len(), chunks, "every tile");
+    assert_eq!(welcome["lastSeen"], json!([]));
+    s.world(|w| w.residents[2].x = 75.0).await;
+    s.broadcast().await;
+    assert_eq!(entity_ids(&b.next("tick").await["changed"]), ["far"]);
+
+    // The Player's own sight, which their scripts see, and their explored terrain are as they
+    // were; the whole map is no Player's and is never saved.
+    let (sight, dirty) = s
+        .game
+        .run(|g, _| {
+            let size = g.terrain.size;
+            let index = csp_sim::world_index::world_index(&mut g.scratch.index, &g.world, size);
+            let seen = csp_sim::sight::entities_in_sight(&g.world, index, Some("r1"), None);
+            (
+                entity_ids(&serde_json::to_value(&*seen).unwrap()),
+                g.explored.lock().unwrap().take_dirty(),
+            )
+        })
+        .await
+        .unwrap();
+    assert_eq!(sight, ["a1", "a2"]);
+    assert!(!dirty.contains(&csp_sim::explored::REVEAL_USER), "{dirty:?}");
+    assert_eq!(explored_tiles(&s, user).await, explored);
+
+    // Switched off: their own sight again.
+    s.realtime.set_reveal(&session, false);
+    assert_eq!(b.close_code().await, WS_CLOSE_RELOAD);
+    let mut c = connect(&s).await;
+    assert_eq!(entity_ids(&c.next("welcome").await["entities"]), ["a1", "a2"]);
 }

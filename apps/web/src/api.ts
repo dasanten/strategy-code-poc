@@ -19,8 +19,17 @@ import type {
   AdminViewRequest,
   AdminWorldView,
   ApiError,
+  Checkpoint,
+  CheckpointSaveRequest,
   ClientFirstDayLine,
   CreateScriptRequest,
+  CreativeAction,
+  CreativeDone,
+  CreativeReveal,
+  CreativeSkipRequest,
+  CreativeSpeed,
+  CreativeSpeedRequest,
+  CreativeState,
   DirectivePriceRequest,
   FirstDay,
   GiveDirectiveRequest,
@@ -37,6 +46,11 @@ import type {
   SignUpRequest,
   TickHealthResponse,
 } from '@csp/shared-types'
+
+/** Where the Creative bar reads and sets the time controls (`CREATIVE_PATH` on the server). */
+export const CREATIVE_PATH = '/api/admin/creative'
+/** Where the Creative bar keeps checkpoints (`CHECKPOINTS_PATH` on the server). */
+export const CHECKPOINTS_PATH = `${CREATIVE_PATH}/checkpoints`
 
 /** A failed API call, with the server's message for the user. */
 export class ApiFailure extends Error {
@@ -115,6 +129,31 @@ export const api = {
     call<HorseOffersReopened>('POST', '/api/admin/horse-offers/reopen', req),
   // The live world's tick health, the last minute and the last hour (ADR 0004).
   tickHealth: () => call<TickHealthResponse>('GET', '/api/admin/tick-health'),
+  // Creative mode's time controls (`CONTEXT.md`: Creative mode): admins on a creative server only.
+  creative: () => call<CreativeState>('GET', CREATIVE_PATH),
+  creativePause: () => call<CreativeState>('POST', `${CREATIVE_PATH}/pause`),
+  creativeResume: () => call<CreativeState>('POST', `${CREATIVE_PATH}/resume`),
+  creativeStep: () => call<CreativeState>('POST', `${CREATIVE_PATH}/step`),
+  creativeSpeed: (speed: CreativeSpeed) =>
+    call<CreativeState>('POST', `${CREATIVE_PATH}/speed`, { speed } satisfies CreativeSpeedRequest),
+  // A creative action from a card's Creative section: goods, finish now (`CONTEXT.md`: Creative mode).
+  creativeAct: (action: CreativeAction) =>
+    call<CreativeDone>('POST', `${CREATIVE_PATH}/act`, action),
+  creativeSkip: (request: CreativeSkipRequest) =>
+    call<CreativeState>('POST', `${CREATIVE_PATH}/skip`, request),
+  creativeSkipCancel: () => call<CreativeState>('POST', `${CREATIVE_PATH}/skip/cancel`),
+  // Reveal (`CONTEXT.md`: Creative mode): this session's game view shows the whole map; switching
+  // it reloads the game view.
+  creativeReveal: () => call<CreativeReveal>('GET', `${CREATIVE_PATH}/reveal`),
+  creativeSetReveal: (on: boolean) =>
+    call<CreativeReveal>('POST', `${CREATIVE_PATH}/reveal`, { on } satisfies CreativeReveal),
+  // Checkpoints (`CONTEXT.md`: Creative mode): named copies of the world, saved and restored live.
+  checkpoints: () => call<Checkpoint[]>('GET', CHECKPOINTS_PATH),
+  saveCheckpoint: (name: string) =>
+    call<Checkpoint[]>('POST', CHECKPOINTS_PATH, { name } satisfies CheckpointSaveRequest),
+  restoreCheckpoint: (id: number) =>
+    call<CreativeState>('POST', `${CHECKPOINTS_PATH}/${id}/restore`),
+  deleteCheckpoint: (id: number) => call<Checkpoint[]>('DELETE', `${CHECKPOINTS_PATH}/${id}`),
   // The script library: saving keeps every version; one without syntax errors becomes active.
   scripts: () => call<ScriptSummary[]>('GET', '/api/scripts'),
   script: (id: number) => call<ScriptDetail>('GET', `/api/scripts/${id}`),

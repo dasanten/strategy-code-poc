@@ -345,6 +345,186 @@ async fn keeps_players_out_of_admin_routes() {
     );
 }
 
+// -------------------------------------------------------------------------------- creative mode
+
+const CREATIVE_ROUTES: [(&str, &str); 12] = [
+    ("GET", "/api/admin/creative"),
+    ("POST", "/api/admin/creative/pause"),
+    ("POST", "/api/admin/creative/resume"),
+    ("POST", "/api/admin/creative/step"),
+    ("POST", "/api/admin/creative/speed"),
+    ("POST", "/api/admin/creative/act"),
+    ("POST", "/api/admin/creative/skip"),
+    ("POST", "/api/admin/creative/skip/cancel"),
+    ("GET", "/api/admin/creative/checkpoints"),
+    ("POST", "/api/admin/creative/checkpoints"),
+    ("POST", "/api/admin/creative/checkpoints/1/restore"),
+    ("DELETE", "/api/admin/creative/checkpoints/1"),
+];
+
+#[tokio::test]
+async fn refuses_every_creative_route_without_the_flag_even_for_an_admin() {
+    let db = Db::new();
+    let app = db.app();
+    create_admin(&db.conn(), Some("Daniel"), Some("admin password")).unwrap();
+    let admin = login_as(&app, "Daniel", "admin password").await;
+    for (method, path) in CREATIVE_ROUTES {
+        let res = call(&app, method, path, Some(&admin), Some(json!({ "speed": "max" }))).await;
+        assert_eq!(res.status, StatusCode::NOT_FOUND, "{method} {path}");
+        assert_eq!(res.error(), "not-found");
+    }
+    // The account says creative mode is off by leaving it out.
+    let me = call(&app, "GET", "/api/me", Some(&admin), None).await;
+    assert_eq!(me.json(), json!({ "name": "Daniel", "isAdmin": true }));
+}
+
+#[tokio::test]
+async fn lets_only_admins_use_the_time_controls_on_a_creative_server() {
+    let db = Db::new();
+    let controls = Arc::new(csp_server::creative::TimeControls::new());
+    let mut opts = db.opts();
+    opts.creative = Some(Arc::clone(&controls));
+    let app = build_app(opts);
+    create_admin(&db.conn(), Some("Daniel"), Some("admin password")).unwrap();
+    let admin = login_as(&app, "Daniel", "admin password").await;
+    sign_up(&app, "Mara", &create_invite_code(&db.conn(), None).unwrap(), "correct horse").await;
+    let mara = login_as(&app, "Mara", "correct horse").await;
+    for (method, path) in CREATIVE_ROUTES {
+        let res = call(&app, method, path, Some(&mara), Some(json!({ "speed": "max" }))).await;
+        assert_eq!(res.status, StatusCode::FORBIDDEN, "{method} {path}");
+        assert_eq!(res.error(), "not-admin");
+        let res = call(&app, method, path, None, Some(json!({ "speed": "max" }))).await;
+        assert_eq!(res.status, StatusCode::UNAUTHORIZED, "{method} {path}");
+    }
+    assert_eq!(controls.state().speed, csp_server::creative::CreativeSpeed::Normal);
+    assert!(!controls.state().paused);
+
+    // The admin's account says creative mode is on; a Player's doesn't.
+    let me = call(&app, "GET", "/api/me", Some(&admin), None).await;
+    assert_eq!(me.json(), json!({ "name": "Daniel", "isAdmin": true, "creative": true }));
+    let me = call(&app, "GET", "/api/me", Some(&mara), None).await;
+    assert_eq!(me.json(), json!({ "name": "Mara", "isAdmin": false }));
+
+    let state = call(&app, "GET", "/api/admin/creative", Some(&admin), None).await;
+    assert_eq!(state.json(), json!({ "paused": false, "speed": "normal" }));
+    let paused = call(&app, "POST", "/api/admin/creative/pause", Some(&admin), None).await;
+    assert_eq!(paused.json(), json!({ "paused": true, "speed": "normal" }));
+    let speed = json!({ "speed": "x60" });
+    let fast = call(&app, "POST", "/api/admin/creative/speed", Some(&admin), Some(speed)).await;
+    assert_eq!(fast.json(), json!({ "paused": true, "speed": "x60" }));
+    let resumed = call(&app, "POST", "/api/admin/creative/resume", Some(&admin), None).await;
+    assert_eq!(resumed.json(), json!({ "paused": false, "speed": "x60" }));
+    let bad = json!({ "speed": "x1000" });
+    let refused = call(&app, "POST", "/api/admin/creative/speed", Some(&admin), Some(bad)).await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST);
+    assert_eq!(controls.state().speed, csp_server::creative::CreativeSpeed::X60);
+}
+
+#[tokio::test]
+async fn starts_one_skip_ahead_at_a_time_and_cancels_it() {
+    let db = Db::new();
+    let controls = Arc::new(csp_server::creative::TimeControls::new());
+    let mut opts = db.opts();
+    opts.creative = Some(Arc::clone(&controls));
+    let app = build_app(opts);
+    create_admin(&db.conn(), Some("Daniel"), Some("admin password")).unwrap();
+    let admin = login_as(&app, "Daniel", "admin password").await;
+    let skip =
+        |body: Value| call(&app, "POST", "/api/admin/creative/skip", Some(&admin), Some(body));
+
+    for bad in [
+        json!({ "amount": 0, "unit": "hours" }),
+        json!({ "amount": 421, "unit": "days" }),
+        json!({ "amount": 2, "unit": "weeks" }),
+        json!({ "amount": -1, "unit": "days" }),
+    ] {
+        let res = skip(bad.clone()).await;
+        assert_eq!(res.status, StatusCode::BAD_REQUEST, "{bad}");
+        assert_eq!(res.error(), "invalid-input");
+    }
+    let started = skip(json!({ "amount": 2, "unit": "days" })).await;
+    assert_eq!(
+        started.json(),
+        json!({ "paused": false, "speed": "normal", "skip": { "done": 0, "total": 2880 } })
+    );
+    let again = skip(json!({ "amount": 1, "unit": "hours" })).await;
+    assert_eq!(again.status, StatusCode::BAD_REQUEST, "one at a time");
+    let state = call(&app, "GET", "/api/admin/creative", Some(&admin), None).await;
+    assert_eq!(state.json()["skip"], json!({ "done": 0, "total": 2880 }));
+
+    let cancelled = call(&app, "POST", "/api/admin/creative/skip/cancel", Some(&admin), None).await;
+    assert_eq!(cancelled.json(), json!({ "paused": false, "speed": "normal" }));
+    assert_eq!(controls.state().skip, None);
+}
+
+/// Checkpoints (`CONTEXT.md`: Creative mode): saved, the world changed, restored, and the saved
+/// world is back whole; the accounts are untouched and a restart goes on from it.
+#[tokio::test]
+async fn restores_a_checkpoint_to_the_saved_world_and_keeps_the_accounts() {
+    let db = Db::new();
+    let terrain = TerrainMap { size: 64, tiles: vec![0; 64 * 64] };
+    let world = create_world(&terrain, 1);
+    let explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
+    let game = game_thread(&db, world, explored);
+    let controls = Arc::new(csp_server::creative::TimeControls::new());
+    let mut opts = db.opts();
+    opts.game = Some(game.clone());
+    opts.creative = Some(Arc::clone(&controls));
+    let app = build_app(opts);
+    create_admin(&db.conn(), Some("Daniel"), Some("admin password")).unwrap();
+    let admin = login_as(&app, "Daniel", "admin password").await;
+    let path = "/api/admin/creative/checkpoints";
+    let snapshot = || {
+        let game = game.clone();
+        async move { game.run(|g, _| serde_json::to_value(&g.world).unwrap()).await.unwrap() }
+    };
+
+    for bad in [json!({ "name": "  " }), json!({ "name": "x".repeat(61) }), json!({})] {
+        let res = call(&app, "POST", path, Some(&admin), Some(bad.clone())).await;
+        assert_eq!(res.status, StatusCode::BAD_REQUEST, "{bad}");
+    }
+    let saved = snapshot().await;
+    let res = call(&app, "POST", path, Some(&admin), Some(json!({ "name": " start " }))).await;
+    assert_eq!(res.status, StatusCode::OK);
+    let list = res.json();
+    assert_eq!(list.as_array().unwrap().len(), 1);
+    assert_eq!(list[0]["name"], "start");
+    assert_eq!(list[0]["tick"], saved["tick"]);
+    let id = list[0]["id"].as_u64().unwrap();
+
+    // The world goes on, and a Player signs up meanwhile.
+    for _ in 0..3 {
+        game.tick().await.unwrap();
+    }
+    assert_ne!(snapshot().await, saved);
+    sign_up(&app, "Mara", &create_invite_code(&db.conn(), None).unwrap(), "correct horse").await;
+
+    controls.pause();
+    let restore = format!("{path}/{id}/restore");
+    let res = call(&app, "POST", &restore, Some(&admin), None).await;
+    assert_eq!(res.status, StatusCode::OK);
+    assert_eq!(res.json(), json!({ "paused": true, "speed": "normal" }), "stays paused");
+    assert_eq!(snapshot().await, saved, "the saved world, whole");
+    // The accounts are kept: Mara, who signed up after the checkpoint, still logs in.
+    assert!(!login_as(&app, "Mara", "correct horse").await.is_empty());
+    // The restored world is the newest save, so a restart goes on from it.
+    let (latest, _) = csp_server::saves::latest_save(&db.conn()).unwrap().unwrap();
+    assert_eq!(latest, saved);
+
+    // A running world runs again once restored.
+    controls.resume();
+    let res = call(&app, "POST", &restore, Some(&admin), None).await;
+    assert_eq!(res.json(), json!({ "paused": false, "speed": "normal" }));
+
+    let missing = format!("{path}/{}/restore", id + 1);
+    let missing = call(&app, "POST", &missing, Some(&admin), None).await;
+    assert_eq!(missing.status, StatusCode::NOT_FOUND);
+    let res = call(&app, "DELETE", &format!("{path}/{id}"), Some(&admin), None).await;
+    assert_eq!(res.json(), json!([]));
+    let res = call(&app, "DELETE", &format!("{path}/{id}"), Some(&admin), None).await;
+    assert_eq!(res.status, StatusCode::NOT_FOUND);
+}
+
 // ------------------------------------------------------------------------------------- sessions
 
 #[tokio::test]
@@ -1142,4 +1322,117 @@ async fn serves_the_land_a_player_explored_and_names_no_other_region() {
     assert_eq!((bad.status, bad.error().as_str()), (StatusCode::BAD_REQUEST, "invalid-input"));
     let anon = call(&app, "POST", "/api/land", None, Some(json!({}))).await;
     assert_eq!(anon.status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn does_creative_actions_on_the_world_for_an_admin_on_a_creative_server() {
+    use csp_shared::world::Building;
+    let db = Db::new();
+    let terrain = TerrainMap { size: 64, tiles: vec![0; 64 * 64] };
+    let world = create_world(&terrain, 1);
+    let explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
+    let game = game_thread(&db, world, explored);
+    let mut opts = db.opts();
+    opts.game = Some(game.clone());
+    opts.creative = Some(Arc::new(csp_server::creative::TimeControls::new()));
+    let app = build_app(opts);
+    create_admin(&db.conn(), Some("Daniel"), Some("admin password")).unwrap();
+    let admin = login_as(&app, "Daniel", "admin password").await;
+    let building = |id: &str, kind: &str, x: u32, site: bool| -> Building {
+        let mut b =
+            json!({ "id": id, "kind": kind, "cityId": null, "realmId": null, "x": x, "y": 5 });
+        b["stock"] = Value::Null;
+        b["site"] = if site { json!({ "delivered": {}, "work": 0 }) } else { Value::Null };
+        b["teardown"] = Value::Null;
+        serde_json::from_value(b).unwrap()
+    };
+    let (storage, road) = (building("s1", "storage", 5, false), building("b1", "road", 20, true));
+    game.run(move |g, _| g.world.buildings.extend([storage, road])).await;
+    let url = "/api/admin/creative/act";
+
+    let give = json!({ "action": "giveGoods", "holderId": "s1", "good": "wood", "amount": 100 });
+    let done = call(&app, "POST", url, Some(&admin), Some(give)).await;
+    assert_eq!(done.json(), json!({ "message": "Gave 100 units.", "violations": [] }));
+    let take = json!({ "action": "takeGoods", "holderId": "s1", "good": "wood", "amount": 30 });
+    let done = call(&app, "POST", url, Some(&admin), Some(take)).await;
+    assert_eq!(done.json()["message"], "Took 30 units.");
+    let finish = json!({ "action": "finishNow", "buildingId": "b1" });
+    let done = call(&app, "POST", url, Some(&admin), Some(finish.clone())).await;
+    assert_eq!(done.json(), json!({ "message": "Finished.", "violations": [] }));
+    let (wood, road_site) = game
+        .run(|g, _| {
+            let b = |id: &str| g.world.buildings.iter().find(|b| b.id == id).unwrap().clone();
+            (b("s1").stock.unwrap()[&csp_shared::world::Good::Wood], b("b1").site)
+        })
+        .await
+        .unwrap();
+    assert_eq!((wood, road_site), (70.0, None));
+
+    // What can't be done is refused with why, and so is what is no creative action.
+    let again = call(&app, "POST", url, Some(&admin), Some(finish)).await;
+    assert_eq!(again.status, StatusCode::BAD_REQUEST);
+    assert!(again.json()["message"].as_str().unwrap().contains("Nothing to finish"));
+    let order = json!({ "action": "build", "residentId": "a1" });
+    let refused = call(&app, "POST", url, Some(&admin), Some(order)).await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST);
+
+    // A Resident added to an NPC city with the picked age, stats and skills, then grown up and
+    // killed by hand.
+    let city = json!({
+        "id": "n1", "name": "Dunmere", "realmId": null, "townHallId": "s1", "occupation": null
+    });
+    let city = serde_json::from_value(city).unwrap();
+    game.run(move |g, _| g.world.cities.push(city)).await;
+    let add = json!({
+        "action": "addResident", "cityId": "n1", "x": 8, "y": 9, "age": 5,
+        "stats": { "strength": 20, "endurance": 4, "agility": 9, "intellect": 9 },
+        "skills": { "mining": 2 }
+    });
+    let done = call(&app, "POST", url, Some(&admin), Some(add)).await;
+    assert_eq!(done.status, StatusCode::OK, "{:?}", done.json());
+    assert!(done.json()["message"].as_str().unwrap().ends_with("joined."));
+    let added = game
+        .run(|g, _| {
+            let r = g.world.residents.iter().find(|r| r.city_id.as_deref() == Some("n1"))?;
+            Some((r.id.clone(), r.stats.strength.base, r.skills.clone()))
+        })
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(added.1, 20.0);
+    assert_eq!(added.2.get(&csp_shared::world::SkillName::Mining), Some(&2.0));
+    let grow = json!({ "action": "growUp", "residentId": added.0 });
+    let done = call(&app, "POST", url, Some(&admin), Some(grow)).await;
+    assert!(done.json()["message"].as_str().unwrap().ends_with("has grown up."));
+    // Moved across the map at once.
+    let to = json!({ "action": "moveResidents", "residentIds": [added.0], "x": 20, "y": 3 });
+    let done = call(&app, "POST", url, Some(&admin), Some(to)).await;
+    assert_eq!(done.status, StatusCode::OK, "{:?}", done.json());
+    assert!(done.json()["message"].as_str().unwrap().ends_with("stands on (20, 3)."));
+    let kill = json!({ "action": "kill", "residentId": added.0 });
+    let done = call(&app, "POST", url, Some(&admin), Some(kill)).await;
+    assert!(done.json()["message"].as_str().unwrap().ends_with("is dead."));
+    let left = game.run(|g, _| g.world.residents.len()).await.unwrap();
+    assert_eq!(left, 0);
+}
+
+#[test]
+fn names_creative_actions_as_the_sim_lists_them() {
+    use csp_server::creative::CreativeAction;
+    let actions: Vec<CreativeAction> = [
+        json!({ "action": "giveGoods", "holderId": "s1", "good": "wood", "amount": 1 }),
+        json!({ "action": "takeGoods", "holderId": "s1", "good": "wood", "amount": 1 }),
+        json!({ "action": "finishNow", "buildingId": "b1" }),
+        json!({ "action": "addResident", "cityId": "c1", "x": 1, "y": 2 }),
+        json!({ "action": "addHorse", "cityId": "c1", "x": 1, "y": 2 }),
+        json!({ "action": "heal", "residentId": "r1" }),
+        json!({ "action": "growUp", "residentId": "r1" }),
+        json!({ "action": "kill", "residentId": "r1" }),
+        json!({ "action": "moveResidents", "residentIds": ["r1"], "x": 1, "y": 2 }),
+    ]
+    .into_iter()
+    .map(|v| serde_json::from_value(v).unwrap())
+    .collect();
+    let names: Vec<&str> = actions.iter().map(CreativeAction::name).collect();
+    assert_eq!(names, csp_sim::creative::CREATIVE_ACTIONS);
 }

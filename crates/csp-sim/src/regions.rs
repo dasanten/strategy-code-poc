@@ -25,7 +25,7 @@ use ts_rs::TS;
 
 use csp_shared::balance::{
     FRONTIER_REGION_COUNT, HEARTLAND_COUNT, PASS_WIDTH, REGION_BORDER_WIDTH, SEA_ARM_SHARE,
-    SECOND_WAY_SHARE,
+    SECOND_WAY_SHARE, SMALL_WORLD_FRONTIERS, SMALL_WORLD_HEARTLANDS,
 };
 use csp_shared::terrain::{Terrain, TerrainMap};
 
@@ -268,7 +268,10 @@ impl Layout {
     pub(crate) fn new(seed: i64, size: i32) -> Layout {
         let seed = seed as f64;
         let shape = MainlandShape::of(seed, size);
-        let count = (HEARTLAND_COUNT + FRONTIER_REGION_COUNT) as usize;
+        let count = {
+            let (h, f) = region_counts(size);
+            h + f
+        };
         let mut s = 0.0;
         let mut rand = || {
             let v = hash(s, 17.0, seed);
@@ -352,7 +355,7 @@ impl Layout {
     /// nearest of the rest.
     fn pick_heartlands(&self, size: i32) -> Vec<RegionKind> {
         let count = self.sites.len();
-        let wanted = (HEARTLAND_COUNT as usize).min(count);
+        let wanted = region_counts(size).0.min(count);
         let touching = self.neighbours_in_envelope(size);
         let mut order: Vec<usize> = (0..count).collect();
         order.sort_by(|&a, &b| {
@@ -1047,7 +1050,7 @@ pub struct RegionProblem {
 }
 
 /// Checks the rules the regions of every generated map keep (ADR 0004): every land tile has a
-/// region; there are `HEARTLAND_COUNT` heartlands and `FRONTIER_REGION_COUNT` frontier regions,
+/// region; there are as many heartlands and frontier regions as `region_counts` says,
 /// each with land; the mainland is joined for a carriage (a path that never needs Mountain); and
 /// each way is at least `pass_width` tiles wide and never Mountain.
 pub fn check_regions(map: &TerrainMap, regions: &Regions) -> Vec<RegionProblem> {
@@ -1063,11 +1066,10 @@ pub fn check_regions(map: &TerrainMap, regions: &Regions) -> Vec<RegionProblem> 
             message: format!("land at {} has no region", at(t)),
         });
     }
-    for (kind, wanted) in
-        [(RegionKind::Heartland, HEARTLAND_COUNT), (RegionKind::Frontier, FRONTIER_REGION_COUNT)]
-    {
+    let (heartlands, frontiers) = region_counts(map.size);
+    for (kind, wanted) in [(RegionKind::Heartland, heartlands), (RegionKind::Frontier, frontiers)] {
         let with_land = regions.of_kind(kind).filter(|r| r.tiles > 0).count();
-        if with_land != wanted as usize {
+        if with_land != wanted {
             problems.push(RegionProblem {
                 rule: "region-counts",
                 message: format!("{with_land} {kind:?} regions with land, not {wanted}"),
@@ -1138,3 +1140,15 @@ pub(crate) fn drive_groups(map: &TerrainMap, on: &dyn Fn(usize) -> bool) -> Vec<
 #[cfg(test)]
 #[path = "regions_tests.rs"]
 mod tests;
+
+/// How many heartlands and frontier regions the mainland of a map of `size` is cut into:
+/// `HEARTLAND_COUNT` and `FRONTIER_REGION_COUNT`, or on a small test world
+/// (`is_small_world`) `SMALL_WORLD_HEARTLANDS` and `SMALL_WORLD_FRONTIERS`, so each region keeps
+/// room for a city.
+pub fn region_counts(size: i32) -> (usize, usize) {
+    if csp_shared::balance::is_small_world(size) {
+        (SMALL_WORLD_HEARTLANDS as usize, SMALL_WORLD_FRONTIERS as usize)
+    } else {
+        (HEARTLAND_COUNT as usize, FRONTIER_REGION_COUNT as usize)
+    }
+}

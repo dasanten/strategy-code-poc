@@ -66,7 +66,7 @@ fn touching(map: &TerrainMap, regions: &Regions) -> BTreeMap<(u32, u32), usize> 
 }
 
 #[test]
-fn every_land_tile_has_one_region_and_the_counts_are_the_balance_numbers() {
+fn every_land_tile_has_one_region_and_the_counts_are_the_balance_numbers_for_its_size() {
     for (seed, size) in MAPS {
         let map = generate_terrain(seed, size);
         assert_eq!(check_terrain(&map), [], "{seed}-{size}");
@@ -77,8 +77,8 @@ fn every_land_tile_has_one_region_and_the_counts_are_the_balance_numbers() {
             assert_eq!(*group != -1, region_of(&regions, t).is_some(), "{seed}-{size} {t}");
         }
         let count = |k| regions.of_kind(k).filter(|r| r.tiles > 0).count();
-        assert_eq!(count(RegionKind::Heartland), HEARTLAND_COUNT as usize);
-        assert_eq!(count(RegionKind::Frontier), FRONTIER_REGION_COUNT as usize);
+        let counts = (count(RegionKind::Heartland), count(RegionKind::Frontier));
+        assert_eq!(counts, region_counts(size), "{seed}-{size}");
         assert_eq!(count(RegionKind::Island), land.islands().count());
         // Each island is its own region, the whole of it.
         for g in land.islands() {
@@ -107,7 +107,8 @@ fn a_carriage_drives_between_any_two_mainland_regions_and_crosses_a_border_only_
         };
         assert_eq!(drive_groups(&map, &mainland).len(), 1, "{seed}-{size}");
         let pairs = touching(&map, &regions);
-        assert!(pairs.len() >= HEARTLAND_COUNT as usize + FRONTIER_REGION_COUNT as usize - 1);
+        let (heartlands, frontiers) = region_counts(size);
+        assert!(pairs.len() >= heartlands + frontiers - 1, "{seed}-{size}");
         for &(a, b) in pairs.keys() {
             let ways: Vec<&Way> = regions.ways_between(a, b).collect();
             let closed: HashSet<usize> =
@@ -245,4 +246,15 @@ fn reports_land_without_a_region_and_a_mainland_split_for_carriages() {
     map.tiles[water.expect("sea")] = Terrain::Plains as u8;
     let rules: Vec<&str> = check_regions(&map, &regions).iter().map(|p| p.rule).collect();
     assert!(rules.contains(&"region-everywhere"), "{rules:?}");
+}
+
+#[test]
+fn a_small_test_world_has_fewer_regions_and_others_the_full_counts() {
+    let full = (HEARTLAND_COUNT as usize, FRONTIER_REGION_COUNT as usize);
+    let small = (SMALL_WORLD_HEARTLANDS as usize, SMALL_WORLD_FRONTIERS as usize);
+    assert!(small.0 < full.0 && small.1 < full.1);
+    // Narrower maps are only made by tests and keep the full counts.
+    for (size, counts) in [(512, full), (640, small), (768, small), (896, full), (5760, full)] {
+        assert_eq!(region_counts(size), counts, "{size}");
+    }
 }

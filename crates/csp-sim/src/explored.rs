@@ -153,6 +153,10 @@ impl MapTerrain {
     }
 }
 
+/// The id under which [`ExploredTerrain::reveal_all`] keeps the whole map explored, for an admin's
+/// reveal (`CONTEXT.md`: Creative mode): no account has it, and its terrain is never saved.
+pub const REVEAL_USER: u64 = u64::MAX;
+
 /// Every Player's explored terrain, by account id (`Realm::user_id`). It grows as the Player's
 /// residents see new tiles (sight).
 #[derive(Debug, Clone)]
@@ -338,6 +342,16 @@ impl ExploredTerrain {
         self.chunks.insert(user_id, counts);
         self.bits.insert(user_id, bits);
         self.dirty.insert(user_id);
+    }
+
+    /// Makes [`REVEAL_USER`]'s terrain the whole map, once: what an admin's reveal shows
+    /// (`CONTEXT.md`: Creative mode). It is no Player's, so it is never saved.
+    pub fn reveal_all(&mut self) {
+        if self.bits.contains_key(&REVEAL_USER) {
+            return;
+        }
+        self.explore_all(REVEAL_USER);
+        self.dirty.remove(&REVEAL_USER);
     }
 
     /// How many tiles the Player has explored.
