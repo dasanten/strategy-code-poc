@@ -18,6 +18,7 @@
     "types:rust": "cargo run -q -p csp-server --bin export-types",
     "balance:rust": "cargo run -q -p csp-shared --bin write-balance",
     "wasm:build": "node scripts/wasm-build.mjs",
+    "art:pixel": "node scripts/pixel-art.mjs",
     "script-data:rust": "cargo run --quiet --package csp-lang-wasm --bin script-data",
     "check:rust": "node scripts/check-rust.mjs",
     "test:slow": "cargo nextest run --cargo-profile slow --profile slow -p csp-sim --lib --run-ignored only -E \"test(/npc_slow::/) and not test(/game_year/)\"",

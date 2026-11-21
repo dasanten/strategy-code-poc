@@ -1,4 +1,4 @@
-# Map art: painted sprites
+# Map art: painted sprites and pixel art
 
 What it takes to replace the map's SVG glyphs with painted images (ADR 0008). The registry in
 `apps/web/src/map/art.ts` points every game kind to one file, so images can be swapped in one at a
@@ -99,25 +99,25 @@ drawn across its footprint (see the table below); the construction sites go with
 
 ### Buildings
 
-| File        | Footprint | Subject                                                         |
-| ----------- | --------- | --------------------------------------------------------------- |
-| town-hall   | 3×3       | Central hall with a bell tower and a banner, a small plaza      |
-| house       | 2×2       | A small timber and thatch house, a small yard                   |
-| storage     | 2×2       | Barn or shed, crates and sacks                                  |
-| warehouse   | 3×3       | Big Trade Organization depot, stone, many crates, merchant feel |
-| farm        | 4×4       | Tilled field rows, a small hut at one corner                    |
-| stable      | 3×3       | Stable, paddock fence, hay                                      |
-| training-ground | 3×3   | Fenced yard, a straw target, a weapon rack, a paved ring        |
-| haven       | 3×3       | Shore yard: a slipway with a boat, a jetty, a shed, crates      |
-| mine        | 2×2       | Mine entrance with timber frame, ore cart, rubble               |
-| quarry      | 2×2       | Cut stone pit with blocks and a crane                           |
-| lumber-camp | 2×2       | Log piles, a chopping block, a sawhorse                         |
-| smelter     | 2×2       | Clay furnace, smoke, ore heap                                   |
-| mint        | 2×2       | Small fortified stone house with gold accents                   |
-| smithy      | 2×2       | Forge, chimney, anvil                                           |
-| wall        | 1×1       | Wooden palisade (pieces below)                                  |
-| gate        | 1×1       | Wooden gate in the palisade; one east–west, one north–south     |
-| road        | 1×1       | Packed light dirt road #e8cf97 (pieces below)                   |
+| File            | Footprint | Subject                                                         |
+| --------------- | --------- | --------------------------------------------------------------- |
+| town-hall       | 3×3       | Central hall with a bell tower and a banner, a small plaza      |
+| house           | 2×2       | A small timber and thatch house, a small yard                   |
+| storage         | 2×2       | Barn or shed, crates and sacks                                  |
+| warehouse       | 3×3       | Big Trade Organization depot, stone, many crates, merchant feel |
+| farm            | 4×4       | Tilled field rows, a small hut at one corner                    |
+| stable          | 3×3       | Stable, paddock fence, hay                                      |
+| training-ground | 3×3       | Fenced yard, a straw target, a weapon rack, a paved ring        |
+| haven           | 3×3       | Shore yard: a slipway with a boat, a jetty, a shed, crates      |
+| mine            | 2×2       | Mine entrance with timber frame, ore cart, rubble               |
+| quarry          | 2×2       | Cut stone pit with blocks and a crane                           |
+| lumber-camp     | 2×2       | Log piles, a chopping block, a sawhorse                         |
+| smelter         | 2×2       | Clay furnace, smoke, ore heap                                   |
+| mint            | 2×2       | Small fortified stone house with gold accents                   |
+| smithy          | 2×2       | Forge, chimney, anvil                                           |
+| wall            | 1×1       | Wooden palisade (pieces below)                                  |
+| gate            | 1×1       | Wooden gate in the palisade; one east–west, one north–south     |
+| road            | 1×1       | Packed light dirt road #e8cf97 (pieces below)                   |
 
 - **Training ground and haven:** the buildings not in the sheet. Each is drawn by hand as
   `apps/web/src/assets/painted/<file>.svg` in the same style, and the registry points to
@@ -164,3 +164,57 @@ diamond): tiny UI markers that read better as line art.
 
 **Minimum:** about 58 images (15 buildings, 12 wall and road pieces, 1 extra gate, 4 construction
 sites, 4 nodes, 6 units, 4 emblems, 12 goods and pile); about 65 with the optional units.
+
+## Pixel art
+
+Daniel's own art (ADR 0043), drawn in Aseprite and kept in `art/pixel/`. The Player sees it with
+the **Pixel** art style (`CONTEXT.md`: Art style); whatever isn't drawn yet keeps the painted look.
+
+### Files
+
+| File                 | What is in it                                                                    |
+| -------------------- | -------------------------------------------------------------------------------- |
+| `buildings.aseprite` | Buildings, towers, construction sites, city emblems                              |
+| `tiles.aseprite`     | Wall, gate and road pieces, resource nodes, the pile                             |
+| `units.aseprite`     | Horse, carriage (alone and hitched), caravan, banner, vessels, siege machines    |
+| `goods.aseprite`     | One icon per good                                                                |
+| `resident.aseprite`  | One figure; a layer each for the body, the Leader's crown and each piece of gear |
+
+Each sheet has a locked `guide` layer (never exported), an `art` layer, and optionally a `tint`
+layer. Each asset is a **named slice** (Slice tool, Shift+C); the name is what the code asks for.
+`art/pixel/make-templates.lua` creates empty files with every slice; it never overwrites a file.
+
+### Rules for drawing
+
+- **16 px per tile.** A building's slice is its footprint: 32×32 for 2×2, 48×48 for 3×3, 64×64
+  for 4×4.
+- **Buildings from straight above; residents from the front; horses, carts, vessels and siege
+  machines from the side**, all facing the same way.
+- **Owner's colour on the `tint` layer**, in white and greys: white becomes the full colour, grey
+  a shaded one. Everything else on `art` in its real colours.
+- **Walls and roads: six pieces**, each drawn once and turned by the game: `end` joins right,
+  `straight` left and right, `corner` right and bottom, `t` left, right and bottom, `cross` all
+  four, `post`/`single` none. Where a piece joins, the same pixels must sit on the tile's edge on
+  every piece. Keep the shading the same from every side, since pieces are turned.
+- **Gates** are drawn four times per material: closed and open, in an east–west and a
+  north–south wall. They are not turned.
+- **Gear on the resident:** a layer named after the good (`sword`, `shield`, `armour`, `spear`,
+  `bow`, `crossbow`), and `steel-…` for a steel one that should look different. Steel without a
+  layer of its own shows the iron layer; gear with no layer at all keeps its small mark.
+
+### Exporting
+
+```
+pnpm art:pixel
+```
+
+It needs Aseprite (set `ASEPRITE` to its executable if it isn't found) and writes
+`apps/web/src/assets/pixel/*.png` and `apps/web/src/map/pixel-slices.ts`. Commit them with the
+`.aseprite` files. A slice with nothing drawn in it is skipped when the game loads, so an export
+of half-finished sheets is fine.
+
+### Adding an asset
+
+Draw it in a new slice, and if the code doesn't know the name yet, add it to
+`apps/web/src/map/pixel-art.ts`. A different look by state (as the open gate or the hitched
+carriage) is a slice of its own that the code picks.

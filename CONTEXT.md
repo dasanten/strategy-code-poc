@@ -2110,6 +2110,13 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   becomes possible is added at the end of its group, and the rows are sorted afresh only when
   something else is picked (ADR 0019). A group card has the same rows, with the group's own
   reasons.
+- **Art style:** how the map and the goods icons are drawn, picked by the Player in the map's
+  legend and remembered per browser (ADR 0043): **Tokens** (line art only), **Painted** (painted
+  sprites where there are some, tokens otherwise; the default) or **Pixel** (Daniel's pixel art,
+  and the Painted look for whatever has none yet). It changes nothing in the world. In Pixel,
+  walls and roads join their neighbours, a gate shows open or closed, a carriage shows with or
+  without its hitched horse, and up close a resident wears their equipped armour, shield and
+  weapon.
 - **Goods on cards:** each kind of good has one icon. Every inventory a card or drawer shows
   (what a resident carries, a carriage's load, a storage's or stable's stock, a workplace's pile,
   a site's materials, trade lists) is a compact grid of icon and amount, the name on hover or

@@ -1,13 +1,40 @@
-import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type MouseEvent,
+  type PointerEvent,
+} from 'react'
 import type { Good } from '@csp/shared-types'
 import { GOOD_ART, GOOD_FILES, GOOD_LABELS, goodsAmount, type GoodsItem } from './goods-grid.js'
+import { artStyle, onArtStyle } from './map/art-style.js'
 import { LONG_PRESS_MS, longPresses } from './map/gestures.js'
+import { PIXEL_FILES, PIXEL_GOOD, pixelSlice } from './map/pixel-art.js'
+import { PIXEL_SLICES } from './map/pixel-slices.js'
 
 /** How long (in ms) a good's name stays after the long-press that showed it lets go. */
 const NAME_STAYS_MS = 1500
 
-/** A good's icon (`GOOD_ART`), in the colour of the text around it. */
+/**
+ * A good's icon (`GOOD_ART`), in the colour of the text around it; in the Pixel art style
+ * (`CONTEXT.md`: Art style) its pixel art, where the good has some.
+ */
 export function GoodIcon({ good }: { good: Good }) {
+  const style = useSyncExternalStore(onArtStyle, artStyle)
+  const slice = style === 'pixel' ? PIXEL_GOOD[good] : undefined
+  const rect = slice === undefined ? undefined : pixelSlice('goods', slice)
+  if (rect) {
+    // The goods sheet, with only this good's slice in view.
+    const [width, height] = PIXEL_SLICES.goods.size
+    return (
+      <span className="good-icon good-icon-pixel" aria-hidden="true">
+        <svg viewBox={rect.join(' ')}>
+          <image href={PIXEL_FILES['goods.png']} width={width} height={height} />
+        </svg>
+      </span>
+    )
+  }
   return (
     <span
       className="good-icon"
