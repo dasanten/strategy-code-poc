@@ -1451,7 +1451,7 @@ export function MapView({
             ×
           </button>
           {look === 'fill' ? <RegionLegend region={world.region} /> : <Legend />}
-          <label className="art-style">
+          <label className="art-style pn">
             Art style
             <select value={style} onChange={(e) => setArtStyle(e.target.value as ArtStyle)}>
               {ART_STYLES.map((s) => (
@@ -1470,7 +1470,7 @@ export function MapView({
       <div className="map-corner">
         {!admin &&
           (minimapOpen ? (
-            <div className="minimap">
+            <div className="minimap pn">
               <canvas
                 ref={minimapRef}
                 aria-label="Minimap: click to centre the map there"
@@ -1498,11 +1498,11 @@ export function MapView({
             </button>
           ))}
         {loading ? (
-          <div className="map-readout" role="status">
+          <div className="map-readout pn" role="status">
             Loading the map…
           </div>
         ) : (
-          <div className="map-readout">{readoutText(hover, tier, look !== 'none')}</div>
+          <div className="map-readout pn">{readoutText(hover, tier, look !== 'none')}</div>
         )}
       </div>
     </div>
@@ -1542,7 +1542,7 @@ function Legend() {
     return s ? `${Math.round(s * 100)}% speed` : 'impassable'
   }
   return (
-    <div className="map-legend">
+    <div className="map-legend pn">
       {terrains.map((t) => (
         <div key={t}>
           <span className="swatch" style={{ background: css(TERRAIN_COLORS[t]!) }} />
@@ -1578,7 +1578,7 @@ function Legend() {
 function RegionLegend({ region }: { region: RegionState | null }) {
   const groups = region ? regionGroups(region) : []
   return (
-    <div className="map-legend region-legend">
+    <div className="map-legend pn region-legend">
       {groups.length === 0 && <div className="rule">No territory on explored terrain yet</div>}
       {groups.map((g) => (
         <div key={g.key}>

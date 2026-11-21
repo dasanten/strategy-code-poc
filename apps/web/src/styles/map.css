@@ -1,0 +1,391 @@
+/* Pick mode (ADR 0012): a notice in the lane says what to pick, with Cancel; while it shows
+   it replaces the other notices (`laneNotices`). */
+.notice.pick-banner {
+  border-left-color: var(--ui-live);
+}
+.pick-banner-text {
+  display: grid;
+  gap: 2px;
+}
+.pick-banner-text .small {
+  color: var(--ui-muted);
+}
+/* A wall line's Wood or Stone (`CONTEXT.md`: Wood or stone), beside Cancel. */
+.material-pick {
+  display: flex;
+  gap: 4px;
+}
+/* One line on a phone: what to pick, then the hint after it. */
+.game.phone .pick-banner-text {
+  display: block;
+}
+.game.phone .pick-banner-text .small::before {
+  content: ' — ';
+}
+
+.hud-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(24, 20, 37, 0.6);
+}
+.hud-dialog {
+  width: min(440px, 100%);
+  box-sizing: border-box;
+  padding: 20px 22px;
+}
+.hud-dialog h2 {
+  margin: -20px -22px 14px;
+}
+.hud-dialog p {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--ui-muted);
+}
+
+.hud-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+/* The map's buttons in one row at the bottom left, above the card's sheet (`--sheet-h`); zoom is
+   pinch only. The Legend button ends the row and its panel opens above it; the minimap button and
+   the readout (or the loading line) sit bottom right. */
+.game.phone .map-buttons {
+  top: auto;
+  left: 12px;
+  bottom: calc(var(--sheet-h, 0px) + 12px);
+  flex-direction: row;
+}
+.game.phone .map-buttons .zoom {
+  display: none;
+}
+.game.phone .map-legend-button {
+  left: calc(12px + 3 * 44px + 3 * 6px);
+  bottom: calc(var(--sheet-h, 0px) + 12px);
+  height: 44px;
+}
+.game.phone .map-legend-panel {
+  bottom: calc(var(--sheet-h, 0px) + 12px + 44px + 6px);
+}
+.game.phone .map-corner {
+  bottom: calc(var(--sheet-h, 0px) + 12px);
+}
+/* An open minimap clears the row of buttons beside the readout. */
+.game.phone .minimap {
+  margin-bottom: 16px;
+}
+.game.phone .map-readout {
+  max-width: calc(100vw - 260px);
+  white-space: normal;
+}
+
+.map-view {
+  position: relative;
+  height: min(70vh, 720px);
+  min-height: 360px;
+  overflow: hidden;
+  border: 2px solid var(--ink);
+  background: var(--terrain-void);
+}
+.map-view .map {
+  position: absolute;
+  inset: 0;
+}
+.map-buttons {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.map-buttons button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* A toggle that is on (Select, Region map) is filled, so its state shows at a glance. */
+.map-buttons button[aria-pressed='true'],
+.map-buttons button[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--gold);
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.map-buttons svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.map-legend,
+.map-readout,
+.minimap {
+  font-size: 12px;
+}
+.map-legend-panel,
+.map-legend-button {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+}
+/* The art style picker under the legend (CONTEXT.md: Art style). */
+.art-style {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.map-legend {
+  padding: 10px 28px 10px 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, auto));
+  gap: 6px 16px;
+}
+.map-legend > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.map-legend .swatch {
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--ink);
+}
+.map-legend .swatch.diamond {
+  width: 9px;
+  height: 9px;
+  margin: 0 1.5px;
+  transform: rotate(45deg);
+}
+.map-legend .rule {
+  font-family: var(--font-mono);
+  color: var(--ui-muted);
+  font-size: 11px;
+}
+/* The minimap over the readout, bottom right (ADR 0008). */
+.map-corner {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: none;
+}
+.map-corner > * {
+  pointer-events: auto;
+}
+.map-readout {
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--ui-text);
+  pointer-events: none;
+}
+.minimap {
+  position: relative;
+  padding: 4px;
+  line-height: 0;
+}
+.minimap canvas {
+  display: block;
+  background: var(--ink);
+  cursor: crosshair;
+  touch-action: none;
+}
+/* Folds the legend or the minimap back to its button. */
+.map-fold {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  line-height: 1;
+  font-size: 15px;
+  z-index: 1;
+}
+.map-legend-button,
+.minimap-button {
+}
+/* On a phone the legend is one column, clear of the minimap and readout bottom right. */
+@media (max-width: 640px) {
+  .map-legend {
+    grid-template-columns: minmax(0, auto);
+    gap: 4px;
+    max-height: 45vh;
+    max-width: calc(100vw - 160px);
+    overflow: auto;
+    font-size: 11px;
+  }
+}
+
+.map-legend.region-legend {
+  grid-template-columns: minmax(0, auto);
+  max-height: 40vh;
+  max-width: 50vw;
+  overflow: auto;
+}
+
+/* The lane every notice shows in (`NoticeLane`; `CONTEXT.md`: Notices): one stack under the top
+   bar, centred over the map between the open drawer and the card, its edges set inline. As a
+   band across the screen it sets `--lane-h`, and the drawers and the card start below it. */
+.notice-lane {
+  position: absolute;
+  top: calc(var(--top-h) + 10px);
+  left: calc(var(--rail-w) + 12px);
+  right: 12px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.notice-lane.band {
+  top: calc(var(--top-h) + 6px);
+}
+.notice-lane:empty {
+  display: none;
+}
+/* A notice (the Horse offer, the pick banner, a group order's report): text, then its button. */
+.notice {
+  pointer-events: auto;
+  max-width: min(560px, 100%);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px 6px 14px;
+  border-left: 6px solid var(--rel-own);
+  color: var(--ui-text);
+  font-family: var(--font-ui);
+}
+.notice-text {
+  min-width: 0;
+}
+.notice-actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+.notice button {
+  flex: none;
+  padding: 3px 12px;
+  font-weight: 600;
+}
+.notice.group-report.skipped {
+  border-left-color: var(--ui-warn);
+}
+.hud-offer-refused {
+  color: var(--ui-bad);
+}
+/* The first-day card (`FirstDayCard`): a checklist, ticked lines muted, ✕ at the top right. */
+.notice.first-day {
+  align-items: flex-start;
+}
+.first-day-count {
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+.first-day ul {
+  margin: 4px 0 2px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+.first-day li.done {
+  color: var(--ui-muted);
+  text-decoration: line-through;
+}
+.first-day li.done .first-day-tick {
+  color: var(--ui-live);
+}
+.first-day li.done a {
+  color: inherit;
+}
+.notice .first-day-dismiss {
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ui-muted);
+  font-weight: 400;
+}
+/* One line on a phone: how far along, then only the first line still to do. */
+.game.phone .first-day ul,
+.game.phone .first-day li {
+  display: inline;
+  margin: 0;
+}
+.game.phone .first-day li:not(.next) {
+  display: none;
+}
+.game.phone .first-day ul::before {
+  content: ' · ';
+}
+/* On a phone every notice is one line, its button at the end; the whole text is its title. */
+.game.phone .notice-text {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* But a trader's stop says where it is, which is what the notice is for: its buttons go below. */
+.game.phone .notice.trader-visit {
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.game.phone .trader-visit .notice-text {
+  flex: 1 1 100%;
+  white-space: normal;
+}
+.game.phone .trader-visit .notice-actions {
+  margin-left: auto;
+}
+
+/* ---------- Waypoints (`CONTEXT.md`: Waypoint) ---------- */
+/* The map's tile menu, at the point right-clicked or long-pressed. */
+.tile-menu {
+  position: fixed;
+  z-index: 7;
+  width: min(260px, calc(100vw - 16px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+}
+.tile-menu h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+/* The legend keeps clear of an open drawer: beside it, or out of sight beside a wide or full one
+   and on a phone, where drawers fill the screen. */
+.game:has(.hud-drawer:not([hidden])) .game-map .map-legend-panel,
+.game:has(.hud-drawer:not([hidden])) .game-map .map-legend-button {
+  left: calc(var(--rail-w) + min(var(--drawer-w, 380px), calc(100vw - var(--rail-w))) + 12px);
+}
+.game:has(.hud-drawer.wide:not([hidden])) .game-map .map-legend-panel,
+.game:has(.hud-drawer.wide:not([hidden])) .game-map .map-legend-button,
+.game:has(.hud-drawer.full:not([hidden])) .game-map .map-legend-panel,
+.game:has(.hud-drawer.full:not([hidden])) .game-map .map-legend-button,
+.game.phone:has(.hud-drawer:not([hidden])) .game-map .map-legend-panel,
+.game.phone:has(.hud-drawer:not([hidden])) .game-map .map-legend-button {
+  display: none;
+}

@@ -392,7 +392,7 @@ export function StartParamsForm({
       style={keyboard > 0 ? { paddingBottom: keyboard } : undefined}
     >
       <form
-        className="hud-dialog start-params"
+        className="hud-dialog pn start-params"
         role="dialog"
         aria-modal="true"
         aria-label={`Start ${script}`}
@@ -404,7 +404,7 @@ export function StartParamsForm({
           if (e.key === 'Escape') onCancel()
         }}
       >
-        <h2>Start {script}</h2>
+        <h2 className="hd">Start {script}</h2>
         <div className="start-params-rows">
           {fromWorkplace && (
             <p className="muted small">

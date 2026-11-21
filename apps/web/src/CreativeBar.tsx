@@ -63,7 +63,7 @@ export function CreativeBar({ tick }: { tick: number | undefined }) {
   }
 
   return (
-    <div className="hud-creative-bar" role="toolbar" aria-label="Creative time controls">
+    <div className="hud-creative-bar bar" role="toolbar" aria-label="Creative time controls">
       <span className="hud-creative-label" title="Creative mode: for testing, never play">
         Creative
       </span>
@@ -281,7 +281,11 @@ function Checkpoints({
           aria-label="Save a checkpoint"
           onSubmit={(e) => {
             e.preventDefault()
-            if (valid !== undefined) change(() => api.saveCheckpoint(valid), () => setName(''))
+            if (valid !== undefined)
+              change(
+                () => api.saveCheckpoint(valid),
+                () => setName(''),
+              )
           }}
         >
           <input

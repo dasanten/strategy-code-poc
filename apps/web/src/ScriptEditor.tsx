@@ -99,11 +99,11 @@ function apiTooltips(defaultScript: boolean) {
   })
 }
 
-/** One Dark's colours on the HUD's well, filling the height it is given (ADR 0008). */
+/** One Dark's colours on the kit's code colour (ADR 0044), filling the height it is given. */
 const hudLook = EditorView.theme(
   {
-    '&': { height: '100%', backgroundColor: THEME.ui.well },
-    '.cm-gutters': { backgroundColor: THEME.ui.well, borderRight: `1px solid ${THEME.ui.line}` },
+    '&': { height: '100%', backgroundColor: THEME.ui.code },
+    '.cm-gutters': { backgroundColor: THEME.ui.code, borderRight: `2px solid ${THEME.ui.ink}` },
     '.cm-scroller': { fontFamily: THEME.font.mono, fontSize: '13px', lineHeight: '1.55' },
     '.cm-api-info, .cm-completionInfo': {
       maxWidth: '360px',

@@ -9,36 +9,12 @@
   width: min(360px, calc(100vw - var(--rail-w) - 24px));
   max-height: calc(100% - var(--top-h) - var(--lane-h, 0px) - 24px);
   overflow: auto;
-  border-radius: 10px;
 }
 /* Hidden behind the wide drawer (`cardHidden`), as it was until the drawer closes. */
 .game-selection[hidden] {
   display: none;
 }
-/* Pick mode (ADR 0012): a notice in the lane says what to pick, with Cancel; while it shows
-   it replaces the other notices (`laneNotices`). */
-.notice.pick-banner {
-  border-left-color: var(--ui-live);
-}
-.pick-banner-text {
-  display: grid;
-  gap: 2px;
-}
-.pick-banner-text .small {
-  color: var(--ui-muted);
-}
-/* A wall line's Wood or Stone (`CONTEXT.md`: Wood or stone), beside Cancel. */
-.material-pick {
-  display: flex;
-  gap: 4px;
-}
-/* One line on a phone: what to pick, then the hint after it. */
-.game.phone .pick-banner-text {
-  display: block;
-}
-.game.phone .pick-banner-text .small::before {
-  content: ' — ';
-}
+
 /* On a phone the card is a bottom sheet (ADR 0012, `CardSheet`): peek shows just its header,
    half and full fixed heights; a drag sets the height inline until it settles. */
 .game-selection.sheet {
@@ -51,7 +27,6 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 14px 14px 0 0;
 }
 .game-selection.sheet-half {
   height: 50%;
@@ -67,9 +42,8 @@
   height: 26px;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  box-shadow: none;
   background: var(--ui-panel);
-  backdrop-filter: blur(10px);
   cursor: ns-resize;
   touch-action: none;
 }
@@ -79,7 +53,6 @@
 .sheet-handle span {
   width: 40px;
   height: 4px;
-  border-radius: 2px;
   background: var(--ui-line-strong);
 }
 .game-selection.sheet .sel-card {
@@ -87,34 +60,25 @@
   min-height: 0;
   overflow: auto;
   border-top: 0;
-  border-radius: 0;
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
 }
 .inspector.sel-card {
   gap: 12px;
   padding: 14px 14px 12px;
-  background: var(--ui-panel);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--ui-line);
-  border-left: 4px solid var(--ui-line-strong);
-  border-radius: 10px;
+  border-left-width: 6px;
   color: var(--ui-text);
   font-family: var(--font-ui);
 }
 /* Shrunk while the map waits for a target: the room the card took stays, lightly drawn, and
    swallows clicks so none lands on the map by accident (`CONTEXT.md`: Picking a target). */
 .inspector.sel-card.sel-shrunk {
-  background: color-mix(in srgb, var(--ui-panel) 45%, transparent);
+  background: transparent;
+  box-shadow: none;
   border-style: dashed;
 }
 .sel-dead {
   flex: 1 1 auto;
-  border-radius: 6px;
-  background: repeating-linear-gradient(
-    135deg,
-    transparent 0 10px,
-    color-mix(in srgb, var(--ui-text) 5%, transparent) 10px 20px
-  );
+  background: repeating-linear-gradient(135deg, transparent 0 10px, var(--tan) 10px 12px);
 }
 .sel-head {
   display: flex;
@@ -131,10 +95,9 @@
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 2px solid currentColor;
-  border-radius: 8px;
+  border: 3px solid currentColor;
   background: var(--ui-ink);
-  color: var(--ui-muted);
+  color: var(--fog);
 }
 .sel-icon svg {
   display: block;
@@ -153,11 +116,6 @@
   color: var(--ui-text);
   font-weight: 600;
 }
-.sel-close {
-  padding: 2px 8px;
-  border: 0;
-  background: var(--ui-raised);
-}
 .sel-facts {
   margin: 0;
   padding: 0;
@@ -172,6 +130,7 @@
   padding: 0;
   border: 0;
   background: none;
+  box-shadow: none;
   color: inherit;
   font: inherit;
   text-decoration: underline;
@@ -262,7 +221,6 @@
   padding: 0 6px;
   font-size: 11px;
   line-height: 16px;
-  border-radius: 999px;
   opacity: 0.35;
 }
 .queue-insert button:hover,
@@ -281,29 +239,16 @@
   align-items: center;
   padding: 6px 8px;
   text-align: left;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: var(--ui-raised);
-  color: var(--ui-text);
-}
-.sel-actions button:hover:not(:disabled) {
-  background: var(--ui-raised-hover);
-}
-.sel-actions button.on {
-  border-color: var(--rel-own);
-  background: var(--ui-raised-hover);
-}
-.sel-actions button:disabled {
-  opacity: 0.45;
+  height: auto;
+  line-height: 1.3;
+  white-space: normal;
 }
 .sel-actions kbd {
   display: grid;
   place-items: center;
   height: 20px;
-  border: 1px solid var(--ui-line-strong);
-  border-radius: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
+  margin: 0;
+  box-sizing: border-box;
   color: var(--ui-muted);
 }
 .sel-reason {
@@ -320,9 +265,6 @@
   flex-direction: column;
   gap: 14px;
   padding: 10px;
-  border: 1px solid var(--ui-line);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.18);
 }
 /* The resident card's tabs (ADR 0012): one open at a time under the header. */
 .sel-tabs button {
@@ -357,6 +299,7 @@
   padding: 2px 6px;
   border: 0;
   background: none;
+  box-shadow: none;
   color: var(--ui-muted);
   font-size: 0.8rem;
 }
@@ -368,8 +311,8 @@
   width: 100%;
   padding: 3px 6px;
   border: 0;
-  border-radius: 6px;
   background: none;
+  box-shadow: none;
   color: var(--ui-muted);
   font: inherit;
   text-align: left;
@@ -399,9 +342,8 @@
   flex-direction: column;
   gap: 2px;
   padding: 2px 4px 2px 8px;
-  border: 1px solid var(--ui-line);
+  border: 2px solid var(--ui-line);
   border-left-width: 3px;
-  border-radius: 6px;
   cursor: grab;
 }
 .queue-step.current {
@@ -411,7 +353,7 @@
 /* A step picked for the planner clipboard (tap; Shift for a range). */
 .queue-step.picked {
   border-color: var(--ui-line-strong);
-  background: color-mix(in srgb, var(--ui-live) 14%, transparent);
+  background: var(--sun);
 }
 .queue-step.current.picked {
   border-left-color: var(--ui-live);
@@ -419,7 +361,6 @@
 .queue-steps:focus-visible {
   outline: 2px solid var(--ui-line-strong);
   outline-offset: 2px;
-  border-radius: 6px;
 }
 /* The planner's toolbar, one compact row (`CONTEXT.md`: Planner blocks): its title, Loop, the
    tools, Save and Load, the help's "?", and how many steps are picked. */
@@ -454,7 +395,7 @@
 }
 /* A step whose place is gone from the map, as a saved queue's loaded after a tear-down. */
 .queue-step-gone {
-  color: var(--ui-warn);
+  color: var(--ui-warn-text);
 }
 /* Brackets (`CONTEXT.md`: Planner blocks): loop the outermost around the steps, its switch in
    the head; each repeat block a bracket nested in it, its count in its head. A bracket is a
@@ -466,8 +407,7 @@
   gap: 3px;
   padding: 0 0 4px 8px;
   border-left: 3px solid var(--ui-line-strong);
-  border-bottom: 1px solid var(--ui-line-strong);
-  border-radius: 6px 0 0 6px;
+  border-bottom: 2px solid var(--ui-line-strong);
 }
 .queue-bracket-head {
   display: flex;
@@ -476,7 +416,6 @@
   min-height: 28px;
   margin-left: -8px;
   padding: 0 4px 0 6px;
-  border-radius: 6px 6px 0 0;
   background: var(--ui-raised);
 }
 .queue-bracket-head .buttons {
@@ -509,8 +448,8 @@
   cursor: grab;
 }
 .queue-repeat-bracket.picked > .queue-bracket-head {
-  background: color-mix(in srgb, var(--ui-live) 14%, transparent);
-  outline: 1px solid var(--ui-line-strong);
+  background: var(--sun);
+  outline: 2px solid var(--ui-line-strong);
 }
 /* An If block (`CONTEXT.md`: If block): its Else part sits under a second head in the bracket. */
 .queue-if-bracket {
@@ -527,12 +466,11 @@
   white-space: normal;
 }
 .queue-if-bracket.picked > .queue-bracket-head {
-  background: color-mix(in srgb, var(--ui-live) 14%, transparent);
-  outline: 1px solid var(--ui-line-strong);
+  background: var(--sun);
+  outline: 2px solid var(--ui-line-strong);
 }
 .queue-if-bracket > .queue-else-head {
   cursor: default;
-  border-radius: 0;
 }
 .queue-branch {
   color: var(--ui-live);
@@ -555,13 +493,13 @@
 }
 /* A resident's queue draft, marked as not running yet (`CONTEXT.md`: Queue draft). */
 .queue-draft-mark {
-  color: var(--ui-warn);
+  color: var(--ui-warn-text);
   font-weight: 600;
   margin: 0 0 4px;
 }
 /* How many steps the plan becomes after repeats, warned when over what a queue holds. */
 .queue-unrolled-over {
-  color: var(--ui-warn);
+  color: var(--ui-warn-text);
 }
 /* Save and Load for saved queues: the name to save under, and the list to load from. */
 .saved-queues {
@@ -629,11 +567,10 @@
   min-width: 0;
   min-height: 24px;
   padding: 0 8px;
-  border-radius: 999px;
   white-space: nowrap;
 }
 .queue-step-chip.needed {
-  color: var(--ui-warn);
+  color: var(--ui-warn-text);
   border-color: var(--ui-warn);
 }
 
@@ -649,41 +586,7 @@
   align-items: center;
   gap: 4px;
 }
-/* A running script's memory on the Script tab: a quiet, read-only tree. */
-.memory-tree {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  overflow-wrap: anywhere;
-}
-.memory-name {
-  color: var(--ui-muted);
-}
-/* How a running script last ran: its steps, and its last error as a link to the line. */
-.script-steps {
-  margin: 0;
-  font-family: var(--font-mono);
-}
-.script-steps.out-of-steps {
-  color: var(--ui-warn);
-}
-.script-error {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  width: 100%;
-  text-align: left;
-  border-left: 3px solid var(--ui-bad);
-}
-.script-error-message {
-  color: var(--ui-bad);
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  overflow-wrap: anywhere;
-}
+
 /* Who and what a tile holds (`CardList`): its horses or workers as rows, meters on the right as
    the resident card has them, a row the Player can open is a button; its goods as the goods grid. */
 .card-list {
@@ -700,8 +603,8 @@
   min-height: 32px;
   padding: 4px 6px;
   border: 0;
-  border-radius: 6px;
   background: none;
+  box-shadow: none;
   color: var(--ui-text);
   font: inherit;
   font-size: 0.8rem;
@@ -765,12 +668,6 @@ button.card-list-row:hover {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 1px 6px 1px 4px;
-  border-radius: 6px;
-  background: var(--ui-raised);
-  color: var(--ui-text);
-  font-size: 0.8rem;
-  line-height: 1.4;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
@@ -787,12 +684,12 @@ button.card-list-row:hover {
 .goods-own {
   margin-left: 6px;
   background: none;
-  outline: 1px dashed var(--ui-muted);
-  outline-offset: -1px;
+  box-shadow: none;
+  border-style: dashed;
 }
 .goods-own.warn {
-  color: var(--ui-warn);
-  outline-color: var(--ui-warn);
+  color: var(--ui-warn-text);
+  border-color: var(--blood);
 }
 .goods-own-tag {
   font-size: 0.65rem;
@@ -808,9 +705,8 @@ button.card-list-row:hover {
   transform: translateX(-50%);
   z-index: 2;
   padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--ui-ink);
-  color: var(--ui-text);
+  background: var(--ink);
+  color: var(--parch);
   font-size: 0.75rem;
   white-space: nowrap;
   pointer-events: none;
@@ -872,6 +768,7 @@ button.card-list-row:hover {
   padding: 0;
   border: 0;
   background: none;
+  box-shadow: none;
   color: inherit;
   font: inherit;
   text-decoration: underline;
@@ -938,10 +835,7 @@ button.card-list-row:hover {
   gap: 2px;
   width: 52px;
   padding: 5px 2px 4px;
-  border: 1px solid var(--ui-line);
-  border-radius: 8px;
-  background: var(--ui-raised);
-  color: var(--ui-text);
+  border: 2px solid var(--ink);
   font-size: 0.68rem;
   font-weight: 400;
   line-height: 1.15;
@@ -949,10 +843,6 @@ button.card-list-row:hover {
 .build-grid .build-kind.dimmed .build-icon,
 .build-grid .build-kind.dimmed .build-name {
   opacity: 0.4;
-}
-.build-grid .build-kind[aria-pressed='true'] {
-  border-color: var(--rel-own);
-  box-shadow: inset 0 0 0 1px var(--rel-own);
 }
 .build-icon svg {
   display: block;
@@ -968,7 +858,7 @@ button.card-list-row:hover {
   flex-direction: column;
   gap: 6px;
   padding-top: 8px;
-  border-top: 1px solid var(--ui-line);
+  border-top: 2px solid var(--ui-line);
   /* `scrollIntoView` leaves it clear of the sheet's edge. */
   scroll-margin-bottom: 8px;
 }
@@ -982,7 +872,7 @@ button.card-list-row:hover {
   margin: 0;
 }
 .build-why {
-  color: var(--ui-warn);
+  color: var(--ui-warn-text);
 }
 .build-cost {
   display: flex;
@@ -1015,8 +905,7 @@ button.card-list-row:hover {
   flex-direction: column;
   gap: 6px;
   padding: 8px 10px;
-  border: 1px dashed var(--ui-line);
-  border-radius: 8px;
+  border: 2px dashed var(--ui-line);
 }
 .card-creative h3 {
   margin: 0;
@@ -1037,7 +926,7 @@ button.card-list-row:hover {
   align-self: flex-start;
 }
 .card-creative-error {
-  color: var(--ui-warn);
+  color: var(--ui-warn-text);
 }
 .card-creative-field {
   display: flex;
@@ -1055,4 +944,364 @@ button.card-list-row:hover {
 }
 .card-creative-add summary {
   cursor: pointer;
+}
+
+/* Order buttons in a drawer row are smaller than the inspector's touch targets. */
+.hud-drawer .order-buttons {
+  gap: 4px;
+  margin-top: 6px;
+}
+.hud-drawer .order-buttons button {
+  min-height: 0;
+  min-width: 0;
+  padding: 4px 9px;
+  font-size: 12px;
+}
+.hud-drawer .order-buttons select {
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.inspector h3 {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+
+.inspector {
+  box-sizing: border-box;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.inspector p {
+  margin: 0;
+}
+.name-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.name-line h2 {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-size: 1.6rem;
+}
+.vitals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.vital-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  margin-bottom: 6px;
+}
+.inspector-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.doing-now {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.stat {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr) 80px;
+  gap: 10px;
+  align-items: center;
+}
+.stat-bar {
+  height: 12px;
+  background: var(--bark);
+  border: 2px solid var(--ink);
+  box-sizing: border-box;
+  display: flex;
+  overflow: hidden;
+}
+.stat-bar .base {
+  background: var(--mist);
+}
+.stat-bar .trained {
+  background: var(--gold);
+}
+.stat-bar .cap {
+  box-sizing: border-box;
+  border: 1px dashed var(--tan);
+}
+.stat .mono {
+  font-size: 0.75rem;
+}
+
+.horse-pick {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  color: inherit;
+}
+.horse-pick input {
+  flex: none;
+  margin: 2px 0 0;
+}
+
+.order-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.order-buttons button {
+  min-height: 44px;
+  min-width: 96px;
+}
+.goods-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.goods-row .buttons {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  display: flex;
+  gap: 6px;
+}
+.goods-row .amount {
+  width: 4.5em;
+  min-height: 36px;
+}
+.goods-row button {
+  min-height: 36px;
+  min-width: 64px;
+}
+
+.warehouse-prices {
+  margin: 6px 8px 0;
+  font-size: 12px;
+  color: var(--ui-text);
+}
+.warehouse-prices p {
+  margin: 4px 0 0;
+}
+.warehouse-prices-place {
+  color: var(--ui-muted);
+}
+.warehouse-prices table {
+  margin-top: 4px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.warehouse-prices caption {
+  text-align: left;
+  padding-bottom: 2px;
+  font-weight: 600;
+}
+.warehouse-prices th,
+.warehouse-prices td {
+  padding: 3px 10px 3px 0;
+  text-align: right;
+  font-weight: normal;
+  border-bottom: 2px solid var(--ui-line);
+}
+.warehouse-prices th[scope='row'],
+.warehouse-prices thead th:first-child {
+  text-align: left;
+}
+.warehouse-prices thead th {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+/* An NPC city's horses for sale (`CONTEXT.md`: Horse market): a block each. */
+.horse-offers {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.horse-offers li {
+  padding: 4px 0;
+  border-bottom: 2px solid var(--ui-line);
+}
+/* An NPC city's rates (`CONTEXT.md`: Swap): a button each, wrapping to the panel's width. */
+.swap-rates ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.swap-rates button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+}
+.swap-rates .good-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+/* A good's icon beside its name: the wiki's goods table, trade prices (`CONTEXT.md`: Goods on
+   cards). */
+.good-label {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.good-label .good-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+/* The realm bar along the bottom of the map in realm control mode (`CONTEXT.md`: Realm order). */
+.hud-realm-bar {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  width: max-content;
+  max-width: min(680px, calc(100vw - var(--rail-w) - 220px));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+}
+/* On a line of its own under the orders. */
+.hud-realm-bar-hint {
+  flex: 1 1 100%;
+  color: var(--ui-muted);
+  white-space: normal;
+}
+.hud-realm-bar button {
+  flex: none;
+  padding: 4px 12px;
+  font-weight: 600;
+}
+.hud-realm-bar button.on {
+  background: var(--gold);
+  box-shadow: inset 2px 2px 0 var(--orange);
+  color: var(--ink);
+}
+/* The who-list (`CONTEXT.md`: Who-list): one row a resident, nearest first, can't-take greyed. */
+.who-choice {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 4px 0 6px;
+}
+.who-search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.who-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.who-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.who-shown {
+  margin: 0 0 4px;
+}
+/* Now / After under a ticked busy resident's row, in line with their name. */
+.who-when {
+  display: flex;
+  gap: 4px;
+  padding: 0 2px 5px 28px;
+  border-bottom: 2px solid var(--ui-line);
+}
+.who-row:has(.who-when) label {
+  border-bottom: none;
+}
+.who-when button {
+  padding: 2px 10px;
+  font-size: 12px;
+}
+.who-more {
+  width: 100%;
+  margin-top: 4px;
+}
+.who-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.who-row label {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: 'tick name way' 'tick doing doing';
+  column-gap: 8px;
+  align-items: baseline;
+  padding: 5px 2px;
+  border-bottom: 2px solid var(--ui-line);
+  cursor: pointer;
+}
+.who-row input {
+  grid-area: tick;
+  align-self: center;
+}
+.who-name {
+  grid-area: name;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.who-way {
+  grid-area: way;
+  white-space: nowrap;
+}
+.who-doing {
+  grid-area: doing;
+  color: var(--ui-muted);
+  min-width: 0;
+}
+.who-cant label {
+  opacity: 0.5;
+  cursor: default;
+}
+.who-actions {
+  margin-top: 8px;
+}
+/* On a phone above the map buttons and the minimap button, clear of the notices up top. */
+.game.phone .hud-realm-bar {
+  bottom: calc(var(--sheet-h, 0px) + 12px + 44px + 6px + 36px + 8px);
+  left: 8px;
+  right: 8px;
+  transform: none;
+  width: auto;
+  max-width: none;
+  padding: 5px 10px;
+  font-size: 12px;
+  gap: 4px 6px;
+}
+/* The orders in as few rows as fit on a phone. */
+.game.phone .hud-realm-bar button {
+  padding: 4px 7px;
 }

@@ -129,7 +129,7 @@ export function TileMenu({
   return (
     <div
       ref={ref}
-      className="tile-menu"
+      className="tile-menu pn"
       role="dialog"
       aria-label="Tile menu"
       style={{ left: spot.left, top: spot.top }}

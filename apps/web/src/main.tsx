@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import * as Sentry from '@sentry/react'
 import { App } from './App.js'
 import { applyTheme } from './theme.js'
-import './styles.css'
+import './styles/index.css'
 
 // Theme colours and fonts as CSS custom properties, before anything renders.
 applyTheme(document.documentElement.style)

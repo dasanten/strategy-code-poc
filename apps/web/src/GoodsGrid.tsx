@@ -91,7 +91,7 @@ export function GoodsGrid({
   const cell = (key: string, good: Good, amount: number, name: string, own = false) => (
     <li
       key={key}
-      className={`goods-cell${own ? ' goods-own' : ''}${own && amount <= 0 ? ' warn' : ''}${named === key ? ' named' : ''}`}
+      className={`goods-cell chip${own ? ' goods-own' : ''}${own && amount <= 0 ? ' warn' : ''}${named === key ? ' named' : ''}`}
       aria-label={`${name}: ${goodsAmount(amount)}`}
       {...press(key)}
     >

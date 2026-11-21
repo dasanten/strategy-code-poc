@@ -291,7 +291,7 @@ export function TopBar({
   zealDraining?: boolean
 }) {
   return (
-    <header className="hud-top">
+    <header className="hud-top bar">
       {control && <ControlSwitch {...control} />}
       {realm && <b title="Your realm">{realm}</b>}
       {cityName && (
@@ -336,13 +336,19 @@ export function TopBar({
       )}
       <span className="hud-sep" />
       {/* A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki). */}
-      <a className="hud-wiki" href={WIKI_PATH} target="_blank" rel="noopener" onClick={onWiki}>
+      <a
+        className="hud-wiki btn sm dk"
+        href={WIKI_PATH}
+        target="_blank"
+        rel="noopener"
+        onClick={onWiki}
+      >
         Wiki
       </a>
       <span className="hud-muted" title="Your account">
         {account}
       </span>
-      <button type="button" className="hud-logout" onClick={onLogout}>
+      <button type="button" className="hud-logout btn sm dk" onClick={onLogout}>
         Log out
       </button>
     </header>
@@ -355,7 +361,7 @@ export function ZealMeter({ zeal, draining = false }: { zeal: number; draining?:
   return (
     <span className={`hud-zeal${shown.draining ? ' draining' : ''}`} title={shown.title}>
       <span
-        className="hud-zeal-bar"
+        className="hud-zeal-bar mt"
         role="meter"
         aria-label="Zeal"
         aria-valuemin={0}
@@ -414,7 +420,7 @@ export function RealmBar({
   onOpen: (order: RealmBarOrder) => void
 }) {
   return (
-    <div className="hud-realm-bar" role="toolbar" aria-label="Realm orders">
+    <div className="hud-realm-bar bar" role="toolbar" aria-label="Realm orders">
       {REALM_BAR_ORDERS.map(({ id, label, title }) => (
         <button
           key={id}
@@ -444,7 +450,7 @@ export function ToolRail({
   marked?: ReadonlySet<DrawerId>
 }) {
   return (
-    <nav className="hud-rail" aria-label="Tools">
+    <nav className="hud-rail bar" aria-label="Tools">
       {railGroups().map((g, i) => (
         <div key={g.id} className="hud-rail-group" role="group" aria-label={g.label}>
           {i > 0 && <hr className="hud-rail-divider" aria-hidden="true" />}
@@ -533,7 +539,7 @@ export function PhoneMenu({
       {shown && (
         <>
           <div className="hud-menu-backdrop" onClick={() => setShown(false)} />
-          <nav className="hud-menu" aria-label="Menu">
+          <nav className="hud-menu pn" aria-label="Menu">
             {railGroups().map((g) => (
               <Fragment key={g.id}>
                 <h2 className="hud-menu-heading">{g.label}</h2>
@@ -582,7 +588,7 @@ export function PhoneMenu({
               <span className="hud-account" title="Your account">
                 {account}
               </span>
-              <button type="button" className="hud-logout" onClick={onLogout}>
+              <button type="button" className="hud-logout btn sm dk" onClick={onLogout}>
                 Log out
               </button>
             </div>
@@ -616,14 +622,14 @@ export function Drawer({
   const [status, setStatus] = useState<HTMLElement | null>(null)
   return (
     <section
-      className={`hud-drawer${isWide(id) || full ? ' wide' : ''}${full ? ' full' : ''}`}
+      className={`hud-drawer pn${isWide(id) || full ? ' wide' : ''}${full ? ' full' : ''}`}
       aria-label={`${label} drawer`}
       hidden={open !== id}
     >
-      <div className="hud-drawer-head">
+      <div className="hud-drawer-head hd">
         <h2>{label}</h2>
         <span className="hud-drawer-status" ref={setStatus} />
-        <button type="button" onClick={onClose} aria-label={`Close ${label}`}>
+        <button type="button" className="btn sm sq" onClick={onClose} aria-label={`Close ${label}`}>
           ✕
         </button>
       </div>
@@ -652,7 +658,7 @@ export function DiplomacyTabs({
   const status = useContext(DrawerStatus)
   return (
     <>
-      <div className="diplomacy-tabs" role="tablist" aria-label="Diplomacy">
+      <div className="tabs diplomacy-tabs" role="tablist" aria-label="Diplomacy">
         {DIPLOMACY_TABS.map((t) => (
           <button
             key={t.id}
@@ -661,7 +667,7 @@ export function DiplomacyTabs({
             id={`diplomacy-tab-${t.id}`}
             aria-selected={tab === t.id}
             aria-controls={`diplomacy-panel-${t.id}`}
-            className={tab === t.id ? 'on' : ''}
+            className={tab === t.id ? 'tab on' : 'tab'}
             onClick={() => onTab(t.id)}
           >
             <Icon name={t.id} size={15} /> {t.label}
@@ -803,8 +809,8 @@ export function useEscapeCloses(open: OpenDrawer, close: () => void) {
 export function CentredDialog({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="hud-backdrop">
-      <div className="hud-dialog" role="alertdialog" aria-modal="true" aria-label={title}>
-        <h2>{title}</h2>
+      <div className="hud-dialog pn" role="alertdialog" aria-modal="true" aria-label={title}>
+        <h2 className="hd">{title}</h2>
         {children}
       </div>
     </div>
@@ -835,7 +841,7 @@ export function HorseOfferNotice({
     if (reason) setBusy(false)
   }
   return (
-    <aside className="notice hud-offer" role="status">
+    <aside className="pn notice hud-offer" role="status">
       <span className="notice-text">
         {NUMBER_WORDS[horses] ?? horses} horses are waiting for you
         {refused && <span className="hud-offer-refused"> — {refused}</span>}
@@ -861,7 +867,7 @@ export function IncomingNotice({
   onDismiss: () => void
 }) {
   return (
-    <aside className="notice incoming-notice" role="status">
+    <aside className="pn notice incoming-notice" role="status">
       <span className="notice-text" title={line}>
         {line}
       </span>
@@ -958,7 +964,7 @@ export function TraderVisitNotice({
   onDismiss: () => void
 }) {
   return (
-    <aside className="notice trader-visit" role="status">
+    <aside className="pn notice trader-visit" role="status">
       <span className="notice-text">{traderVisitLine(visit, tick)}</span>
       <span className="notice-actions">
         <button type="button" onClick={onShow}>
@@ -990,7 +996,7 @@ export function GroupReportNotice({
   const skipped = skippedByWhy(report.skipped)
   return (
     <aside
-      className={`notice group-report${skipped.length ? ' skipped' : ''}`}
+      className={`pn notice group-report${skipped.length ? ' skipped' : ''}`}
       role="status"
       aria-label="Last group order"
       title={[sent, ...skipped.map((s) => `Skipped ${s.names.join(', ')}: ${s.why}`)].join('\n')}
@@ -1026,7 +1032,7 @@ export function FirstDayCard({
 }) {
   const { lines, next, ticked } = firstDayView(card)
   return (
-    <aside className="notice first-day" aria-label="First day">
+    <aside className="pn notice first-day" aria-label="First day">
       <div className="notice-text">
         <strong>First day</strong>{' '}
         <span className="first-day-count">

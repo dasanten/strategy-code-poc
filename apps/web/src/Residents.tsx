@@ -2775,7 +2775,7 @@ export function ResidentCard({
       : (cities.find((c) => c.id === r.cityId)?.name ?? 'a city out of sight')
   // The open order's panel, right under the row that opened it (`ActionRows`).
   const openPanel = shown && (
-    <div className="sel-panel">
+    <div className="sel-panel well">
       {shown === 'haul' && (carriage || boatToRow) && (
         <HaulBlock
           adult={!child}
@@ -3304,6 +3304,7 @@ export function ResidentCard({
         {CARD_TABS.map((t) => (
           <button
             type="button"
+            className="tab"
             key={t}
             role="tab"
             aria-selected={tab === t}

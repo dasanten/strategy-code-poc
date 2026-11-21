@@ -1,0 +1,656 @@
+/* The Diplomacy drawer's tabs: the kit's tabs (`.tabs`), right under the drawer's header bar. */
+.diplomacy-tabs {
+  flex-wrap: wrap;
+  margin: -10px -16px 10px;
+}
+
+.residents-scroll {
+  overflow-x: auto;
+}
+.residents-table {
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+}
+/* One city's residents under its name and count. */
+.residents-group {
+  display: flex;
+  flex-direction: column;
+}
+.hud-drawer .residents-group h3 {
+  margin: 12px 0 0;
+  padding: 0 6px 4px;
+  border-bottom: 2px solid var(--ui-line-strong);
+}
+.residents-group h3 span {
+  font-weight: 400;
+  color: var(--ui-muted);
+}
+.residents-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px minmax(0, 2fr) 44px 76px;
+  gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  padding: 4px 6px;
+  text-align: left;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-bottom: 2px solid var(--ui-line);
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+}
+/* The Residents drawer's button that opens or closes the full list. */
+.residents-full-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+/* The full list's search, filters and its close button, wrapping on a narrow screen. */
+.residents-full-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.residents-full-choice .search {
+  flex: 0 1 180px;
+  min-width: 120px;
+}
+.residents-full-choice .search input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.residents-full-choice .muted {
+  align-self: center;
+  font-size: 12px;
+}
+.residents-full-choice .pick {
+  margin-left: auto;
+}
+.residents-full-none {
+  padding: 12px 6px;
+}
+/* The full list (`ResidentsFullList`) scrolls by itself, under the drawer's head and its button;
+   rows have a fixed height so only those in view are drawn. */
+.residents-full {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.residents-full-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overflow-anchor: none;
+}
+.residents-full-table {
+  min-width: 1312px;
+}
+/* A row of the full list: its tick, then the button that opens the resident. */
+.residents-full-row {
+  display: flex;
+  align-items: stretch;
+}
+.residents-full-row > .residents-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.residents-full-row.heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ui-panel);
+}
+.residents-full-row .tick {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid var(--ui-line);
+  background: transparent;
+  box-shadow: none;
+}
+/* The whole of a card's height is the tick there, wide enough for a thumb. */
+.residents-full-cards .residents-full-row .tick {
+  width: 44px;
+}
+.tick-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 2px solid var(--ui-line-strong);
+  background: var(--ui-well);
+  font-size: 12px;
+  line-height: 1;
+}
+.tick-box.on {
+  border-color: var(--ink);
+  background: var(--gold);
+  color: var(--ink);
+}
+.residents-row.full {
+  width: 100%;
+  box-sizing: border-box;
+  grid-template-columns:
+    150px 40px 110px repeat(4, 40px) 170px 110px 170px 54px 54px
+    minmax(180px, 1fr);
+}
+.residents-row.full.heading {
+  letter-spacing: 0;
+}
+/* A heading of the full list is a button that sorts by its column. */
+.residents-row.heading .column {
+  padding: 2px 0;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  text-transform: inherit;
+  white-space: nowrap;
+}
+.residents-row.heading .column:hover:not(:disabled) {
+  background: transparent;
+  box-shadow: none;
+  color: var(--ui-text);
+}
+.residents-row.heading .column[aria-pressed='true'] {
+  color: var(--ink);
+  text-decoration: underline;
+}
+/* Cells stay on their line: all of it is in the tooltip, and on the resident's card. */
+.residents-row .cut {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+.residents-row .cut small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+.residents-row.lines.full-card {
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+}
+.residents-row.lines.full-card .wide {
+  flex: 1 1 auto;
+}
+.residents-row.lines.full-card .meter {
+  width: 32px;
+}
+.residents-row.lines.full-card .doing.cut {
+  white-space: nowrap;
+}
+/* A horse: name and place, stats, age, health and hunger; narrow enough not to scroll. */
+.horses .residents-table {
+  min-width: 0;
+}
+.horses-row {
+  grid-template-columns: minmax(0, 2fr) 54px 22px 44px 44px;
+  gap: 6px;
+}
+.residents-row.horses-row.heading {
+  letter-spacing: 0;
+}
+.horses-row .mono {
+  white-space: nowrap;
+}
+.residents-row .doing .name {
+  display: block;
+  color: var(--ui-text);
+}
+.residents-row .mono {
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-muted);
+}
+.residents-row.heading {
+  min-height: 0;
+  padding-top: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ui-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+button.residents-row:hover:not(:disabled) {
+  background: var(--ui-raised);
+}
+.residents-row.selected,
+button.residents-row.selected:hover {
+  background: var(--sun);
+  border-left-color: var(--ink);
+  color: inherit;
+}
+.residents-row .name {
+  font-weight: 600;
+}
+/* Names wrap rather than cut off; the Leader is marked on a small line under theirs. */
+.residents-row .name {
+  overflow-wrap: anywhere;
+}
+.residents-row .leader-mark {
+  display: block;
+  font-size: 11px;
+}
+.leader-mark {
+  font-weight: 600;
+  color: var(--text-rel-own);
+}
+/* Doing wraps rather than cut off. */
+.residents-row .doing {
+  color: var(--ui-muted);
+  overflow-wrap: anywhere;
+}
+/* The script they run, on a line of its own under their Doing line. */
+.residents-row .doing small {
+  display: block;
+  font-size: 11px;
+}
+/* On a phone a row is two lines instead of columns (`residentLines`, `horseLines`): name and
+   age, then Doing (or where a horse is) with the meters at its end. Doing wraps, never cut. */
+.residents-table.lines {
+  min-width: 0;
+}
+.residents-row.lines {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 6px 8px;
+}
+.residents-row.lines .line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.residents-row.lines .name,
+.residents-row.lines .doing {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.residents-row.lines .doing {
+  white-space: normal;
+}
+/* The Leader mark stays on the name's line, not under it as in the table. */
+.residents-row.lines .leader-mark {
+  display: inline;
+  font-size: inherit;
+}
+.residents-row.lines .mono,
+.residents-row.lines .muted {
+  flex: none;
+}
+.residents-row.lines .meter {
+  flex: none;
+  width: 44px;
+}
+
+/* Rows in a drawer: a hairline under each, a left mark in the tone or relationship colour. */
+.realm-log-list,
+.alliance-list,
+.script-history {
+  list-style: none;
+  margin: 4px 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.realm-log-list li,
+.alliance-list li,
+.script-history li {
+  padding: 7px 8px;
+  border-left: 3px solid var(--rel, transparent);
+  border-bottom: 2px solid var(--ui-line);
+}
+.realm-log-list {
+  font-size: 12px;
+}
+.realm-log-list li {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 10px;
+  line-height: 1.45;
+}
+.realm-log-list li time {
+  color: var(--ui-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.realm-log-list li.info {
+  --rel: var(--rel-alliance);
+}
+.realm-log-list li.warn {
+  --rel: var(--ui-warn);
+}
+.realm-log-list li.bad {
+  --rel: var(--ui-bad);
+}
+.realm-log-list li button.place {
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 11px;
+  color: var(--text-rel-alliance);
+}
+.alliance-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.alliance-list li > span {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.alliance-list li.invited {
+  color: var(--ui-muted);
+}
+/* An army in the drawer: a row to open it, or its card (ADR 0012) across the drawer. */
+.alliance-list li.army > .army-row {
+  flex: 1;
+  text-align: left;
+  line-height: 1.5;
+}
+.alliance-list li.army > .sel-card {
+  flex: 1;
+  min-width: 0;
+}
+.city-list {
+  list-style: none;
+  margin: 4px 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+}
+.city-list > li {
+  border-bottom: 2px solid var(--ui-line);
+  padding: 2px 0 6px;
+}
+.city-list > li > button {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 32px;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 600;
+}
+.city-list > li > button span {
+  color: var(--ui-muted);
+  font-weight: 400;
+}
+/* A Cities drawer row (`CONTEXT.md`: Cities drawer): whose it is in that relation's colour, and
+   under the name an own city's residents against housing and key goods, or when last seen. */
+.city-list > li > button .city-row-whose {
+  color: var(--rel-text, var(--ui-muted));
+}
+.city-row-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 0 8px;
+  color: var(--ui-muted);
+}
+/* An opened city's headed, collapsible sections (`CONTEXT.md`: Cities drawer). */
+.city-section {
+  margin: 6px 0 0;
+  border-top: 2px solid var(--ui-line);
+}
+.city-section > summary {
+  cursor: pointer;
+  padding: 6px 8px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+.city-section-body {
+  padding-bottom: 4px;
+}
+.city-section-body > .goods-grid {
+  padding: 4px 8px 0;
+}
+.city-details {
+  margin: 4px 0 0;
+  padding: 0 8px;
+  color: var(--ui-muted);
+}
+/* Who occupies a town hall and the game days left (`CONTEXT.md`: Occupying a town hall), on the
+   tile card and in the city inspector; a warning on the Player's own city. */
+.occupation {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.city-list .occupation {
+  padding: 0 8px;
+}
+.occupation.warn {
+  color: var(--ui-warn-text);
+}
+
+.army-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  max-height: 8rem;
+  overflow-y: auto;
+}
+
+/* The Contracts form (`CONTEXT.md`: Mercenary contract): one field a line, its label on the left,
+   the residents as a list with their Doing, and the offer as it will read under them. */
+.contract-form,
+.hud-drawer form.contract-form {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+}
+.contract-form h3 {
+  margin: 4px 0 0;
+}
+.contract-field {
+  display: grid;
+  grid-template-columns: 5.5em minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+.contract-field select {
+  min-width: 0;
+}
+.contract-field input[type='number'] {
+  width: 64px;
+}
+.contract-label {
+  font-size: 12px;
+  color: var(--ui-muted);
+}
+.contract-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.contract-residents {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+.contract-residents label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+}
+.contract-resident {
+  display: grid;
+  min-width: 0;
+}
+.contract-form > button {
+  justify-self: start;
+}
+.contract-summary {
+  margin: 4px 0 0;
+  padding: 8px;
+  background: var(--ui-raised);
+  color: var(--ui-text);
+}
+/* A demand's note (`CONTEXT.md`: Demand): the sender's words as they wrote them, line breaks and
+   long words kept inside the drawer. */
+.demand-note {
+  margin: 4px 0;
+  padding: 6px 8px;
+  border-left: 3px solid var(--ui-line-strong);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.demand-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+.demand-goods {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.demand-goods li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.demand-goods select {
+  min-width: 0;
+  flex: 1 1 8em;
+}
+.demand-goods input[type='number'] {
+  width: 72px;
+}
+.game.phone .contract-field {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+
+.waypoint-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.waypoint-form input {
+  flex: 1;
+  min-width: 0;
+}
+.waypoint-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: auto;
+}
+.waypoint-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 0;
+  border-bottom: 2px solid var(--ui-line);
+}
+.waypoint-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.waypoint-head > button:not(.waypoint-name) {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.waypoint-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+.waypoint-name .name {
+  font-weight: 600;
+  color: var(--ui-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.storage-offers h4 {
+  margin: 0 0 4px;
+}
+
+.offer-list {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+}
+
+.offer-list li {
+  margin-bottom: 6px;
+}
+
+.offer-post input[type='number'],
+.offer-accept input[type='number'] {
+  width: 4.5em;
+}
+
+/* What others sent the Player, and what they sent, under Direct offers. */
+.incoming-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.incoming-list li {
+  padding: 6px 0;
+  border-bottom: 2px solid var(--ui-line);
+}
+
+.incoming-list p {
+  margin: 4px 0;
+}
+
+.incoming-list strong {
+  overflow-wrap: anywhere;
+}

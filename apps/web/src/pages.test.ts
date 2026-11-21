@@ -5,6 +5,8 @@ import {
   adminTabFor,
   adminTabPath,
   directiveTargetFor,
+  isKitPath,
+  KIT_PATH,
   pageFor,
 } from './pages.js'
 import { WIKI_PATH } from './wiki-view.js'
@@ -44,6 +46,15 @@ describe('wiki', () => {
     }
     // A path that only starts like the wiki's is the game's.
     expect(pageFor('/wikipedia', player)).toBe('game')
+  })
+})
+
+describe('kit', () => {
+  it('knows the pixel kit page by its path, and only by it', () => {
+    expect(isKitPath(KIT_PATH)).toBe(true)
+    expect(isKitPath(`${KIT_PATH}/`)).toBe(true)
+    expect(isKitPath('/kitchen')).toBe(false)
+    expect(isKitPath('/')).toBe(false)
   })
 })
 

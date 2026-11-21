@@ -84,7 +84,7 @@ export function AdminPage({ account, onLoggedOut }: { account: Account; onLogged
 
   return (
     <div className="layout admin-page">
-      <header>
+      <header className="bar">
         <h1>Code Strategy admin</h1>
         {account.isAdmin && (
           <div className="tabs admin-tabs" role="tablist">
@@ -92,6 +92,7 @@ export function AdminPage({ account, onLoggedOut }: { account: Account; onLogged
               <button
                 key={t}
                 type="button"
+                className="tab"
                 role="tab"
                 aria-selected={tab === t}
                 onClick={() => open(t)}

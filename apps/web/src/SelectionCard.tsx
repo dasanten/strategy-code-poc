@@ -54,7 +54,6 @@ import { Meter, meterClass, pct } from './Horses.js'
 import { WaypointNameForm, addProblem } from './Waypoints.js'
 import { suggestedWaypointName } from './waypoints-view.js'
 import { SHEET_OPENS_AT, nextSheet, snapSheet, stepSheet, type SheetHeight } from './sheet-view.js'
-import './selection-card.css'
 
 /**
  * The selection card (ADR 0008): docked top right over the map, a dark translucent panel whose
@@ -101,7 +100,7 @@ export function SelectionCard({
   return (
     <aside
       ref={ref}
-      className={`inspector sel-card${dead ? ' sel-shrunk' : ''}`}
+      className={`inspector pn sel-card${dead ? ' sel-shrunk' : ''}`}
       aria-label="Selection"
       style={{
         ...(colour ? { borderLeftColor: colour } : {}),
@@ -131,7 +130,7 @@ export function SelectionCard({
         </div>
         <button
           type="button"
-          className="sel-close"
+          className="sel-close btn sm sq"
           aria-label="Close the selection card"
           onClick={onClose}
         >
@@ -299,7 +298,11 @@ export function PickBanner({
 }) {
   const line = under ?? hint
   return (
-    <div className="notice pick-banner" role="status" title={hint ? `${prompt}\n${hint}` : prompt}>
+    <div
+      className="pn notice pick-banner"
+      role="status"
+      title={hint ? `${prompt}\n${hint}` : prompt}
+    >
       <div className="notice-text pick-banner-text">
         <strong>{prompt}</strong>
         {line && <span className="small">{line}</span>}
@@ -350,7 +353,14 @@ export function CardTabs<T extends string>({
   return (
     <div className="tabs sel-tabs" role="tablist" aria-label="Card">
       {tabs.map((t) => (
-        <button type="button" key={t} role="tab" aria-selected={tab === t} onClick={() => onTab(t)}>
+        <button
+          type="button"
+          key={t}
+          className="tab"
+          role="tab"
+          aria-selected={tab === t}
+          onClick={() => onTab(t)}
+        >
           {labels[t]}
         </button>
       ))}
