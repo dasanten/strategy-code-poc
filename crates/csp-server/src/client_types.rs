@@ -130,6 +130,7 @@ fn client_roots(cfg: &Config) -> io::Result<()> {
         crate::checkpoints::CheckpointSaveRequest,
         crate::creative::CreativeAction,
         crate::creative::CreativeDone,
+        crate::creative::CreativeReveal,
         crate::creative::CreativeSkipRequest,
         crate::creative::CreativeSpeedRequest,
         crate::creative::CreativeState,

@@ -103,10 +103,56 @@ export function CreativeBar({ tick }: { tick: number | undefined }) {
           <span className="hud-creative-status">{creativeRunning(state.paused, state.speed)}</span>
           <SkipAhead skip={state.skip} busy={busy} act={act} />
           <Checkpoints tick={tick} busy={busy} act={act} />
+          <Reveal onError={setError} />
         </>
       )}
       {error && <span className="hud-creative-error">{error}</span>}
     </div>
+  )
+}
+
+/**
+ * Reveal (`CONTEXT.md`: Creative mode): this session's game view shows the whole map, fog lifted,
+ * every tile and thing as the admin map does, until switched off. The server keeps it per
+ * session, never in the world, and reloads the game view when it is switched.
+ */
+function Reveal({ onError }: { onError: (e: string) => void }) {
+  const [on, setOn] = useState<boolean>()
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    let live = true
+    api
+      .creativeReveal()
+      .then((r) => live && setOn(r.on))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [])
+  if (on === undefined) return null
+  return (
+    <button
+      type="button"
+      className={on ? 'on' : undefined}
+      aria-pressed={on}
+      disabled={busy}
+      title={
+        on
+          ? 'The whole map is shown, fog lifted; switch off for your own sight (reloads the view)'
+          : 'Show the whole map, fog lifted, as the admin map does (reloads the view)'
+      }
+      onClick={() => {
+        setBusy(true)
+        // The server closes this session's sockets and the game view loads again with it.
+        api
+          .creativeSetReveal(!on)
+          .then((r) => setOn(r.on))
+          .catch((e: unknown) => onError(message(e)))
+          .finally(() => setBusy(false))
+      }}
+    >
+      Reveal
+    </button>
   )
 }
 

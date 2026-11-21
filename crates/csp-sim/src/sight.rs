@@ -115,9 +115,21 @@ pub struct Eyes {
     grid: SeenFrom,
     /// The squares anything in sight can stand in.
     watched: HashSet<i32>,
+    /// Whether they see the whole map ([`Eyes::everywhere`]).
+    everywhere: bool,
 }
 
 impl Eyes {
+    /// Eyes that see every tile of a map `size` tiles across: an admin's reveal (`CONTEXT.md`:
+    /// Creative mode), never a Player's sight.
+    pub fn everywhere(size: i32) -> Self {
+        let mut eyes = Eyes::of_ranged(size, &[]);
+        let across = eyes.squares.across;
+        eyes.watched = (0..across * across).collect();
+        eyes.everywhere = true;
+        eyes
+    }
+
     /// The eyes of observers on a map `size` tiles across, each seeing `SIGHT_RANGE`.
     pub fn of(size: i32, observers: &[Spot]) -> Self {
         let ranged: Vec<(Spot, f64)> = observers.iter().map(|&o| (o, SIGHT_RANGE)).collect();
@@ -134,7 +146,14 @@ impl Eyes {
         let steps: Vec<i32> = if across < 3 { (0..across).collect() } else { vec![-1, 0, 1] };
         let mut grid: SeenFrom = HashMap::new();
         let mut watched = HashSet::new();
-        let mut eyes = Eyes { size, squares, steps, grid: HashMap::new(), watched: HashSet::new() };
+        let mut eyes = Eyes {
+            size,
+            squares,
+            steps,
+            grid: HashMap::new(),
+            watched: HashSet::new(),
+            everywhere: false,
+        };
         for &(o, range) in observers {
             let (sx, sy) = (squares.square(o.x), squares.square(o.y));
             grid.entry(sy * across + sx)
@@ -172,6 +191,9 @@ impl Eyes {
 
     /// Whether any observer is within sight range plus `reach` of the spot.
     pub fn sees_within(&self, at: Spot, reach: f64) -> bool {
+        if self.everywhere {
+            return true;
+        }
         let across = self.squares.across;
         let (sx, sy) = (self.squares.square(at.x), self.squares.square(at.y));
         if !self.watched.contains(&(sy * across + sx)) {
@@ -283,6 +305,9 @@ pub struct Insight {
     cities: HashMap<String, usize>,
     standing: HashSet<(i32, i32)>,
     coins_seen: OnceCell<HashSet<String>>,
+    /// An admin's reveal (`CONTEXT.md`: Creative mode): everything is seen as its own side sees
+    /// it, inside storages and carriages, and how everyone fares, as the admin map shows it.
+    revealed: bool,
 }
 
 impl Insight {
@@ -303,6 +328,7 @@ impl Insight {
             cities,
             standing: observers.iter().map(|o| o.tile()).collect(),
             coins_seen: OnceCell::new(),
+            revealed: false,
         }
     }
 
@@ -312,6 +338,9 @@ impl Insight {
 
     /// Whether a thing of this realm, or else of this city, is the side's own or its allies'.
     pub fn ours(&self, world: &WorldState, realm_id: Option<&str>, city_id: Option<&str>) -> bool {
+        if self.revealed {
+            return true;
+        }
         if let Some(realm) = realm_id {
             return self.orgs.contains(realm);
         }
@@ -868,6 +897,8 @@ pub struct SideSight {
     insight: OnceCell<Insight>,
     seen_places: OnceCell<Arc<Vec<SeenEntity>>>,
     everything: OnceCell<Arc<Vec<SeenEntity>>>,
+    /// The whole map as an admin's reveal shows it ([`SideSight::revealed`]).
+    revealed: bool,
 }
 
 impl SideSight {
@@ -883,6 +914,22 @@ impl SideSight {
             insight: OnceCell::new(),
             seen_places: OnceCell::new(),
             everything: OnceCell::new(),
+            revealed: false,
+        }
+    }
+
+    /// The whole world as a reveal shows it to an admin playing `side` (`CONTEXT.md`: Creative
+    /// mode): every tile in sight, inside everything, everyone's fare. Never put in a
+    /// [`SightCache`], so neither the Player's sight nor what their scripts see changes.
+    pub fn revealed(index: &WorldIndex, side: &str) -> Self {
+        SideSight {
+            side: side.to_string(),
+            observers: Vec::new(),
+            eyes: Arc::new(Eyes::everywhere(index.size())),
+            insight: OnceCell::new(),
+            seen_places: OnceCell::new(),
+            everything: OnceCell::new(),
+            revealed: true,
         }
     }
 
@@ -891,13 +938,17 @@ impl SideSight {
         self.eyes.clone()
     }
 
-    /// Whether the side has anyone to see through.
+    /// Whether the side has anyone to see through (or sees all, revealed).
     pub fn looking(&self) -> bool {
-        !self.observers.is_empty()
+        self.revealed || !self.observers.is_empty()
     }
 
     fn insight(&self, world: &WorldState, index: &WorldIndex) -> &Insight {
-        self.insight.get_or_init(|| Insight::of(world, index.size(), &self.side, &self.observers))
+        self.insight.get_or_init(|| {
+            let mut insight = Insight::of(world, index.size(), &self.side, &self.observers);
+            insight.revealed = self.revealed;
+            insight
+        })
     }
 
     /// The buildings and cities in its sight; `by_square` (`buildings_by_square` this tick)
@@ -908,7 +959,7 @@ impl SideSight {
         index: &WorldIndex,
         by_square: Option<&HashMap<i32, Vec<usize>>>,
     ) -> Arc<Vec<SeenEntity>> {
-        if self.observers.is_empty() {
+        if !self.looking() {
             return Arc::new(Vec::new());
         }
         self.seen_places
@@ -927,7 +978,7 @@ impl SideSight {
         index: &WorldIndex,
         b: &Building,
     ) -> Option<SeenEntity> {
-        if self.observers.is_empty() || !self.eyes.building_seen(placed(b)) {
+        if !self.looking() || !self.eyes.building_seen(placed(b)) {
             return None;
         }
         let insight = self.insight(world, index);
@@ -936,7 +987,7 @@ impl SideSight {
 
     /// Everything in its sight.
     pub fn entities(&self, world: &WorldState, index: &WorldIndex) -> Arc<Vec<SeenEntity>> {
-        if self.observers.is_empty() {
+        if !self.looking() {
             return Arc::new(Vec::new());
         }
         if let Some(all) = self.everything.get() {
@@ -1062,6 +1113,18 @@ pub fn entities_in_sight(
         return Arc::new(Vec::new());
     };
     with_side(world, index, realm, cache, |s| s.entities(world, index))
+}
+
+/// Everything in the world as an admin's reveal shows it to the realm's Player (`CONTEXT.md`:
+/// Creative mode): what `entities_in_sight` would show with every tile in sight and inside
+/// everything. Worked out apart from any sight cache: the Player's sight and their scripts' stay
+/// as they are.
+pub fn entities_revealed(
+    world: &WorldState,
+    index: &WorldIndex,
+    realm_id: &str,
+) -> Arc<Vec<SeenEntity>> {
+    SideSight::revealed(index, realm_id).entities(world, index)
 }
 
 /// The buildings and cities a side sees, its eyes and whether it has anyone to see through

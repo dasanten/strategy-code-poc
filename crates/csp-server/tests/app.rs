@@ -1404,6 +1404,11 @@ async fn does_creative_actions_on_the_world_for_an_admin_on_a_creative_server() 
     let grow = json!({ "action": "growUp", "residentId": added.0 });
     let done = call(&app, "POST", url, Some(&admin), Some(grow)).await;
     assert!(done.json()["message"].as_str().unwrap().ends_with("has grown up."));
+    // Moved across the map at once.
+    let to = json!({ "action": "moveResidents", "residentIds": [added.0], "x": 20, "y": 3 });
+    let done = call(&app, "POST", url, Some(&admin), Some(to)).await;
+    assert_eq!(done.status, StatusCode::OK, "{:?}", done.json());
+    assert!(done.json()["message"].as_str().unwrap().ends_with("stands on (20, 3)."));
     let kill = json!({ "action": "kill", "residentId": added.0 });
     let done = call(&app, "POST", url, Some(&admin), Some(kill)).await;
     assert!(done.json()["message"].as_str().unwrap().ends_with("is dead."));
@@ -1423,6 +1428,7 @@ fn names_creative_actions_as_the_sim_lists_them() {
         json!({ "action": "heal", "residentId": "r1" }),
         json!({ "action": "growUp", "residentId": "r1" }),
         json!({ "action": "kill", "residentId": "r1" }),
+        json!({ "action": "moveResidents", "residentIds": ["r1"], "x": 1, "y": 2 }),
     ]
     .into_iter()
     .map(|v| serde_json::from_value(v).unwrap())

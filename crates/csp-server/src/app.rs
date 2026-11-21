@@ -35,7 +35,7 @@ use csp_sim::admin_map::{
 use csp_sim::directives::{
     admin_directives, directive_target_choices, give_directive, lift_directive, set_directive_price,
 };
-use csp_sim::explored::{ExploredTerrain, MapTerrain};
+use csp_sim::explored::{ExploredTerrain, MapTerrain, REVEAL_USER};
 use csp_sim::orders::OrderQueue;
 use csp_sim::queries::player_land::{explored_in, player_land, LAND_PATH};
 use csp_sim::sight::SightTracker;
@@ -47,16 +47,16 @@ use ts_rs::TS;
 
 use crate::auth::{
     create_invite_code, create_session, delete_session, find_user_by_name, get_session_user,
-    log_in, now_ms, reset_password, sign_up, ApiErrorCode, AuthError, AuthFailure, LoginBackoff,
-    SessionSockets, SessionUser, SESSION_DAYS,
+    hash_token, log_in, now_ms, reset_password, sign_up, ApiErrorCode, AuthError, AuthFailure,
+    LoginBackoff, SessionSockets, SessionUser, SESSION_DAYS,
 };
 use crate::checkpoints::{
     delete_checkpoint, list_checkpoints, load_checkpoint, save_checkpoint, Checkpoint,
     CheckpointError, CheckpointSaveRequest,
 };
 use crate::creative::{
-    CreativeAction, CreativeDone, CreativeSkipRequest, CreativeSpeedRequest, CreativeState,
-    TimeControls,
+    CreativeAction, CreativeDone, CreativeReveal, CreativeSkipRequest, CreativeSpeedRequest,
+    CreativeState, TimeControls,
 };
 use crate::first_day::{
     dismiss_first_day, mark_first_day, read_first_day, FirstDayLine, FIRST_DAY_DISMISS_PATH,
@@ -703,12 +703,27 @@ fn game_of(state: &AppState) -> ApiResult<&Arc<dyn GameHandle>> {
     state.game.as_ref().ok_or_else(|| fail(ApiErrorCode::NotFound, "Not found."))
 }
 
+/// Whose explored terrain a request reads (`CONTEXT.md`: Creative mode, reveal): the whole map
+/// for an admin's session that reveals it on a creative server, else the Player's own.
+fn explored_id(state: &AppState, user: &User, headers: &HeaderMap) -> ApiResult<u64> {
+    let u = user.logged_in()?;
+    let revealed = u.is_admin
+        && state.creative.is_some()
+        && state
+            .sockets
+            .as_ref()
+            .zip(session_token(headers))
+            .is_some_and(|(s, token)| s.reveals(&hash_token(&token)));
+    Ok(if revealed { REVEAL_USER } else { u.id as u64 })
+}
+
 async fn terrain_chunk(
     State(state): State<Shared>,
     Extension(user): Extension<User>,
     Path((cx, cy)): Path<(String, String)>,
+    headers: HeaderMap,
 ) -> ApiResult<Response> {
-    let id = user.logged_in()?.id as u64;
+    let id = explored_id(&state, &user, &headers)?;
     let game = game_of(&state)?;
     let chunk = match (chunk_param(&cx), chunk_param(&cy)) {
         (Some(cx), Some(cy)) => {
@@ -725,9 +740,10 @@ async fn terrain_chunk(
 async fn terrain_batch(
     State(state): State<Shared>,
     Extension(user): Extension<User>,
+    headers: HeaderMap,
     body: Bytes,
 ) -> ApiResult<Response> {
-    let id = user.logged_in()?.id as u64;
+    let id = explored_id(&state, &user, &headers)?;
     let game = game_of(&state)?;
     let b = JsonBody::parse(&body)?;
     let wanted = match b.get("chunks").and_then(Value::as_array) {
@@ -780,9 +796,10 @@ async fn terrain_batch(
 async fn land_route(
     State(state): State<Shared>,
     Extension(user): Extension<User>,
+    headers: HeaderMap,
     body: Bytes,
 ) -> ApiResult<Response> {
-    let id = user.logged_in()?.id as u64;
+    let id = explored_id(&state, &user, &headers)?;
     let game = game_of(&state)?;
     let b = JsonBody::parse(&body)?;
     let wanted: Option<std::collections::BTreeSet<u32>> = match b.get("chunks") {
@@ -1379,6 +1396,50 @@ async fn creative_act(
     Ok(Json(done))
 }
 
+/// The admin session's sockets and token hash, for its reveal (`CONTEXT.md`: Creative mode).
+fn reveal_session(
+    state: &AppState,
+    user: &User,
+    headers: &HeaderMap,
+) -> ApiResult<(Arc<dyn SessionSockets + Send + Sync>, String)> {
+    user.creative(state)?;
+    let sockets = state.sockets().ok_or_else(|| fail(ApiErrorCode::NotFound, "Not found."))?;
+    let token =
+        session_token(headers).ok_or_else(|| fail(ApiErrorCode::NotLoggedIn, "Not logged in."))?;
+    Ok((sockets, hash_token(&token)))
+}
+
+/// Whether this session reveals the whole map in the game view.
+async fn creative_reveal(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    headers: HeaderMap,
+) -> ApiResult<Json<CreativeReveal>> {
+    let (sockets, token_hash) = reveal_session(&state, &user, &headers)?;
+    Ok(Json(CreativeReveal { on: sockets.reveals(&token_hash) }))
+}
+
+/// Switches this session's reveal on or off (`CONTEXT.md`: Creative mode): kept by the server per
+/// session, never in the world, so neither the Player's sight nor what their scripts see changes.
+/// The session's game views load again with it.
+async fn creative_reveal_set(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<CreativeReveal>> {
+    let (sockets, token_hash) = reveal_session(&state, &user, &headers)?;
+    let request: CreativeReveal = serde_json::from_slice(&body)
+        .map_err(|_| fail(ApiErrorCode::InvalidInput, "Say whether reveal is on."))?;
+    if request.on {
+        // The whole map's terrain, ready before the game view asks for it.
+        let game = game_of(&state)?;
+        with_game(game.as_ref(), |g| g.explored.reveal_all()).await.ok_or_else(game_gone)?;
+    }
+    sockets.set_reveal(&token_hash, request.on);
+    Ok(Json(CreativeReveal { on: sockets.reveals(&token_hash) }))
+}
+
 /// Starts a skip ahead of `amount` game hours or days, up to a game year; answers at once, and
 /// the state's `skip` shows its progress until it ends. One at a time.
 async fn creative_skip(
@@ -1594,6 +1655,7 @@ pub fn build_app(opts: AppOptions) -> Router {
         .route(CREATIVE_ACT_PATH, post(creative_act))
         .route(&format!("{CREATIVE_PATH}/skip"), post(creative_skip))
         .route(&format!("{CREATIVE_PATH}/skip/cancel"), post(creative_skip_cancel))
+        .route(&format!("{CREATIVE_PATH}/reveal"), get(creative_reveal).post(creative_reveal_set))
         .route(CHECKPOINTS_PATH, get(checkpoints_list).post(checkpoints_save))
         .route(&format!("{CHECKPOINTS_PATH}/{{id}}"), delete(checkpoints_delete))
         .route(&format!("{CHECKPOINTS_PATH}/{{id}}/restore"), post(checkpoints_restore));

@@ -93,6 +93,7 @@ const RESIDENT_PROMPTS: Record<Exclude<Picking, false>, string> = {
   roadTo: 'where the road ends',
   wallFrom: 'where the wall starts',
   wallTo: 'where the wall ends',
+  creativeMove: 'where to move them at once (creative)',
 }
 
 const GROUP_PROMPTS: Record<Exclude<GroupPicking, false>, string> = {
@@ -106,6 +107,7 @@ const GROUP_PROMPTS: Record<Exclude<GroupPicking, false>, string> = {
   roadTo: 'where the road ends',
   wallFrom: 'where the wall starts',
   wallTo: 'where the wall ends',
+  creativeMove: 'where to move them at once (creative)',
   tearDown: 'the building they tear down',
   storeAt: 'the storage, stable, carriage or boat they store at',
   fetchFrom: 'the storage, stable, carriage or boat they fetch from',
@@ -135,6 +137,7 @@ const RESIDENT_HINTS: Partial<Record<Exclude<Picking, false>, string>> = {
   roadFrom: 'Then where it ends; the resident walks there and builds along the line.',
   roadTo: `Builds road along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, fetching stone from storage; with none, the sites are laid out for later.`,
   wallFrom: 'Then where it ends; the resident walks there and builds along the line.',
+  creativeMove: 'They stand there at once, their way and work dropped, what they carry kept.',
   wallTo: `Builds wall along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, past tiles with a wall or gate, fetching wood or stone from storage; with none, the sites are laid out for later.`,
 }
 
@@ -155,6 +158,7 @@ export const GROUP_HINTS: Record<Exclude<GroupPicking, false>, string> = {
   fetchFrom: 'Each fetches as much as fits of the good from there.',
   attack: 'They all attack it.',
   climb: 'Those standing next to it climb over.',
+  creativeMove: 'They all stand there at once, their way and work dropped, what they carry kept.',
 }
 
 /** More on what picking does, for the banner's second line, where the prompt doesn't say it all. */

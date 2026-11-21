@@ -290,6 +290,9 @@ pub enum CreativeAction {
     GrowUp { resident_id: String },
     /// Kills a Resident by a normal death (Leader death rules for a Leader).
     Kill { resident_id: String },
+    /// Moves a Resident, or each of a group, to a tile at once: their way and work dropped,
+    /// what they carry kept.
+    MoveResidents { resident_ids: Vec<String>, x: f64, y: f64 },
 }
 
 impl CreativeAction {
@@ -304,6 +307,7 @@ impl CreativeAction {
             CreativeAction::Heal { .. } => "heal",
             CreativeAction::GrowUp { .. } => "growUp",
             CreativeAction::Kill { .. } => "kill",
+            CreativeAction::MoveResidents { .. } => "moveResidents",
         }
     }
 
@@ -338,8 +342,20 @@ impl CreativeAction {
             CreativeAction::Kill { resident_id } => {
                 creative::kill(world, &resident_id, terrain.size)
             }
+            CreativeAction::MoveResidents { resident_ids, x, y } => {
+                creative::move_residents(world, terrain, &resident_ids, (x, y))
+            }
         }
     }
+}
+
+/// Whether an admin's session reveals the whole map in the game view (`CONTEXT.md`: Creative
+/// mode, reveal): kept by the server per session until switched off or the server stops, never in
+/// the world. Switching it reloads that session's game views.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct CreativeReveal {
+    pub on: bool,
 }
 
 /// What a creative action did: its line for the admin, and the invariants it left broken (run

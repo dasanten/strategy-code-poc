@@ -1335,8 +1335,11 @@ The shared language of the game. Domain terms only — no implementation details
     Organization) and on unowned tiles: give or take goods in a city's storage or a carriage;
     **finish now** a building, a site, a road or wall line, or a training; add a Resident (age
     and skills picked) or a horse to a realm on a tile; heal, grow a child up or kill a Resident;
-    move a Resident or a group to a tile at once; and **reveal**, which shows the admin the whole
-    map in the game view, fog lifted, until switched off. They are given by hand only: they are
+    move a Resident or a group to a tile at once (their way and work dropped, what they carry
+    kept; never onto a tile a Resident may not stand on, such as water without a vessel); and
+    **reveal**, which shows the admin the whole map in the game view, fog lifted, until switched
+    off (kept by the server per admin session, never in the world: it changes neither the
+    Player's sight nor what their scripts see). They are given by hand only: they are
     no order kind and no script call (ADR 0002 stays whole for Players).
   - **Checkpoints:** a named copy of the world saved and restored from the game view while the
     server runs. Restoring pauses the world, swaps it whole and reloads every client; accounts are

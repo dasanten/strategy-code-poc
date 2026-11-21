@@ -1235,3 +1235,74 @@ async fn tells_every_socket_to_reload_when_a_checkpoint_is_restored() {
     let welcome = again.next("welcome").await;
     assert_eq!(welcome["tick"], json!(saved_tick), "the restored world's tick");
 }
+
+// ----------------------------------------------------------------------------------- reveal
+
+/// How many tiles the Player has explored.
+async fn explored_tiles(s: &Server, user: u64) -> usize {
+    s.game.run(move |g, _| g.explored.lock().unwrap().explored_tiles(user)).await.unwrap()
+}
+
+/// The ids of a message's entities.
+fn entity_ids(v: &Value) -> Vec<String> {
+    v.as_array().unwrap().iter().map(|e| e["id"].as_str().unwrap().to_owned()).collect()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_revealing_session_is_sent_the_whole_world_and_the_players_own_sight_stays_theirs() {
+    let s = start(StartOptions::default()).await;
+    // A stranger across the (wrapping) map, out of the Player's sight.
+    s.world(|w| {
+        let mut far = w.residents[1].clone();
+        far.id = "far".into();
+        far.owner = Some("r2".into());
+        (far.x, far.y) = (74.0, 74.0);
+        w.residents.push(far);
+    })
+    .await;
+    let user = s.user_id as u64;
+    let mut a = connect(&s).await;
+    let welcome = a.next("welcome").await;
+    assert_eq!(entity_ids(&welcome["entities"]), ["a1", "a2"]);
+    let explored = explored_tiles(&s, user).await;
+
+    // Switched on: the session's sockets load again, and are welcomed with everything.
+    let session = hash_token(&s.token);
+    s.realtime.set_reveal(&session, true);
+    assert!(s.realtime.reveals(&session));
+    assert_eq!(a.close_code().await, WS_CLOSE_RELOAD);
+    let mut b = connect(&s).await;
+    let welcome = b.next("welcome").await;
+    assert_eq!(entity_ids(&welcome["entities"]), ["a1", "a2", "far"]);
+    let chunks = (128 / csp_shared::chunks::CHUNK_SIZE).pow(2) as usize;
+    assert_eq!(counts_of(&welcome["exploredCounts"]).len(), chunks, "every tile");
+    assert_eq!(welcome["lastSeen"], json!([]));
+    s.world(|w| w.residents[2].x = 75.0).await;
+    s.broadcast().await;
+    assert_eq!(entity_ids(&b.next("tick").await["changed"]), ["far"]);
+
+    // The Player's own sight, which their scripts see, and their explored terrain are as they
+    // were; the whole map is no Player's and is never saved.
+    let (sight, dirty) = s
+        .game
+        .run(|g, _| {
+            let size = g.terrain.size;
+            let index = csp_sim::world_index::world_index(&mut g.scratch.index, &g.world, size);
+            let seen = csp_sim::sight::entities_in_sight(&g.world, index, Some("r1"), None);
+            (
+                entity_ids(&serde_json::to_value(&*seen).unwrap()),
+                g.explored.lock().unwrap().take_dirty(),
+            )
+        })
+        .await
+        .unwrap();
+    assert_eq!(sight, ["a1", "a2"]);
+    assert!(!dirty.contains(&csp_sim::explored::REVEAL_USER), "{dirty:?}");
+    assert_eq!(explored_tiles(&s, user).await, explored);
+
+    // Switched off: their own sight again.
+    s.realtime.set_reveal(&session, false);
+    assert_eq!(b.close_code().await, WS_CLOSE_RELOAD);
+    let mut c = connect(&s).await;
+    assert_eq!(entity_ids(&c.next("welcome").await["entities"]), ["a1", "a2"]);
+}

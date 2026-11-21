@@ -118,6 +118,12 @@ impl UserRow {
 pub trait SessionSockets {
     fn disconnect_session(&self, token_hash: &str);
     fn disconnect_user(&self, user_id: i64);
+    /// Whether the session reveals the whole map (`CONTEXT.md`: Creative mode, reveal).
+    fn reveals(&self, _token_hash: &str) -> bool {
+        false
+    }
+    /// Switches the session's reveal on or off, and has its game views load again with it.
+    fn set_reveal(&self, _token_hash: &str, _on: bool) {}
 }
 
 /// Milliseconds since the epoch, as `Date.now()`.
