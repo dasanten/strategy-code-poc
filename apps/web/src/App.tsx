@@ -68,6 +68,8 @@ import {
   wrap,
 } from './shared/terrain.js'
 import { isWallOrGate } from './shared/walls.js'
+import { CreativeBar } from './CreativeBar.js'
+import { showsCreativeBar } from './creative-bar.js'
 import { isAt, covers } from './shared/footprint.js'
 import { targetParam } from './shared/default-scripts.js'
 import { HORSE_GRANT_HORSES, PASSENGER_WEIGHT } from '@csp/balance'
@@ -2758,6 +2760,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       <DrawerEdge open={fullList ? undefined : openDrawer} />
       {/* Every notice in one lane under the top bar (`CONTEXT.md`: Notices). */}
       <NoticeLane phone={phone}>
+        {/* First in the lane under the top bar, so the notices stack below it. */}
+        {showsCreativeBar(account) && <CreativeBar tick={world?.tick} />}
         {laneNotices({
           pick: pick !== undefined,
           horseOffer: world?.horseOffer,

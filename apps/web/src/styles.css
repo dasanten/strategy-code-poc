@@ -2743,6 +2743,51 @@ button.residents-row.selected:hover {
 .game.phone .hud-control button {
   padding: 4px 8px;
 }
+/* The Creative bar, first in the notice lane under the top bar, for admins on a creative server
+   (`CONTEXT.md`: Creative mode): its dashed border marks it as a testing tool, never play. */
+.hud-creative-bar {
+  pointer-events: auto;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  background: var(--ui-bar);
+  backdrop-filter: blur(8px);
+  border: 1px dashed var(--ui-line);
+  border-radius: 10px;
+}
+.hud-creative-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.8em;
+}
+.hud-creative-time {
+  font-variant-numeric: tabular-nums;
+}
+.hud-creative-bar button {
+  flex: none;
+  padding: 3px 10px;
+}
+.hud-creative-speeds {
+  display: flex;
+  gap: 2px;
+}
+.hud-creative-speeds button.on {
+  background: var(--rel-own);
+  color: var(--ui-ink);
+  font-weight: 600;
+}
+.hud-creative-status,
+.hud-creative-error {
+  color: var(--ui-muted);
+}
+.hud-creative-error {
+  flex: 1 1 100%;
+}
 /* The realm bar along the bottom of the map in realm control mode (`CONTEXT.md`: Realm order). */
 .hud-realm-bar {
   position: absolute;
