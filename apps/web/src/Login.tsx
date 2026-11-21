@@ -33,13 +33,25 @@ export function Login({ onLoggedIn }: { onLoggedIn: (account: Account) => void }
   const signup = mode === 'signup'
   return (
     <main className="login">
-      <form onSubmit={submit} className="login-form">
-        <h1>Code Strategy</h1>
+      <form onSubmit={submit} className="login-form pn">
+        <h1 className="hd">Code Strategy</h1>
         <div className="tabs" role="tablist">
-          <button type="button" role="tab" aria-selected={!signup} onClick={() => setMode('login')}>
+          <button
+            type="button"
+            className="tab"
+            role="tab"
+            aria-selected={!signup}
+            onClick={() => setMode('login')}
+          >
             Log in
           </button>
-          <button type="button" role="tab" aria-selected={signup} onClick={() => setMode('signup')}>
+          <button
+            type="button"
+            className="tab"
+            role="tab"
+            aria-selected={signup}
+            onClick={() => setMode('signup')}
+          >
             Sign up
           </button>
         </div>

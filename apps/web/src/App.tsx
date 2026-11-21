@@ -71,7 +71,12 @@ import { isWallOrGate } from './shared/walls.js'
 import { CreativeBar } from './CreativeBar.js'
 import { showsCreativeBar } from './creative-bar.js'
 import { CreativeSection } from './CreativeSection.js'
-import { creativeCities, creativeOffer, creativeProblem, offersAnything } from './creative-section.js'
+import {
+  creativeCities,
+  creativeOffer,
+  creativeProblem,
+  offersAnything,
+} from './creative-section.js'
 import {
   CreativeAddSection,
   CreativeGroupMove,
@@ -215,8 +220,9 @@ import {
 } from './vehicle-orders.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
-import { isWikiPath, pageFor } from './pages.js'
+import { isKitPath, isWikiPath, pageFor } from './pages.js'
 import { Wiki } from './Wiki.js'
+import { Kit } from './Kit.js'
 import { RealmLog } from './RealmLog.js'
 import {
   heirTakeover,
@@ -428,6 +434,7 @@ function toFeed(world: NonNullable<ReturnType<typeof useWorld>['world']>) {
 export function App() {
   // The Wiki needs no account, so it shows without asking who is logged in.
   if (isWikiPath(window.location.pathname)) return <Wiki />
+  if (isKitPath(window.location.pathname)) return <Kit />
   return <Pages />
 }
 
@@ -1662,7 +1669,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setGroupPicking(false)
     if (!world) return
     if (mode === 'creativeMove') {
-      setGroupError(await creativeMove(group.map((r) => r.id), x, y))
+      setGroupError(
+        await creativeMove(
+          group.map((r) => r.id),
+          x,
+          y,
+        ),
+      )
       return
     }
     if (mode === 'build') {

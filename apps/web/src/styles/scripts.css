@@ -1,0 +1,354 @@
+/* A running script's memory on the Script tab: a quiet, read-only tree. */
+.memory-tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.memory-name {
+  color: var(--ui-muted);
+}
+/* How a running script last ran: its steps, and its last error as a link to the line. */
+.script-steps {
+  margin: 0;
+  font-family: var(--font-mono);
+}
+.script-steps.out-of-steps {
+  color: var(--ui-warn-text);
+}
+.script-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border-left: 3px solid var(--ui-bad);
+}
+.script-error-message {
+  color: var(--ui-bad);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+/* The form before a script starts: the rows scroll between its title and Start and Cancel. */
+.hud-dialog.start-params {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
+}
+.start-params h2 {
+  flex: none;
+  /* The kit's header bar (`.hd`), across the dialog's top edge. */
+  margin: -20px -22px 10px;
+}
+.start-params .hud-dialog-actions {
+  flex: none;
+  margin-top: 10px;
+}
+.start-params .error {
+  flex: none;
+  margin-top: 6px;
+}
+.start-params-rows {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Out of the way while a param is picked on the map; the map gets the taps. */
+.start-params-backdrop.picking {
+  visibility: hidden;
+}
+/* A param's row: its name and the value in use on the left, its field on the right. */
+.start-param {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 2px solid var(--ui-line);
+}
+.start-param:last-child {
+  border-bottom: 0;
+}
+.start-param-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.start-param .buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.start-param .amount {
+  width: 4.5em;
+  min-height: 36px;
+  box-sizing: border-box;
+}
+.start-param select {
+  max-width: 9.5em;
+  min-height: 36px;
+  text-overflow: ellipsis;
+}
+.start-param .buttons button {
+  min-height: 36px;
+  padding-inline: 10px;
+}
+.start-param-why {
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  margin-left: 6px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+.hud-dialog .start-param-note {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+
+/* The form before a script starts is a bottom sheet, up to the top bar; above the keyboard, too. */
+.game.phone .start-params-backdrop {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0;
+}
+.game.phone .hud-dialog.start-params {
+  width: 100%;
+  max-height: calc(100% - var(--top-h));
+  padding: 14px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-width: 2px 0 0;
+}
+.game.phone .start-params h2 {
+  margin: -14px -14px 10px;
+}
+.game.phone .start-params .hud-dialog-actions button {
+  flex: 1;
+  min-height: 44px;
+}
+/* At 16px a phone doesn't zoom the page when the field takes focus. */
+.game.phone .start-param input,
+.game.phone .start-param select {
+  font-size: 16px;
+}
+.game.phone .start-param .buttons button,
+.game.phone .start-param input,
+.game.phone .start-param select {
+  min-height: 40px;
+}
+.game.phone .start-param-why {
+  width: 28px;
+  height: 28px;
+}
+
+/* A script param: its name and what it is for, the value the script uses, the field's buttons. */
+.script-params .goods-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  margin: 4px 0;
+}
+/* Under the row, across it: the rest of the row fills the first line. */
+.param-purpose {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+/* The script editor: the library beside a full-height editor. */
+.script-library {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 16px;
+}
+.hud-drawer .script-list h3:first-child {
+  margin-top: 4px;
+}
+.script-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 12px;
+  border-right: 2px solid var(--ui-line);
+}
+.script-list > ul:first-of-type {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.script-list > ul:first-of-type button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 8px;
+  text-align: left;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-bottom: 2px solid var(--ui-line);
+  background: transparent;
+  box-shadow: none;
+}
+.script-list > ul:first-of-type button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.script-list > ul:first-of-type button.on {
+  background: var(--sun);
+  border-left-color: var(--ink);
+  font-weight: 600;
+}
+.script-list small {
+  color: var(--ui-muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.script-main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.script-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.hud-drawer form.script-head,
+.script-head form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+.script-head strong {
+  font-size: 15px;
+}
+.script-template {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+.script-help {
+  display: flex;
+  gap: 10px;
+}
+.script-head > span {
+  color: var(--ui-muted);
+}
+.script-main .editor {
+  flex: 1;
+  min-height: 260px;
+  overflow: hidden;
+  border: 2px solid var(--ink);
+}
+.script-foot {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.diagnostics {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  color: var(--ui-live);
+}
+.diagnostics.has-errors {
+  color: var(--ui-bad);
+}
+.diagnostics.has-warnings {
+  color: var(--ui-warn-text);
+}
+.default-changed {
+  font-size: 12px;
+  color: var(--ui-muted);
+}
+.script-diff {
+  margin: 4px 0;
+  max-height: 200px;
+  overflow: auto;
+  font-family: var(--font-mono);
+}
+.script-diff .added {
+  color: var(--ui-live);
+}
+.script-diff .removed {
+  color: var(--ui-bad);
+}
+.script-message {
+  margin: 0;
+  color: var(--ui-muted);
+}
+.script-history {
+  font-size: 12px;
+}
+.script-history li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.script-history li > span:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.script-history-actions {
+  display: flex;
+  gap: 4px;
+}
+.script-history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.script-history-head button {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.script-history-actions button {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.script-history li.active {
+  --rel: var(--ui-live);
+}
+.script-history li.has-errors {
+  --rel: var(--ui-bad);
+}
+.script-history time,
+.script-history em {
+  color: var(--ui-muted);
+}
+.script-history time {
+  flex-basis: 100%;
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  .script-library {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .script-list {
+    max-height: 30vh;
+    padding: 0 0 8px;
+    border-right: 0;
+    border-bottom: 2px solid var(--ui-line);
+  }
+}

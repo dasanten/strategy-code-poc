@@ -5,7 +5,6 @@ import { ADMIN_MAP_REFRESH_MS } from './admin-map.js'
 import { inspectorCard } from './admin-inspector.js'
 import type { Relationship } from './theme.js'
 import { SelectionCard } from './SelectionCard.js'
-import './admin-inspector.css'
 
 /** The card's edge in the theme's colour for the kind of Organization holding it. */
 const ORG_TONE: Record<NonNullable<AdminInspection['org']>['is'], Relationship> = {

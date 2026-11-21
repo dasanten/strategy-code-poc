@@ -29,7 +29,7 @@ describe('theme', () => {
   it('sets its variables on an element', () => {
     const set = new Map<string, string>()
     applyTheme({ setProperty: (name: string, value: string | null) => set.set(name, value!) })
-    expect(set.get('--font-ui')).toContain('Inter')
+    expect(set.get('--font-ui')).toContain('IBM Plex Sans')
     expect(set.get('--ui-panel')).toBe(THEME.ui.panel)
   })
 
