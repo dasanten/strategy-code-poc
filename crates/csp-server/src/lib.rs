@@ -16,6 +16,7 @@ pub mod game_scripts;
 pub mod log;
 pub mod map_tools;
 pub mod monitoring;
+pub mod new_world;
 pub mod realtime;
 pub mod reset;
 pub mod saves;
