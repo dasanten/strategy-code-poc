@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ADULT_AGE, CHILD_YEAR_DAYS, MAX_HEALTH, TICKS_PER_GAME_DAY } from '@csp/balance'
 import {
+  citiesFromPlaces,
   creativeCities,
   defaultCreativeCity,
   pickedNumber,
@@ -30,6 +31,38 @@ describe('adding a Resident or horse in creative mode', () => {
     expect(defaultCreativeCity(listed, undefined, 'c1')).toBe('c1')
     expect(defaultCreativeCity(listed, 'gone', undefined)).toBe('c1')
     expect(defaultCreativeCity([], undefined, 'c1')).toBeUndefined()
+  })
+
+  it('lists every city of the world from the jump list, the admin’s own first', () => {
+    const place = (id: string, name: string) => ({ id, name, x: 0, y: 0 })
+    const realm = (id: string, name: string, cities: ReturnType<typeof place>[]) => ({
+      id,
+      name,
+      account: null,
+      alliance: null,
+      leader: null,
+      cities,
+    })
+    const places = {
+      realms: [
+        realm('r2', 'Northmarch', [place('p2', 'Brindle')]),
+        realm('r1', 'Mine', [place('c1', 'Ashford')]),
+      ],
+      npcCities: [{ ...place('n1', 'Dunmere'), selfManaged: false, alliance: null }],
+      tradeOrg: {
+        hq: place('h1', 'Coldwater'),
+        posts: [place('t1', 'Rookpost')],
+        caravans: [],
+        traders: [],
+      },
+    }
+    expect(citiesFromPlaces(places, 'r1')).toEqual([
+      { id: 'c1', label: 'Ashford (your realm)' },
+      { id: 'p2', label: 'Brindle (Northmarch)' },
+      { id: 'n1', label: 'Dunmere (NPC city)' },
+      { id: 'h1', label: 'Coldwater (Trade Organization)' },
+      { id: 't1', label: 'Rookpost (Trade Organization)' },
+    ])
   })
 
   it('takes a number in range, or nothing for an empty field', () => {

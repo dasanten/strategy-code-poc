@@ -2,7 +2,14 @@
 // an admin on a server started with `CREATIVE=1` can give by hand for the building or carriage
 // the card shows. The server checks every action; this only picks which to offer.
 import { MAX_HEALTH } from '@csp/balance'
-import type { Building, BuildingKind, Carriage, City, Resident } from '@csp/shared-types'
+import type {
+  AdminPlaces,
+  Building,
+  BuildingKind,
+  Carriage,
+  City,
+  Resident,
+} from '@csp/shared-types'
 import { canWork } from './shared/stats.js'
 
 /** Kinds of building that keep goods (`KEEPS_GOODS` on the server). */
@@ -83,6 +90,33 @@ export function creativeCities(
   return [...cities]
     .sort((a, b) => own(a) - own(b) || a.name.localeCompare(b.name))
     .map((c) => ({ id: c.id, label: `${c.name} (${whose(c)})` }))
+}
+
+/**
+ * Every city in the world a creative Resident or horse can join, from the admin's jump list
+ * (`adminPlaces`), seen or not: the admin's own realm first, then other Players' by realm, the NPC
+ * cities and the Trade Organization's.
+ */
+export function citiesFromPlaces(
+  places: Pick<AdminPlaces, 'realms' | 'npcCities' | 'tradeOrg'>,
+  homeRealmId: string | undefined,
+): CreativeCity[] {
+  const realms = [...places.realms].sort(
+    (a, b) => Number(a.id !== homeRealmId) - Number(b.id !== homeRealmId),
+  )
+  return [
+    ...realms.flatMap((r) =>
+      r.cities.map((c) => ({
+        id: c.id,
+        label: `${c.name} (${r.id === homeRealmId ? 'your realm' : r.name})`,
+      })),
+    ),
+    ...places.npcCities.map((c) => ({ id: c.id, label: `${c.name} (NPC city)` })),
+    ...[...(places.tradeOrg.hq ? [places.tradeOrg.hq] : []), ...places.tradeOrg.posts].map((c) => ({
+      id: c.id,
+      label: `${c.name} (Trade Organization)`,
+    })),
+  ]
 }
 
 /**

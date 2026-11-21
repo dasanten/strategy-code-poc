@@ -1,8 +1,11 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { CREATIVE_HORSE_AGE_MAX, CREATIVE_STAT_MAX, LIFESPAN_MIN, SKILL_MAX } from '@csp/balance'
 import type { HorseStats, SkillName, StatRecord } from '@csp/shared-types'
+import { api } from './api.js'
 import { CreativeSaid, useCreativeAct } from './CreativeSection.js'
 import {
+  citiesFromPlaces,
+  defaultCreativeCity,
   pickedNumber,
   residentActions,
   type CreativeCity,
@@ -36,6 +39,7 @@ function Field({
         type="number"
         min={0}
         max={max}
+        aria-label={label}
         placeholder="drawn"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -69,29 +73,48 @@ const blank = <K extends string>(names: readonly K[]) =>
 export function CreativeAddSection({
   x,
   y,
-  cities,
-  defaultCityId,
+  knownCities,
+  tileCityId,
+  homeCityId,
+  homeRealmId,
   children,
 }: {
   x: number
   y: number
-  cities: readonly CreativeCity[]
-  defaultCityId: string | undefined
+  /** The cities the admin knows, listed until every city of the world has loaded. */
+  knownCities: readonly CreativeCity[]
+  /** The city whose area holds the tile, picked at first. */
+  tileCityId: string | undefined
+  homeCityId: string | undefined
+  homeRealmId: string | undefined
   /** The Residents on the tile, each with heal, grow up and kill (`CreativeResidentActions`). */
   children?: ReactNode
 }) {
   const { busy, said, act } = useCreativeAct()
-  const [cityId, setCityId] = useState(defaultCityId)
+  const [allCities, setAllCities] = useState<CreativeCity[]>()
+  const [picked, setPicked] = useState<string>()
   const [age, setAge] = useState('')
   const [stats, setStats] = useState(blank(STAT_NAMES))
   const [skills, setSkills] = useState(blank(SKILL_NAMES))
   const [horseAge, setHorseAge] = useState('')
   const [horseStats, setHorseStats] = useState(blank(HORSE_STAT_NAMES))
-  if (!cityId) return null
+  // Every city of the world, seen or not, from the admin's jump list.
+  useEffect(() => {
+    let live = true
+    api
+      .adminPlaces()
+      .then((places) => live && setAllCities(citiesFromPlaces(places, homeRealmId)))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [homeRealmId])
+  const cities = allCities ?? knownCities
+  const cityId = picked ?? defaultCreativeCity(cities, tileCityId, homeCityId)
 
   const residentAge = age.trim() === '' ? undefined : pickedNumber(age, 0, LIFESPAN_MIN - 0.01)
-  const picked = Object.values(stats).some((v) => v !== '')
-  const residentStats = picked ? allPicked(stats, STAT_NAMES) : undefined
+  const statsPicked = Object.values(stats).some((v) => v !== '')
+  const residentStats = statsPicked ? allPicked(stats, STAT_NAMES) : undefined
   const pickedSkills: Partial<Record<SkillName, number>> = {}
   let skillsOk = true
   for (const s of SKILL_NAMES) {
@@ -101,7 +124,7 @@ export function CreativeAddSection({
     else pickedSkills[s] = v
   }
   const residentOk =
-    (age.trim() === '' || residentAge !== undefined) && (!picked || residentStats) && skillsOk
+    (age.trim() === '' || residentAge !== undefined) && (!statsPicked || residentStats) && skillsOk
 
   const hAge =
     horseAge.trim() === '' ? undefined : pickedNumber(horseAge, 0, CREATIVE_HORSE_AGE_MAX)
@@ -115,7 +138,7 @@ export function CreativeAddSection({
       {children}
       <label className="card-creative-field">
         <span className="small muted">Joins</span>
-        <select aria-label="Joins" value={cityId} onChange={(e) => setCityId(e.target.value)}>
+        <select aria-label="Joins" value={cityId} onChange={(e) => setPicked(e.target.value)}>
           {cities.map((c) => (
             <option key={c.id} value={c.id}>
               {c.label}
@@ -148,12 +171,12 @@ export function CreativeAddSection({
         </div>
         <button
           type="button"
-          disabled={busy || !residentOk}
+          disabled={busy || !cityId || !residentOk}
           title="Stats: all four picked, or all drawn"
           onClick={() =>
             act({
               action: 'addResident',
-              cityId,
+              cityId: cityId!,
               x,
               y,
               ...(residentAge !== undefined && { age: residentAge }),
@@ -181,12 +204,12 @@ export function CreativeAddSection({
         </div>
         <button
           type="button"
-          disabled={busy || !horseOk}
+          disabled={busy || !cityId || !horseOk}
           title="Stats: all three picked, or all drawn"
           onClick={() =>
             act({
               action: 'addHorse',
-              cityId,
+              cityId: cityId!,
               x,
               y,
               ...(hAge !== undefined && { age: hAge }),

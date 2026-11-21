@@ -71,12 +71,7 @@ import { isWallOrGate } from './shared/walls.js'
 import { CreativeBar } from './CreativeBar.js'
 import { showsCreativeBar } from './creative-bar.js'
 import { CreativeSection } from './CreativeSection.js'
-import {
-  creativeCities,
-  creativeOffer,
-  defaultCreativeCity,
-  offersAnything,
-} from './creative-section.js'
+import { creativeCities, creativeOffer, offersAnything } from './creative-section.js'
 import { CreativeAddSection, CreativeResidentActions } from './CreativeResidents.js'
 import { inCityArea } from './shared/city.js'
 import { isAt, covers } from './shared/footprint.js'
@@ -2972,12 +2967,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                       key={`${x},${y}`}
                       x={x}
                       y={y}
-                      cities={cities}
-                      defaultCityId={defaultCreativeCity(
-                        cities,
-                        tileCity?.id,
-                        world.home.cityId ?? undefined,
-                      )}
+                      knownCities={cities}
+                      tileCityId={tileCity?.id}
+                      homeCityId={world.home.cityId ?? undefined}
+                      homeRealmId={world.home.realmId ?? undefined}
                     >
                       {here.map((r) => (
                         <CreativeResidentActions key={r.id} resident={r} tick={world.tick} named />
