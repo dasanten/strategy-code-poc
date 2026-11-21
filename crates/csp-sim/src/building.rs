@@ -175,6 +175,18 @@ pub fn finish_site(
     r: &Resident,
     terrain: Option<&TerrainMap>,
 ) -> bool {
+    finish_site_by(world, site, r.owner.as_deref(), r.city_id.as_deref(), terrain)
+}
+
+/// [`finish_site`] for a finisher of realm `owner` (none for an NPC city's) who lives in
+/// `city_id`: what the site becomes goes to them, as to the resident who put the last in.
+pub fn finish_site_by(
+    world: &mut WorldState,
+    site: usize,
+    owner: Option<&str>,
+    city_id: Option<&str>,
+    terrain: Option<&TerrainMap>,
+) -> bool {
     let b = &world.buildings[site];
     if b.site.is_none() || work_needed(b) > 0.0 || !materials_needed(b).is_empty() {
         return false;
@@ -198,7 +210,7 @@ pub fn finish_site(
         world.vessels.push(Vessel {
             id,
             kind,
-            realm_id: r.owner.clone(),
+            realm_id: owner.map(str::to_string),
             x: f64::from(x),
             y: f64::from(y),
             load: Stock::new(),
@@ -216,7 +228,7 @@ pub fn finish_site(
         world.siege_machines.push(SiegeMachine {
             id,
             kind,
-            realm_id: r.owner.clone(),
+            realm_id: owner.map(str::to_string),
             x,
             y,
             damage: None,
@@ -231,8 +243,8 @@ pub fn finish_site(
         let id = new_id("carriage", &mut world.next_id);
         world.carriages.push(Carriage {
             id,
-            realm_id: r.owner.clone(),
-            city_id: if r.owner.is_none() { r.city_id.clone() } else { None },
+            realm_id: owner.map(str::to_string),
+            city_id: if owner.is_none() { city_id.map(str::to_string) } else { None },
             x,
             y,
             horse_id: None,
@@ -259,12 +271,12 @@ pub fn finish_site(
     b.realm_id = None;
     let (kind, id) = (b.kind, b.id.clone());
     if kind == BuildingKind::TownHall {
-        found_city(world, &id, r.owner.as_deref());
+        found_city(world, &id, owner);
     }
     // A storage no city takes in is the builder's realm's (`CONTEXT.md`: Outpost storage).
-    if kind == BuildingKind::Storage && r.owner.is_some() {
+    if kind == BuildingKind::Storage && owner.is_some() {
         if let Some(b) = world.buildings.iter_mut().find(|b| b.id == id) {
-            b.realm_id = r.owner.clone();
+            b.realm_id = owner.map(str::to_string);
         }
     }
     true
@@ -333,33 +345,9 @@ pub fn resolve_building(
             {
                 next_tile(&mut world.residents[ri]);
             } else {
-                let id = new_id("b", &mut world.next_id);
-                let r = &world.residents[ri];
-                let site = Building {
-                    id: id.clone(),
-                    kind: part.building,
-                    city_id: laid_out_for(world, r, part.building),
-                    // The realm whose resident lays it out, until it is finished.
-                    realm_id: r.owner.clone(),
-                    x: r.x,
-                    y: r.y,
-                    stock: None,
-                    site: Some(ConstructionSite { delivered: Stock::new(), work: 0.0 }),
-                    teardown: None,
-                    closed: None,
-                    damage: None,
-                    breedings: None,
-                    decay: None,
-                    ruined_at: None,
-                    repair: None,
-                    // Only stone is written down: none is wood.
-                    material: is_stone(part.building, part.material).then_some(WallMaterial::Stone),
-                };
-                world.buildings.push(site.clone());
-                gather_pile(world, &site, size);
-                set_site_id(&mut world.residents[ri].order, id.clone());
-                let r = world.residents[ri].clone();
-                own_workplace(world, &r, part.building, &id);
+                let at = (world.residents[ri].x, world.residents[ri].y);
+                let id = lay_out_site(world, ri, at, part.building, part.material, size);
+                set_site_id(&mut world.residents[ri].order, id);
             }
             continue;
         }
@@ -398,8 +386,53 @@ pub fn resolve_building(
     if finished {
         update_city_membership(world, size);
     }
-    // Orders on a site that is finished go on (a line order to its next tile); on one that is
-    // gone, they end. `new Map(...)`: the last building with an id wins.
+    orders_follow_sites(world);
+}
+
+/// The resident at `ri` lays out a new construction site of `kind` (of `material`) at `at`, the
+/// tile they stand on in a tick, gathering the goods on its footprint into its pile; answers its id.
+/// The caller has checked that it may go there.
+pub fn lay_out_site(
+    world: &mut WorldState,
+    ri: usize,
+    at: (f64, f64),
+    kind: BuildingKind,
+    material: Option<WallMaterial>,
+    size: i32,
+) -> String {
+    let id = new_id("b", &mut world.next_id);
+    let r = &world.residents[ri];
+    let site = Building {
+        id: id.clone(),
+        kind,
+        city_id: laid_out_for(world, r, kind),
+        // The realm whose resident lays it out, until it is finished.
+        realm_id: r.owner.clone(),
+        x: at.0,
+        y: at.1,
+        stock: None,
+        site: Some(ConstructionSite { delivered: Stock::new(), work: 0.0 }),
+        teardown: None,
+        closed: None,
+        damage: None,
+        breedings: None,
+        decay: None,
+        ruined_at: None,
+        repair: None,
+        // Only stone is written down: none is wood.
+        material: is_stone(kind, material).then_some(WallMaterial::Stone),
+    };
+    world.buildings.push(site.clone());
+    gather_pile(world, &site, size);
+    let r = world.residents[ri].clone();
+    own_workplace(world, &r, kind, &id);
+    id
+}
+
+/// Orders on a site that is finished go on (a line order to its next tile); on one that is gone,
+/// they end (the end of `resolveBuilding`).
+pub fn orders_follow_sites(world: &mut WorldState) {
+    // `new Map(...)`: the last building with an id wins.
     let built = |world: &WorldState, id: &str| {
         world.buildings.iter().rev().find(|b| b.id == id).map(|b| b.site.is_none())
     };

@@ -8,6 +8,7 @@ use std::{
 use csp_server::scripts::{create_script, game_defaults};
 use csp_server::{
     auth::{create_admin, create_session, find_user_by_name},
+    config::LIVE_INVARIANT_SAMPLE_RATE,
     creative::{CreativeSpeed, TimeControls, FAST_BROADCAST_GAP, MAX_SKIP_TICKS},
     db::open_db,
     monitoring::LogSink,
@@ -362,6 +363,9 @@ async fn a_cancelled_skip_stops_between_ticks() {
         assert!(controls.skip(MAX_SKIP_TICKS));
         let mut clock = controls.subscribe();
         clock.wait_for(|c| c.skip.is_some_and(|s| s.done >= 10)).await.unwrap();
+        // The skip's ticks check invariants at the live rate, not the configured 1.0.
+        let rate = thread.run(|g, _| g.invariant_sample_rate(SETTINGS.invariant_sample_rate));
+        assert_eq!(rate.await.unwrap(), LIVE_INVARIANT_SAMPLE_RATE);
         controls.cancel_skip();
         tokio::time::sleep(Duration::from_millis(50)).await;
         let stopped_at = tick_of(&thread).await;
@@ -369,6 +373,8 @@ async fn a_cancelled_skip_stops_between_ticks() {
         tokio::time::sleep(Duration::from_millis(100)).await;
         assert_eq!(tick_of(&thread).await, stopped_at, "no tick after the cancel");
         assert!(!thread.run(|g, _| g.broadcasts.holding).await.unwrap());
+        let rate = thread.run(|g, _| g.invariant_sample_rate(SETTINGS.invariant_sample_rate));
+        assert_eq!(rate.await.unwrap(), 1.0, "back to the configured rate");
         // A step still runs exactly one tick afterwards.
         controls.step().await;
         assert_eq!(tick_of(&thread).await, stopped_at + 1);
@@ -376,4 +382,13 @@ async fn a_cancelled_skip_stops_between_ticks() {
     };
     tokio::join!(creative_loop(&thread, &controls, stopped), drive);
     thread.stop().await.unwrap();
+}
+
+#[test]
+fn a_skip_ahead_checks_invariants_at_most_at_the_live_rate() {
+    let mut g = game(FakeLog::default());
+    assert_eq!(g.invariant_sample_rate(1.0), 1.0, "outside a skip, as configured");
+    g.skipping = true;
+    assert_eq!(g.invariant_sample_rate(1.0), LIVE_INVARIANT_SAMPLE_RATE);
+    assert_eq!(g.invariant_sample_rate(0.05), 0.05, "never more than configured");
 }

@@ -32,6 +32,8 @@ mod carrying_output;
 mod city_layout;
 #[path = "coin_sums.rs"]
 mod coin_sums;
+#[path = "creative.rs"]
+mod creative;
 #[path = "crew_tile.rs"]
 mod crew_tile;
 #[path = "default_scripts.rs"]

@@ -4,6 +4,10 @@
 
 use std::path::{Path, PathBuf};
 
+/// The share of ticks whose invariants the live game checks; a creative skip ahead checks no more
+/// (`crate::server::Game::invariant_sample_rate`).
+pub const LIVE_INVARIANT_SAMPLE_RATE: f64 = 0.1;
+
 /// Where Vite serves the client in development (`apps/web/vite.config.ts`).
 const DEV_ORIGINS: &str = "http://localhost:5173,http://127.0.0.1:5173";
 
@@ -138,7 +142,7 @@ impl Config {
             sentry_dsn: non_empty("SENTRY_DSN"),
             invariant_sample_rate: number(
                 "INVARIANT_SAMPLE_RATE",
-                if is_production { 0.1 } else { 1.0 },
+                if is_production { LIVE_INVARIANT_SAMPLE_RATE } else { 1.0 },
             )?,
             slow_tick_ms: number("SLOW_TICK_MS", 800.0)?,
             origins: Origins { allowed, allow_missing: !is_production },

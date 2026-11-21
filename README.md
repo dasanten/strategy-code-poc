@@ -81,9 +81,9 @@ DB_PATH=data/test-world.db CREATIVE=1 pnpm dev
 
 (In PowerShell: `$env:DB_PATH = 'data/test-world.db'; $env:CREATIVE = '1'; pnpm dev`.)
 
-Skip ahead on the Creative bar runs ticks as fast as the machine allows. In development every
-tick checks every invariant, which is most of a tick's time on a small world (a game day takes
-about a minute); with `INVARIANT_SAMPLE_RATE=0.1`, as in production, it takes about 15 seconds.
+Skip ahead on the Creative bar runs ticks as fast as the machine allows, checking invariants at
+the live game's rate (0.1) even where every normal tick checks them all, as in development: a
+game day on a small world takes about 15 seconds.
 
 Other scripts:
 
@@ -143,6 +143,12 @@ back to back; the sockets are told at most ten times a second, so the client kee
 runs as at normal speed, only sooner. Speed and pause live in the running server, not the world: a
 restart always starts running at ×1. On the full-size world a dev tick takes about 200 ms, most of
 it checking invariants every tick: `INVARIANT_SAMPLE_RATE=0.1` lets ×10 and Max run faster.
+
+The cards of buildings and carriages, any realm's, show admins a **Creative** section: give or take
+goods in a storage (warehouse, stable, haven) or a carriage, and **Finish now** a construction site
+(with the rest of any road or wall line building on it) or the trainings at a training ground. Each
+action runs between ticks, the invariants run once after it, and the change shows with the next tick
+(press Step on a paused world).
 
 
 `npc_slow::game_year::the_new_world_runs_a_game_year_on_its_own` runs a generated world for a game

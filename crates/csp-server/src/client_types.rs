@@ -128,6 +128,8 @@ fn client_roots(cfg: &Config) -> io::Result<()> {
         crate::auth::ApiError,
         crate::checkpoints::Checkpoint,
         crate::checkpoints::CheckpointSaveRequest,
+        crate::creative::CreativeAction,
+        crate::creative::CreativeDone,
         crate::creative::CreativeSkipRequest,
         crate::creative::CreativeSpeedRequest,
         crate::creative::CreativeState,

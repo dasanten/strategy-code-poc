@@ -47,7 +47,7 @@ use crate::{
     auth::SessionSockets,
     auth::{delete_expired_sessions, now_ms},
     backup::{backup_db, Reason},
-    config::Config,
+    config::{Config, LIVE_INVARIANT_SAMPLE_RATE},
     creative::{BroadcastPace, Clock, TimeControls},
     db::{open_db, DbError},
     explored::{load_explored, save_explored},
@@ -176,6 +176,9 @@ pub struct Game<L: LogSink> {
     pub probe: Option<Box<Probe>>,
     /// How often the sockets are told of ticks: every tick, but for creative ×60 and max.
     pub broadcasts: BroadcastPace,
+    /// Whether a creative skip ahead is under way: its ticks check invariants at most at the live
+    /// rate ([`Game::invariant_sample_rate`]).
+    pub skipping: bool,
     log: Arc<L>,
 }
 
@@ -214,6 +217,7 @@ impl<L: LogSink> Game<L> {
             path_budget_ms: PATH_BUDGET_MS,
             probe: None,
             broadcasts: BroadcastPace::default(),
+            skipping: false,
             log,
         }
     }
@@ -321,6 +325,7 @@ impl<L: LogSink> Game<L> {
     /// in the tick's health.
     pub fn tick(&mut self, conn: &Connection, settings: TickSettings) -> Option<TickHealth> {
         self.saver.poll(conn);
+        let invariant_rate = self.invariant_sample_rate(settings.invariant_sample_rate);
         let Game {
             world,
             terrain,
@@ -394,8 +399,7 @@ impl<L: LogSink> Game<L> {
         let mut queues = queues.as_mut().map(|inner| Probed { inner, look: &look });
         let mut scripts = scripts.as_mut().map(|inner| Probed { inner, look: &look });
         let mut walking = Budgeted { walking, budget_ms: *path_budget_ms };
-        let mut opts =
-            TickOptions::new(reporter, settings.invariant_sample_rate, settings.slow_tick_ms);
+        let mut opts = TickOptions::new(reporter, invariant_rate, settings.slow_tick_ms);
         opts.orders = Some(&mut orders);
         opts.queues = queues.as_mut().map(|q| q as &mut dyn RunQueues);
         opts.scripts = scripts.as_mut().map(|s| s as &mut dyn RunScripts);
@@ -406,9 +410,20 @@ impl<L: LogSink> Game<L> {
         health
     }
 
+    /// The share of a tick's invariants checked: `configured`, but during a creative skip ahead at
+    /// most the live game's (Daniel, 2026-11-21), so a skip runs as fast as the live server would.
+    pub fn invariant_sample_rate(&self, configured: f64) -> f64 {
+        if self.skipping {
+            configured.min(LIVE_INVARIANT_SAMPLE_RATE)
+        } else {
+            configured
+        }
+    }
+
     /// A skip ahead's end, done or cancelled: its ticks were not broadcast, so the sockets get
     /// one full update of the world as it stands, with every chunk explored meanwhile.
     pub fn end_skip(&mut self) {
+        self.skipping = false;
         let grown = self.broadcasts.flush(std::time::Instant::now());
         if let Some(rt) = self.realtime.as_ref() {
             let explored = self.explored.lock().unwrap_or_else(|e| e.into_inner());
@@ -719,8 +734,9 @@ async fn clock_changed(clock: &mut Option<tokio::sync::watch::Receiver<Clock>>) 
 ///
 /// A skip ahead runs its ticks back to back, one `game.tick()` at a time so the jobs between
 /// ticks (the HTTP side's) still get their turn and a cancel stops it between two ticks. No other
-/// tick runs meanwhile, none of its ticks is broadcast, and at its end (done or cancelled) the
-/// sockets get one full update; the world then runs, or stays paused, as before.
+/// tick runs meanwhile, its ticks check invariants at most at the live rate, none of its ticks is
+/// broadcast, and at its end (done or cancelled) the sockets get one full update; the world then
+/// runs, or stays paused, as before.
 pub async fn tick_loop<L: LogSink + 'static>(
     game: &GameThread<L>,
     period: Duration,
@@ -754,7 +770,11 @@ pub async fn tick_loop<L: LogSink + 'static>(
                 }
                 match (clock.skip, changed.skip) {
                     (None, Some(_)) => {
-                        game.run(|g, _| g.broadcasts.holding = true).await;
+                        game.run(|g, _| {
+                            g.broadcasts.holding = true;
+                            g.skipping = true;
+                        })
+                        .await;
                     }
                     (Some(_), None) => {
                         game.run(|g, _| g.end_skip()).await;

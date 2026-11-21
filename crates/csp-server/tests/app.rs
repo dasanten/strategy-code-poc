@@ -347,12 +347,13 @@ async fn keeps_players_out_of_admin_routes() {
 
 // -------------------------------------------------------------------------------- creative mode
 
-const CREATIVE_ROUTES: [(&str, &str); 11] = [
+const CREATIVE_ROUTES: [(&str, &str); 12] = [
     ("GET", "/api/admin/creative"),
     ("POST", "/api/admin/creative/pause"),
     ("POST", "/api/admin/creative/resume"),
     ("POST", "/api/admin/creative/step"),
     ("POST", "/api/admin/creative/speed"),
+    ("POST", "/api/admin/creative/act"),
     ("POST", "/api/admin/creative/skip"),
     ("POST", "/api/admin/creative/skip/cancel"),
     ("GET", "/api/admin/creative/checkpoints"),
@@ -1321,4 +1322,72 @@ async fn serves_the_land_a_player_explored_and_names_no_other_region() {
     assert_eq!((bad.status, bad.error().as_str()), (StatusCode::BAD_REQUEST, "invalid-input"));
     let anon = call(&app, "POST", "/api/land", None, Some(json!({}))).await;
     assert_eq!(anon.status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn does_creative_actions_on_the_world_for_an_admin_on_a_creative_server() {
+    use csp_shared::world::Building;
+    let db = Db::new();
+    let terrain = TerrainMap { size: 64, tiles: vec![0; 64 * 64] };
+    let world = create_world(&terrain, 1);
+    let explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
+    let game = game_thread(&db, world, explored);
+    let mut opts = db.opts();
+    opts.game = Some(game.clone());
+    opts.creative = Some(Arc::new(csp_server::creative::TimeControls::new()));
+    let app = build_app(opts);
+    create_admin(&db.conn(), Some("Daniel"), Some("admin password")).unwrap();
+    let admin = login_as(&app, "Daniel", "admin password").await;
+    let building = |id: &str, kind: &str, x: u32, site: bool| -> Building {
+        let mut b =
+            json!({ "id": id, "kind": kind, "cityId": null, "realmId": null, "x": x, "y": 5 });
+        b["stock"] = Value::Null;
+        b["site"] = if site { json!({ "delivered": {}, "work": 0 }) } else { Value::Null };
+        b["teardown"] = Value::Null;
+        serde_json::from_value(b).unwrap()
+    };
+    let (storage, road) = (building("s1", "storage", 5, false), building("b1", "road", 20, true));
+    game.run(move |g, _| g.world.buildings.extend([storage, road])).await;
+    let url = "/api/admin/creative/act";
+
+    let give = json!({ "action": "giveGoods", "holderId": "s1", "good": "wood", "amount": 100 });
+    let done = call(&app, "POST", url, Some(&admin), Some(give)).await;
+    assert_eq!(done.json(), json!({ "message": "Gave 100 units.", "violations": [] }));
+    let take = json!({ "action": "takeGoods", "holderId": "s1", "good": "wood", "amount": 30 });
+    let done = call(&app, "POST", url, Some(&admin), Some(take)).await;
+    assert_eq!(done.json()["message"], "Took 30 units.");
+    let finish = json!({ "action": "finishNow", "buildingId": "b1" });
+    let done = call(&app, "POST", url, Some(&admin), Some(finish.clone())).await;
+    assert_eq!(done.json(), json!({ "message": "Finished.", "violations": [] }));
+    let (wood, road_site) = game
+        .run(|g, _| {
+            let b = |id: &str| g.world.buildings.iter().find(|b| b.id == id).unwrap().clone();
+            (b("s1").stock.unwrap()[&csp_shared::world::Good::Wood], b("b1").site)
+        })
+        .await
+        .unwrap();
+    assert_eq!((wood, road_site), (70.0, None));
+
+    // What can't be done is refused with why, and so is what is no creative action.
+    let again = call(&app, "POST", url, Some(&admin), Some(finish)).await;
+    assert_eq!(again.status, StatusCode::BAD_REQUEST);
+    assert!(again.json()["message"].as_str().unwrap().contains("Nothing to finish"));
+    let order = json!({ "action": "build", "residentId": "a1" });
+    let refused = call(&app, "POST", url, Some(&admin), Some(order)).await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST);
+}
+
+#[test]
+fn names_creative_actions_as_the_sim_lists_them() {
+    use csp_server::creative::CreativeAction;
+    let actions: Vec<CreativeAction> = [
+        json!({ "action": "giveGoods", "holderId": "s1", "good": "wood", "amount": 1 }),
+        json!({ "action": "takeGoods", "holderId": "s1", "good": "wood", "amount": 1 }),
+        json!({ "action": "finishNow", "buildingId": "b1" }),
+    ]
+    .into_iter()
+    .map(|v| serde_json::from_value(v).unwrap())
+    .collect();
+    let names: Vec<&str> = actions.iter().map(CreativeAction::name).collect();
+    assert_eq!(names, csp_sim::creative::CREATIVE_ACTIONS);
 }
