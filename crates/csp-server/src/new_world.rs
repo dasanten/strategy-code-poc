@@ -9,7 +9,12 @@ use std::{
     time::Instant,
 };
 
-use csp_shared::{balance::{MAP_SIZE, SMALL_WORLD_MIN_SIZE}, chunks::CHUNK_SIZE, terrain::TerrainMap, world::WorldState};
+use csp_shared::{
+    balance::{MAP_SIZE, SMALL_WORLD_MIN_SIZE},
+    chunks::CHUNK_SIZE,
+    terrain::TerrainMap,
+    world::WorldState,
+};
 use csp_sim::{
     queries::trade_org::trade_org_hq, terrain_gen::generate_terrain, trading_posts::trading_posts,
     world::generate_world,
