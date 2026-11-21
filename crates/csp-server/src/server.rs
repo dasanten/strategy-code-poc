@@ -48,6 +48,7 @@ use crate::{
     auth::{delete_expired_sessions, now_ms},
     backup::{backup_db, Reason},
     config::Config,
+    creative::{BroadcastPace, Clock, TimeControls},
     db::{open_db, DbError},
     explored::{load_explored, save_explored},
     field_check::note_script_view_changes,
@@ -173,6 +174,8 @@ pub struct Game<L: LogSink> {
     pub path_budget_ms: f64,
     /// Looks at the world through each tick, for the shadow run; none in the game.
     pub probe: Option<Box<Probe>>,
+    /// How often the sockets are told of ticks: every tick, but for creative ×60 and max.
+    pub broadcasts: BroadcastPace,
     log: Arc<L>,
 }
 
@@ -210,6 +213,7 @@ impl<L: LogSink> Game<L> {
             reporter: ServerReporter::new(Arc::clone(&log)),
             path_budget_ms: PATH_BUDGET_MS,
             probe: None,
+            broadcasts: BroadcastPace::default(),
             log,
         }
     }
@@ -287,6 +291,7 @@ impl<L: LogSink> Game<L> {
             log,
             path_budget_ms,
             probe,
+            broadcasts,
             ..
         } = self;
         let size = terrain.size;
@@ -316,6 +321,7 @@ impl<L: LogSink> Game<L> {
                 log.log(Level::WARN, json!({ "tick": world.tick }), line);
             }
             timer.time(TickPhase::Broadcast, || {
+                let Some(grown) = broadcasts.due(grown, std::time::Instant::now()) else { return };
                 if let Some(rt) = realtime.as_ref() {
                     let explored = lock();
                     let view =
@@ -615,30 +621,83 @@ async fn shutdown_signal() {
     }
 }
 
-/// Ticks `game` at start + n Ã— `period` until `stop` resolves, with the daily jobs every `day`:
-/// a slow tick skips the ticks it missed instead of rushing to catch up, so the schedule never
+/// Ticks at start + n × `period`: a slow tick skips the ticks it missed instead of rushing to
+/// catch up, so the schedule never drifts.
+fn tick_schedule(period: Duration) -> tokio::time::Interval {
+    let mut ticks = tokio::time::interval_at(tokio::time::Instant::now() + period, period);
+    ticks.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    ticks
+}
+
+/// The next tick's turn: on `schedule`, or at once without one (creative max speed).
+async fn next_tick(schedule: &mut Option<tokio::time::Interval>) {
+    match schedule {
+        Some(ticks) => {
+            ticks.tick().await;
+        }
+        None => tokio::task::yield_now().await,
+    }
+}
+
+/// The time controls' next change; never, on a server without them.
+async fn clock_changed(clock: &mut Option<tokio::sync::watch::Receiver<Clock>>) -> Clock {
+    if let Some(rx) = clock {
+        if rx.changed().await.is_ok() {
+            return *rx.borrow_and_update();
+        }
+    }
+    std::future::pending().await
+}
+
+/// Ticks `game` once every `period` until `stop` resolves, with the daily jobs every `day`: a
+/// slow tick skips the ticks it missed instead of rushing to catch up, so the schedule never
 /// drifts, and the next tick starts only once the last one is done.
+///
+/// On a creative server `controls` set the pace (`CONTEXT.md`: Creative mode): paused, no tick
+/// runs but the steps asked for, one each; at ×10 or ×60 the period is that much shorter; at max
+/// the ticks run back to back. At ×60 and max the sockets are told at most every
+/// [`crate::creative::FAST_BROADCAST_GAP`] ([`BroadcastPace`]), so clients can follow.
 pub async fn tick_loop<L: LogSink + 'static>(
     game: &GameThread<L>,
     period: Duration,
     day: Duration,
     backup_dir: Option<PathBuf>,
+    controls: Option<Arc<TimeControls>>,
     stop: impl std::future::Future<Output = ()>,
 ) {
-    let mut ticks = tokio::time::interval_at(tokio::time::Instant::now() + period, period);
-    ticks.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut clock_rx = controls.as_ref().map(|c| c.subscribe());
+    let mut clock = clock_rx.as_mut().map(|rx| *rx.borrow_and_update()).unwrap_or_default();
+    let mut schedule = clock.speed.period(period).map(tick_schedule);
     let mut daily = tokio::time::interval_at(tokio::time::Instant::now() + day, day);
     tokio::pin!(stop);
     loop {
+        let step = clock.step_waiting();
+        let running = !clock.paused;
         tokio::select! {
-            _ = ticks.tick() => {
-                game.tick().await;
-            }
+            biased;
+            _ = &mut stop => break,
             _ = daily.tick() => {
                 let dir = backup_dir.clone();
                 game.run(move |g, conn| g.daily(conn, dir.as_deref())).await;
             }
-            _ = &mut stop => break,
+            changed = clock_changed(&mut clock_rx) => {
+                if changed.speed != clock.speed || changed.paused != clock.paused {
+                    // A new pace starts its schedule afresh, a full period from now.
+                    schedule = changed.speed.period(period).map(tick_schedule);
+                    let gap = changed.speed.broadcast_gap();
+                    game.run(move |g, _| g.broadcasts.gap = gap).await;
+                }
+                clock = changed;
+            }
+            _ = std::future::ready(()), if step => {
+                game.tick().await;
+                if let Some(c) = &controls {
+                    c.stepped();
+                }
+            }
+            _ = next_tick(&mut schedule), if running => {
+                game.tick().await;
+            }
         }
     }
 }
@@ -701,6 +760,16 @@ pub async fn run(config: Config) -> Result<(), ServerError> {
     opts.web_dist = config.web_dist.clone();
     opts.game = Some(Arc::clone(&game) as Arc<dyn GameHandle>);
     opts.defaults = defaults;
+    // Creative mode's time controls, only on a server started with `CREATIVE=1` (ADR 0043).
+    let controls = config.creative.then(|| Arc::new(TimeControls::new()));
+    opts.creative = controls.clone();
+    if config.creative {
+        TracingLog.log(
+            Level::WARN,
+            json!({ "creative": true }),
+            "creative mode is on: admins can control time (never on the live server)",
+        );
+    }
     let slow_tick_ms = config.slow_tick_ms;
     opts.tick_health = Some(Arc::new(move || {
         let now = clock.elapsed().as_secs_f64() * 1000.0;
@@ -734,6 +803,7 @@ pub async fn run(config: Config) -> Result<(), ServerError> {
         Duration::from_millis(TICK_MS),
         DAY,
         config.backup_dir.clone(),
+        controls,
         stopped(stop_rx),
     )
     .await;

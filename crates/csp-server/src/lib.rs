@@ -6,6 +6,7 @@ pub mod backup;
 pub mod bench;
 pub mod client_types;
 pub mod config;
+pub mod creative;
 pub mod db;
 pub mod diplomacy;
 pub mod explored;

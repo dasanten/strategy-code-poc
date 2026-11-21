@@ -345,6 +345,74 @@ async fn keeps_players_out_of_admin_routes() {
     );
 }
 
+// -------------------------------------------------------------------------------- creative mode
+
+const CREATIVE_ROUTES: [(&str, &str); 5] = [
+    ("GET", "/api/admin/creative"),
+    ("POST", "/api/admin/creative/pause"),
+    ("POST", "/api/admin/creative/resume"),
+    ("POST", "/api/admin/creative/step"),
+    ("POST", "/api/admin/creative/speed"),
+];
+
+#[tokio::test]
+async fn refuses_every_creative_route_without_the_flag_even_for_an_admin() {
+    let db = Db::new();
+    let app = db.app();
+    create_admin(&db.conn(), Some("Daniel"), Some("admin password")).unwrap();
+    let admin = login_as(&app, "Daniel", "admin password").await;
+    for (method, path) in CREATIVE_ROUTES {
+        let res = call(&app, method, path, Some(&admin), Some(json!({ "speed": "max" }))).await;
+        assert_eq!(res.status, StatusCode::NOT_FOUND, "{method} {path}");
+        assert_eq!(res.error(), "not-found");
+    }
+    // The account says creative mode is off by leaving it out.
+    let me = call(&app, "GET", "/api/me", Some(&admin), None).await;
+    assert_eq!(me.json(), json!({ "name": "Daniel", "isAdmin": true }));
+}
+
+#[tokio::test]
+async fn lets_only_admins_use_the_time_controls_on_a_creative_server() {
+    let db = Db::new();
+    let controls = Arc::new(csp_server::creative::TimeControls::new());
+    let mut opts = db.opts();
+    opts.creative = Some(Arc::clone(&controls));
+    let app = build_app(opts);
+    create_admin(&db.conn(), Some("Daniel"), Some("admin password")).unwrap();
+    let admin = login_as(&app, "Daniel", "admin password").await;
+    sign_up(&app, "Mara", &create_invite_code(&db.conn(), None).unwrap(), "correct horse").await;
+    let mara = login_as(&app, "Mara", "correct horse").await;
+    for (method, path) in CREATIVE_ROUTES {
+        let res = call(&app, method, path, Some(&mara), Some(json!({ "speed": "max" }))).await;
+        assert_eq!(res.status, StatusCode::FORBIDDEN, "{method} {path}");
+        assert_eq!(res.error(), "not-admin");
+        let res = call(&app, method, path, None, Some(json!({ "speed": "max" }))).await;
+        assert_eq!(res.status, StatusCode::UNAUTHORIZED, "{method} {path}");
+    }
+    assert_eq!(controls.state().speed, csp_server::creative::CreativeSpeed::Normal);
+    assert!(!controls.state().paused);
+
+    // The admin's account says creative mode is on; a Player's doesn't.
+    let me = call(&app, "GET", "/api/me", Some(&admin), None).await;
+    assert_eq!(me.json(), json!({ "name": "Daniel", "isAdmin": true, "creative": true }));
+    let me = call(&app, "GET", "/api/me", Some(&mara), None).await;
+    assert_eq!(me.json(), json!({ "name": "Mara", "isAdmin": false }));
+
+    let state = call(&app, "GET", "/api/admin/creative", Some(&admin), None).await;
+    assert_eq!(state.json(), json!({ "paused": false, "speed": "normal" }));
+    let paused = call(&app, "POST", "/api/admin/creative/pause", Some(&admin), None).await;
+    assert_eq!(paused.json(), json!({ "paused": true, "speed": "normal" }));
+    let speed = json!({ "speed": "x60" });
+    let fast = call(&app, "POST", "/api/admin/creative/speed", Some(&admin), Some(speed)).await;
+    assert_eq!(fast.json(), json!({ "paused": true, "speed": "x60" }));
+    let resumed = call(&app, "POST", "/api/admin/creative/resume", Some(&admin), None).await;
+    assert_eq!(resumed.json(), json!({ "paused": false, "speed": "x60" }));
+    let bad = json!({ "speed": "x1000" });
+    let refused = call(&app, "POST", "/api/admin/creative/speed", Some(&admin), Some(bad)).await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST);
+    assert_eq!(controls.state().speed, csp_server::creative::CreativeSpeed::X60);
+}
+
 // ------------------------------------------------------------------------------------- sessions
 
 #[tokio::test]

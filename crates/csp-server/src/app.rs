@@ -50,6 +50,7 @@ use crate::auth::{
     log_in, now_ms, reset_password, sign_up, ApiErrorCode, AuthError, AuthFailure, LoginBackoff,
     SessionSockets, SessionUser, SESSION_DAYS,
 };
+use crate::creative::{CreativeSpeedRequest, CreativeState, TimeControls};
 use crate::first_day::{
     dismiss_first_day, mark_first_day, read_first_day, FirstDayLine, FIRST_DAY_DISMISS_PATH,
     FIRST_DAY_PATH,
@@ -189,6 +190,9 @@ pub struct AppOptions {
     pub tick_health: Option<Arc<dyn Fn() -> Value + Send + Sync>>,
     /// The WebSocket hub, served at `WS_PATH` with the game; without it there are no sockets.
     pub realtime: Option<Arc<crate::realtime::Realtime>>,
+    /// Creative mode's time controls (ADR 0043), only on a server started with `CREATIVE=1`.
+    /// Without them every creative route refuses, admin or not.
+    pub creative: Option<Arc<TimeControls>>,
 }
 
 impl AppOptions {
@@ -207,6 +211,7 @@ impl AppOptions {
             defaults: crate::scripts::game_defaults(),
             tick_health: None,
             realtime: None,
+            creative: None,
         }
     }
 }
@@ -328,6 +333,7 @@ struct AppState {
     sockets: Option<Arc<dyn SessionSockets + Send + Sync>>,
     defaults: &'static Defaults,
     tick_health: Option<Arc<dyn Fn() -> Value + Send + Sync>>,
+    creative: Option<Arc<TimeControls>>,
 }
 
 type Shared = Arc<AppState>;
@@ -367,6 +373,16 @@ impl User {
             return Err(fail(ApiErrorCode::NotAdmin, "Admins only."));
         }
         Ok(user)
+    }
+
+    /// The creative guard (`CONTEXT.md`: Creative mode, ADR 0043): an admin on a server started
+    /// with `CREATIVE=1`, and the server's time controls. Without the flag it refuses everyone,
+    /// admins too, as if the route were not there.
+    fn creative<'s>(&self, state: &'s AppState) -> ApiResult<&'s Arc<TimeControls>> {
+        let controls =
+            state.creative.as_ref().ok_or_else(|| fail(ApiErrorCode::NotFound, "Not found."))?;
+        self.admin()?;
+        Ok(controls)
     }
 }
 
@@ -525,10 +541,17 @@ fn chunk_param(s: &str) -> Option<i32> {
 pub struct Account {
     name: String,
     is_admin: bool,
+    /// Whether this account has creative mode: an admin on a server started with `CREATIVE=1`
+    /// (`CONTEXT.md`: Creative mode), so the game view shows the Creative bar. Sent only when
+    /// true: everywhere else (and in the socket's welcome) the account has none.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[ts(optional, as = "Option<bool>")]
+    creative: bool,
 }
 
-fn public_account(u: &SessionUser) -> Account {
-    Account { name: u.name.clone(), is_admin: u.is_admin }
+fn public_account(state: &AppState, u: &SessionUser) -> Account {
+    let creative = u.is_admin && state.creative.is_some();
+    Account { name: u.name.clone(), is_admin: u.is_admin, creative }
 }
 
 /// The session cookie for a new session (`startSession`).
@@ -548,7 +571,7 @@ async fn start_session(
 ) -> ApiResult<Response> {
     let id = user.id;
     let token = state.db(move |conn| Ok(create_session(conn, id, now_ms())?)).await?;
-    let mut res = (status, Json(public_account(&user))).into_response();
+    let mut res = (status, Json(public_account(state, &user))).into_response();
     res.headers_mut().insert(header::SET_COOKIE, session_cookie(state, &token));
     Ok(res)
 }
@@ -616,8 +639,11 @@ async fn logout(State(state): State<Shared>, headers: HeaderMap) -> ApiResult<Re
     Ok(res)
 }
 
-async fn me(Extension(user): Extension<User>) -> ApiResult<Json<Account>> {
-    Ok(Json(public_account(user.logged_in()?)))
+async fn me(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Json<Account>> {
+    Ok(Json(public_account(&state, user.logged_in()?)))
 }
 
 async fn first_day_mark(
@@ -1237,6 +1263,60 @@ async fn admin_tick_health(
     Ok(Json(summary()).into_response())
 }
 
+/// Where the Creative bar reads and sets the time controls (`CONTEXT.md`: Creative mode).
+pub const CREATIVE_PATH: &str = "/api/admin/creative";
+
+/// The time controls as they stand.
+async fn creative_state(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Json<CreativeState>> {
+    Ok(Json(user.creative(&state)?.state()))
+}
+
+/// Pauses the world: no tick runs until it is resumed or stepped.
+async fn creative_pause(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Json<CreativeState>> {
+    let controls = user.creative(&state)?;
+    controls.pause();
+    Ok(Json(controls.state()))
+}
+
+/// Runs the world again, at the speed set.
+async fn creative_resume(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Json<CreativeState>> {
+    let controls = user.creative(&state)?;
+    controls.resume();
+    Ok(Json(controls.state()))
+}
+
+/// Pauses the world and runs exactly one tick; answers once it has run.
+async fn creative_step(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Json<CreativeState>> {
+    let controls = user.creative(&state)?;
+    controls.step().await;
+    Ok(Json(controls.state()))
+}
+
+/// Sets the speed: normal, ×10, ×60 or max.
+async fn creative_speed(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    body: Bytes,
+) -> ApiResult<Json<CreativeState>> {
+    let controls = user.creative(&state)?;
+    let request: CreativeSpeedRequest = serde_json::from_slice(&body)
+        .map_err(|_| fail(ApiErrorCode::InvalidInput, "Speed must be normal, x10, x60 or max."))?;
+    controls.set_speed(request.speed);
+    Ok(Json(controls.state()))
+}
+
 /// Fastify's answer to a route it doesn't have, without the built client.
 async fn no_route(method: Method, uri: axum::http::Uri) -> Response {
     let message =
@@ -1271,6 +1351,7 @@ pub fn build_app(opts: AppOptions) -> Router {
         sockets: opts.sockets,
         defaults: opts.defaults,
         tick_health: opts.tick_health,
+        creative: opts.creative,
     });
 
     let auth = Router::new()
@@ -1300,7 +1381,13 @@ pub fn build_app(opts: AppOptions) -> Router {
         .route("/api/scripts/{id}", get(scripts_get))
         .route("/api/admin/invites", post(admin_invites))
         .route("/api/admin/password", post(admin_password))
-        .route("/api/admin/tick-health", get(admin_tick_health));
+        .route("/api/admin/tick-health", get(admin_tick_health))
+        // Creative mode (ADR 0043): they refuse unless the server runs with `CREATIVE=1`.
+        .route(CREATIVE_PATH, get(creative_state))
+        .route(&format!("{CREATIVE_PATH}/pause"), post(creative_pause))
+        .route(&format!("{CREATIVE_PATH}/resume"), post(creative_resume))
+        .route(&format!("{CREATIVE_PATH}/step"), post(creative_step))
+        .route(&format!("{CREATIVE_PATH}/speed"), post(creative_speed));
     if state.game.is_some() {
         api = api
             .route("/api/terrain/{cx}/{cy}", get(terrain_chunk))

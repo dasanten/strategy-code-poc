@@ -8,6 +8,7 @@ use std::{
 use csp_server::scripts::{create_script, game_defaults};
 use csp_server::{
     auth::{create_admin, create_session, find_user_by_name},
+    creative::{CreativeSpeed, TimeControls, FAST_BROADCAST_GAP},
     db::open_db,
     monitoring::LogSink,
     server::{tick_loop, Game, GameThread, TickSettings},
@@ -214,6 +215,7 @@ async fn the_loop_ticks_on_schedule_until_stopped() {
         Duration::from_millis(20),
         Duration::from_secs(3600),
         None,
+        None,
         tokio::time::sleep(Duration::from_millis(210)),
     )
     .await;
@@ -222,5 +224,73 @@ async fn the_loop_ticks_on_schedule_until_stopped() {
     // One tick per period, never more: a late tick is skipped, not made up for.
     assert!(ticked >= 1, "{ticked} ticks");
     assert!(ticked <= elapsed / 20, "{ticked} ticks in {elapsed} ms");
+    thread.stop().await.unwrap();
+}
+
+async fn tick_of(thread: &GameThread<FakeLog>) -> u64 {
+    thread.run(|g, _| g.world.tick).await.unwrap()
+}
+
+#[tokio::test]
+async fn creative_time_controls_pause_step_and_speed_up_the_loop() {
+    let thread =
+        GameThread::spawn(|| Ok((open_db(":memory:", None)?, game(FakeLog::default()))), SETTINGS)
+            .unwrap();
+    let controls = Arc::new(TimeControls::new());
+    controls.pause();
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let drive = async {
+        // Paused: no tick runs, at any speed.
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        assert_eq!(tick_of(&thread).await, 0, "paused");
+        // A step runs exactly one tick, and answers once it has.
+        controls.step().await;
+        assert_eq!(tick_of(&thread).await, 1);
+        controls.step().await;
+        controls.step().await;
+        assert_eq!(tick_of(&thread).await, 3);
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        assert_eq!(tick_of(&thread).await, 3, "still paused after the steps");
+        assert!(controls.state().paused);
+
+        // ×10 with the game's one-second tick: ten ticks a real second.
+        controls.set_speed(CreativeSpeed::X10);
+        controls.resume();
+        let (before, start) = (tick_of(&thread).await, Instant::now());
+        tokio::time::sleep(Duration::from_millis(1000)).await;
+        let ran = tick_of(&thread).await - before;
+        let elapsed = start.elapsed().as_millis() as u64;
+        assert!(ran <= elapsed / 100, "{ran} ticks in {elapsed} ms at ×10");
+        assert!(ran >= 7, "{ran} ticks in {elapsed} ms at ×10");
+        assert_eq!(thread.run(|g, _| g.broadcasts.gap).await.unwrap(), None);
+
+        // Max runs ticks back to back, and the sockets are told at most every gap.
+        controls.set_speed(CreativeSpeed::Max);
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let before = tick_of(&thread).await;
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let ran = tick_of(&thread).await - before;
+        assert!(ran > 20, "{ran} ticks in 200 ms at max");
+        assert_eq!(thread.run(|g, _| g.broadcasts.gap).await.unwrap(), Some(FAST_BROADCAST_GAP));
+
+        // Paused again, the ticks stop.
+        controls.pause();
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let held = tick_of(&thread).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(tick_of(&thread).await, held);
+        let _ = stop.send(());
+    };
+    let run = tick_loop(
+        &thread,
+        Duration::from_millis(1000),
+        Duration::from_secs(3600),
+        None,
+        Some(Arc::clone(&controls)),
+        async {
+            let _ = stopped.await;
+        },
+    );
+    tokio::join!(run, drive);
     thread.stop().await.unwrap();
 }
