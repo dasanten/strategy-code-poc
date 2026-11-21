@@ -8,6 +8,7 @@ import type {
   BuildingKind,
   Carriage,
   City,
+  CreativeDone,
   Resident,
 } from '@csp/shared-types'
 import { canWork } from './shared/stats.js'
@@ -162,4 +163,13 @@ export function pickedNumber(text: string, min: number, max: number): number | u
 export function creativeAmount(text: string): number | undefined {
   const n = Number(text.trim())
   return text.trim() !== '' && Number.isInteger(n) && n >= 1 ? n : undefined
+}
+
+/**
+ * What a creative action that was done says is wrong, or nothing: the invariants it broke, which
+ * the server reports as a tick's (ADR 0004).
+ */
+export function creativeProblem(done: CreativeDone): string | undefined {
+  if (done.violations.length === 0) return undefined
+  return `${done.message} Invariants broken: ${done.violations.join('; ')}`
 }

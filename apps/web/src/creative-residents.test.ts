@@ -3,6 +3,7 @@ import { ADULT_AGE, CHILD_YEAR_DAYS, MAX_HEALTH, TICKS_PER_GAME_DAY } from '@csp
 import {
   citiesFromPlaces,
   creativeCities,
+  creativeProblem,
   defaultCreativeCity,
   pickedNumber,
   residentActions,
@@ -81,5 +82,14 @@ describe("a Resident's Creative section", () => {
     expect(residentActions({ ...adult, health: 40 }, tick).heal).toBe(true)
     expect(residentActions({ ...adult, health: 0, downUntil: tick + 5 }, tick).heal).toBe(true)
     expect(residentActions({ bornAt: tick - 10, health: MAX_HEALTH }, tick).growUp).toBe(true)
+  })
+})
+
+describe('a creative action done', () => {
+  it('says nothing more when it broke no invariant, and names what it broke otherwise', () => {
+    expect(creativeProblem({ message: 'Ana stands on (3, 4).', violations: [] })).toBeUndefined()
+    expect(creativeProblem({ message: 'Done.', violations: ['a: b', 'c: d'] })).toBe(
+      'Done. Invariants broken: a: b; c: d',
+    )
   })
 })

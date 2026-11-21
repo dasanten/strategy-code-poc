@@ -10,11 +10,11 @@ use csp_shared::terrain::{Terrain, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_YEAR;
 use csp_shared::world::{
     Building, BuildingKind, Carriage, Good, HorseStats, RealmEventWhat, ResidentOrder, SkillName,
-    Stat, StatRecord, Stock, WorldState,
+    Stat, StatRecord, Stock, UpSide, Vessel, VesselKind, WorldState,
 };
 use csp_sim::creative::{
-    add_horse, add_resident, finish_now, give_goods, grow_up, heal, kill, take_goods, ResidentPick,
-    CREATIVE_ACTIONS,
+    add_horse, add_resident, finish_now, give_goods, grow_up, heal, kill, move_residents,
+    take_goods, ResidentPick, CREATIVE_ACTIONS,
 };
 use csp_sim::horses::HORSE_NAMES;
 use csp_sim::orders::order_kinds;
@@ -372,4 +372,154 @@ fn kill_is_a_normal_death_and_a_killed_leader_follows_the_leader_death_rules() {
     assert!(world.cities[0].realm_id.is_none());
     assert_sound(&world, &terrain);
     assert!(kill(&mut world, "w3", terrain.size).is_err());
+}
+
+// ------------------------------------------------------------------------------------- move
+
+fn ids(list: &[&str]) -> Vec<String> {
+    list.iter().map(|s| s.to_string()).collect()
+}
+
+#[test]
+fn a_moved_resident_stands_on_the_tile_with_no_way_and_keeps_what_they_carry() {
+    let (mut world, terrain, mut orders) = city_world(4.0, 4.0);
+    let walk = json!({ "kind": "walkTo", "residentId": "w1", "x": 20, "y": 4 });
+    let _ = order(&mut world, &mut orders, &player(7), walk, &terrain);
+    assert!(world.residents[0].order.is_some(), "on their way");
+    world.residents[0].carried.insert(Good::Wood, 3.0);
+    world.residents[0].up = Some(UpSide::Inside);
+
+    let said = move_residents(&mut world, &terrain, &ids(&["w1"]), (15.4, 18.9)).unwrap();
+    let r = &world.residents[0];
+    assert_eq!((r.x, r.y), (15.0, 18.0));
+    assert_eq!(r.order, None, "their way is dropped");
+    assert_eq!(r.up, None, "on the ground");
+    assert_eq!(r.carried.get(&Good::Wood), Some(&3.0));
+    assert!(said.contains("(15, 18)"), "{said}");
+    assert_sound(&world, &terrain);
+}
+
+#[test]
+fn a_group_moves_all_at_once_and_a_riders_horse_comes_along() {
+    let (mut world, terrain, _) = city_world(4.0, 4.0);
+    resident(&mut world, "w2", 6.0, 6.0);
+    let mut rand = csp_sim::random::Mulberry32::new(1.0);
+    let fields = csp_sim::horses::NewHorse {
+        id: "h1".into(),
+        realm_id: Some("r1".into()),
+        city_id: None,
+        x: 6.0,
+        y: 6.0,
+        tick: 0.0,
+    };
+    world.horses.push(csp_sim::horses::new_horse(&mut || rand.next(), fields));
+    at(&mut world, "w2").riding = Some("h1".into());
+
+    let said = move_residents(&mut world, &terrain, &ids(&["w1", "w2"]), (12.0, 3.0)).unwrap();
+    assert_eq!(said, "2 residents stand on (12, 3).");
+    for r in &world.residents {
+        assert_eq!((r.x, r.y), (12.0, 3.0), "{}", r.id);
+    }
+    assert_eq!((world.horses[0].x, world.horses[0].y), (12.0, 3.0));
+    assert_eq!(at(&mut world, "w2").riding.as_deref(), Some("h1"));
+    assert_sound(&world, &terrain);
+}
+
+#[test]
+fn a_move_refuses_water_without_a_vessel_a_wall_and_off_the_map_and_moves_nobody() {
+    let (mut world, mut terrain, _) = city_world(4.0, 4.0);
+    let lake = (terrain.size * 8 + 8) as usize;
+    terrain.tiles[lake] = Terrain::Lake as u8;
+    let mut wall = building("wl", BuildingKind::Wall, 14.0, 14.0);
+    wall.city_id = Some("c1".into());
+    world.buildings.push(wall);
+    resident(&mut world, "w2", 6.0, 6.0);
+    let both = ids(&["w1", "w2"]);
+
+    for (to, why) in [
+        ((8.0, 8.0), "water without a vessel"),
+        ((14.0, 14.0), "wall"),
+        ((-1.0, 3.0), "off the map"),
+    ] {
+        let refused = move_residents(&mut world, &terrain, &both, to).unwrap_err();
+        assert!(refused.contains(why), "{refused}");
+    }
+    assert_eq!(
+        move_residents(&mut world, &terrain, &ids(&["w1", "nobody"]), (3.0, 3.0)),
+        Err("No such resident.".into())
+    );
+    assert_eq!((world.residents[0].x, world.residents[1].x), (4.0, 6.0), "nobody moved");
+}
+
+#[test]
+fn a_move_onto_water_with_a_vessel_of_their_realm_takes_them_aboard() {
+    let (mut world, mut terrain, _) = city_world(4.0, 4.0);
+    let lake = (terrain.size * 8 + 8) as usize;
+    terrain.tiles[lake] = Terrain::Lake as u8;
+    let boat = |realm: Option<&str>| Vessel {
+        id: "b1".into(),
+        kind: VesselKind::Boat,
+        realm_id: realm.map(str::to_string),
+        x: 8.0,
+        y: 8.0,
+        load: Stock::new(),
+        rower_id: None,
+        crew_ids: Vec::new(),
+    };
+    world.vessels.push(boat(Some("r2")));
+    let refused = move_residents(&mut world, &terrain, &ids(&["w1"]), (8.0, 8.0)).unwrap_err();
+    assert!(refused.contains("not of the vessel's realm"), "{refused}");
+
+    world.vessels[0] = boat(Some("r1"));
+    move_residents(&mut world, &terrain, &ids(&["w1"]), (8.0, 8.0)).unwrap();
+    assert_eq!(world.residents[0].aboard.as_deref(), Some("b1"));
+    assert_sound(&world, &terrain);
+    // And off it again onto land.
+    move_residents(&mut world, &terrain, &ids(&["w1"]), (3.0, 3.0)).unwrap();
+    assert_eq!(world.residents[0].aboard, None);
+    assert_sound(&world, &terrain);
+}
+
+// ----------------------------------------------------------------------------------- reveal
+
+#[test]
+fn a_reveal_shows_the_whole_world_and_inside_it_and_leaves_the_players_sight_as_it_is() {
+    use csp_shared::protocol::SeenEntity;
+    use csp_sim::sight::{entities_in_sight, entities_revealed, SightCache};
+    use csp_sim::world_index::WorldIndex;
+
+    let terrain = plains(128);
+    let mut world = empty_world(&terrain);
+    world.realms.push(realm("r1", 7, "w1"));
+    resident(&mut world, "w1", 4.0, 4.0);
+    // Another realm's resident and storage, across the (wrapping) map out of sight.
+    world.residents.push(new_resident("far", Some("r2"), 66.0, 66.0));
+    let mut storage = building("s2", BuildingKind::Storage, 64.0, 64.0);
+    storage.realm_id = Some("r2".into());
+    storage.stock = Some(Stock::from([(Good::Wood, 5.0)]));
+    world.buildings.push(storage);
+    let index = WorldIndex::new(&world, terrain.size);
+    let ids = |seen: &[SeenEntity]| seen.iter().map(|e| e.id().to_string()).collect::<Vec<_>>();
+
+    let mut cache = SightCache::open(terrain.size);
+    let before = entities_in_sight(&world, &index, Some("r1"), Some(&mut cache));
+    assert_eq!(ids(&before), ["w1"]);
+
+    let revealed = entities_revealed(&world, &index, "r1");
+    assert_eq!(ids(&revealed), ["w1", "far", "s2"]);
+    let inside = revealed.iter().find_map(|e| match e {
+        SeenEntity::Building(b) => b.building.stock.clone(),
+        _ => None,
+    });
+    assert_eq!(inside, Some(Stock::from([(Good::Wood, 5.0)])), "inside storages too");
+    let fares = revealed.iter().find_map(|e| match e {
+        SeenEntity::Resident(r) if r.id == "far" => r.health,
+        _ => None,
+    });
+    assert!(fares.is_some(), "and how everyone fares");
+
+    // The Player's sight, and so what their scripts see, is as it was, cached or not.
+    let after = entities_in_sight(&world, &index, Some("r1"), Some(&mut cache));
+    assert_eq!(ids(&after), ["w1"]);
+    assert_eq!(ids(&entities_in_sight(&world, &index, Some("r1"), None)), ["w1"]);
 }

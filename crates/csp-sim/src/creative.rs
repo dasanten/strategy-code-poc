@@ -10,13 +10,14 @@
 //!   tick of work.
 //! - **Residents and horses:** add a Resident (age, stats and skills picked) or a horse to a realm
 //!   on a tile; heal a Resident, grow a child up, or kill one by a normal death.
+//! - **Move:** a Resident or a group stands on a tile at once, their way and work dropped.
 
 use csp_shared::balance::{
     ticks_for_age, ADULT_AGE, CREATIVE_HORSE_AGE_MAX, CREATIVE_STAT_MAX, LIFESPAN_MIN, MAP_SIZE,
-    MAX_HEALTH, SKILL_MAX,
+    MAX_HEALTH, PASSENGER_WEIGHT, SKILL_MAX,
 };
 use csp_shared::footprint::is_at;
-use csp_shared::terrain::{is_passable_terrain, terrain_at, TerrainMap};
+use csp_shared::terrain::{is_passable_terrain, is_water, terrain_at, tile_index, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_YEAR;
 use csp_shared::world::{
     BuildingKind, DeathCause, Good, HorseStats, RealmEventWhat, ResidentOrder, SkillName, Stat,
@@ -31,8 +32,8 @@ use crate::horses::{new_horse, NewHorse};
 use crate::names::resident_names_taken;
 use crate::queries::balance::{skill_value, training_gain};
 use crate::queries::building::{
-    build_problem_for, construction_index_at, is_stone, line_building, line_kind_at, materials_of,
-    teacher_at, work_of, TerrainLookup, KEEPS_GOODS,
+    build_problem_for, carriage_can_go_to, construction_index_at, is_stone, line_building,
+    line_kind_at, materials_of, teacher_at, work_of, TerrainLookup, KEEPS_GOODS,
 };
 use crate::queries::carriages::carriage_capacity;
 use crate::queries::goods::take_out;
@@ -40,10 +41,12 @@ use crate::queries::js_round;
 use crate::queries::names::placed;
 use crate::queries::residents::can_work;
 use crate::queries::residents::{good_weight, stock_weight};
+use crate::queries::vessels::vessel_room;
 use crate::random::{hash_str, new_id, Mulberry32};
 use crate::residents::{new_resident, NewResident};
 use crate::survival::die_all;
 use crate::training::learn;
+use crate::walls::{wall_map, WallKind};
 
 /// The most ticks of training [`finish_now`] runs for one trainee: far more than any training
 /// to its ceiling takes, so it only stops one that would never end.
@@ -313,8 +316,17 @@ fn train_to_the_end(
 
 /// The creative actions as the server's creative route names them: none is an order kind or a
 /// script call.
-pub const CREATIVE_ACTIONS: [&str; 8] =
-    ["giveGoods", "takeGoods", "finishNow", "addResident", "addHorse", "heal", "growUp", "kill"];
+pub const CREATIVE_ACTIONS: [&str; 9] = [
+    "giveGoods",
+    "takeGoods",
+    "finishNow",
+    "addResident",
+    "addHorse",
+    "heal",
+    "growUp",
+    "kill",
+    "moveResidents",
+];
 
 /// Who a creative Resident or horse joins: a city and its realm. A Player's city gives them to its
 /// realm; an NPC city, trading post or the Trade Organization's HQ keeps them as its own (no
@@ -503,5 +515,106 @@ pub fn kill(world: &mut WorldState, id: &str, size: i32) -> Result<String, Strin
         (false, _) => format!("{name} is dead."),
         (true, true) => format!("{name}, the Leader, is dead; the heir takes over."),
         (true, false) => format!("{name}, the Leader, is dead; the realm has ended."),
+    })
+}
+
+/// Moves the residents `ids` (one, or a group) to the tile `(x, y)` at once (`CONTEXT.md`:
+/// Creative mode, move): they stand there now, their order (the way they walked, the work they
+/// did) dropped, what they carry kept. A rider's horse comes along where a horse may go; elsewhere
+/// they get off and it stays. Whoever leaves a carriage, vessel or siege machine is off it and out
+/// of its crew, and one up on a wall walk is on the ground.
+///
+/// The tile must be one a resident may stand on: land, or water only with a vessel there that
+/// takes them all aboard (of their realm, with room); never a wall, which is reached only up on
+/// its walk. All of them move, or none. Answers what was done, for the admin.
+pub fn move_residents(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    ids: &[String],
+    (x, y): (f64, f64),
+) -> Result<String, String> {
+    let mut moved: Vec<usize> = Vec::new();
+    for id in ids {
+        let i = resident_at(world, id)?;
+        if !moved.contains(&i) {
+            moved.push(i);
+        }
+    }
+    if moved.is_empty() {
+        return Err("Pick a resident to move.".into());
+    }
+    let (tx, ty) = (x.floor(), y.floor());
+    let on_map = |v: f64| v.is_finite() && v >= 0.0 && v < f64::from(terrain.size);
+    if !on_map(tx) || !on_map(ty) {
+        return Err("That tile is off the map.".into());
+    }
+    let (ix, iy) = (tx as i32, ty as i32);
+    let ground = terrain_at(terrain, ix, iy);
+    // On water, the vessel there takes them aboard.
+    let vessel = if is_water(ground) {
+        let v = world
+            .vessels
+            .iter()
+            .find(|v| (v.x as i32, v.y as i32) == (ix, iy))
+            .ok_or("Nobody can stand on water without a vessel there.")?;
+        let boarding: Vec<usize> = moved
+            .iter()
+            .copied()
+            .filter(|&i| world.residents[i].aboard.as_deref() != Some(v.id.as_str()))
+            .collect();
+        let stranger = boarding.iter().find(|&&i| {
+            let owner = world.residents[i].owner.as_deref();
+            owner.is_none() || owner != v.realm_id.as_deref()
+        });
+        if let Some(&i) = stranger {
+            return Err(format!("{} is not of the vessel's realm.", world.residents[i].name));
+        }
+        if vessel_room(world, v) + 1e-9 < boarding.len() as f64 * PASSENGER_WEIGHT {
+            return Err("The vessel there has no room for them all.".into());
+        }
+        Some(v.id.clone())
+    } else if !is_passable_terrain(ground) {
+        return Err("Nobody can stand on that tile.".into());
+    } else {
+        let walls = wall_map(world, terrain);
+        let wall = walls.tiles.get(&tile_index(terrain.size, ix, iy));
+        if wall.is_some_and(|w| w.kind == WallKind::Wall) {
+            return Err(
+                "Nobody stands on a wall from the ground: it is reached up on its walk.".into()
+            );
+        }
+        None
+    };
+    let horses_go = vessel.is_none() && carriage_can_go_to(world, terrain, ix, iy);
+    for &i in &moved {
+        let id = world.residents[i].id.clone();
+        if world.residents[i].aboard != vessel {
+            for v in &mut world.vessels {
+                v.crew_ids.retain(|c| *c != id);
+                if v.rower_id.as_deref() == Some(id.as_str()) {
+                    v.rower_id = None;
+                }
+            }
+        }
+        for m in &mut world.siege_machines {
+            m.crew_ids.retain(|c| *c != id);
+        }
+        let r = &mut world.residents[i];
+        r.order = None;
+        r.interrupted = None;
+        r.up = None;
+        r.aboard = vessel.clone();
+        r.x = tx;
+        r.y = ty;
+        let ridden = if horses_go { r.riding.clone() } else { r.riding.take() };
+        if let Some(h) = ridden.and_then(|h| world.horses.iter_mut().find(|x| x.id == h)) {
+            h.x = tx;
+            h.y = ty;
+        }
+    }
+    let at = format!("({tx}, {ty})");
+    Ok(match moved.as_slice() {
+        [i] => format!("{} stands on {at}.", world.residents[*i].name),
+        _ => format!("{} residents stand on {at}.", moved.len()),
     })
 }

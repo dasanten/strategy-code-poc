@@ -155,6 +155,15 @@ Tile cards add a **Resident** (age, stats and skills picked, or left empty to be
 on the tile, like the Resident card, has **Heal** (wounds close, a Down one wakes), **Grow up** (a
 child becomes an adult) and **Kill** (a normal death; a Leader's follows the Leader death rules).
 
+**Move** on a Resident's card, or on a group's, then a tile on the map: they stand there at once,
+their way and work dropped, what they carry kept (a rider's horse comes along). Water takes them
+only aboard a vessel of their realm with room there; a wall never.
+
+**Reveal** on the Creative bar shows your game view the whole map, fog lifted, every tile and
+thing as the admin map does, until you switch it off. It is kept by the server for your login
+session, never in the world: your sight and your scripts' stay as they are. Switching it reloads
+the game view.
+
 
 `npc_slow::game_year::the_new_world_runs_a_game_year_on_its_own` runs a generated world for a game
 year (about 50 min in release; ignored for time). It fails on the game day an NPC city starves out

@@ -374,6 +374,8 @@ export type Picking =
   | 'roadTo'
   | 'wallFrom'
   | 'wallTo'
+  /** Creative mode: where to move them at once (`CONTEXT.md`: Creative mode). */
+  | 'creativeMove'
 
 /** What a haul route carries, picked before its other stop (`CONTEXT.md`: Haul route). */
 export interface HaulSetup {
@@ -1668,6 +1670,7 @@ export function GroupCard({
   relocate,
   seen = {},
   mapSize,
+  creative,
 }: {
   residents: Resident[]
   scripts: ScriptSummary[]
@@ -1724,6 +1727,8 @@ export function GroupCard({
   seen?: GroupSeen
   /** Tiles along each side of the map. */
   mapSize?: number
+  /** The Creative section, for an admin on a creative server (`CreativeGroupMove`). */
+  creative?: ReactNode
 }) {
   // Two of one name are told apart by age and city (`CONTEXT.md`: Game-given names).
   const card = groupCard(tick === undefined ? residents : labelled(residents, tick, cities))
@@ -2197,6 +2202,7 @@ export function GroupCard({
               : 'Right-click the map to walk them there. Hold Shift with any order to queue it.'}
         </p>
       )}
+      {creative}
     </SelectionCard>
   )
 }
@@ -2219,6 +2225,8 @@ export type GroupPicking =
   | 'fetchFrom'
   | 'attack'
   | 'climb'
+  /** Creative mode: where to move them at once (`CONTEXT.md`: Creative mode). */
+  | 'creativeMove'
 
 /** What a group order picked on the map needs besides the tile: a haul route's goods, a good. */
 export interface GroupPickWith {

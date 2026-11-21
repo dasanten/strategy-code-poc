@@ -234,11 +234,14 @@ export function CreativeResidentActions({
   resident: r,
   tick,
   named = false,
+  move,
 }: {
   resident: CreativeResident
   tick: number
   /** Says whose row it is: on the tile card, where several Residents may stand. */
   named?: boolean
+  /** Move: picks the tile on the map they stand on at once (their own card only). */
+  move?: CreativeMove
 }) {
   const { busy, said, act } = useCreativeAct()
   const can = residentActions(r, tick)
@@ -271,6 +274,7 @@ export function CreativeResidentActions({
       >
         Kill
       </button>
+      {move && <MoveButton move={move} />}
     </div>
   )
   if (named) {
@@ -286,6 +290,43 @@ export function CreativeResidentActions({
       <h3 title="Creative mode: for testing, never play">Creative</h3>
       {buttons}
       <CreativeSaid said={said} />
+    </section>
+  )
+}
+
+/** Move in creative mode: whether the map is picking the tile, and what switches that. */
+export interface CreativeMove {
+  picking: boolean
+  onPick: () => void
+}
+
+/**
+ * Move (`CONTEXT.md`: Creative mode): pick a tile on the map, and the Resident (or each of the
+ * group) stands there at once, their way and work dropped, what they carry kept. Pressed while
+ * the map waits for the tile; pressed again, it stops waiting.
+ */
+function MoveButton({ move }: { move: CreativeMove }) {
+  return (
+    <button
+      type="button"
+      className={move.picking ? 'on' : undefined}
+      aria-pressed={move.picking}
+      title="Pick a tile: they stand there at once, their way and work dropped, what they carry kept"
+      onClick={move.onPick}
+    >
+      Move
+    </button>
+  )
+}
+
+/** The Creative section of a group's card (`CONTEXT.md`: Creative mode): move them all at once. */
+export function CreativeGroupMove({ move }: { move: CreativeMove }) {
+  return (
+    <section className="card-creative" aria-label="Creative">
+      <h3 title="Creative mode: for testing, never play">Creative</h3>
+      <div className="card-creative-goods">
+        <MoveButton move={move} />
+      </div>
     </section>
   )
 }

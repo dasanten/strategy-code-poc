@@ -71,8 +71,12 @@ import { isWallOrGate } from './shared/walls.js'
 import { CreativeBar } from './CreativeBar.js'
 import { showsCreativeBar } from './creative-bar.js'
 import { CreativeSection } from './CreativeSection.js'
-import { creativeCities, creativeOffer, offersAnything } from './creative-section.js'
-import { CreativeAddSection, CreativeResidentActions } from './CreativeResidents.js'
+import { creativeCities, creativeOffer, creativeProblem, offersAnything } from './creative-section.js'
+import {
+  CreativeAddSection,
+  CreativeGroupMove,
+  CreativeResidentActions,
+} from './CreativeResidents.js'
 import { inCityArea } from './shared/city.js'
 import { isAt, covers } from './shared/footprint.js'
 import { targetParam } from './shared/default-scripts.js'
@@ -1090,6 +1094,26 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [dismissedVisits, setDismissedVisits] = useState<ReadonlySet<string>>(new Set())
 
   /**
+   * Moves residents to a tile at once (`CONTEXT.md`: Creative mode): a creative action, no order.
+   * Answers why it was refused or what it broke, or nothing; they show there with the next tick.
+   */
+  async function creativeMove(residentIds: string[], x: number, y: number) {
+    if (!world) return undefined
+    const size = world.map.size
+    try {
+      const done = await api.creativeAct({
+        action: 'moveResidents',
+        residentIds,
+        x: wrap(x, size),
+        y: wrap(y, size),
+      })
+      return creativeProblem(done)
+    } catch (e: unknown) {
+      return e instanceof Error ? e.message : String(e)
+    }
+  }
+
+  /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
    * carriage on their tile there, or, while picking a haul route's other stop, to haul between
    * their tile and that one, or, while picking a road's or wall's two ends, to build it along the
@@ -1149,6 +1173,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return
     }
     if (!selected) return
+    if (mode === 'creativeMove') {
+      setOrderError(await creativeMove([selected.id], x, y))
+      return
+    }
     // One of a siege machine's crew pushes it there (`CONTEXT.md`: Siege machine).
     if (mode === 'push' && pushing) {
       const order = { kind: 'push', residentId: selected.id, machineId: pushing, x, y }
@@ -1633,6 +1661,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const mode = groupPicking
     setGroupPicking(false)
     if (!world) return
+    if (mode === 'creativeMove') {
+      setGroupError(await creativeMove(group.map((r) => r.id), x, y))
+      return
+    }
     if (mode === 'build') {
       setGroupBuildAt({ x, y })
       return
@@ -3169,7 +3201,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               resident={selected}
               creative={
                 showsCreativeBar(account) && (
-                  <CreativeResidentActions resident={selected} tick={world.tick} />
+                  <CreativeResidentActions
+                    resident={selected}
+                    tick={world.tick}
+                    move={{
+                      picking: picking === 'creativeMove',
+                      onPick: () =>
+                        setPicking((p) => (p === 'creativeMove' ? false : 'creativeMove')),
+                    }}
+                  />
                 )
               }
               arrivesIn={arrivesIn || undefined}
@@ -3467,6 +3507,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             residents={group}
             seen={groupSeen}
             mapSize={world.map.size}
+            creative={
+              showsCreativeBar(account) && (
+                <CreativeGroupMove
+                  move={{
+                    picking: groupPicking === 'creativeMove',
+                    onPick: () =>
+                      setGroupPicking((p) => (p === 'creativeMove' ? false : 'creativeMove')),
+                  }}
+                />
+              )
+            }
             relocate={relocateForGroup(group)}
             cities={knownCities}
             scripts={scripts}

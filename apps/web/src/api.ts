@@ -25,6 +25,7 @@ import type {
   CreateScriptRequest,
   CreativeAction,
   CreativeDone,
+  CreativeReveal,
   CreativeSkipRequest,
   CreativeSpeed,
   CreativeSpeedRequest,
@@ -141,6 +142,11 @@ export const api = {
   creativeSkip: (request: CreativeSkipRequest) =>
     call<CreativeState>('POST', `${CREATIVE_PATH}/skip`, request),
   creativeSkipCancel: () => call<CreativeState>('POST', `${CREATIVE_PATH}/skip/cancel`),
+  // Reveal (`CONTEXT.md`: Creative mode): this session's game view shows the whole map; switching
+  // it reloads the game view.
+  creativeReveal: () => call<CreativeReveal>('GET', `${CREATIVE_PATH}/reveal`),
+  creativeSetReveal: (on: boolean) =>
+    call<CreativeReveal>('POST', `${CREATIVE_PATH}/reveal`, { on } satisfies CreativeReveal),
   // Checkpoints (`CONTEXT.md`: Creative mode): named copies of the world, saved and restored live.
   checkpoints: () => call<Checkpoint[]>('GET', CHECKPOINTS_PATH),
   saveCheckpoint: (name: string) =>
