@@ -667,6 +667,13 @@ pub const HORSE_START_AGE_MIN: f64 = 3.0;
 
 pub const HORSE_START_AGE_MAX: f64 = 8.0;
 
+/// The most a base stat picked for a Resident or horse added in creative mode can be (`CONTEXT.md`:
+/// Creative mode): well past any drawn one, to test the extremes.
+pub const CREATIVE_STAT_MAX: f64 = 30.0;
+
+/// The oldest a horse added in creative mode can be, in game years.
+pub const CREATIVE_HORSE_AGE_MAX: f64 = 30.0;
+
 /// How much faster a horse pulls its carriage for each point of Speed above average (slower below).
 pub const HORSE_SPEED_EFFECT: f64 = 0.04;
 
@@ -3361,6 +3368,8 @@ pub fn balance_json() -> Value {
     m.insert("AVERAGE_HORSE_STATS".into(), to_value(AVERAGE_HORSE_STATS).expect("serialisable"));
     m.insert("HORSE_START_AGE_MIN".into(), json!(HORSE_START_AGE_MIN));
     m.insert("HORSE_START_AGE_MAX".into(), json!(HORSE_START_AGE_MAX));
+    m.insert("CREATIVE_STAT_MAX".into(), json!(CREATIVE_STAT_MAX));
+    m.insert("CREATIVE_HORSE_AGE_MAX".into(), json!(CREATIVE_HORSE_AGE_MAX));
     m.insert("HORSE_SPEED_EFFECT".into(), json!(HORSE_SPEED_EFFECT));
     m.insert("HORSE_SPEED_LIMIT".into(), json!(HORSE_SPEED_LIMIT));
     m.insert("HORSE_STRENGTH_EFFECT".into(), json!(HORSE_STRENGTH_EFFECT));

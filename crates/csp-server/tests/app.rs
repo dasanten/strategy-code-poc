@@ -1375,6 +1375,40 @@ async fn does_creative_actions_on_the_world_for_an_admin_on_a_creative_server() 
     let order = json!({ "action": "build", "residentId": "a1" });
     let refused = call(&app, "POST", url, Some(&admin), Some(order)).await;
     assert_eq!(refused.status, StatusCode::BAD_REQUEST);
+
+    // A Resident added to an NPC city with the picked age, stats and skills, then grown up and
+    // killed by hand.
+    let city = json!({
+        "id": "n1", "name": "Dunmere", "realmId": null, "townHallId": "s1", "occupation": null
+    });
+    let city = serde_json::from_value(city).unwrap();
+    game.run(move |g, _| g.world.cities.push(city)).await;
+    let add = json!({
+        "action": "addResident", "cityId": "n1", "x": 8, "y": 9, "age": 5,
+        "stats": { "strength": 20, "endurance": 4, "agility": 9, "intellect": 9 },
+        "skills": { "mining": 2 }
+    });
+    let done = call(&app, "POST", url, Some(&admin), Some(add)).await;
+    assert_eq!(done.status, StatusCode::OK, "{:?}", done.json());
+    assert!(done.json()["message"].as_str().unwrap().ends_with("joined."));
+    let added = game
+        .run(|g, _| {
+            let r = g.world.residents.iter().find(|r| r.city_id.as_deref() == Some("n1"))?;
+            Some((r.id.clone(), r.stats.strength.base, r.skills.clone()))
+        })
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(added.1, 20.0);
+    assert_eq!(added.2.get(&csp_shared::world::SkillName::Mining), Some(&2.0));
+    let grow = json!({ "action": "growUp", "residentId": added.0 });
+    let done = call(&app, "POST", url, Some(&admin), Some(grow)).await;
+    assert!(done.json()["message"].as_str().unwrap().ends_with("has grown up."));
+    let kill = json!({ "action": "kill", "residentId": added.0 });
+    let done = call(&app, "POST", url, Some(&admin), Some(kill)).await;
+    assert!(done.json()["message"].as_str().unwrap().ends_with("is dead."));
+    let left = game.run(|g, _| g.world.residents.len()).await.unwrap();
+    assert_eq!(left, 0);
 }
 
 #[test]
@@ -1384,6 +1418,11 @@ fn names_creative_actions_as_the_sim_lists_them() {
         json!({ "action": "giveGoods", "holderId": "s1", "good": "wood", "amount": 1 }),
         json!({ "action": "takeGoods", "holderId": "s1", "good": "wood", "amount": 1 }),
         json!({ "action": "finishNow", "buildingId": "b1" }),
+        json!({ "action": "addResident", "cityId": "c1", "x": 1, "y": 2 }),
+        json!({ "action": "addHorse", "cityId": "c1", "x": 1, "y": 2 }),
+        json!({ "action": "heal", "residentId": "r1" }),
+        json!({ "action": "growUp", "residentId": "r1" }),
+        json!({ "action": "kill", "residentId": "r1" }),
     ]
     .into_iter()
     .map(|v| serde_json::from_value(v).unwrap())

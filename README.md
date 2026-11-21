@@ -150,6 +150,11 @@ goods in a storage (warehouse, stable, haven) or a carriage, and **Finish now** 
 action runs between ticks, the invariants run once after it, and the change shows with the next tick
 (press Step on a paused world).
 
+Tile cards add a **Resident** (age, stats and skills picked, or left empty to be drawn) or a
+**horse** on the tile to a city and its realm (the tile's city, else your own), and every Resident
+on the tile, like the Resident card, has **Heal** (wounds close, a Down one wakes), **Grow up** (a
+child becomes an adult) and **Kill** (a normal death; a Leader's follows the Leader death rules).
+
 
 `npc_slow::game_year::the_new_world_runs_a_game_year_on_its_own` runs a generated world for a game
 year (about 50 min in release; ignored for time). It fails on the game day an NPC city starves out

@@ -15,8 +15,9 @@ use std::{
 
 use csp_shared::terrain::TerrainMap;
 use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_HOUR, TICKS_PER_GAME_YEAR};
-use csp_shared::world::{Good, WorldState};
+use csp_shared::world::{Good, HorseStats, SkillName, StatRecord, WorldState};
 use csp_sim::creative;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 use ts_rs::TS;
@@ -255,6 +256,40 @@ pub enum CreativeAction {
     /// Finishes a construction site (and the road or wall lines building on it) or the trainings
     /// at a training ground now.
     FinishNow { building_id: String },
+    /// Adds a Resident on a tile to a city and its realm, with an age (game years), base stats
+    /// and skills picked; what is left out is drawn as for a starting city's resident.
+    AddResident {
+        city_id: String,
+        x: f64,
+        y: f64,
+        #[serde(default)]
+        #[ts(optional)]
+        age: Option<f64>,
+        #[serde(default)]
+        #[ts(optional)]
+        stats: Option<StatRecord<f64>>,
+        #[serde(default)]
+        #[ts(optional, as = "Option<IndexMap<SkillName, f64>>")]
+        skills: IndexMap<SkillName, f64>,
+    },
+    /// Adds a horse on a tile to a city and its realm, with an age and stats picked or drawn.
+    AddHorse {
+        city_id: String,
+        x: f64,
+        y: f64,
+        #[serde(default)]
+        #[ts(optional)]
+        age: Option<f64>,
+        #[serde(default)]
+        #[ts(optional)]
+        stats: Option<HorseStats>,
+    },
+    /// Heals a Resident: wounds close and a Down one wakes.
+    Heal { resident_id: String },
+    /// Grows a child up now, as if the years had passed.
+    GrowUp { resident_id: String },
+    /// Kills a Resident by a normal death (Leader death rules for a Leader).
+    Kill { resident_id: String },
 }
 
 impl CreativeAction {
@@ -264,6 +299,11 @@ impl CreativeAction {
             CreativeAction::GiveGoods { .. } => "giveGoods",
             CreativeAction::TakeGoods { .. } => "takeGoods",
             CreativeAction::FinishNow { .. } => "finishNow",
+            CreativeAction::AddResident { .. } => "addResident",
+            CreativeAction::AddHorse { .. } => "addHorse",
+            CreativeAction::Heal { .. } => "heal",
+            CreativeAction::GrowUp { .. } => "growUp",
+            CreativeAction::Kill { .. } => "kill",
         }
     }
 
@@ -281,6 +321,22 @@ impl CreativeAction {
             }
             CreativeAction::FinishNow { building_id } => {
                 creative::finish_now(world, &building_id, Some(terrain))
+            }
+            CreativeAction::AddResident { city_id, x, y, age, stats, skills } => {
+                let pick = creative::ResidentPick { age, stats, skills };
+                let id = creative::add_resident(world, terrain, &city_id, (x, y), &pick)?;
+                let name = world.residents.iter().find(|r| r.id == id).map(|r| r.name.clone());
+                Ok(format!("{} joined.", name.unwrap_or(id)))
+            }
+            CreativeAction::AddHorse { city_id, x, y, age, stats } => {
+                let id = creative::add_horse(world, terrain, &city_id, (x, y), age, stats)?;
+                let name = world.horses.iter().find(|h| h.id == id).map(|h| h.name.clone());
+                Ok(format!("The horse {} joined.", name.unwrap_or(id)))
+            }
+            CreativeAction::Heal { resident_id } => creative::heal(world, &resident_id),
+            CreativeAction::GrowUp { resident_id } => creative::grow_up(world, &resident_id),
+            CreativeAction::Kill { resident_id } => {
+                creative::kill(world, &resident_id, terrain.size)
             }
         }
     }
