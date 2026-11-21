@@ -2747,6 +2747,9 @@ button.residents-row.selected:hover {
    (`CONTEXT.md`: Creative mode): its dashed border marks it as a testing tool, never play. */
 .hud-creative-bar {
   pointer-events: auto;
+  /* Above the notices after it, so the Checkpoints menu opens over them. */
+  position: relative;
+  z-index: 6;
   max-width: 100%;
   box-sizing: border-box;
   display: flex;
@@ -2812,10 +2815,10 @@ button.residents-row.selected:hover {
 .hud-creative-checkpoints-panel {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
+  right: 0;
   z-index: 5;
-  min-width: 300px;
-  max-width: min(420px, 90vw);
+  width: min(380px, 90vw);
+  box-sizing: border-box;
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
@@ -2843,14 +2846,14 @@ button.residents-row.selected:hover {
   gap: 4px;
 }
 .hud-creative-checkpoints-panel li {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
   align-items: center;
   gap: 6px;
 }
 .hud-creative-checkpoint-name {
   font-weight: 600;
-  flex: 1;
+  overflow-wrap: anywhere;
 }
 .hud-creative-checkpoints-panel p {
   margin: 0;
