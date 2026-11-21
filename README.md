@@ -100,7 +100,23 @@ Every test ignored for time runs each night on `dev` (ADR 0040), so none rots: t
 tests ignored as measurements) and appends pass or fail, the failing tests and the time to the
 nightly report. An ignore reason says how long the test takes alone in the dev profile.
 
-### The year run and its checkpoints
+### Testing locally with creative mode
+
+Creative mode (`CONTEXT.md`: Creative mode, ADR 0043) lets an admin test without waiting. It exists
+only on a server started with `CREATIVE=1` (in `.env` or the environment); never set it on the
+live server. Without it every creative route answers 404, admin or not.
+
+```sh
+CREATIVE=1 pnpm dev
+```
+
+Logged in as an admin, the game view shows the **Creative bar** under the top bar: pause and
+resume the whole world, **Step** one tick (it pauses first), and run at ×1, ×10, ×60 or **Max** (ticks
+back to back; the sockets are told at most ten times a second, so the client keeps up). Every rule
+runs as at normal speed, only sooner. Speed and pause live in the running server, not the world: a
+restart always starts running at ×1. On the full-size world a dev tick takes about 200 ms, most of
+it checking invariants every tick: `INVARIANT_SAMPLE_RATE=0.1` lets ×10 and Max run faster.
+
 
 `npc_slow::game_year::the_new_world_runs_a_game_year_on_its_own` runs a generated world for a game
 year (about 50 min in release; ignored for time). It fails on the game day an NPC city starves out
