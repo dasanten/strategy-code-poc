@@ -140,6 +140,12 @@ runs as at normal speed, only sooner. Speed and pause live in the running server
 restart always starts running at ×1. On the full-size world a dev tick takes about 200 ms, most of
 it checking invariants every tick: `INVARIANT_SAMPLE_RATE=0.1` lets ×10 and Max run faster.
 
+The cards of buildings and carriages, any realm's, show admins a **Creative** section: give or take
+goods in a storage (warehouse, stable, haven) or a carriage, and **Finish now** a construction site
+(with the rest of any road or wall line building on it) or the trainings at a training ground. Each
+action runs between ticks, the invariants run once after it, and the change shows with the next tick
+(press Step on a paused world).
+
 
 `npc_slow::game_year::the_new_world_runs_a_game_year_on_its_own` runs a generated world for a game
 year (about 50 min in release; ignored for time). It fails on the game day an NPC city starves out
