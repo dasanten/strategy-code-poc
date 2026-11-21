@@ -15,9 +15,9 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    NpcCitySize, MAP_SIZE, NPC_STARTING_SITE_CLEARANCE, NPC_TOWN, NPC_TOWNS_PER_FRONTIER,
-    NPC_VILLAGE, NPC_VILLAGES_PER_FRONTIER, NPC_VILLAGES_PER_HEARTLAND, NPC_WAY_CLEARANCE,
-    TRADING_POST,
+    is_small_world, NpcCitySize, MAP_SIZE, NPC_CITY_MIN_DISTANCE, NPC_STARTING_SITE_CLEARANCE,
+    NPC_TOWN, NPC_TOWNS_PER_FRONTIER, NPC_VILLAGE, NPC_VILLAGES_PER_FRONTIER,
+    NPC_VILLAGES_PER_HEARTLAND, NPC_WAY_CLEARANCE, TRADING_POST,
 };
 use csp_shared::footprint::footprint_tiles;
 use csp_shared::terrain::{
@@ -168,6 +168,18 @@ pub fn starting_site_clearance(size: i32) -> f64 {
     (NPC_STARTING_SITE_CLEARANCE * f).max((square * std::f64::consts::SQRT_2).ceil())
 }
 
+/// How far apart the NPC cities and frontier trading posts are placed on a new world of `size`,
+/// town hall to town hall: `NPC_CITY_MIN_DISTANCE`, which a small test world (`is_small_world`)
+/// has no room for, so there it is scaled with the side, but never nearer than a starting
+/// site keeps them (`starting_site_clearance`).
+pub fn npc_city_spacing(size: i32) -> f64 {
+    if !is_small_world(size) {
+        return NPC_CITY_MIN_DISTANCE;
+    }
+    let f = f64::from(size) / f64::from(MAP_SIZE);
+    (NPC_CITY_MIN_DISTANCE * f).max(starting_site_clearance(size))
+}
+
 /// Whether `at` lies closer than `starting_site_clearance` to one of `starting`, the short way
 /// round a map of `size`.
 pub fn near_a_starting_site(starting: &[(f64, f64)], size: i32, at: (f64, f64)) -> bool {
@@ -209,6 +221,10 @@ pub fn place_on_the_land_in(
 /// How far apart candidate sites for the HQ lie, as `find_hq_site`'s.
 const HQ_SITE_STEP: usize = 24;
 
+/// How far apart candidate sites for the HQ lie on a small test world (`is_small_world`), whose
+/// little room so coarse a grid would often miss.
+const SMALL_WORLD_HQ_SITE_STEP: usize = 6;
+
 /// Places the Trade Org HQ in a frontier region (`place_trade_org_hq` on the land), unless the
 /// world has one. Returns its id; none when no frontier region has room.
 pub fn place_trade_org_hq_on(
@@ -247,8 +263,9 @@ fn find_hq_site_on(
     };
     from.extend(world.cities.iter().filter_map(|c| town_hall_of(world, c)).map(|h| (h.x, h.y)));
     let mut candidates: Vec<((i32, i32), f64, f64)> = Vec::new();
-    for y in (edge..size - edge).step_by(HQ_SITE_STEP) {
-        for x in (edge..size - edge).step_by(HQ_SITE_STEP) {
+    let step = if is_small_world(size) { SMALL_WORLD_HQ_SITE_STEP } else { HQ_SITE_STEP };
+    for y in (edge..size - edge).step_by(step) {
+        for x in (edge..size - edge).step_by(step) {
             if land.kind_at(x, y) != Some(RegionKind::Frontier)
                 || !land.clear(x - reach, y - reach, 2 * reach, side("farm"))
             {
@@ -280,6 +297,7 @@ pub fn place_trading_posts_on(
     land: &LandSites,
 ) -> Vec<String> {
     let mut m = Mulberry32::new((world.seed * 15_485_863 + 47) as f64);
+    let apart = Some(npc_city_spacing(terrain.size));
     let side = TRADING_POST.size as i32;
     let mut placed_posts = Vec::new();
     for id in land.ids_of(RegionKind::Heartland) {
@@ -291,7 +309,7 @@ pub fn place_trading_posts_on(
         let middle = (f64::from(r.x), f64::from(r.y));
         let allowed = |x: i32, y: i32| land.allows(id, x, y, side);
         let site =
-            find_trading_post_site_where(world, terrain, &square, middle, None, false, &allowed);
+            find_trading_post_site_where(world, terrain, &square, middle, None, None, &allowed);
         let Some((x, y)) = site else { continue };
         let resource = common_resource(world, &square);
         placed_posts.push(found_trading_post(world, terrain, x, y, resource, &mut || m.next()));
@@ -306,7 +324,7 @@ pub fn place_trading_posts_on(
                 && land.clear(x, y, side, FARM_RING)
         };
         let site =
-            find_trading_post_site_where(world, terrain, &square, middle, None, true, &allowed);
+            find_trading_post_site_where(world, terrain, &square, middle, None, apart, &allowed);
         let Some((x, y)) = site else { continue };
         let resource = common_resource(world, &square);
         placed_posts.push(found_trading_post(world, terrain, x, y, resource, &mut || m.next()));
@@ -387,7 +405,7 @@ pub fn find_npc_city_site_in(
         return None;
     }
     let ground = taken_ground(world, terrain);
-    let among = SiteWorld::new(world);
+    let among = SiteWorld::new(world).keeping(npc_city_spacing(terrain.size));
     for _ in 0..3000 {
         let x = x0 + FARM_RING + (rand() * f64::from(span_x)).floor() as i32;
         let y = y0 + FARM_RING + (rand() * f64::from(span_y)).floor() as i32;
