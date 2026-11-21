@@ -21,6 +21,8 @@ import type {
   ApiError,
   ClientFirstDayLine,
   CreateScriptRequest,
+  CreativeAction,
+  CreativeDone,
   CreativeSpeed,
   CreativeSpeedRequest,
   CreativeState,
@@ -128,6 +130,9 @@ export const api = {
   creativeStep: () => call<CreativeState>('POST', `${CREATIVE_PATH}/step`),
   creativeSpeed: (speed: CreativeSpeed) =>
     call<CreativeState>('POST', `${CREATIVE_PATH}/speed`, { speed } satisfies CreativeSpeedRequest),
+  // A creative action from a card's Creative section: goods, finish now (`CONTEXT.md`: Creative mode).
+  creativeAct: (action: CreativeAction) =>
+    call<CreativeDone>('POST', `${CREATIVE_PATH}/act`, action),
   // The script library: saving keeps every version; one without syntax errors becomes active.
   scripts: () => call<ScriptSummary[]>('GET', '/api/scripts'),
   script: (id: number) => call<ScriptDetail>('GET', `/api/scripts/${id}`),

@@ -70,6 +70,8 @@ import {
 import { isWallOrGate } from './shared/walls.js'
 import { CreativeBar } from './CreativeBar.js'
 import { showsCreativeBar } from './creative-bar.js'
+import { CreativeSection } from './CreativeSection.js'
+import { creativeOffer, offersAnything } from './creative-section.js'
 import { isAt, covers } from './shared/footprint.js'
 import { targetParam } from './shared/default-scripts.js'
 import { HORSE_GRANT_HORSES, PASSENGER_WEIGHT } from '@csp/balance'
@@ -2937,6 +2939,22 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   onClear={(name) => void setWorkSettings(tileBuilding.id, { [name]: null })}
                 />
               )
+            }
+            creative={
+              // Admins on a creative server act on any realm's building or carriage by hand.
+              showsCreativeBar(account) &&
+              (() => {
+                const carriage = world.carriages.find(
+                  (k) => k.x === selectedTile.x && k.y === selectedTile.y,
+                )
+                const name = tileBuilding ? BUILDING_NAMES[tileBuilding.kind].toLowerCase() : ''
+                const offer = creativeOffer(tileBuilding, carriage, name)
+                return (
+                  offersAnything(offer) && (
+                    <CreativeSection key={`${tileBuilding?.id}/${carriage?.id}`} offer={offer} />
+                  )
+                )
+              })()
             }
             realmOrders={
               // In realm control mode a building in sight starts the orders about it.

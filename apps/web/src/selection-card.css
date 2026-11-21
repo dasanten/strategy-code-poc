@@ -1003,3 +1003,35 @@ button.card-list-row:hover {
   display: grid;
   gap: 2px;
 }
+
+/* The Creative section on a building's or carriage's card, for admins on a creative server
+   (`CONTEXT.md`: Creative mode): dashed like the Creative bar, a testing tool, never play. */
+.card-creative {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px dashed var(--ui-line);
+  border-radius: 8px;
+}
+.card-creative h3 {
+  margin: 0;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.card-creative-goods {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.card-creative-goods input {
+  width: 5em;
+}
+.card-creative > button {
+  align-self: flex-start;
+}
+.card-creative-error {
+  color: var(--ui-warn);
+}

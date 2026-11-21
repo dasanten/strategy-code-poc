@@ -50,15 +50,22 @@ use crate::auth::{
     log_in, now_ms, reset_password, sign_up, ApiErrorCode, AuthError, AuthFailure, LoginBackoff,
     SessionSockets, SessionUser, SESSION_DAYS,
 };
-use crate::creative::{CreativeSpeedRequest, CreativeState, TimeControls};
+use crate::creative::{
+    CreativeAction, CreativeDone, CreativeSpeedRequest, CreativeState, TimeControls,
+};
 use crate::first_day::{
     dismiss_first_day, mark_first_day, read_first_day, FirstDayLine, FIRST_DAY_DISMISS_PATH,
     FIRST_DAY_PATH,
 };
+use crate::log::log_event;
+use crate::monitoring::{ServerReporter, TracingLog};
 use crate::scripts::{
     activate_version, create_script, delete_older_versions, delete_script, delete_version,
     get_script, list_scripts, rename_script, reset_script, save_script, Defaults,
 };
+use csp_sim::invariants::check_all;
+use csp_sim::tick::TickReporter;
+use tracing::Level;
 
 /// The session cookie's name (`SESSION_COOKIE`).
 pub const SESSION_COOKIE: &str = "csp_session";
@@ -1317,6 +1324,43 @@ async fn creative_speed(
     Ok(Json(controls.state()))
 }
 
+/// Where the Creative sections of the cards send creative actions (`CONTEXT.md`: Creative mode).
+pub const CREATIVE_ACT_PATH: &str = "/api/admin/creative/act";
+
+/// Does one creative action (`CreativeAction`) on the world between ticks, as admin directives
+/// are given, then runs every invariant once and reports what it broke as a tick's (ADR 0004).
+/// The change reaches the clients with the next tick's broadcast.
+async fn creative_act(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    body: Bytes,
+) -> ApiResult<Json<CreativeDone>> {
+    user.creative(&state)?;
+    let admin = user.logged_in()?.name.clone();
+    let game = game_of(&state)?;
+    let action: CreativeAction = serde_json::from_slice(&body)
+        .map_err(|e| fail(ApiErrorCode::InvalidInput, format!("Not a creative action: {e}")))?;
+    let name = action.name();
+    let done = with_game(game.as_ref(), move |g| {
+        let message = action.apply(g.world, g.terrain)?;
+        let violations = check_all(g.world, g.terrain);
+        if !violations.is_empty() {
+            ServerReporter::new(TracingLog).invariant_violations(g.world, &violations);
+        }
+        let violations = violations.iter().map(|v| format!("{}: {}", v.invariant, v.message));
+        Ok::<_, String>(CreativeDone { message, violations: violations.collect() })
+    })
+    .await
+    .ok_or_else(game_gone)?
+    .map_err(|e| fail(ApiErrorCode::InvalidInput, e))?;
+    log_event(
+        Level::INFO,
+        &json!({ "admin": admin, "action": name }),
+        &format!("creative action {name}: {}", done.message),
+    );
+    Ok(Json(done))
+}
+
 /// Fastify's answer to a route it doesn't have, without the built client.
 async fn no_route(method: Method, uri: axum::http::Uri) -> Response {
     let message =
@@ -1387,7 +1431,8 @@ pub fn build_app(opts: AppOptions) -> Router {
         .route(&format!("{CREATIVE_PATH}/pause"), post(creative_pause))
         .route(&format!("{CREATIVE_PATH}/resume"), post(creative_resume))
         .route(&format!("{CREATIVE_PATH}/step"), post(creative_step))
-        .route(&format!("{CREATIVE_PATH}/speed"), post(creative_speed));
+        .route(&format!("{CREATIVE_PATH}/speed"), post(creative_speed))
+        .route(CREATIVE_ACT_PATH, post(creative_act));
     if state.game.is_some() {
         api = api
             .route("/api/terrain/{cx}/{cy}", get(terrain_chunk))
