@@ -19,6 +19,8 @@ import type {
   AdminViewRequest,
   AdminWorldView,
   ApiError,
+  Checkpoint,
+  CheckpointSaveRequest,
   ClientFirstDayLine,
   CreateScriptRequest,
   CreativeSkipRequest,
@@ -44,6 +46,8 @@ import type {
 
 /** Where the Creative bar reads and sets the time controls (`CREATIVE_PATH` on the server). */
 export const CREATIVE_PATH = '/api/admin/creative'
+/** Where the Creative bar keeps checkpoints (`CHECKPOINTS_PATH` on the server). */
+export const CHECKPOINTS_PATH = `${CREATIVE_PATH}/checkpoints`
 
 /** A failed API call, with the server's message for the user. */
 export class ApiFailure extends Error {
@@ -132,6 +136,13 @@ export const api = {
   creativeSkip: (request: CreativeSkipRequest) =>
     call<CreativeState>('POST', `${CREATIVE_PATH}/skip`, request),
   creativeSkipCancel: () => call<CreativeState>('POST', `${CREATIVE_PATH}/skip/cancel`),
+  // Checkpoints (`CONTEXT.md`: Creative mode): named copies of the world, saved and restored live.
+  checkpoints: () => call<Checkpoint[]>('GET', CHECKPOINTS_PATH),
+  saveCheckpoint: (name: string) =>
+    call<Checkpoint[]>('POST', CHECKPOINTS_PATH, { name } satisfies CheckpointSaveRequest),
+  restoreCheckpoint: (id: number) =>
+    call<CreativeState>('POST', `${CHECKPOINTS_PATH}/${id}/restore`),
+  deleteCheckpoint: (id: number) => call<Checkpoint[]>('DELETE', `${CHECKPOINTS_PATH}/${id}`),
   // The script library: saving keeps every version; one without syntax errors becomes active.
   scripts: () => call<ScriptSummary[]>('GET', '/api/scripts'),
   script: (id: number) => call<ScriptDetail>('GET', `/api/scripts/${id}`),

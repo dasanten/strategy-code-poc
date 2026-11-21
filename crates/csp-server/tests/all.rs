@@ -16,6 +16,8 @@ mod app;
 mod auth;
 #[path = "bench.rs"]
 mod bench;
+#[path = "checkpoints.rs"]
+mod checkpoints;
 #[path = "db.rs"]
 mod db;
 #[path = "default_scripts.rs"]

@@ -347,7 +347,7 @@ async fn keeps_players_out_of_admin_routes() {
 
 // -------------------------------------------------------------------------------- creative mode
 
-const CREATIVE_ROUTES: [(&str, &str); 7] = [
+const CREATIVE_ROUTES: [(&str, &str); 11] = [
     ("GET", "/api/admin/creative"),
     ("POST", "/api/admin/creative/pause"),
     ("POST", "/api/admin/creative/resume"),
@@ -355,6 +355,10 @@ const CREATIVE_ROUTES: [(&str, &str); 7] = [
     ("POST", "/api/admin/creative/speed"),
     ("POST", "/api/admin/creative/skip"),
     ("POST", "/api/admin/creative/skip/cancel"),
+    ("GET", "/api/admin/creative/checkpoints"),
+    ("POST", "/api/admin/creative/checkpoints"),
+    ("POST", "/api/admin/creative/checkpoints/1/restore"),
+    ("DELETE", "/api/admin/creative/checkpoints/1"),
 ];
 
 #[tokio::test]
@@ -450,6 +454,74 @@ async fn starts_one_skip_ahead_at_a_time_and_cancels_it() {
     let cancelled = call(&app, "POST", "/api/admin/creative/skip/cancel", Some(&admin), None).await;
     assert_eq!(cancelled.json(), json!({ "paused": false, "speed": "normal" }));
     assert_eq!(controls.state().skip, None);
+}
+
+/// Checkpoints (`CONTEXT.md`: Creative mode): saved, the world changed, restored, and the saved
+/// world is back whole; the accounts are untouched and a restart goes on from it.
+#[tokio::test]
+async fn restores_a_checkpoint_to_the_saved_world_and_keeps_the_accounts() {
+    let db = Db::new();
+    let terrain = TerrainMap { size: 64, tiles: vec![0; 64 * 64] };
+    let world = create_world(&terrain, 1);
+    let explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
+    let game = game_thread(&db, world, explored);
+    let controls = Arc::new(csp_server::creative::TimeControls::new());
+    let mut opts = db.opts();
+    opts.game = Some(game.clone());
+    opts.creative = Some(Arc::clone(&controls));
+    let app = build_app(opts);
+    create_admin(&db.conn(), Some("Daniel"), Some("admin password")).unwrap();
+    let admin = login_as(&app, "Daniel", "admin password").await;
+    let path = "/api/admin/creative/checkpoints";
+    let snapshot = || {
+        let game = game.clone();
+        async move { game.run(|g, _| serde_json::to_value(&g.world).unwrap()).await.unwrap() }
+    };
+
+    for bad in [json!({ "name": "  " }), json!({ "name": "x".repeat(61) }), json!({})] {
+        let res = call(&app, "POST", path, Some(&admin), Some(bad.clone())).await;
+        assert_eq!(res.status, StatusCode::BAD_REQUEST, "{bad}");
+    }
+    let saved = snapshot().await;
+    let res = call(&app, "POST", path, Some(&admin), Some(json!({ "name": " start " }))).await;
+    assert_eq!(res.status, StatusCode::OK);
+    let list = res.json();
+    assert_eq!(list.as_array().unwrap().len(), 1);
+    assert_eq!(list[0]["name"], "start");
+    assert_eq!(list[0]["tick"], saved["tick"]);
+    let id = list[0]["id"].as_u64().unwrap();
+
+    // The world goes on, and a Player signs up meanwhile.
+    for _ in 0..3 {
+        game.tick().await.unwrap();
+    }
+    assert_ne!(snapshot().await, saved);
+    sign_up(&app, "Mara", &create_invite_code(&db.conn(), None).unwrap(), "correct horse").await;
+
+    controls.pause();
+    let restore = format!("{path}/{id}/restore");
+    let res = call(&app, "POST", &restore, Some(&admin), None).await;
+    assert_eq!(res.status, StatusCode::OK);
+    assert_eq!(res.json(), json!({ "paused": true, "speed": "normal" }), "stays paused");
+    assert_eq!(snapshot().await, saved, "the saved world, whole");
+    // The accounts are kept: Mara, who signed up after the checkpoint, still logs in.
+    assert!(!login_as(&app, "Mara", "correct horse").await.is_empty());
+    // The restored world is the newest save, so a restart goes on from it.
+    let (latest, _) = csp_server::saves::latest_save(&db.conn()).unwrap().unwrap();
+    assert_eq!(latest, saved);
+
+    // A running world runs again once restored.
+    controls.resume();
+    let res = call(&app, "POST", &restore, Some(&admin), None).await;
+    assert_eq!(res.json(), json!({ "paused": false, "speed": "normal" }));
+
+    let missing = format!("{path}/{}/restore", id + 1);
+    let missing = call(&app, "POST", &missing, Some(&admin), None).await;
+    assert_eq!(missing.status, StatusCode::NOT_FOUND);
+    let res = call(&app, "DELETE", &format!("{path}/{id}"), Some(&admin), None).await;
+    assert_eq!(res.json(), json!([]));
+    let res = call(&app, "DELETE", &format!("{path}/{id}"), Some(&admin), None).await;
+    assert_eq!(res.status, StatusCode::NOT_FOUND);
 }
 
 // ------------------------------------------------------------------------------------- sessions

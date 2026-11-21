@@ -50,6 +50,10 @@ use crate::auth::{
     log_in, now_ms, reset_password, sign_up, ApiErrorCode, AuthError, AuthFailure, LoginBackoff,
     SessionSockets, SessionUser, SESSION_DAYS,
 };
+use crate::checkpoints::{
+    delete_checkpoint, list_checkpoints, load_checkpoint, save_checkpoint, Checkpoint,
+    CheckpointError, CheckpointSaveRequest,
+};
 use crate::creative::{CreativeSkipRequest, CreativeSpeedRequest, CreativeState, TimeControls};
 use crate::first_day::{
     dismiss_first_day, mark_first_day, read_first_day, FirstDayLine, FIRST_DAY_DISMISS_PATH,
@@ -78,6 +82,10 @@ pub struct GameView<'a> {
     pub territory: Option<&'a csp_sim::queries::territory::Territory>,
 }
 
+/// A restore under way ([`GameHandle::restore`]): `None` if the game is gone, else whether the
+/// world was swapped.
+pub type Restoring<'a> = Pin<Box<dyn Future<Output = Option<Result<(), String>>> + Send + 'a>>;
+
 /// Work on the game between ticks.
 pub type GameJob = Box<dyn for<'a> FnOnce(GameView<'a>) + Send>;
 
@@ -91,6 +99,9 @@ pub trait GameHandle: Send + Sync + 'static {
     fn explored(&self) -> Arc<Mutex<ExploredTerrain>>;
     /// The map's terrain and what is made from it alone, read without any lock.
     fn map(&self) -> Arc<MapTerrain>;
+    /// Swaps the world whole for `world` between ticks (a checkpoint's, `CONTEXT.md`: Creative
+    /// mode) and tells every socket to reload; `None` if the game is gone.
+    fn restore(&self, world: WorldState) -> Restoring<'_>;
 }
 
 impl<L: crate::monitoring::LogSink + Send + Sync + 'static> GameHandle
@@ -123,6 +134,10 @@ impl<L: crate::monitoring::LogSink + Send + Sync + 'static> GameHandle
 
     fn map(&self) -> Arc<MapTerrain> {
         Arc::clone(&self.map)
+    }
+
+    fn restore(&self, world: WorldState) -> Restoring<'_> {
+        Box::pin(self.run(move |g, conn| g.restore(conn, world).map_err(|e| e.to_string())))
     }
 }
 
@@ -1265,6 +1280,8 @@ async fn admin_tick_health(
 
 /// Where the Creative bar reads and sets the time controls (`CONTEXT.md`: Creative mode).
 pub const CREATIVE_PATH: &str = "/api/admin/creative";
+/// Where the Creative bar lists, saves, restores and deletes checkpoints.
+pub const CHECKPOINTS_PATH: &str = "/api/admin/creative/checkpoints";
 
 /// The time controls as they stand.
 async fn creative_state(
@@ -1347,6 +1364,117 @@ async fn creative_skip_cancel(
     Ok(Json(controls.state()))
 }
 
+/// The creative guard and the running game, for the checkpoint routes: without a game there is
+/// no world to save or restore.
+fn creative_game<'s>(
+    user: &User,
+    state: &'s AppState,
+) -> ApiResult<(&'s Arc<TimeControls>, &'s Arc<dyn GameHandle>)> {
+    let controls = user.creative(state)?;
+    let game = state.game.as_ref().ok_or_else(|| fail(ApiErrorCode::NotFound, "Not found."))?;
+    Ok((controls, game))
+}
+
+/// Every checkpoint, the newest first (`CONTEXT.md`: Creative mode, Checkpoints).
+async fn checkpoints_list(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Json<Vec<Checkpoint>>> {
+    creative_game(&user, &state)?;
+    Ok(Json(state.db(|conn| Ok(list_checkpoints(conn)?)).await?))
+}
+
+/// Saves the world as it is now under a name (one of the same name is replaced); answers every
+/// checkpoint. The world is turned into JSON between ticks, then stored off the game thread.
+async fn checkpoints_save(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    body: Bytes,
+) -> ApiResult<Json<Vec<Checkpoint>>> {
+    let (_, game) = creative_game(&user, &state)?;
+    let name = serde_json::from_slice::<CheckpointSaveRequest>(&body)
+        .ok()
+        .and_then(|r| r.name().map(str::to_owned))
+        .ok_or_else(|| {
+            let max = crate::checkpoints::CHECKPOINT_NAME_MAX;
+            fail(
+                ApiErrorCode::InvalidInput,
+                format!("Name the checkpoint (1 to {max} characters)."),
+            )
+        })?;
+    let (tick, json) = with_game(game.as_ref(), |g| (g.world.tick, serde_json::to_vec(&*g.world)))
+        .await
+        .ok_or_else(game_gone)?;
+    let json = json.map_err(|e| ApiFailure::Internal(e.to_string()))?;
+    let list = state
+        .db(move |conn| {
+            save_checkpoint(conn, &name, tick, &json)
+                .map_err(|e| ApiFailure::Internal(e.to_string()))?;
+            Ok(list_checkpoints(conn)?)
+        })
+        .await?;
+    Ok(Json(list))
+}
+
+/// Restores a checkpoint: pauses the world, swaps it whole (migrated if the checkpoint is of an
+/// older format), tells every client to reload, and runs the world again if it was running.
+/// Accounts are kept. A skip ahead under way is cancelled.
+async fn checkpoints_restore(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<CreativeState>> {
+    let (controls, game) = creative_game(&user, &state)?;
+    let id = u64::try_from(id_param(&id))
+        .map_err(|_| fail(ApiErrorCode::NotFound, "No such checkpoint."))?;
+    let was_paused = controls.state().paused;
+    controls.cancel_skip();
+    controls.pause();
+    let restored = restore_checkpoint(&state, game.as_ref(), id).await;
+    if !was_paused {
+        controls.resume();
+    }
+    restored?;
+    Ok(Json(controls.state()))
+}
+
+async fn restore_checkpoint(state: &AppState, game: &dyn GameHandle, id: u64) -> ApiResult<()> {
+    let seed = with_game(game, |g| g.world.seed).await.ok_or_else(game_gone)?;
+    let terrain = Arc::clone(game.map().terrain());
+    let world = state
+        .db(move |conn| {
+            load_checkpoint(conn, id, &terrain, seed).map_err(|e| match e {
+                CheckpointError::NotFound => fail(ApiErrorCode::NotFound, "No such checkpoint."),
+                CheckpointError::OtherWorld { .. } | CheckpointError::Format(_) => {
+                    fail(ApiErrorCode::InvalidInput, format!("Cannot restore it: {e}."))
+                }
+                CheckpointError::Saves(e) => ApiFailure::Internal(e.to_string()),
+            })
+        })
+        .await?;
+    game.restore(world).await.ok_or_else(game_gone)?.map_err(ApiFailure::Internal)
+}
+
+/// Deletes a checkpoint; answers every checkpoint left.
+async fn checkpoints_delete(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Vec<Checkpoint>>> {
+    creative_game(&user, &state)?;
+    let id = u64::try_from(id_param(&id))
+        .map_err(|_| fail(ApiErrorCode::NotFound, "No such checkpoint."))?;
+    let list = state
+        .db(move |conn| {
+            if !delete_checkpoint(conn, id)? {
+                return Err(fail(ApiErrorCode::NotFound, "No such checkpoint."));
+            }
+            Ok(list_checkpoints(conn)?)
+        })
+        .await?;
+    Ok(Json(list))
+}
+
 /// Fastify's answer to a route it doesn't have, without the built client.
 async fn no_route(method: Method, uri: axum::http::Uri) -> Response {
     let message =
@@ -1419,7 +1547,10 @@ pub fn build_app(opts: AppOptions) -> Router {
         .route(&format!("{CREATIVE_PATH}/step"), post(creative_step))
         .route(&format!("{CREATIVE_PATH}/speed"), post(creative_speed))
         .route(&format!("{CREATIVE_PATH}/skip"), post(creative_skip))
-        .route(&format!("{CREATIVE_PATH}/skip/cancel"), post(creative_skip_cancel));
+        .route(&format!("{CREATIVE_PATH}/skip/cancel"), post(creative_skip_cancel))
+        .route(CHECKPOINTS_PATH, get(checkpoints_list).post(checkpoints_save))
+        .route(&format!("{CHECKPOINTS_PATH}/{{id}}"), delete(checkpoints_delete))
+        .route(&format!("{CHECKPOINTS_PATH}/{{id}}/restore"), post(checkpoints_restore));
     if state.game.is_some() {
         api = api
             .route("/api/terrain/{cx}/{cy}", get(terrain_chunk))

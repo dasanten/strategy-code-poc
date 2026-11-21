@@ -228,17 +228,64 @@ impl<L: LogSink> Game<L> {
         errors: Option<ScriptErrors>,
     ) -> Self {
         let host = Arc::new(LibraryHost::new(db, defaults, Arc::clone(&self.explored), errors));
-        let kinds = library_order_kinds(&host);
+        self.run_orders_with(Some(&host));
+        self.library = Some((host, defaults));
+        self
+    }
+
+    /// A fresh order queue, queue runner and script runner, on the script library `host` if
+    /// there is one: nothing waits in them yet.
+    fn run_orders_with(&mut self, host: Option<&Arc<LibraryHost>>) {
         let terrain = Arc::clone(&self.terrain);
+        let Some(host) = host else {
+            self.orders = OrderQueue::new(order_kinds(), Some(terrain));
+            return;
+        };
+        let kinds = library_order_kinds(host);
         self.orders = OrderQueue::new(kinds.clone(), Some(Arc::clone(&terrain)));
         self.queues = Some(QueueRunner::new(
-            Box::new(SharedHost(Arc::clone(&host))),
+            Box::new(SharedHost(Arc::clone(host))),
             kinds.clone(),
             Some(Arc::clone(&terrain)),
         ));
         self.scripts = Some(ScriptRunner::new(terrain, host.clone(), kinds));
-        self.library = Some((host, defaults));
-        self
+    }
+
+    /// Swaps the world whole for `world`, a checkpoint's (`CONTEXT.md`: Creative mode), between
+    /// ticks. What [`Game::new`] and [`open_world`] make from a world at start is made again from
+    /// it (scratch, sight, territory, walking, the order queue and the runners); the explored
+    /// terrain and the accounts are kept. Every socket is told to reload, and the restored world
+    /// is saved at once, so a restart goes on from it; a save of the old world still in flight
+    /// lands before it.
+    pub fn restore(&mut self, conn: &Connection, world: WorldState) -> Result<(), ServerError> {
+        self.saver.settled(conn);
+        {
+            let mut explored = self.explored();
+            for node in world.nodes_ever() {
+                explored.map().add_node(&node);
+            }
+            csp_sim::new_veins::hide_new_veins(&world, &mut explored);
+            explored.map().regions(world.seed);
+        }
+        self.scratch = Scratch {
+            land: Some(Arc::clone(&self.explored)),
+            waiting: csp_sim::script_runner::Waiting::of(&world),
+            ..Scratch::default()
+        };
+        self.world = world;
+        tag_world(&self.world);
+        self.sight = SightTracker::new();
+        self.territory = TerritoryTracker::default();
+        self.walking = Walking::new(Arc::clone(&self.terrain));
+        let host = self.library.as_ref().map(|(host, _)| Arc::clone(host));
+        self.run_orders_with(host.as_ref());
+        // Nothing explored in the old world is held for a broadcast; a skip ahead stops holding.
+        self.broadcasts.flush(std::time::Instant::now());
+        if let Some(rt) = &self.realtime {
+            rt.reload_all();
+        }
+        crate::saves::save_world(conn, &self.world)?;
+        Ok(())
     }
 
     /// The script library's invariants (`checkScriptLibrary`), reported as the tick's are: at

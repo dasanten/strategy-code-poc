@@ -4,6 +4,7 @@ pub mod app;
 pub mod auth;
 pub mod backup;
 pub mod bench;
+pub mod checkpoints;
 pub mod client_types;
 pub mod config;
 pub mod creative;
