@@ -151,3 +151,32 @@ fn a_tile_is_near_a_starting_site_the_short_way_round_the_map() {
     assert!(!near_a_starting_site(&starting, 1000, (2.0 + starting_site_clearance(1000), 2.0)));
     assert_eq!(starting_site_clearance(MAP_SIZE), NPC_STARTING_SITE_CLEARANCE);
 }
+
+#[test]
+fn a_small_test_world_places_its_cities_nearer_together_and_others_keep_the_full_distance() {
+    use csp_shared::balance::NPC_CITY_MIN_DISTANCE;
+    for size in [512, 896, 1536, MAP_SIZE] {
+        assert_eq!(npc_city_spacing(size), NPC_CITY_MIN_DISTANCE, "{size}");
+    }
+    for size in [640, 768] {
+        let spacing = npc_city_spacing(size);
+        assert!(spacing < NPC_CITY_MIN_DISTANCE / 4.0, "{size}: {spacing}");
+        assert!(spacing >= starting_site_clearance(size), "{size}: {spacing}");
+    }
+    // On one, the HQ, a post and NPC cities, each NPC city that far from every other city.
+    let (seed, size) = (2, 768);
+    let terrain = generate_terrain(seed, size);
+    let world = generate_world(&terrain, seed);
+    let land = LandSites::of(&world, &terrain);
+    assert!(check_on_the_land(&world, &terrain, &land).is_empty());
+    assert!(trade_org_hq(&world).is_some());
+    assert!(!trading_posts(&world).is_empty());
+    let npc: Vec<&City> = world.cities.iter().filter(|c| c.trade_org.is_none()).collect();
+    assert!(npc.len() >= 2, "{} NPC cities", npc.len());
+    for c in npc {
+        for o in world.cities.iter().filter(|o| o.id != c.id) {
+            let d = wrap_distance(size, hall(&world, c), hall(&world, o));
+            assert!(d >= npc_city_spacing(size) - NPC_VILLAGE.size, "{} to {}: {d}", c.id, o.id);
+        }
+    }
+}

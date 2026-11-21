@@ -13,7 +13,8 @@ use crate::reset::reset_world;
 pub const USAGE: &str = "usage: admin create <name> | admin invite \
                          | admin explore <player> (--radius <tiles> | --all) [--yes] \
                          | admin map-stats \r
-                         | admin reset-world [--seed <n>] [--yes]";
+                         | admin reset-world [--seed <n>] [--yes] \
+                         | admin new-world --db <path> [--size <tiles>] [--seed <n>]";
 
 /// The database the server uses (`config.dbPath`, `.env` included): `DB_PATH`, or
 /// `data/world.db` from where it runs.
