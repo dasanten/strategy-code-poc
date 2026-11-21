@@ -81,9 +81,9 @@ DB_PATH=data/test-world.db CREATIVE=1 pnpm dev
 
 (In PowerShell: `$env:DB_PATH = 'data/test-world.db'; $env:CREATIVE = '1'; pnpm dev`.)
 
-Skip ahead on the Creative bar runs ticks as fast as the machine allows. In development every
-tick checks every invariant, which is most of a tick's time on a small world (a game day takes
-about a minute); with `INVARIANT_SAMPLE_RATE=0.1`, as in production, it takes about 15 seconds.
+Skip ahead on the Creative bar runs ticks as fast as the machine allows, checking invariants at
+the live game's rate (0.1) even where every normal tick checks them all, as in development: a
+game day on a small world takes about 15 seconds.
 
 Other scripts:
 
