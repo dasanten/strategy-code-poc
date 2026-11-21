@@ -21,6 +21,8 @@ import type {
   ApiError,
   ClientFirstDayLine,
   CreateScriptRequest,
+  CreativeAction,
+  CreativeDone,
   CreativeSkipRequest,
   CreativeSpeed,
   CreativeSpeedRequest,
@@ -129,6 +131,9 @@ export const api = {
   creativeStep: () => call<CreativeState>('POST', `${CREATIVE_PATH}/step`),
   creativeSpeed: (speed: CreativeSpeed) =>
     call<CreativeState>('POST', `${CREATIVE_PATH}/speed`, { speed } satisfies CreativeSpeedRequest),
+  // A creative action from a card's Creative section: goods, finish now (`CONTEXT.md`: Creative mode).
+  creativeAct: (action: CreativeAction) =>
+    call<CreativeDone>('POST', `${CREATIVE_PATH}/act`, action),
   creativeSkip: (request: CreativeSkipRequest) =>
     call<CreativeState>('POST', `${CREATIVE_PATH}/skip`, request),
   creativeSkipCancel: () => call<CreativeState>('POST', `${CREATIVE_PATH}/skip/cancel`),

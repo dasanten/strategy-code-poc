@@ -553,6 +553,7 @@ export function TileCard({
   onRepair,
   onRally,
   realm,
+  creative,
 }: {
   card: TileCardData
   /** The building the card is named after, for its icon. */
@@ -630,6 +631,8 @@ export function TileCard({
   onRally?: (leaderId: string, stop: boolean) => void
   /** The realm orders about the tile in realm control mode (`RealmTileOrders`), if any. */
   realm?: ReactNode
+  /** The Creative section, for an admin on a creative server (`CreativeSection`), if any. */
+  creative?: ReactNode
 }) {
   const actions = tileActions(card, actor, tick, mapSize)
   const [open, setOpen] = useState<string | undefined>()
@@ -739,6 +742,7 @@ export function TileCard({
       {card.what === 'building' && workSettings}
       {realm}
       {card.what === 'building' && realmOrders}
+      {creative}
       {actions.length > 0 && (
         <ActionRows
           actions={actions}

@@ -13,7 +13,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+use csp_shared::terrain::TerrainMap;
 use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_HOUR, TICKS_PER_GAME_YEAR};
+use csp_shared::world::{Good, WorldState};
+use csp_sim::creative;
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 use ts_rs::TS;
@@ -236,6 +239,60 @@ impl TimeControls {
     pub fn stepped(&self) {
         self.clock.send_modify(|c| c.steps_run += 1);
     }
+}
+
+/// A creative action an admin gives by hand from a card (`CONTEXT.md`: Creative mode, Creative
+/// actions): sent to [`crate::app::CREATIVE_ACT_PATH`], done between ticks through `with_game`,
+/// never an order kind or a script call (ADR 0043). Later actions add their variants here.
+#[derive(Debug, Clone, PartialEq, Deserialize, TS)]
+#[serde(tag = "action", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[ts(tag = "action", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum CreativeAction {
+    /// Gives whole units of a good to a storage (warehouse, stable, haven) or a carriage.
+    GiveGoods { holder_id: String, good: Good, amount: f64 },
+    /// Takes whole units of a good out of one, never below none.
+    TakeGoods { holder_id: String, good: Good, amount: f64 },
+    /// Finishes a construction site (and the road or wall lines building on it) or the trainings
+    /// at a training ground now.
+    FinishNow { building_id: String },
+}
+
+impl CreativeAction {
+    /// The action's name, as `csp_sim::creative::CREATIVE_ACTIONS` lists it.
+    pub fn name(&self) -> &'static str {
+        match self {
+            CreativeAction::GiveGoods { .. } => "giveGoods",
+            CreativeAction::TakeGoods { .. } => "takeGoods",
+            CreativeAction::FinishNow { .. } => "finishNow",
+        }
+    }
+
+    /// Does the action on the world: what was done, for the admin, or why not.
+    pub fn apply(self, world: &mut WorldState, terrain: &TerrainMap) -> Result<String, String> {
+        let units = |n: f64| if n == 1.0 { "1 unit".to_string() } else { format!("{n} units") };
+        match self {
+            CreativeAction::GiveGoods { holder_id, good, amount } => {
+                creative::give_goods(world, &holder_id, good, amount)
+                    .map(|n| format!("Gave {}.", units(n)))
+            }
+            CreativeAction::TakeGoods { holder_id, good, amount } => {
+                creative::take_goods(world, &holder_id, good, amount)
+                    .map(|n| format!("Took {}.", units(n)))
+            }
+            CreativeAction::FinishNow { building_id } => {
+                creative::finish_now(world, &building_id, Some(terrain))
+            }
+        }
+    }
+}
+
+/// What a creative action did: its line for the admin, and the invariants it left broken (run
+/// once after every action, ADR 0004), which are reported as a tick's are.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct CreativeDone {
+    pub message: String,
+    pub violations: Vec<String>,
 }
 
 /// The explored chunks that grew, by user id, as a tick's sight gives them.

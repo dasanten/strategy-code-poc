@@ -114,7 +114,7 @@ pub fn step_training(world: &mut WorldState, size: i32) {
 }
 
 /// Adds `gain` to a trainee's stat's trained bonus or skill, within its cap or maximum (`learn`).
-fn learn(r: &mut Resident, subject: TrainingSubject, gain: f64) {
+pub(crate) fn learn(r: &mut Resident, subject: TrainingSubject, gain: f64) {
     match subject_parts(subject) {
         Ok(stat) => {
             let s = match stat {
