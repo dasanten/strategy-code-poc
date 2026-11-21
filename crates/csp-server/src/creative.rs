@@ -3,12 +3,17 @@
 //! tick loop ([`crate::server::tick_loop`]) honours them and drives the same `Game::tick` as
 //! always, so every rule runs unchanged, only sooner. They live in the running server, never in
 //! the world: a server always starts running at normal speed.
+//!
+//! A **skip ahead** runs a number of game hours or days as fast as the machine allows, one tick
+//! after another through the same loop, cancellable between ticks. The sockets get one full
+//! update at its end; the Creative bar asks for its progress meanwhile.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
     time::{Duration, Instant},
 };
 
+use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_HOUR, TICKS_PER_GAME_YEAR};
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 use ts_rs::TS;
@@ -61,6 +66,58 @@ const STEP_WAIT: Duration = Duration::from_secs(30);
 pub struct CreativeState {
     pub paused: bool,
     pub speed: CreativeSpeed,
+    /// The skip ahead under way, if one is.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub skip: Option<SkipProgress>,
+}
+
+/// How far a skip ahead has come: ticks run of the ticks asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct SkipProgress {
+    pub done: u64,
+    pub total: u64,
+}
+
+/// What a skip ahead counts in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum SkipUnit {
+    Hours,
+    Days,
+}
+
+/// A skip ahead asked for by the Creative bar: `amount` game hours or days.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct CreativeSkipRequest {
+    pub amount: u32,
+    pub unit: SkipUnit,
+}
+
+/// The longest skip ahead: one game year.
+pub const MAX_SKIP_TICKS: u64 = TICKS_PER_GAME_YEAR as u64;
+
+impl CreativeSkipRequest {
+    /// The ticks this skip runs, or `None` if it is none or longer than [`MAX_SKIP_TICKS`].
+    pub fn ticks(self) -> Option<u64> {
+        let per = match self.unit {
+            SkipUnit::Hours => TICKS_PER_GAME_HOUR,
+            SkipUnit::Days => TICKS_PER_GAME_DAY,
+        } as u64;
+        let ticks = u64::from(self.amount) * per;
+        (1..=MAX_SKIP_TICKS).contains(&ticks).then_some(ticks)
+    }
+}
+
+/// A skip ahead under way. `id` tells it from a later one, so a tick that was running when it
+/// was cancelled never counts for the next.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Skip {
+    pub id: u64,
+    pub done: u64,
+    pub total: u64,
 }
 
 /// A speed asked for by the Creative bar.
@@ -77,6 +134,10 @@ pub struct Clock {
     pub speed: CreativeSpeed,
     pub steps_asked: u64,
     pub steps_run: u64,
+    /// The skip ahead under way, if one is: while it runs, no other tick does.
+    pub skip: Option<Skip>,
+    /// How many skips were started, for their ids.
+    pub skips_started: u64,
 }
 
 impl Clock {
@@ -106,7 +167,39 @@ impl TimeControls {
 
     pub fn state(&self) -> CreativeState {
         let c = *self.clock.borrow();
-        CreativeState { paused: c.paused, speed: c.speed }
+        let skip = c.skip.map(|s| SkipProgress { done: s.done, total: s.total });
+        CreativeState { paused: c.paused, speed: c.speed, skip }
+    }
+
+    /// Starts skipping `ticks` ahead; `false` if a skip is already under way.
+    pub fn skip(&self, ticks: u64) -> bool {
+        self.clock.send_if_modified(|c| {
+            if c.skip.is_some() {
+                return false;
+            }
+            c.skips_started += 1;
+            c.skip = Some(Skip { id: c.skips_started, done: 0, total: ticks });
+            true
+        })
+    }
+
+    /// Stops the skip ahead after the tick it is running, if one is under way.
+    pub fn cancel_skip(&self) {
+        self.clock.send_if_modified(|c| c.skip.take().is_some());
+    }
+
+    /// The tick loop ran a tick of skip `id`: the skip ends once it has run them all.
+    pub fn skip_ticked(&self, id: u64) {
+        self.clock.send_if_modified(|c| match &mut c.skip {
+            Some(s) if s.id == id => {
+                s.done += 1;
+                if s.done >= s.total {
+                    c.skip = None;
+                }
+                true
+            }
+            _ => false,
+        });
     }
 
     pub fn pause(&self) {
@@ -154,6 +247,9 @@ pub type Grown = BTreeMap<u64, BTreeSet<usize>>;
 #[derive(Debug, Default)]
 pub struct BroadcastPace {
     pub gap: Option<Duration>,
+    /// During a skip ahead no tick is broadcast: everything goes out at its end
+    /// ([`BroadcastPace::flush`]).
+    pub holding: bool,
     last: Option<Instant>,
     held: Grown,
 }
@@ -165,6 +261,9 @@ impl BroadcastPace {
         for (user, chunks) in grown {
             self.held.entry(user).or_default().extend(chunks);
         }
+        if self.holding {
+            return None;
+        }
         if let (Some(gap), Some(last)) = (self.gap, self.last) {
             if now.saturating_duration_since(last) < gap {
                 return None;
@@ -172,6 +271,14 @@ impl BroadcastPace {
         }
         self.last = Some(now);
         Some(std::mem::take(&mut self.held))
+    }
+
+    /// Stops holding and hands over every chunk grown since the last broadcast, for a broadcast
+    /// at `now` (a skip ahead's end).
+    pub fn flush(&mut self, now: Instant) -> Grown {
+        self.holding = false;
+        self.last = Some(now);
+        std::mem::take(&mut self.held)
     }
 }
 
@@ -237,11 +344,57 @@ mod tests {
     #[test]
     fn starts_running_at_normal_speed() {
         let controls = TimeControls::new();
-        assert_eq!(controls.state(), CreativeState { paused: false, speed: CreativeSpeed::Normal });
+        let normal = CreativeState { paused: false, speed: CreativeSpeed::Normal, skip: None };
+        assert_eq!(controls.state(), normal);
         controls.pause();
         controls.set_speed(CreativeSpeed::X60);
-        assert_eq!(controls.state(), CreativeState { paused: true, speed: CreativeSpeed::X60 });
+        let paused = CreativeState { paused: true, speed: CreativeSpeed::X60, skip: None };
+        assert_eq!(controls.state(), paused);
         controls.resume();
         assert!(!controls.state().paused);
+    }
+
+    #[test]
+    fn counts_a_skip_in_game_hours_or_days_up_to_a_year() {
+        let ticks = |amount, unit| CreativeSkipRequest { amount, unit }.ticks();
+        assert_eq!(ticks(1, SkipUnit::Days), Some(1440));
+        assert_eq!(ticks(3, SkipUnit::Hours), Some(180));
+        assert_eq!(ticks(0, SkipUnit::Hours), None);
+        assert_eq!(ticks(420, SkipUnit::Days), Some(MAX_SKIP_TICKS));
+        assert_eq!(ticks(421, SkipUnit::Days), None);
+        let request: CreativeSkipRequest =
+            serde_json::from_value(serde_json::json!({ "amount": 2, "unit": "hours" })).unwrap();
+        assert_eq!(request.ticks(), Some(120));
+    }
+
+    #[test]
+    fn runs_one_skip_at_a_time_and_never_counts_a_cancelled_skips_tick_for_the_next() {
+        let controls = TimeControls::new();
+        assert!(controls.skip(2));
+        assert!(!controls.skip(5), "one at a time");
+        assert_eq!(controls.state().skip, Some(SkipProgress { done: 0, total: 2 }));
+        controls.skip_ticked(1);
+        assert_eq!(controls.state().skip, Some(SkipProgress { done: 1, total: 2 }));
+        controls.skip_ticked(1);
+        assert_eq!(controls.state().skip, None, "done");
+
+        assert!(controls.skip(3));
+        controls.cancel_skip();
+        assert_eq!(controls.state().skip, None);
+        assert!(controls.skip(3));
+        // The tick the cancelled skip was running when it was cancelled.
+        controls.skip_ticked(2);
+        assert_eq!(controls.state().skip, Some(SkipProgress { done: 0, total: 3 }));
+    }
+
+    #[test]
+    fn holds_every_tick_during_a_skip_and_hands_them_over_at_its_end() {
+        let mut pace = BroadcastPace { holding: true, ..BroadcastPace::default() };
+        let now = Instant::now();
+        assert_eq!(pace.due(Grown::from([(1, BTreeSet::from([3]))]), now), None);
+        assert_eq!(pace.due(Grown::from([(1, BTreeSet::from([4]))]), now), None);
+        assert_eq!(pace.flush(now), Grown::from([(1, BTreeSet::from([3, 4]))]));
+        assert!(!pace.holding);
+        assert_eq!(pace.due(Grown::new(), now), Some(Grown::new()));
     }
 }

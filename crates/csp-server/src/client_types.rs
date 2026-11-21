@@ -126,6 +126,7 @@ fn client_roots(cfg: &Config) -> io::Result<()> {
     roots!(cfg;
         crate::app::Account,
         crate::auth::ApiError,
+        crate::creative::CreativeSkipRequest,
         crate::creative::CreativeSpeedRequest,
         crate::creative::CreativeState,
         crate::first_day::ClientFirstDayLine,
