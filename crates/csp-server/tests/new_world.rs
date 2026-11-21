@@ -50,7 +50,7 @@ fn refuses_a_database_that_exists() {
 }
 
 #[test]
-fn a_small_world_has_npc_cities_the_trade_org_and_posts_keeps_the_rules_and_runs_a_game_day() {
+fn a_small_world_has_npc_cities_the_trade_org_and_posts_and_keeps_the_rules() {
     let dir = tempfile::tempdir().unwrap();
     let db = dir.path().join("test-worlds").join("small.db");
     let said = new_world(&NewWorld { db: db.clone(), size: DEFAULT_SIZE, seed: SEED }).unwrap();
@@ -63,7 +63,7 @@ fn a_small_world_has_npc_cities_the_trade_org_and_posts_keeps_the_rules_and_runs
     assert!(latest_save(&conn).unwrap().is_some());
     let never = |_| panic!("the terrain is stored");
     let never_world = |_: &_, _| panic!("the world is saved");
-    let (mut world, terrain) = load_or_create_world(&conn, never, never_world, 1).unwrap();
+    let (world, terrain) = load_or_create_world(&conn, never, never_world, 1).unwrap();
     let (_, generated) = generate(DEFAULT_SIZE, SEED);
     assert_eq!(world, generated);
 
@@ -77,7 +77,11 @@ fn a_small_world_has_npc_cities_the_trade_org_and_posts_keeps_the_rules_and_runs
     let problems = check_on_the_land(&world, &terrain, &land);
     assert!(problems.is_empty(), "{:?}", problems.iter().map(|p| &p.message).collect::<Vec<_>>());
     assert_eq!(check_all(&world, &terrain), []);
+}
 
+#[test]
+fn a_small_world_runs_a_game_day_keeping_the_invariants() {
+    let (terrain, mut world) = generate(DEFAULT_SIZE, SEED);
     // A game day as the server runs it, the invariants held every three game hours.
     let mut walking = Walking::new(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
