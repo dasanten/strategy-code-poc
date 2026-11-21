@@ -23,6 +23,8 @@ import {
   paintedCell,
 } from './art.js'
 import { tileToScreen, zoomTier, type Camera, type Size } from './camera.js'
+import { artStyle } from './art-style.js'
+import { PIXEL_TILE, pixelTint, pixelUnit, pixelUnitSize, type UnitLook } from './pixel-art.js'
 import {
   gearMarks,
   residentActivity,
@@ -91,7 +93,9 @@ const LYING = -Math.PI / 2
 /**
  * A unit as a token (ADR 0008): a dark round badge, the ring and glyph in the relationship
  * colour. The art's circle has a radius of 11 in its 24-unit box. A `lying` figure, someone
- * Down (`CONTEXT.md`: Down), lies on its side.
+ * Down (`CONTEXT.md`: Down), lies on its side. In the Pixel art style it is drawn from its pixel
+ * art where that is drawn, `look` picking the image and the gear layers. Returns the equipped
+ * gear it did not show, for the marks (`drawGear`).
  */
 function drawUnit(
   tokens: TokenLayer,
@@ -101,20 +105,35 @@ function drawUnit(
   r: number,
   rel: Tone | undefined,
   lying = false,
-) {
+  look: UnitLook = {},
+): GearMarks {
   const color = relationshipColor(rel)
   const base = (r * 24) / 11
   const turn = lying ? LYING : 0
-  const painted = PAINTED_UNIT_ART[file]
+  const style = artStyle()
+  const pixel = style === 'pixel' ? pixelUnit(file, look, tokens.has) : undefined
+  if (pixel) {
+    // Pixel art (`docs/art.md`): the image's layers inside a ring in the relationship colour, what
+    // is on the tint layer in that colour too.
+    tokens.place(BASE_ART.roundRing, x, y, base, color)
+    for (const key of pixel.layers) {
+      const [w, h] = pixelUnitSize(...(tokens.sizeOf(key) ?? [PIXEL_TILE, PIXEL_TILE]), r)
+      tokens.place(key, x, y, w, 0xffffff, 1, turn, h)
+      tokens.place(pixelTint(key), x, y, w, color, 1, turn, h)
+    }
+    return pixel.unshown
+  }
+  const painted = style === 'tokens' ? undefined : PAINTED_UNIT_ART[file]
   if (painted !== undefined) {
     // Painted art (`docs/art.md`): the figure inside a ring in the relationship colour.
     tokens.place(BASE_ART.roundRing, x, y, base, color)
     tokens.place(paintedCell(painted), x, y, r * 1.7, 0xffffff, 1, turn)
-    return
+    return look.gear ?? {}
   }
   tokens.place(BASE_ART.round, x, y, base)
   tokens.place(BASE_ART.roundRing, x, y, base, color)
   tokens.place(file, x, y, r * 1.2, color, 1, turn)
+  return look.gear ?? {}
 }
 
 /**
@@ -224,6 +243,8 @@ export function drawUnits(
       ...p,
       r,
       entityRelationship(k, viewer, known),
+      false,
+      { hitched: Boolean(k.horseId) },
     )
     const aboard = k.passengerIds ?? []
     if (aboard.length > 0) badge(`${aboard.length}`, ...p, r)
@@ -368,8 +389,9 @@ function drawFigures(
     const rel = of.relOf(f.id)
     const leader = isLeader(of.leaders, f.id)
     if (of.rides(f.id)) drawMount(tokens, { x, y, r }, rel)
-    drawUnit(tokens, leader ? UNIT_ART.leader : UNIT_ART.person, x, y, r, rel, of.lies(f.id))
-    drawGear(tokens, of.gearOf(f.id), x, y, r)
+    const file = leader ? UNIT_ART.leader : UNIT_ART.person
+    const unshown = drawUnit(tokens, file, x, y, r, rel, of.lies(f.id), { gear: of.gearOf(f.id) })
+    drawGear(tokens, unshown, x, y, r)
     of.spots.set(f.id, { x, y, r })
     const activity = of.activityOf(f.id)
     if (activity && tile >= ACTIVITY_SCALE) {

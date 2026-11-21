@@ -94,9 +94,18 @@ export class TokenLayer {
     this.used = 0
   }
 
+  /** Whether the atlas has this art: pixel art not drawn yet is left out of it. */
+  has = (file: string): boolean => this.atlas?.has(file) ?? false
+
+  /** The art's own size in its pixels, as [width, height]; undefined when the atlas lacks it. */
+  sizeOf(file: string): [number, number] | undefined {
+    const frame = this.atlas?.get(file)?.frame
+    return frame && [frame.width, frame.height]
+  }
+
   /**
    * One art file (`art.ts`) centred at a screen point, `size` pixels across, tinted, turned by
-   * `rotation` radians.
+   * `rotation` radians; `height` only for art that isn't square.
    */
   place(
     file: string,
@@ -106,6 +115,7 @@ export class TokenLayer {
     tint = 0xffffff,
     alpha = 1,
     rotation = 0,
+    height = size,
   ) {
     const texture = this.atlas?.get(file)
     if (!texture) return
@@ -118,7 +128,8 @@ export class TokenLayer {
     this.used++
     sprite.texture = texture
     sprite.position.set(x, y)
-    sprite.width = sprite.height = size
+    sprite.width = size
+    sprite.height = height
     sprite.tint = tint
     sprite.alpha = alpha
     sprite.rotation = rotation

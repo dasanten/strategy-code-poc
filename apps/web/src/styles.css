@@ -1116,6 +1116,19 @@ label > select {
   bottom: 12px;
   left: 12px;
 }
+/* The art style picker under the legend (CONTEXT.md: Art style). */
+.art-style {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 6px 12px;
+  background: var(--ui-bar);
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  font-size: 12px;
+}
 .map-legend {
   padding: 10px 28px 10px 12px;
   display: grid;

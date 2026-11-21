@@ -780,6 +780,10 @@ button.card-list-row:hover {
   width: 16px;
   height: 16px;
 }
+/* Pixel art (CONTEXT.md: Art style) stays crisp at any size. */
+.good-icon-pixel image {
+  image-rendering: pixelated;
+}
 .goods-own {
   margin-left: 6px;
   background: none;
