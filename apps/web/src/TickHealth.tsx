@@ -23,25 +23,31 @@ export function TickHealthPanel() {
 /** The tick health as shown, from the last answer, when it came and the last failure. */
 export function TickHealthView({ health, fetchedAt, error }: TickHealthState) {
   return (
-    <section className="admin-panel tick-health" aria-label="Tick health">
-      <h2>Tick health</h2>
-      <p className="muted small">
-        {fetchedAt === undefined
-          ? 'Not fetched yet.'
-          : `Fetched at ${new Date(fetchedAt).toLocaleTimeString('en-GB')}.`}{' '}
-        Fetched again every {TICK_HEALTH_POLL_MS / 1000} s while this tab is open.
-        {health && ` A phase whose p95 is over ${formatMs(health.slowTickMs)} is marked slow.`}
-      </p>
-      {error && (
-        <p role="alert" className="error">
-          {`Could not fetch the tick health: ${error}`}
+    <section className="pn admin-panel tick-health" aria-label="Tick health">
+      <h2 className="hd">Tick health</h2>
+      <div className="sec">
+        <p className="mu">
+          {fetchedAt === undefined
+            ? 'Not fetched yet.'
+            : `Fetched at ${new Date(fetchedAt).toLocaleTimeString('en-GB')}.`}{' '}
+          Fetched again every {TICK_HEALTH_POLL_MS / 1000} s while this tab is open.
+          {health && ` A phase whose p95 is over ${formatMs(health.slowTickMs)} is marked slow.`}
         </p>
-      )}
+        {error && (
+          <p role="alert" className="error">
+            {`Could not fetch the tick health: ${error}`}
+          </p>
+        )}
+      </div>
       {health && (
-        <div className="tick-health-windows">
-          <TickWindow title="Last minute" stats={health.lastMinute} slowMs={health.slowTickMs} />
-          <TickWindow title="Last hour" stats={health.lastHour} slowMs={health.slowTickMs} />
-        </div>
+        <>
+          <div className="sec">
+            <TickWindow title="Last minute" stats={health.lastMinute} slowMs={health.slowTickMs} />
+          </div>
+          <div className="sec">
+            <TickWindow title="Last hour" stats={health.lastHour} slowMs={health.slowTickMs} />
+          </div>
+        </>
       )}
     </section>
   )
@@ -60,13 +66,13 @@ function TickWindow({
   const count = (n: number) => String(n)
   return (
     <div className="tick-health-window" aria-label={title}>
-      <h3>{title}</h3>
-      <ul className="codes">
-        <li>{`${stats.ticks} ${stats.ticks === 1 ? 'tick' : 'ticks'}, ${stats.slow} slow`}</li>
-      </ul>
+      <div className="fx wrap">
+        <h3>{title}</h3>
+        <span className="mu">{`${stats.ticks} ${stats.ticks === 1 ? 'tick' : 'ticks'}, ${stats.slow} slow`}</span>
+      </div>
       {stats.ticks > 0 && (
         <>
-          <table>
+          <table className="tb">
             <thead>
               <tr>
                 <th />
@@ -81,7 +87,7 @@ function TickWindow({
               <Row name="Script runs" p={stats.scriptRuns} show={count} />
             </tbody>
           </table>
-          <table aria-label={`Phases, ${title.toLowerCase()}`}>
+          <table className="tb" aria-label={`Phases, ${title.toLowerCase()}`}>
             <thead>
               <tr>
                 <th>Phase</th>
