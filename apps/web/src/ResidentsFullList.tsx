@@ -158,14 +158,29 @@ export function ResidentsFullList({
     viewport,
   })
   const Row = phone ? ResidentCardRow : ResidentTableRow
+  const narrowed = filtersOn(choice) > 0 || choice.search.trim() !== ''
   return (
     <section className="residents-full" aria-label="All residents">
-      <PanelHead title="Residents">{residentsCount(all.map((l) => l.resident))}</PanelHead>
-      <div className="residents-full-choice">
-        <label className="search">
-          Search
+      <PanelHead title="Residents">
+        <span className="residents-full-head">
+          {narrowed ? (
+            <span role="status">
+              {listed.length} of {all.length} shown
+            </span>
+          ) : (
+            <span>{residentsCount(all.map((l) => l.resident))}</span>
+          )}
+          <button type="button" className="btn sm dk" onClick={onClose}>
+            Close full list
+          </button>
+        </span>
+      </PanelHead>
+      <div className="residents-full-choice fx wrap">
+        <label className="fld search">
+          <span className="lb">Search</span>
           <input
             type="search"
+            className="in"
             placeholder="Name"
             value={saved.search}
             onChange={(e) => choose({ ...saved, search: e.target.value })}
@@ -179,11 +194,12 @@ export function ResidentsFullList({
               options={LIST_COLUMNS.map((value) => ({ value, label: COLUMN_LABELS[value] }))}
               onChange={(sort) => choose(sortBy(saved, sort))}
             />
-            <button type="button" onClick={() => choose(sortBy(saved, saved.sort))}>
+            <button type="button" className="btn" onClick={() => choose(sortBy(saved, saved.sort))}>
               {directionLabel(saved.sort, saved.descending)}
             </button>
             <button
               type="button"
+              className="btn"
               aria-expanded={filtersOpen}
               onClick={() => setFiltersOpen((open) => !open)}
             >
@@ -228,27 +244,20 @@ export function ResidentsFullList({
             />
           </>
         )}
-        {(filtersOn(choice) > 0 || choice.search.trim() !== '') && (
-          <>
-            <span className="muted" role="status">
-              {listed.length} of {all.length} shown
-            </span>
-            <button type="button" onClick={() => choose(clearFilters(saved))}>
-              Clear filters
-            </button>
-          </>
+        {narrowed && (
+          <button type="button" className="btn" onClick={() => choose(clearFilters(saved))}>
+            Clear filters
+          </button>
         )}
+        <span className="grow" />
         <button
           type="button"
-          className="primary pick"
+          className="btn primary"
           title="Pick those ticked as a group, or everyone listed when none of them is"
           disabled={toPick.length === 0}
           onClick={() => onPick(toPick)}
         >
           Pick these ({toPick.length})
-        </button>
-        <button type="button" onClick={onClose}>
-          Close full list
         </button>
       </div>
       <div
@@ -260,7 +269,7 @@ export function ResidentsFullList({
           {!phone && (
             <div className="residents-full-row heading">
               <span className="tick" />
-              <div className="residents-row full heading">
+              <div className="full-cells heading">
                 {LIST_COLUMNS.map((column) => (
                   <ColumnHeading
                     key={column}
@@ -315,9 +324,9 @@ function Choice<T extends string>({
   onChange: (value: T) => void
 }) {
   return (
-    <label>
-      {label}
-      <select value={value} onChange={(e) => onChange(e.target.value as T)}>
+    <label className="fld">
+      <span className="lb">{label}</span>
+      <select className="in" value={value} onChange={(e) => onChange(e.target.value as T)}>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
@@ -327,6 +336,15 @@ function Choice<T extends string>({
     </label>
   )
 }
+
+/** The columns that hold a number, right-aligned as the kit's table does them (`.n`). */
+const NUMBER_COLUMNS: ReadonlySet<ListColumn> = new Set([
+  'age',
+  'strength',
+  'endurance',
+  'agility',
+  'intellect',
+])
 
 /** A heading of the table: tapping it sorts by that column, and again turns the order round. */
 function ColumnHeading({
@@ -343,7 +361,7 @@ function ColumnHeading({
   return (
     <button
       type="button"
-      className="column"
+      className={NUMBER_COLUMNS.has(column) ? 'column n' : 'column'}
       title={name}
       aria-pressed={sorted}
       aria-label={
@@ -360,7 +378,7 @@ function ColumnHeading({
 /**
  * A row's tick, beside its button rather than in it, since a button can't hold another. It is a
  * button itself: a key pressed in an input counts as typing, so after a tick in one, Escape and the
- * group keys would do nothing.
+ * group keys would do nothing. It shows the kit's checkbox (`.cb`).
  */
 function TickBox({
   name,
@@ -380,9 +398,7 @@ function TickBox({
       aria-label={`Tick ${name}`}
       onClick={onToggle}
     >
-      <span className={ticked ? 'tick-box on' : 'tick-box'} aria-hidden="true">
-        {ticked && '✓'}
-      </span>
+      <span className={ticked ? 'cb on' : 'cb'} aria-hidden="true" />
     </button>
   )
 }
@@ -402,6 +418,16 @@ function RowMeter({ label, share }: { label: string; share: number }) {
   )
 }
 
+/** The Leader or Heir mark beside a name, as the kit's chip. */
+function Marks({ row }: { row: ResidentRow }) {
+  return (
+    <>
+      {row.leader && <span className="chip y">Leader</span>}
+      {row.heir && <span className="chip bl">Heir</span>}
+    </>
+  )
+}
+
 /** A resident's row in the wide table; long cells are cut, with all of it in their tooltip. */
 function ResidentTableRow({ row, selected, onSelect }: RowProps) {
   const { stats } = row
@@ -409,39 +435,38 @@ function ResidentTableRow({ row, selected, onSelect }: RowProps) {
     <button
       type="button"
       data-resident={row.id}
-      className={`residents-row full${selected ? ' selected' : ''}`}
+      className={`rw people-row full-cells${selected ? ' sel' : ''}`}
       style={{ height: FULL_ROW_HEIGHT }}
       aria-pressed={selected}
       onClick={() => onSelect(row.id)}
     >
-      <span className="name cut" title={row.name}>
+      <span className="b cut" title={row.name}>
         {row.name}
-        {row.leader && <small className="leader-mark">Leader</small>}
-        {row.heir && <small className="leader-mark">Heir</small>}
+        <Marks row={row} />
       </span>
-      <span className="mono">{row.age}</span>
+      <span className="mono n">{row.age}</span>
       <span className="cut" title={row.city}>
         {row.city}
       </span>
-      <span className="mono">{stats.strength}</span>
-      <span className="mono">{stats.endurance}</span>
-      <span className="mono">{stats.agility}</span>
-      <span className="mono">{stats.intellect}</span>
-      <span className="cut muted" title={row.skills}>
+      <span className="mono n">{stats.strength}</span>
+      <span className="mono n">{stats.endurance}</span>
+      <span className="mono n">{stats.agility}</span>
+      <span className="mono n">{stats.intellect}</span>
+      <span className="cut" title={row.skills}>
         {row.skills || '–'}
       </span>
       <span className="cut" title={row.gear}>
         {row.gear || '–'}
       </span>
-      <span className="cut muted" title={row.carrying}>
+      <span className="cut" title={row.carrying}>
         {row.carrying || '–'}
-        <small className="mono">{row.weight}</small>
+        <span className="mono mu under">{row.weight}</span>
       </span>
       <RowMeter label="Hunger" share={row.fed} />
       <RowMeter label="Health" share={row.health} />
-      <span className="doing cut" title={row.under ? `${row.doing}\n${row.under}` : row.doing}>
+      <span className="cut" title={row.under ? `${row.doing}\n${row.under}` : row.doing}>
         {row.doing}
-        {row.under && <small className="muted">{row.under}</small>}
+        {row.under && <span className="mu under">{row.under}</span>}
       </span>
     </button>
   )
@@ -454,43 +479,42 @@ function ResidentCardRow({ row, selected, onSelect }: RowProps) {
     <button
       type="button"
       data-resident={row.id}
-      className={`residents-row lines full-card${selected ? ' selected' : ''}`}
+      className={`rw people-row full-card${selected ? ' sel' : ''}`}
       style={{ height: FULL_CARD_HEIGHT }}
       aria-pressed={selected}
       onClick={() => onSelect(row.id)}
     >
-      <span className="line">
-        <span className="name cut">
+      <span className="fx">
+        <span className="b grow cut">
           {row.name}
-          {row.leader && <span className="leader-mark"> · Leader</span>}
-          {row.heir && <span className="leader-mark"> · Heir</span>}
+          <Marks row={row} />
         </span>
-        <span className="mono">{yearsLine(row.age)}</span>
+        <span className="mono mu">{yearsLine(row.age)}</span>
       </span>
-      <span className="line">
-        <span className="doing cut">{row.doing}</span>
+      <span className="fx">
+        <span className="grow cut">{row.doing}</span>
         <RowMeter label="Hunger" share={row.fed} />
         <RowMeter label="Health" share={row.health} />
       </span>
-      <span className="line">
-        <span className="mono cut wide">
+      <span className="fx">
+        <span className="mono grow cut">
           Str {stats.strength} · End {stats.endurance} · Agi {stats.agility} · Int {stats.intellect}
         </span>
       </span>
-      <span className="line">
-        <span className="cut muted wide">{row.skills || 'No skills yet'}</span>
+      <span className="fx">
+        <span className="mu grow cut">{row.skills || 'No skills yet'}</span>
       </span>
-      <span className="line">
-        <span className="cut wide">
+      <span className="fx">
+        <span className="grow cut">
           {row.city}
           {row.gear && ` · ${row.gear}`}
         </span>
       </span>
-      <span className="line">
-        <span className="cut muted wide">
+      <span className="fx">
+        <span className="mu grow cut">
           {row.carrying ? `Carrying ${row.carrying}` : 'Carrying nothing'}
         </span>
-        <span className="mono">{row.weight}</span>
+        <span className="mono mu">{row.weight}</span>
       </span>
     </button>
   )
