@@ -123,13 +123,15 @@
   height: auto;
   min-height: 44px;
 }
+/* Off a phone the bar wraps wherever it no longer fits (a long realm name, a narrow window); its
+   height is measured into --top-h. Below 1000 px it always splits into two rows. */
+.game:not(.phone) .hud-top {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
 @media (max-width: 999px) {
-  .game:not(.phone) .hud-top {
-    flex-wrap: wrap;
-    row-gap: 4px;
-    padding-top: 4px;
-    padding-bottom: 4px;
-  }
   .game:not(.phone) .hud-top > .grow {
     flex-basis: 100%;
   }
