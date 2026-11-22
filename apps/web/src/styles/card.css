@@ -129,76 +129,6 @@
   flex: none;
   font-size: 0.75rem;
 }
-/* The Add step palette (`CONTEXT.md`: Planner blocks): step kinds grouped as the Orders tab is,
-   each a compact button with its icon, Customise a small ⚙ on its step. */
-.step-palette {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 6px;
-}
-.step-palette-group h4 {
-  margin: 0 0 3px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.step-palette-items {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: 3px;
-}
-.step-palette-item {
-  display: flex;
-  min-width: 0;
-}
-.step-palette-item > button:first-child {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 30px;
-  padding: 2px 6px;
-  text-align: left;
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.step-palette-item button.customise-small {
-  flex: none;
-  min-width: 26px;
-  min-height: 30px;
-  padding: 0 4px;
-  margin-left: -1px;
-  font-size: 12px;
-}
-/* An insert point between two steps: "+" to add the next step there, faint until hovered. */
-.queue-insert {
-  list-style: none;
-  display: flex;
-  justify-content: center;
-  height: 0;
-  position: relative;
-  z-index: 1;
-}
-.queue-insert button {
-  position: absolute;
-  top: -11px;
-  min-width: 22px;
-  min-height: 18px;
-  padding: 0 6px;
-  font-size: 11px;
-  line-height: 16px;
-  opacity: 0.35;
-}
-.queue-insert button:hover,
-.queue-insert button:focus-visible,
-.queue-insert.set button {
-  opacity: 1;
-}
-.queue-insert.set button {
-  color: var(--ui-live);
-  border-color: var(--ui-live);
-}
 .sel-actions button {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr) auto;
@@ -293,265 +223,6 @@
 .sel-group strong {
   color: var(--ui-text);
   font-weight: 600;
-}
-
-/* The resident's queue: its steps in order, the current one marked. */
-.queue-steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.queue-step {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 2px 4px 2px 8px;
-  border: 2px solid var(--ui-line);
-  border-left-width: 3px;
-  cursor: grab;
-}
-.queue-step.current {
-  border-left-color: var(--ui-live);
-  background: var(--ui-raised);
-}
-/* A step picked for the planner clipboard (tap; Shift for a range). */
-.queue-step.picked {
-  border-color: var(--ui-line-strong);
-  background: var(--sun);
-}
-.queue-step.current.picked {
-  border-left-color: var(--ui-live);
-}
-.queue-steps:focus-visible {
-  outline: 2px solid var(--ui-line-strong);
-  outline-offset: 2px;
-}
-/* The planner's toolbar, one compact row (`CONTEXT.md`: Planner blocks): its title, Loop, the
-   tools, Save and Load, the help's "?", and how many steps are picked. */
-.queue-tools {
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 6px;
-}
-.order-buttons.queue-tools {
-  gap: 2px;
-}
-.order-buttons.queue-tools button {
-  min-width: 0;
-  min-height: 30px;
-  padding: 2px 4px;
-  font-size: 12px;
-}
-.queue-tools .queue-loop {
-  gap: 2px;
-  margin-right: 2px;
-}
-.queue-tools .muted {
-  margin-left: auto;
-}
-/* Save and Load sit in the toolbar's row; the name to save under and the list open below it. */
-.queue-tools .saved-queues,
-.queue-tools .saved-queues > .order-buttons {
-  display: contents;
-}
-.queue-tools .saved-queues > :not(.order-buttons) {
-  flex-basis: 100%;
-}
-/* A step whose place is gone from the map, as a saved queue's loaded after a tear-down. */
-.queue-step-gone {
-  color: var(--ui-warn-text);
-}
-/* Brackets (`CONTEXT.md`: Planner blocks): loop the outermost around the steps, its switch in
-   the head; each repeat block a bracket nested in it, its count in its head. A bracket is a
-   rule down the left with a head on top and a foot under its last step. */
-.queue-bracket {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 0 0 4px 8px;
-  border-left: 3px solid var(--ui-line-strong);
-  border-bottom: 2px solid var(--ui-line-strong);
-}
-.queue-bracket-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 28px;
-  margin-left: -8px;
-  padding: 0 4px 0 6px;
-  background: var(--ui-raised);
-}
-.queue-bracket-head .buttons {
-  display: flex;
-  gap: 4px;
-  margin-left: auto;
-}
-.queue-bracket-head button {
-  min-width: 28px;
-  min-height: 28px;
-}
-/* Loop: off, its bracket is faint, the queue ends after its last step. */
-.queue-loop-bracket {
-  margin-bottom: 6px;
-  border-left-style: dashed;
-  border-bottom-style: dashed;
-  border-color: var(--ui-line);
-}
-.queue-loop-bracket.on {
-  border-style: solid;
-  border-color: var(--ui-live);
-}
-.queue-loop-bracket > .queue-bracket-head {
-  cursor: default;
-}
-.queue-repeat-bracket {
-  border-color: var(--ui-warn);
-}
-.queue-repeat-bracket > .queue-bracket-head {
-  cursor: grab;
-}
-.queue-repeat-bracket.picked > .queue-bracket-head {
-  background: var(--sun);
-  outline: 2px solid var(--ui-line-strong);
-}
-/* An If block (`CONTEXT.md`: If block): its Else part sits under a second head in the bracket. */
-.queue-if-bracket {
-  border-color: var(--ui-live);
-}
-/* Its condition reads in full: the head's buttons wrap below it when the card is narrow. */
-.queue-if-bracket > .queue-bracket-head {
-  cursor: grab;
-  flex-wrap: wrap;
-  padding-block: 2px;
-}
-.queue-if-bracket > .queue-bracket-head > .queue-step-label {
-  flex: 1 1 14em;
-  white-space: normal;
-}
-.queue-if-bracket.picked > .queue-bracket-head {
-  background: var(--sun);
-  outline: 2px solid var(--ui-line-strong);
-}
-.queue-if-bracket > .queue-else-head {
-  cursor: default;
-}
-.queue-branch {
-  color: var(--ui-live);
-  font-weight: 600;
-}
-/* With steps picked, the "+" points are where they move to. */
-.queue-insert.move button {
-  opacity: 1;
-  color: var(--ui-live);
-  border-color: var(--ui-live);
-}
-.queue-insert.move {
-  height: auto;
-}
-.queue-insert.move button {
-  position: static;
-}
-.queue-block-count {
-  width: 4em;
-}
-/* A resident's queue draft, marked as not running yet (`CONTEXT.md`: Queue draft). */
-.queue-draft-mark {
-  color: var(--ui-warn-text);
-  font-weight: 600;
-  margin: 0 0 4px;
-}
-/* How many steps the plan becomes after repeats, warned when over what a queue holds. */
-.queue-unrolled-over {
-  color: var(--ui-warn-text);
-}
-/* Save and Load for saved queues: the name to save under, and the list to load from. */
-.saved-queues {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-.saved-queues-save {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-.saved-queues-save input {
-  flex: 1 1 10em;
-  min-width: 0;
-}
-.saved-queues-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.saved-queues-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 6px;
-}
-/* A step on one line: icon, label with its place, the duration chip, remove. */
-.queue-step-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.queue-step-icon {
-  flex: none;
-  width: 1.4em;
-  text-align: center;
-  color: var(--ui-muted);
-}
-.queue-step-label {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.queue-step-head .buttons {
-  display: flex;
-  gap: 4px;
-  margin-left: auto;
-}
-.queue-step-head button {
-  min-width: 28px;
-  min-height: 28px;
-}
-/* A step's duration (`DurationChip`), flagged while a step that never ends needs one. */
-.queue-step-head .queue-step-chip {
-  flex: none;
-  min-width: 0;
-  min-height: 24px;
-  padding: 0 8px;
-  white-space: nowrap;
-}
-.queue-step-chip.needed {
-  color: var(--ui-warn-text);
-  border-color: var(--ui-warn);
-}
-
-.queue-step:focus-visible {
-  outline: 2px solid var(--ui-line-strong);
-  outline-offset: 1px;
-}
-.queue-step-minutes,
-.queue-loop {
-  flex-direction: row;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
 }
 
 /* Who and what a tile holds (`CardList`): its horses or workers as rows, meters on the right as
@@ -979,33 +650,6 @@ button.card-list-row:hover {
 .doing-now {
   font-size: 1rem;
   font-weight: 600;
-}
-.stat {
-  display: grid;
-  grid-template-columns: 82px minmax(0, 1fr) 80px;
-  gap: 10px;
-  align-items: center;
-}
-.stat-bar {
-  height: 12px;
-  background: var(--bark);
-  border: 2px solid var(--ink);
-  box-sizing: border-box;
-  display: flex;
-  overflow: hidden;
-}
-.stat-bar .base {
-  background: var(--mist);
-}
-.stat-bar .trained {
-  background: var(--gold);
-}
-.stat-bar .cap {
-  box-sizing: border-box;
-  border: 1px dashed var(--tan);
-}
-.stat .mono {
-  font-size: 0.75rem;
 }
 
 .horse-pick {
@@ -1812,4 +1456,450 @@ button.card-list-row:hover {
 .sel-body > :is(.inspector-block, .card-site, .card-list, .card-carriage, .sel-actions) + * {
   padding-top: 10px;
   border-top: 2px solid var(--tan);
+}
+
+/* Queue, Stats and Script tabs (T119.10) ----------
+   The Queue and Stats tabs of the command bar (`CONTEXT.md`: Queue, Planner blocks; artboards
+   `Card-Queue-Blocks` and `Card-Stats-Script`); the Script tab's rules are in scripts.css under
+   the same heading. Each tab fills the bar's body edge to edge, in columns that scroll inside
+   it; in the phone's sheet they stack and the sheet scrolls. */
+
+/* The Queue tab grows the bar upward (`CommandBar`'s `tall`), its button at the tabs' end. */
+.cmd-bar.cmd-tall {
+  height: min(520px, calc(100vh - var(--top-h, 44px) - 24px));
+}
+.cmd-main {
+  position: relative;
+}
+.cmd-grow {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+}
+
+/* The planner (`QueueBlock`): the toolbar, the steps in their brackets and the foot on the left,
+   the Add step palette and its ask beside them. */
+.queue-planner {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: -8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.queue-list {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.queue-list > p {
+  margin: 8px 10px;
+}
+.queue-planner .order-buttons button {
+  min-height: 0;
+  min-width: 0;
+}
+/* The toolbar: title and draft mark, the tools, the count; Saved…'s form opens on a row below. */
+.queue-tools {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 2px solid var(--tan);
+}
+.queue-tools .saved-queues,
+.queue-tools .saved-queues > .order-buttons,
+.queue-tools > .order-buttons {
+  display: contents;
+}
+.queue-tools .saved-queues > :not(.order-buttons) {
+  flex-basis: 100%;
+}
+.queue-help {
+  flex: none;
+  margin: 6px 8px 0;
+  padding: 6px 8px;
+}
+/* How many steps the plan becomes after repeats, warned when over what a queue holds. */
+.queue-unrolled-over {
+  color: var(--ui-warn-text);
+  font-weight: 600;
+}
+/* Saved…: the name to save under, and the list to load from. */
+.saved-queues-save,
+.saved-queues-list,
+.saved-queues-none {
+  margin: 0;
+  padding: 6px 8px;
+}
+.saved-queues-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.saved-queues-save input {
+  flex: 1 1 10em;
+  min-width: 0;
+  height: 24px;
+}
+.saved-queues-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.saved-queues-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+.saved-queues-list .buttons {
+  display: flex;
+  gap: 4px;
+}
+/* Brackets (`CONTEXT.md`: Planner blocks): Loop the outermost, scrolling under its head; each
+   repeat and If block a head row with its steps indented under it, a rule down their left. */
+.queue-bracket {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.queue-loop-bracket {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.queue-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.queue-loop-bracket > .queue-steps {
+  margin-left: 12px;
+  border-left: 2px dashed var(--tan);
+}
+.queue-loop-bracket.on > .queue-steps {
+  border-left: 2px solid var(--ui-live);
+}
+.queue-steps .queue-steps {
+  margin-left: 18px;
+  border-left: 2px solid var(--clay);
+}
+.queue-steps:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+/* A block's head as the kit's group row: tan, an If on sun; the words in full colour there. */
+.queue-bracket-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-height: 30px;
+  box-sizing: border-box;
+  padding: 3px 8px;
+  background: var(--tan);
+  border-bottom: 2px solid var(--clay);
+  color: var(--ui-text);
+}
+.queue-bracket-head .muted {
+  color: var(--ui-text);
+}
+.queue-loop-bracket > .queue-bracket-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.queue-repeat-bracket > .queue-bracket-head,
+.queue-if-bracket > .queue-bracket-head:not(.queue-else-head) {
+  cursor: grab;
+}
+.queue-if-bracket > .queue-bracket-head:not(.queue-else-head) {
+  background: var(--sun);
+}
+.queue-if-bracket > .queue-bracket-head > .queue-step-label {
+  flex: 1 1 14em;
+  white-space: normal;
+}
+.queue-bracket-head .buttons,
+.queue-step-head .buttons {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.queue-bracket-head:focus-visible,
+.queue-step:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+/* A step: a row with its icon, number and label, its duration, remove; the current one marked
+   down its left edge, a picked one on sun. */
+.queue-step {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 32px;
+  box-sizing: border-box;
+  padding: 3px 8px;
+  border-bottom: 2px solid var(--tan);
+  cursor: grab;
+}
+.queue-step.current {
+  background: var(--paper);
+  box-shadow: inset 4px 0 0 var(--ui-live);
+}
+.queue-step.picked,
+.queue-bracket.picked > .queue-bracket-head {
+  background: var(--sun);
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+.queue-step-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.queue-step-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A step whose place is gone from the map, as a saved queue's loaded after a tear-down. */
+.queue-step-gone {
+  color: var(--ui-warn-text);
+  font-weight: 600;
+}
+.queue-step-chip {
+  flex: none;
+}
+/* Repeat's how and count, a duration being typed, Loop's switch: one line of small fields. */
+.queue-step-minutes,
+.queue-loop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.queue-step-minutes select,
+.queue-step-minutes input {
+  height: 24px;
+}
+.queue-block-count {
+  width: 4em;
+}
+/* The part of an If being run, in a running queue. */
+.queue-branch {
+  margin-left: 4px;
+}
+/* An insert point between two items: "+" to add the next step there, faint until hovered; the
+   one set, and Move here while steps are picked, a full-width bar in the list. */
+.queue-insert {
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  height: 0;
+  position: relative;
+  z-index: 1;
+}
+.queue-insert button {
+  position: absolute;
+  top: -10px;
+  height: 18px;
+  min-height: 0;
+  padding: 0 6px;
+  font-size: 11px;
+  opacity: 0.4;
+}
+.queue-insert button:hover,
+.queue-insert button:focus-visible,
+.queue-insert.set button,
+.queue-insert.move button {
+  opacity: 1;
+}
+.queue-insert.set,
+.queue-insert.move {
+  height: auto;
+  padding: 3px 8px;
+}
+.queue-insert.set button,
+.queue-insert.move button {
+  position: static;
+  width: 100%;
+}
+/* Under the steps: what giving does or why it waits, then Discard and Start (or Edit as draft). */
+.queue-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-top: 2px solid var(--tan);
+}
+.queue-foot p {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+}
+/* Add step beside the steps: its palette, then what the step being planned asks for. */
+.queue-palette {
+  min-width: 0;
+  min-height: 0;
+  max-width: 440px;
+  overflow: auto;
+  border-left: 2px solid var(--ink);
+}
+.add-step {
+  display: flex;
+  flex-direction: column;
+}
+.add-step.open {
+  width: 420px;
+  max-width: 100%;
+}
+.add-step p {
+  margin: 0;
+}
+.step-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.step-palette-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.step-palette-group h4 {
+  margin: 0;
+}
+.step-palette-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.step-palette-item {
+  display: inline-flex;
+  gap: 2px;
+}
+.add-step-ask {
+  background: var(--paper);
+}
+.add-step-ask .order-buttons {
+  gap: 4px;
+}
+/* The condition editor of an If, a Repeat until or a Wait until: its fields on a line, what it
+   reads as in a well, then its button. */
+.condition-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.condition-editor .order-buttons {
+  align-items: center;
+}
+.condition-preview {
+  margin: 0;
+  padding: 6px 8px;
+}
+
+/* The Stats tab: facts and family, the four stats, skills; side by side, each scrolling. */
+.stats-tab {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: -8px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.3fr) minmax(0, 1fr);
+}
+.stats-tab > .sec {
+  min-height: 0;
+  overflow: auto;
+}
+.stats-tab > .sec + .sec {
+  border-top: 0;
+  border-left: 2px solid var(--tan);
+}
+.stats-tab h3 {
+  margin: 0;
+}
+/* A stat: its name, base + trained + room to the cap as one bar, the numbers. */
+.stat {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) 92px;
+  gap: 8px;
+  align-items: center;
+}
+.stat .mono {
+  text-align: right;
+  font-size: 12px;
+}
+.stat-bar > .stat-base {
+  background: var(--clay);
+}
+.stat-bar > .stat-trained {
+  background: var(--gold);
+}
+.stat-bar > .stat-room {
+  background: var(--steel);
+}
+.stat-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.stat-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.stat-legend .stat-base {
+  --rel: var(--clay);
+}
+.stat-legend .stat-trained {
+  --rel: var(--gold);
+}
+.stat-legend .stat-room {
+  --rel: var(--steel);
+}
+
+/* In the phone's sheet: the planner's palette under the steps, the stats stacked, the sheet
+   scrolling them all at a finger's size. */
+.game-selection.sheet :is(.queue-planner, .stats-tab) {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.game-selection.sheet :is(.queue-loop-bracket, .queue-palette, .stats-tab > .sec) {
+  overflow: visible;
+}
+.game-selection.sheet .queue-palette {
+  max-width: none;
+  border-left: 0;
+  border-top: 2px solid var(--ink);
+}
+.game-selection.sheet .add-step.open {
+  width: auto;
+}
+.game-selection.sheet .stats-tab > .sec + .sec {
+  border-left: 0;
+  border-top: 2px solid var(--tan);
+}
+.game-selection.sheet .queue-planner button {
+  min-height: 36px;
+}
+.game-selection.sheet .queue-insert button {
+  min-height: 0;
+  height: 28px;
+}
+.game-selection.sheet .queue-insert:not(.set, .move) button {
+  top: -14px;
 }
