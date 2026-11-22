@@ -2509,6 +2509,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         )}
       </section>
       <TopBar
+        phone={phone}
         realm={world ? (world.home.realmName ?? leader?.name) : undefined}
         account={account.name}
         cityName={homeCity?.name}
@@ -2557,6 +2558,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           account={account.name}
           onLogout={logout}
           onWiki={() => reportFirstDay('openWiki')}
+          zeal={world?.zeal}
+          zealDraining={leader?.order?.kind === 'rally'}
         />
       )}
       <Sidebar
@@ -2653,6 +2656,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onOpen={(id) => {
                 // The army's card takes the command bar: a resident or group picked lets go.
                 if (id) setSelectedIds([])
+                // On a phone the tab fills the screen over the sheet: it folds, as it does when a
+                // resident is picked from Residents (`showBeside`), so the army's sheet shows.
+                if (id && phone) foldSidebar()
                 cancelPick()
                 setArmyError(undefined)
                 setOpenArmyId(id)

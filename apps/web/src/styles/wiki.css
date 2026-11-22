@@ -149,6 +149,18 @@
   .wiki-toc li {
     break-inside: avoid;
   }
+  /* Each topic a finger's height to tap; To the game too. */
+  .wiki-toc a {
+    display: inline-block;
+    padding: 10px 0;
+    line-height: 1.3;
+  }
+  .wiki-head h1 {
+    font-size: 18px;
+  }
+  .wiki-head .btn {
+    height: 44px;
+  }
   .wiki-text {
     padding: 2px 12px 12px;
   }

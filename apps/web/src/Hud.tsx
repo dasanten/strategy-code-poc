@@ -7,7 +7,8 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { formatGameTime } from './shared/time.js'
+import { formatGameTime, formatGameTimeShort } from './shared/time.js'
+import { useMapDockHeight } from './Dock.js'
 import type { FirstDay, TraderVisit } from '@csp/shared-types'
 import { DrawerStatus } from './drawer-head.js'
 import { zealShown } from './zeal.js'
@@ -138,7 +139,10 @@ export function TopBar({
   control,
   zeal,
   zealDraining,
+  phone = false,
 }: {
+  /** On a phone the bar's height is fixed (`--top-h`); elsewhere it is measured into it. */
+  phone?: boolean
   /** The realm's name (`CONTEXT.md`: Realm name), once the world has come. */
   realm?: string
   account: string
@@ -161,8 +165,24 @@ export function TopBar({
   /** The Leader rallies the crew: the Zeal doesn't fill and drains while the crew works (`CONTEXT.md`: Zeal). */
   zealDraining?: boolean
 }) {
+  // Off a phone the bar wraps to a second row where one has no room (a tablet): its height goes
+  // to the screen as `--top-h`, so the sidebar, the dock and the notices start below it.
+  const ref = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const bar = ref.current
+    const screen = bar?.parentElement
+    if (!bar || !screen || phone) return
+    const observer = new ResizeObserver(() => {
+      if (bar.offsetHeight > 0) screen.style.setProperty('--top-h', `${bar.offsetHeight}px`)
+    })
+    observer.observe(bar)
+    return () => {
+      observer.disconnect()
+      screen.style.removeProperty('--top-h')
+    }
+  }, [phone])
   return (
-    <header className="hud-top bar">
+    <header ref={ref} className="hud-top bar">
       {control && <ControlSwitch {...control} />}
       {realm && (
         <span className="hud-realm px t18" title="Your realm">
@@ -180,7 +200,9 @@ export function TopBar({
           className="hud-clock mono"
           title="1 game day = 24 real minutes; 1 game year = 420 game days = 1 real week"
         >
-          {formatGameTime(tick)}
+          {/* A phone has room only for the short form (`formatGameTimeShort`). */}
+          <span className="hud-clock-long">{formatGameTime(tick)}</span>
+          <span className="hud-clock-short">{formatGameTimeShort(tick)}</span>
         </span>
       )}
       <span
@@ -290,7 +312,8 @@ const REALM_BAR_GAP = 8
  * command bar's place along the bottom, left of the map dock, and is where the orders that begin
  * with a kind or a place start, under a heading and a line on what the mode is for. On a desktop
  * its height, with the gap above it, goes to the screen as `--command-h`, so the sidebar and the
- * dock stop above it as they do above the command bar. On a phone it sits above the map buttons.
+ * dock stop above it as they do above the command bar. On a phone it sits above the map buttons
+ * (`--map-dock-h`).
  */
 export function RealmBar({
   open,
@@ -318,6 +341,8 @@ export function RealmBar({
       screen.style.removeProperty('--command-h')
     }
   }, [phone])
+  // On a phone it stands above the map's buttons, which give their height as `--map-dock-h`.
+  useMapDockHeight(ref, phone)
   return (
     <section ref={ref} className="realm-bar pn" aria-label="Realm bar">
       <div className="realm-bar-head">
@@ -355,8 +380,9 @@ export function UnseenMark() {
 }
 
 /**
- * On a phone the sidebar's strip and the top bar's goods, Leader, Wiki and Log out fold into one
- * menu button at the top left (ADR 0012); picking a tab from it opens that tab full-screen.
+ * On a phone the sidebar's strip and the top bar's goods, Leader, heir, Zeal, Wiki and Log out fold
+ * into one menu button at the top left (ADR 0012); picking a tab from it opens that tab
+ * full-screen.
  */
 export function PhoneMenu({
   open,
@@ -369,6 +395,8 @@ export function PhoneMenu({
   account,
   onLogout,
   onWiki,
+  zeal,
+  zealDraining,
 }: {
   open: OpenTab
   onToggle: (id: SideTabId) => void
@@ -384,6 +412,9 @@ export function PhoneMenu({
   onLogout: () => void
   /** The Wiki link was followed (`CONTEXT.md`: First day). */
   onWiki?: () => void
+  /** The Player's Zeal (`CONTEXT.md`: Zeal): on a phone the top bar has no room for it. */
+  zeal?: number
+  zealDraining?: boolean
 }) {
   const [shown, setShown] = useState(false)
   useEffect(() => {
@@ -412,6 +443,28 @@ export function PhoneMenu({
         <>
           <div className="hud-menu-backdrop" onClick={() => setShown(false)} />
           <nav className="hud-menu pn" aria-label="Menu">
+            {/* As the artboard (`Phone-Menu`): the goods and the realm's people first, the tabs,
+                then Wiki and Log out at the foot. */}
+            {goods && <Goods goods={goods} className="hud-menu-goods" />}
+            {(leader || heir !== undefined || zeal !== undefined) && (
+              <div className="hud-menu-realm">
+                {leader && (
+                  <span className="hud-leader" title="Your Leader">
+                    <Icon name="crown" size={16} /> {leader}
+                  </span>
+                )}
+                {heir !== undefined && (
+                  <HeirShown
+                    heir={heir}
+                    onPickHeir={() => {
+                      setShown(false)
+                      onPickHeir?.()
+                    }}
+                  />
+                )}
+                {zeal !== undefined && <ZealMeter zeal={zeal} draining={zealDraining} />}
+              </div>
+            )}
             {sidebarGroups().map((g) => (
               <Fragment key={g.id}>
                 <h2 className="hud-menu-heading">{g.label}</h2>
@@ -432,24 +485,9 @@ export function PhoneMenu({
                 ))}
               </Fragment>
             ))}
-            {goods && <Goods goods={goods} className="hud-menu-goods" />}
-            {leader && (
-              <span className="hud-leader" title="Your Leader">
-                <Icon name="crown" size={16} /> {leader}
-              </span>
-            )}
-            {heir !== undefined && (
-              <HeirShown
-                heir={heir}
-                onPickHeir={() => {
-                  setShown(false)
-                  onPickHeir?.()
-                }}
-              />
-            )}
             <div className="hud-menu-links">
               <a
-                className="hud-wiki"
+                className="hud-wiki btn lg"
                 href={WIKI_PATH}
                 target="_blank"
                 rel="noopener"
@@ -457,13 +495,13 @@ export function PhoneMenu({
               >
                 Wiki
               </a>
-              <span className="hud-account" title="Your account">
-                {account}
-              </span>
-              <button type="button" className="hud-logout btn sm dk" onClick={onLogout}>
+              <button type="button" className="hud-logout btn lg" onClick={onLogout}>
                 Log out
               </button>
             </div>
+            <span className="hud-account mu" title="Your account">
+              Signed in as {account}
+            </span>
           </nav>
         </>
       )}

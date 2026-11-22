@@ -244,6 +244,24 @@
 }
 
 @media (max-width: 640px) {
+  /* The header's tabs and links a finger's size, wrapping under the title. */
+  .admin-head .btn {
+    height: 44px;
+    padding: 0 10px;
+    font-size: 14px;
+  }
+  .admin-main {
+    padding: 8px;
+  }
+  .admin-main :is(button, select, input:not([type='checkbox'], [type='radio'])) {
+    min-height: 44px;
+  }
+  /* The inspector across the map's top, so it never sits half off a narrow map. */
+  .admin-inspector {
+    left: 8px;
+    width: auto;
+    max-height: 60%;
+  }
   .admin-map {
     flex-direction: column;
   }
