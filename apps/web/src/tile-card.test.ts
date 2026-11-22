@@ -341,7 +341,7 @@ describe('the tile card of someone Down (`CONTEXT.md`: Down)', () => {
       onPickUp: (...args) => picked.push(args),
     })
     expect(html).toContain('Carried by Ana, Down · Bo picks up')
-    expect(html).toMatch(/<button type="button">Pick up<\/button>/)
+    expect(html).toMatch(/<button type="button" class="btn sm">Pick up<\/button>/)
     const goods = findTileGoods(tree)!
     goods.props.onPickUp({ kind: 'resident', residentId: 'ana' }, { stone: 2 })
     expect(picked).toEqual([['bo', { kind: 'resident', residentId: 'ana' }, { stone: 2 }]])
@@ -351,7 +351,7 @@ describe('the tile card of someone Down (`CONTEXT.md`: Down)', () => {
     const { html } = render([ana])
     expect(html).toContain('Carried by Ana, Down')
     expect(html).toContain('Anyone of yours on this tile can pick it up.')
-    expect(html).toMatch(/<button type="button" disabled="">Pick up<\/button>/)
+    expect(html).toMatch(/<button type="button" class="btn sm" disabled="">Pick up<\/button>/)
   })
 })
 
