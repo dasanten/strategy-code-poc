@@ -259,8 +259,9 @@ button[aria-pressed='true']:hover:not(:disabled) {
   color: var(--ink);
   box-shadow: inset 2px 2px 0 var(--orange);
 }
+/* As strong as .btn.pri (0,2,0) and later, so a greyed primary, gold or danger button greys out. */
 .btn.off,
-button:disabled {
+:is(button, .btn):disabled {
   background: transparent;
   color: var(--ui-muted);
   border-style: dashed;

@@ -235,15 +235,15 @@ import { horseFaresKnown } from './seen.js'
 import { PanelHead } from './drawer-head.js'
 import { labelled } from './name-labels.js'
 import {
-  ActionRows,
   CardTabs,
   FeedBlock,
-  SelectionCard,
   useActionKeys,
+  useInSheet,
   useEscapeClosesPanel,
   useKeptRows,
 } from './SelectionCard.js'
 import { rallyProblem } from './zeal.js'
+import { CommandBar, OrderGrid } from './CommandBar.js'
 import { HorsePick } from './HorsePick.js'
 import {
   orderGroupOf,
@@ -1766,10 +1766,15 @@ export function GroupCard({
   useEffect(() => {
     buildBlock.current?.scrollIntoView({ block: 'nearest' })
   }, [buildAt?.x, buildAt?.y, picking])
-  useEscapeClosesPanel(tab === 'orders' && (shown !== undefined || (!!buildAt && !picking)), () => {
+  const closePanel = () => {
     setPanel(undefined)
     if (buildAt) onPicking(false)
-  })
+  }
+  useEscapeClosesPanel(
+    tab === 'orders' && (shown !== undefined || (!!buildAt && !picking)),
+    closePanel,
+  )
+  const phone = useInSheet()
   const act = (a: CardAction<GroupButton>) => {
     if (tab !== 'orders' && a.id !== 'script') showTab('orders')
     // With one carriage or boat to board they board that; with several, or a ship (as crew or as
@@ -1795,7 +1800,7 @@ export function GroupCard({
     (b) => b.kind === 'stable' && !b.site && residents.some((r) => isAt(r, b)),
   )
   const { busy, idle } = busyAndIdle(residents)
-  // The open order's panel, right under the row that opened it (`ActionRows`).
+  // The open order's panel, above the command bar or on a phone under its order (`CommandBar`).
   const openPanel = shown && (
     <>
       {shown === 'board' && (
@@ -1976,47 +1981,8 @@ export function GroupCard({
       )}
     </>
   )
-  return (
-    <SelectionCard
-      rel="own"
-      title={card.title}
-      lines={[
-        card.names,
-        <strong key="doing">{busy === 0 ? 'All idle' : `${busy} busy, ${idle} idle`}</strong>,
-      ]}
-      onClose={onClose}
-      collapsed={collapsed}
-    >
-      <CardTabs tabs={GROUP_TABS} labels={TAB_LABELS} tab={tab} onTab={showTab} />
-
-      {tab === 'orders' &&
-        rowGroups(rows, groupButtonGroup).map((g) => (
-          <div className="sel-order-group" key={g.group}>
-            <h3>{g.label}</h3>
-            <ActionRows
-              actions={g.actions}
-              open={shown}
-              onAction={act}
-              label={g.label}
-              keys={false}
-              panel={openPanel || undefined}
-              beside={(a) => {
-                const task = GROUP_ROW_TASKS[a.id]
-                return (
-                  task && (
-                    <CustomiseButton
-                      order={taskStart(task)}
-                      of={a.label}
-                      disabled={a.disabled}
-                      give={() => act(a)}
-                    />
-                  )
-                )
-              }}
-            />
-          </div>
-        ))}
-      {tab === 'orders' && buildAt && !picking && (
+  // Build's tile picked: its menu opens where an order's panel does (`CommandBar`).
+  const buildPanel = tab === 'orders' && buildAt && !picking && (
         <section className="inspector-block" aria-label="Build" ref={buildBlock}>
           <div className="panel-head">
             <h3>Build</h3>
@@ -2074,7 +2040,67 @@ export function GroupCard({
             Each walks there; the first lays out the site and the others join it.
           </p>
         </section>
+      )
+  return (
+    <CommandBar
+      rel="own"
+      title={card.title}
+      lines={[
+        card.names,
+        <strong key="doing">{busy === 0 ? 'All idle' : `${busy} busy, ${idle} idle`}</strong>,
+      ]}
+      onClose={onClose}
+      collapsed={collapsed}
+      tabs={<CardTabs tabs={GROUP_TABS} labels={TAB_LABELS} tab={tab} onTab={showTab} />}
+      panel={
+        tab === 'orders' && ((shown && openPanel) || buildPanel)
+          ? {
+              title: buildPanel ? 'Build' : (rows.find((a) => a.id === shown)?.label ?? ''),
+              body: (
+                <>
+                  {shown && openPanel}
+                  {buildPanel}
+                </>
+              ),
+              onClose: closePanel,
+            }
+          : undefined
+      }
+      status={
+        (orderError || picking || tab === 'orders') && (
+          <p className="muted small" role="status">
+            {orderError
+              ? `Order turned down: ${orderError}`
+              : picking
+                ? `${GROUP_PICKING_HINTS[picking]} Tap a tile on the map.`
+                : 'Right-click the map to walk them there. Hold Shift with any order to queue it.'}
+          </p>
+        )
+      }
+    >
+      {tab === 'orders' && (
+        <OrderGrid
+          groups={rowGroups(rows, groupButtonGroup)}
+          open={shown}
+          onAction={act}
+          panel={openPanel || undefined}
+          beside={(a) => {
+            const task = GROUP_ROW_TASKS[a.id]
+            return (
+              task && (
+                <CustomiseButton
+                  order={taskStart(task)}
+                  of={a.label}
+                  disabled={a.disabled}
+                  give={() => act(a)}
+                  small
+                />
+              )
+            )
+          }}
+        />
       )}
+      {phone && buildPanel}
       {tab === 'queue' && planner}
       {tab === 'members' && (
         <ul className="sel-facts sel-group" aria-label="Selected residents">
@@ -2159,18 +2185,8 @@ export function GroupCard({
           )}
         </>
       )}
-
-      {(orderError || picking || tab === 'orders') && (
-        <p className="muted small" role="status">
-          {orderError
-            ? `Order turned down: ${orderError}`
-            : picking
-              ? `${GROUP_PICKING_HINTS[picking]} Tap a tile on the map.`
-              : 'Right-click the map to walk them there. Hold Shift with any order to queue it.'}
-        </p>
-      )}
       {creative}
-    </SelectionCard>
+    </CommandBar>
   )
 }
 
@@ -2740,7 +2756,7 @@ export function ResidentCard({
     r.cityId === null
       ? 'Homeless'
       : (cities.find((c) => c.id === r.cityId)?.name ?? 'a city out of sight')
-  // The open order's panel, right under the row that opened it (`ActionRows`).
+  // The open order's panel, above the command bar or on a phone under its order (`CommandBar`).
   const openPanel = shown && (
     <div className="sel-panel well">
       {shown === 'haul' && (carriage || boatToRow) && (
@@ -3218,7 +3234,7 @@ export function ResidentCard({
     </div>
   )
   return (
-    <SelectionCard
+    <CommandBar
       rel={r.owner === realmId ? 'own' : 'alliance'}
       title={r.name}
       badge={r.id === leaderId ? 'Leader' : makeLeader?.heir?.named ? 'Heir' : undefined}
@@ -3241,74 +3257,92 @@ export function ResidentCard({
               </span>,
             ]
           : []),
-        <div key="carried" className="carried-line">
-          <GoodsGrid label="Carried" {...carriedItems(r.carried)} />
-          <span className="mono">{carryLine(stockWeight(r.carried), carryCapacity(r, tick))}</span>
-        </div>,
-        <span key="equipped" className="muted">
-          {equipmentLine(r.equipped, r.condition)}
-        </span>,
-        ...(ridden ? [ridden] : []),
       ]}
       head={
-        <div className="vitals">
-          <Meter
-            label="Health"
-            value={`${Math.round(r.health)} / ${MAX_HEALTH}`}
-            share={r.health / MAX_HEALTH}
-          />
-          <Meter
-            label="Hunger"
-            value={r.hunger / MAX_HUNGER < 0.25 ? 'hungry' : `${pct(r.hunger / MAX_HUNGER)} fed`}
-            share={r.hunger / MAX_HUNGER}
-          />
-        </div>
+        <>
+          <div className="vitals">
+            <Meter
+              label="Health"
+              value={`${Math.round(r.health)} / ${MAX_HEALTH}`}
+              share={r.health / MAX_HEALTH}
+            />
+            <Meter
+              label="Hunger"
+              value={r.hunger / MAX_HUNGER < 0.25 ? 'hungry' : `${pct(r.hunger / MAX_HUNGER)} fed`}
+              share={r.hunger / MAX_HUNGER}
+            />
+          </div>
+          <div className="carried-line">
+            <GoodsGrid label="Carried" {...carriedItems(r.carried)} />
+            <span className="mono">
+              {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
+            </span>
+          </div>
+          <div className="sel-line muted">{equipmentLine(r.equipped, r.condition)}</div>
+          {ridden && <div className="sel-line">{ridden}</div>}
+        </>
       }
       onClose={onClose}
       collapsed={collapsed}
+      tabs={
+        <div className="tabs sel-tabs" role="tablist" aria-label="Card">
+          {CARD_TABS.map((t) => (
+            <button
+              type="button"
+              className="tab"
+              key={t}
+              role="tab"
+              aria-selected={tab === t}
+              onClick={() => onSections({ ...sections, tab: t })}
+            >
+              {CARD_TAB_LABELS[t]}
+            </button>
+          ))}
+        </div>
+      }
+      panel={
+        tab === 'orders' && shown && openPanel
+          ? {
+              title: rows.find((a) => a.id === shown)?.label ?? '',
+              body: openPanel,
+              onClose: () => setPanel(undefined),
+            }
+          : undefined
+      }
+      status={
+        (orderError || tab === 'orders') && (
+          <p className="muted small" role="status">
+            {orderError
+              ? `Order turned down: ${orderError}`
+              : isDown(r)
+                ? `${DOWN_NO_ORDERS}.`
+                : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
+          </p>
+        )
+      }
     >
-      <div className="tabs sel-tabs" role="tablist" aria-label="Card">
-        {CARD_TABS.map((t) => (
-          <button
-            type="button"
-            className="tab"
-            key={t}
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => onSections({ ...sections, tab: t })}
-          >
-            {CARD_TAB_LABELS[t]}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'orders' &&
-        rowGroups(rows, orderGroupOf).map((g) => (
-          <div className="sel-order-group" key={g.group}>
-            <h3>{g.label}</h3>
-            <ActionRows
-              actions={g.actions}
-              open={shown}
-              onAction={act}
-              label={g.label}
-              keys={false}
-              panel={openPanel || undefined}
-              beside={(a) => {
-                const task = ROW_TASKS[a.id]
-                return (
-                  task && (
-                    <CustomiseButton
-                      order={taskStart(task)}
-                      of={a.label}
-                      disabled={a.disabled}
-                      give={() => act(a)}
-                    />
-                  )
-                )
-              }}
-            />
-          </div>
-        ))}
+      {tab === 'orders' && (
+        <OrderGrid
+          groups={rowGroups(rows, orderGroupOf)}
+          open={shown}
+          onAction={act}
+          panel={openPanel || undefined}
+          beside={(a) => {
+            const task = ROW_TASKS[a.id]
+            return (
+              task && (
+                <CustomiseButton
+                  order={taskStart(task)}
+                  of={a.label}
+                  disabled={a.disabled}
+                  give={() => act(a)}
+                  small
+                />
+              )
+            )
+          }}
+        />
+      )}
       {tab === 'queue' &&
         (queuePlan && onPlanQueue ? (
           <>
@@ -3474,17 +3508,8 @@ export function ResidentCard({
           </section>
         </>
       )}
-      {(orderError || tab === 'orders') && (
-        <p className="muted small" role="status">
-          {orderError
-            ? `Order turned down: ${orderError}`
-            : isDown(r)
-              ? `${DOWN_NO_ORDERS}.`
-              : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
-        </p>
-      )}
       {creative}
-    </SelectionCard>
+    </CommandBar>
   )
 }
 

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { REALM_NAME_MAX_LENGTH, RESIDENT_NAME_MAX_LENGTH } from '@csp/balance'
 import { foundingProblem } from './shared/names.js'
+import { EntryScreen } from './Login.js'
 
 /**
  * The naming screen of a Player without a realm (first login, or after a Leader death): they name
@@ -34,15 +35,19 @@ export function Founding({
   }
 
   return (
-    <main className="login">
-      <form onSubmit={submit} className="login-form pn">
-        <h1 className="hd">Found your realm</h1>
-        <p className="founding-hint">
+    <EntryScreen label="Found your realm">
+      <h2 className="hd">
+        <span className="ic s24 i-crown" aria-hidden="true" />
+        <span className="grow">Found your realm</span>
+      </h2>
+      <form onSubmit={submit} className="login-form">
+        <p>
           Name your realm and your Leader. Others know your realm by its name, and it never changes.
         </p>
-        <label>
-          Realm name
+        <label className="fld">
+          <span className="lb">Realm name</span>
           <input
+            className="in lg"
             value={realmName}
             onChange={(e) => setRealmName(e.target.value)}
             maxLength={REALM_NAME_MAX_LENGTH}
@@ -50,24 +55,57 @@ export function Founding({
             required
           />
         </label>
-        <label>
-          Leader's name
+        <label className="fld">
+          <span className="lb">Leader's name</span>
           <input
+            className="in lg"
             value={leaderName}
             onChange={(e) => setLeaderName(e.target.value)}
             maxLength={RESIDENT_NAME_MAX_LENGTH}
             required
           />
+          <span className="mu">A name from the game. Keep it or type your own.</span>
         </label>
         {error && (
-          <p className="error" role="alert">
+          <p className="login-error well bad" role="alert">
             {error}
           </p>
         )}
-        <button type="submit" className="primary" disabled={busy}>
+        <button type="submit" className="btn gold lg" disabled={busy}>
           Found the realm
         </button>
       </form>
-    </main>
+    </EntryScreen>
+  )
+}
+
+/**
+ * Over the game once the Player's Leader has died with no heir (`CONTEXT.md`: Leader):
+ * Start afresh reloads, and the server then asks for a new founding.
+ */
+export function RealmEnded() {
+  return (
+    <div className="hud-backdrop">
+      <div
+        className="hud-dialog realm-ended pn"
+        role="alertdialog"
+        aria-modal="true"
+        aria-label="Your realm has ended"
+      >
+        <h2 className="hd">
+          <span className="ic s24 i-warn" aria-hidden="true" />
+          <span className="grow">Your realm has ended</span>
+        </h2>
+        <p>
+          Your Leader has died and your realm has ended. The realm log says what became of your
+          cities. You start afresh with a new Leader and a new starting city.
+        </p>
+        <div className="hud-dialog-actions">
+          <button type="button" className="btn pri lg" onClick={() => window.location.reload()}>
+            Start afresh
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

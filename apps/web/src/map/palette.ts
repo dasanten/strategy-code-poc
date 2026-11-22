@@ -133,3 +133,10 @@ export const css = (color: number) => `#${color.toString(16).padStart(6, '0')}`
 
 /** The Player's waypoints (`CONTEXT.md`: Waypoint), on the map and the minimap: no relationship's colour. */
 export const WAYPOINT_COLOR = 0xd36cf0
+
+/** The darkest tone of the palette: outlines of marks and pins, and the pills behind labels. */
+export const INK_COLOR = hex(THEME.palette.ink)
+/** The palette's lightest parchment: a ring that must show on any colour. */
+export const PAPER_COLOR = hex(THEME.palette.paper)
+/** What doesn't fit, in a pick's preview: a footprint where it can't go, a line too long. */
+export const REFUSED_COLOR = hex(THEME.palette.red)
