@@ -10,6 +10,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react'
+import { createPortal } from 'react-dom'
 import { CITY_NAME_MAX_LENGTH, FEED_UNITS, HORSE_NAME_MAX_LENGTH } from '@csp/balance'
 import { canHandle } from './shared/stats.js'
 import { nameProblem } from './shared/names.js'
@@ -29,7 +30,7 @@ import { GoodIcon, GoodsGrid } from './GoodsGrid.js'
 import { GOOD_LABELS, goodsItems } from './goods-grid.js'
 import { TileGoods } from './Residents.js'
 import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
-import type { Relationship } from './theme.js'
+import { relationshipClass, type Relationship } from './theme.js'
 import {
   actionForKey,
   feedTargetLabel,
@@ -56,9 +57,10 @@ import { suggestedWaypointName } from './waypoints-view.js'
 import { SHEET_OPENS_AT, nextSheet, snapSheet, stepSheet, type SheetHeight } from './sheet-view.js'
 
 /**
- * The selection card (ADR 0008): docked top right over the map, a dark translucent panel whose
- * edge has the relationship colour of what is selected. The head says what it is; the actions
- * that fit follow as rows with their keys.
+ * A card in the dock (ADR 0044, `CONTEXT.md`: Screen): a tile card, the who-list or a realm order
+ * card (the army card in the Armies tab too). A wood header bar with the owner's relationship
+ * colour as a square, the icon of what it is, the title and close; under it the lines, `head`,
+ * then the actions that fit as rows with their keys.
  */
 export function SelectionCard({
   rel,
@@ -85,9 +87,6 @@ export function SelectionCard({
   children: ReactNode
 }) {
   const peek = useContext(SheetPeek)
-  const colour = rel
-    ? `var(--rel-${rel.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)})`
-    : undefined
   // How tall the card was before it shrank: while shrunk, the room it took stays dead, so a click
   // there gives no order by accident (`CONTEXT.md`: Picking a target). A bottom sheet at peek
   // shows the map instead; a tap there only previews.
@@ -100,34 +99,22 @@ export function SelectionCard({
   return (
     <aside
       ref={ref}
-      className={`inspector pn sel-card${dead ? ' sel-shrunk' : ''}`}
+      className={`inspector pn sel-card${rel ? ` ${relationshipClass(rel)}` : ''}${dead ? ' sel-shrunk' : ''}`}
       aria-label="Selection"
-      style={{
-        ...(colour ? { borderLeftColor: colour } : {}),
-        ...(dead ? { minHeight: tall.current } : {}),
-      }}
+      style={dead ? { minHeight: tall.current } : undefined}
     >
-      <div className="sel-head">
+      <div className="hd sel-head">
+        {rel && <span className="dot sel-owner" aria-hidden="true" />}
         {icon && ART_FILES[icon] && (
           <span
             className="sel-icon"
             aria-hidden="true"
-            style={colour ? { color: colour } : undefined}
             // The registry's own SVG source, stroked in currentColor.
             dangerouslySetInnerHTML={{ __html: ART_FILES[icon].replace('color="#fff"', '') }}
           />
         )}
-        <div className="sel-title">
-          <div className="name-line">
-            <h2>{title}</h2>
-            {badge && <span className="badge">{badge}</span>}
-          </div>
-          {lines.map((l, i) => (
-            <div key={i} className="sel-line">
-              {l}
-            </div>
-          ))}
-        </div>
+        <h2 className="sel-title grow">{title}</h2>
+        {badge && <span className="chip y">{badge}</span>}
         <button
           type="button"
           className="sel-close btn sm sq"
@@ -137,9 +124,16 @@ export function SelectionCard({
           ✕
         </button>
       </div>
-      {head}
-      {!collapsed && !peek && children}
-      {dead && <div className="sel-dead" aria-hidden="true" />}
+      <div className="sec sel-body">
+        {lines.map((l, i) => (
+          <div key={i} className="sel-line">
+            {l}
+          </div>
+        ))}
+        {head}
+        {!collapsed && !peek && children}
+        {dead && <div className="sel-dead" aria-hidden="true" />}
+      </div>
     </aside>
   )
 }
@@ -147,7 +141,19 @@ export function SelectionCard({
 /** Whether the card is in a bottom sheet dropped to its header, so only the header shows. */
 const SheetPeek = createContext(false)
 
-/** Whether the card is hidden behind the wide drawer (`cardHidden`), its keys off with it. */
+/** Whether the card is in a phone's bottom sheet rather than over a desktop's map. */
+const InSheet = createContext(false)
+
+/** Whether the card is in a bottom sheet dropped to its header (`CardSheet`). */
+export const useSheetPeek = () => useContext(SheetPeek)
+
+/** Whether the card is in a phone's bottom sheet (`CardSheet`). */
+export const useInSheet = () => useContext(InSheet)
+
+/**
+ * Whether the card's order keys are off: it is hidden behind the wide drawer (`cardHidden`), or
+ * it is the command bar under an open tile card, whose keys win (`CardSheet`'s `keysOff`).
+ */
 const CardHidden = createContext(false)
 
 const SHEET_LABELS: Record<SheetHeight, string> = {
@@ -156,22 +162,42 @@ const SHEET_LABELS: Record<SheetHeight, string> = {
   full: 'full screen',
 }
 
+/** The gap, in pixels, between the command bar and the bottom of the screen (`.game-command`). */
+const BAR_GAP = 8
+
 /** How far, in pixels, the handle moves before a press counts as a drag rather than a tap. */
 const DRAG_SLOP = 6
 
 /**
- * Where the selection card sits over the map: docked top right on a desktop, a bottom sheet on a
- * phone (ADR 0012). The sheet opens at half; dragging its handle moves it between peek (just the
- * header), half and full, and a tap goes one height up. Pick mode drops it to peek, and it comes
- * back to where it was once the target is picked. A hidden card keeps all that until it shows.
+ * Where the selection card sits over the map (ADR 0044): on a desktop in the dock on the right
+ * (`dock`, a tile card, the who-list, a realm order card), or with `bar` the command bar along
+ * the bottom; a bottom sheet on a phone (ADR 0012). The sheet opens at half; dragging its handle
+ * moves it between peek (just the header), half and full, and a tap goes one height up. Pick mode
+ * drops it to peek, and it comes back to where it was once the target is picked. A hidden card
+ * keeps all that until it shows.
  */
 export function CardSheet({
   phone,
   pinnedPeek,
   hidden = false,
+  bar = false,
+  dock,
+  keysOff = false,
   children,
 }: {
   phone: boolean
+  /**
+   * The command bar along the bottom on a desktop (`CONTEXT.md`: Screen): a resident's or a
+   * group's card. Its height goes to the screen as `--command-h`, so the sidebar stops above it.
+   */
+  bar?: boolean
+  /**
+   * The dock on the right (`Dock`), which a card without `bar` goes into on a desktop; null until
+   * it is mounted, when the card shows top right on its own.
+   */
+  dock?: HTMLElement | null
+  /** Its order keys off, as under an open tile card, whose keys win; its buttons still work. */
+  keysOff?: boolean
   /** Held at peek while the map waits for a target for this card. */
   pinnedPeek: boolean
   /** Hidden behind the wide drawer (`cardHidden`). */
@@ -184,25 +210,30 @@ export function CardSheet({
   const press = useRef<{ y: number; from: number; moved: boolean }>(undefined)
   const ref = useRef<HTMLDivElement>(null)
   // The map's buttons and readout sit above the sheet: its height goes to the screen as `--sheet-h`.
+  // The command bar's, with the gap under it, goes as `--command-h` for the sidebar to stop above.
+  const measured = phone ? '--sheet-h' : bar ? '--command-h' : undefined
   useEffect(() => {
     const sheet = ref.current
     const screen = sheet?.parentElement
-    if (!sheet || !screen) return
-    const observer = new ResizeObserver(() =>
-      screen.style.setProperty('--sheet-h', `${sheet.offsetHeight}px`),
-    )
+    if (!sheet || !screen || !measured) return
+    const observer = new ResizeObserver(() => {
+      const tall = sheet.offsetHeight
+      screen.style.setProperty(measured, `${tall > 0 && !phone ? tall + BAR_GAP : tall}px`)
+    })
     observer.observe(sheet)
     return () => {
       observer.disconnect()
-      screen.style.removeProperty('--sheet-h')
+      screen.style.removeProperty(measured)
     }
-  }, [phone])
-  if (!phone)
-    return (
-      <div className="game-selection" hidden={hidden}>
-        <CardHidden.Provider value={hidden}>{children}</CardHidden.Provider>
+  }, [phone, measured])
+  if (!phone) {
+    const card = (
+      <div ref={ref} className={bar ? 'game-command' : 'game-selection'} hidden={hidden}>
+        <CardHidden.Provider value={hidden || keysOff}>{children}</CardHidden.Provider>
       </div>
     )
+    return !bar && dock ? createPortal(card, dock) : card
+  }
   const shown = pinnedPeek ? 'peek' : height
   const screen = () => ref.current?.parentElement?.clientHeight ?? window.innerHeight
   const settle = (to: SheetHeight) => {
@@ -262,7 +293,9 @@ export function CardSheet({
         <span aria-hidden="true" />
       </button>
       <SheetPeek.Provider value={dragged === undefined && shown === 'peek'}>
-        <CardHidden.Provider value={hidden}>{children}</CardHidden.Provider>
+        <InSheet.Provider value={true}>
+          <CardHidden.Provider value={hidden || keysOff}>{children}</CardHidden.Provider>
+        </InSheet.Provider>
       </SheetPeek.Provider>
     </div>
   )
@@ -332,7 +365,7 @@ export function PickBanner({
         </button>
       )}
       <button type="button" onClick={onCancel}>
-        Cancel
+        Cancel<kbd aria-hidden="true">Esc</kbd>
       </button>
     </div>
   )
@@ -371,7 +404,8 @@ export function CardTabs<T extends string>({
 /**
  * The card's actions as rows, each with its key; a row that opens a panel shows it pressed, and
  * `panel` opens right under it, scrolled into view when it opens. Each row is a button named by
- * its label, a greyed row's reason its description.
+ * its label, a greyed row's reason its description. With `grid` they are the command bar's order
+ * buttons instead (`OrderGrid`), two to a row when `grid.wide`, the key cap after the label.
  */
 export function ActionRows<Id extends string>({
   actions,
@@ -381,6 +415,7 @@ export function ActionRows<Id extends string>({
   keys = true,
   panel,
   beside,
+  grid,
 }: {
   actions: CardAction<Id>[]
   /** The action whose panel is open, if any. */
@@ -393,20 +428,26 @@ export function ActionRows<Id extends string>({
   panel?: ReactNode
   /** A control beside a row, such as its Customise button. */
   beside?: (a: CardAction<Id>) => ReactNode
+  /** The command bar's grid of order buttons (`OrderGrid`), two to a row when wide. */
+  grid?: { wide: boolean }
 }) {
   useActionKeys(keys ? actions : [], onAction)
   const ids = useId()
   return (
-    <div className="sel-actions" role="group" aria-label={label}>
+    <div
+      className={grid ? `cmd-grid og${grid.wide ? ' og2' : ''}` : 'sel-actions'}
+      role="group"
+      aria-label={label}
+    >
       {actions.map((a) => {
         const on = a.active || (a.opens && open === a.id)
         const why = `${ids}-${a.id}`
         return (
           <Fragment key={a.id}>
-            <div className="sel-action">
+            <div className={grid ? 'cmd-order' : 'sel-action'}>
               <button
                 type="button"
-                className={on ? 'on' : ''}
+                className={grid ? `btn sm fill${on ? ' on' : ''}` : on ? 'on' : ''}
                 aria-label={a.label}
                 aria-describedby={a.reason ? why : undefined}
                 aria-pressed={a.opens || a.active !== undefined ? !!on : undefined}
@@ -416,7 +457,7 @@ export function ActionRows<Id extends string>({
                 onClick={() => onAction(a)}
               >
                 <kbd>{a.key}</kbd>
-                <span>
+                <span className={grid ? 'cmd-label' : undefined}>
                   {a.label}
                   {a.reason && (
                     <span className="sel-reason" id={why}>
@@ -471,7 +512,8 @@ export function useKeptRows<Id extends string>(
 
 /**
  * What closes each panel open on the shown card, the one opened last at the end, which the
- * game's Escape calls before it leaves the card (`escapeStep`). One card shows at a time.
+ * game's Escape calls before it leaves the card (`escapeStep`). With a tile card open beside the
+ * command bar, the panel opened last on either closes first.
  */
 const openPanels = new Set<() => void>()
 

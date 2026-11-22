@@ -1,18 +1,21 @@
 import { Container, Graphics, Sprite, Text } from 'pixi.js'
 import type { City, ResourceKind } from '@csp/shared-types'
-import { THEME } from '../theme.js'
+import { THEME, hex } from '../theme.js'
 import type { Atlas } from './atlas.js'
 
 /** Who owns a token, seen from the Player's realm (ADR 0008). There is no "enemy": no war state. */
 export type Relationship = 'own' | 'alliance' | 'other' | 'npc' | 'trade'
 
-/** The fixed relationship colours on token bases (ADR 0008), as 0xRRGGBB. */
+/**
+ * The fixed relationship colours on token bases and hover outlines (ADR 0008), the pixel art's
+ * palette's (ADR 0044), as 0xRRGGBB.
+ */
 export const RELATIONSHIP_COLORS: Record<Relationship, number> = {
-  own: 0xf2b630,
-  alliance: 0x4f9dff,
-  other: 0xff6a48,
-  npc: 0xa89c8a,
-  trade: 0x2ec8b8,
+  own: hex(THEME.relationship.own),
+  alliance: hex(THEME.relationship.alliance),
+  other: hex(THEME.relationship.otherRealm),
+  npc: hex(THEME.relationship.npcCity),
+  trade: hex(THEME.relationship.tradeOrg),
 }
 /** The ring of a building of no city (a workplace on a node) or of a city out of sight. */
 export const UNOWNED_COLOR = 0x6b7580

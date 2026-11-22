@@ -28,6 +28,7 @@ import {
   type KeyGood,
   type OpenTab,
 } from './hud-view.js'
+import { dockCovers } from './dock-view.js'
 import { groupSentLine, type Skipped } from './group-orders.js'
 import {
   FIRST_DAY_RALLY_TIP,
@@ -622,20 +623,22 @@ export function DiplomacyTabs({
 
 /**
  * How many pixels of the map the sidebar covers from the left (its strip alone while folded) and
- * the selection card from the right, 0 for each that isn't showing; and how many the strip alone
+ * the cards in the dock from the right, 0 for each that isn't showing; and how many the strip alone
  * covers, all the sidebar leaves when folded. The map fills the window, so screen edges measure it.
  */
 export function mapCovered(): { left: number; right: number; strip: number } {
-  // A bottom sheet covers the bottom of the map, not its right side; a hidden card none of it.
-  const card = document
-    .querySelector('.game-selection:not(.sheet):not([hidden])')
-    ?.getBoundingClientRect()
+  // A bottom sheet and the command bar (`.game-command`) cover the bottom of the map, not its right
+  // side; a hidden card none of it. Only the cards in the dock (`Dock`: a tile card, the who-list,
+  // a realm order card) cover the right; the empty dock lets the map through.
+  const docked = [...document.querySelectorAll('.game-dock > :not([hidden])')].map(
+    (el) => el.getBoundingClientRect().left,
+  )
   // A folded sidebar on a phone isn't drawn, and measures 0.
   const side = document.querySelector('.side')?.getBoundingClientRect()
   const strip = document.querySelector('.side-strip')?.getBoundingClientRect()
   return {
     left: side?.right ?? 0,
-    right: card ? window.innerWidth - card.left : 0,
+    right: dockCovers(docked, window.innerWidth),
     strip: strip && strip.width > 0 ? strip.right : 0,
   }
 }
@@ -654,12 +657,26 @@ export function useEscapeCloses(open: OpenTab, close: () => void) {
   }, [open, close])
 }
 
-/** A dialog in the middle of the screen, over a dimmed map. */
-export function CentredDialog({ title, children }: { title: string; children: ReactNode }) {
+/**
+ * A dialog in the middle of the screen, over a dimmed map. Its header bar says what kind of news
+ * it is: `bad` (red, with a warning sign) for a loss, `news` (navy) for word from the game.
+ */
+export function CentredDialog({
+  title,
+  tone,
+  children,
+}: {
+  title: string
+  tone?: 'bad' | 'news'
+  children: ReactNode
+}) {
   return (
     <div className="hud-backdrop">
       <div className="hud-dialog pn" role="alertdialog" aria-modal="true" aria-label={title}>
-        <h2 className="hd">{title}</h2>
+        <h2 className={`hd${tone ? ` hd-${tone}` : ''}`}>
+          {tone === 'bad' && <span className="ic s24 i-warn" aria-hidden="true" />}
+          <span className="grow">{title}</span>
+        </h2>
         {children}
       </div>
     </div>
@@ -691,11 +708,12 @@ export function HorseOfferNotice({
   }
   return (
     <aside className="pn notice hud-offer" role="status">
-      <span className="notice-text">
+      <span className="ic s24 i-horse" aria-hidden="true" />
+      <span className="notice-text b">
         {NUMBER_WORDS[horses] ?? horses} horses are waiting for you
         {refused && <span className="hud-offer-refused"> — {refused}</span>}
       </span>
-      <button type="button" disabled={busy} onClick={() => void claim()}>
+      <button type="button" className="btn sm gold" disabled={busy} onClick={() => void claim()}>
         Claim
       </button>
     </aside>
@@ -720,11 +738,11 @@ export function IncomingNotice({
       <span className="notice-text" title={line}>
         {line}
       </span>
-      <button type="button" onClick={onOpen}>
+      <button type="button" className="btn sm" onClick={onOpen}>
         Open
       </button>
-      <button type="button" aria-label="Dismiss" onClick={onDismiss}>
-        ×
+      <button type="button" className="btn sm sq" aria-label="Dismiss" onClick={onDismiss}>
+        <span className="ic s16 i-x" aria-hidden="true" />
       </button>
     </aside>
   )
@@ -778,7 +796,7 @@ export function NoticeLane({ phone, children }: { phone: boolean; children: Reac
     if (!lane || !w) return
     w.disconnect()
     w.observe(lane)
-    for (const el of document.querySelectorAll('.side, .game-selection')) w.observe(el)
+    for (const el of document.querySelectorAll('.side, .game-dock > *')) w.observe(el)
   })
   return (
     <div
@@ -816,14 +834,15 @@ export function TraderVisitNotice({
     <aside className="pn notice trader-visit" role="status">
       <span className="notice-text">{traderVisitLine(visit, tick)}</span>
       <span className="notice-actions">
-        <button type="button" onClick={onShow}>
+        <button type="button" className="btn sm" onClick={onShow}>
           Show
         </button>
-        <button type="button" onClick={onTrade}>
+        <button type="button" className="btn sm gold" onClick={onTrade}>
           Trade
         </button>
         <button
           type="button"
+          className="btn sm"
           aria-label={`Dismiss the trader at ${visit.city}`}
           onClick={onDismiss}
         >
@@ -858,7 +877,12 @@ export function GroupReportNotice({
           </span>
         ))}
       </span>
-      <button type="button" aria-label="Dismiss the group order's report" onClick={onDismiss}>
+      <button
+        type="button"
+        className="btn sm"
+        aria-label="Dismiss the group order's report"
+        onClick={onDismiss}
+      >
         OK
       </button>
     </aside>
@@ -882,11 +906,24 @@ export function FirstDayCard({
   const { lines, next, ticked } = firstDayView(card)
   return (
     <aside className="pn notice first-day" aria-label="First day">
-      <div className="notice-text">
-        <strong>First day</strong>{' '}
-        <span className="first-day-count">
-          {ticked} of {lines.length}
+      <div className="hd first-day-head">
+        <span className="grow">
+          First day ·{' '}
+          <span className="first-day-count">
+            {ticked} of {lines.length}
+          </span>
         </span>
+        <button
+          type="button"
+          className="btn sm sq dk first-day-dismiss"
+          aria-label="Don't show again"
+          title="Don't show again"
+          onClick={onDismiss}
+        >
+          <span className="ic s16 i-x" aria-hidden="true" />
+        </button>
+      </div>
+      <div className="notice-text first-day-body">
         <ul>
           {lines.map((l) => (
             <li
@@ -894,9 +931,7 @@ export function FirstDayCard({
               className={l.done ? 'done' : l.line === next ? 'next' : undefined}
               aria-label={l.done ? `${l.label}: done` : undefined}
             >
-              <span className="first-day-tick" aria-hidden="true">
-                {l.done ? '✓' : '○'}
-              </span>{' '}
+              <span className={`cb first-day-tick${l.done ? ' on' : ''}`} aria-hidden="true" />{' '}
               {l.line === 'openWiki' ? (
                 // A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki).
                 <a href={WIKI_PATH} target="_blank" rel="noopener" onClick={onWiki}>
@@ -908,17 +943,8 @@ export function FirstDayCard({
             </li>
           ))}
         </ul>
-        <p className="first-day-tip small">{FIRST_DAY_RALLY_TIP}</p>
+        <p className="first-day-tip small mu">{FIRST_DAY_RALLY_TIP}</p>
       </div>
-      <button
-        type="button"
-        className="first-day-dismiss"
-        aria-label="Don't show again"
-        title="Don't show again"
-        onClick={onDismiss}
-      >
-        ✕
-      </button>
     </aside>
   )
 }

@@ -21,15 +21,6 @@
   border: 0;
   background: var(--terrain-void);
 }
-/* The map's own controls clear the top bar and the sidebar's strip. */
-.game-map .map-buttons {
-  left: calc(var(--rail-w) + 12px);
-  top: calc(var(--top-h) + var(--lane-h, 0px) + 12px);
-}
-.game-map .map-legend-panel,
-.game-map .map-legend-button {
-  left: calc(var(--rail-w) + 12px);
-}
 .game-waiting {
   position: absolute;
   inset: 0;

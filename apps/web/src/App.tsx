@@ -251,6 +251,8 @@ import {
 import { BuildMenu } from './BuildMenu.js'
 import { kindProblemOn } from './build-menu-view.js'
 import { WhoList } from './WhoList.js'
+import { Dock } from './Dock.js'
+import { barBesideTile } from './dock-view.js'
 import {
   WHO_SUGGESTS,
   lineProblem,
@@ -481,9 +483,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }, [])
   // The first-day lines reported and not turned down, so each goes out once (`reportFirstDay`).
   const firstDayReported = useRef(new Set<ClientFirstDayLine>())
-  // A tile picked on the map with no resident of the Player's on it; its card shows over the
-  // resident's, who stays picked to be sent there.
+  // A tile picked on the map with no resident of the Player's on it; its card shows in the dock
+  // beside the resident's (on a phone over it), who stays picked to be sent there.
   const [selectedTile, setSelectedTile] = useState<{ x: number; y: number }>()
+  // The dock on the right (`Dock`) once it is mounted; none on a phone.
+  const [dock, setDock] = useState<HTMLElement | null>(null)
   // The map's tile menu (`CONTEXT.md`: Waypoint): the tile right-clicked or long-pressed with
   // nothing else to do there, and where in the window it was pressed.
   const [tileMenu, setTileMenu] = useState<{ x: number; y: number; at: { x: number; y: number } }>()
@@ -961,6 +965,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const picked = pick !== undefined
   const formOpen = starting !== undefined
   const tileOpen = selectedTile !== undefined
+  // The command bar beside an open tile card: both on a desktop, the tile card's keys winning.
+  const besideTile = barBesideTile(phone, tileOpen)
   // The realm order's Build menu or who-list, which Escape closes as it does a card.
   const realmCard = realmOrder !== undefined && !realmPicking
   useEffect(() => {
@@ -2910,8 +2916,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           onClose={closeTileMenu}
         />
       )}
+      {!phone && <Dock onMount={setDock} />}
       {world && selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={workPick !== undefined} hidden={hideCard}>
+        <CardSheet phone={phone} dock={dock} pinnedPeek={workPick !== undefined} hidden={hideCard}>
           <TileCard
             card={describeTile(
               {
@@ -3218,10 +3225,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           />
         </CardSheet>
       )}
-      {world && selected && !selectedTile && (
+      {world && selected && besideTile.shows && (
         <CardSheet
           phone={phone}
           pinnedPeek={pick !== undefined && pick.kind !== 'army'}
+          bar
+          keysOff={!besideTile.keys}
           hidden={hideCard}
         >
           <InsertPointContext.Provider value={insertFor(selected.id)}>
@@ -3524,10 +3533,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           </InsertPointContext.Provider>
         </CardSheet>
       )}
-      {world && group.length > 1 && !selectedTile && (
+      {world && group.length > 1 && besideTile.shows && (
         <CardSheet
           phone={phone}
           pinnedPeek={pick?.kind === 'group' || pick?.kind === 'plan'}
+          bar
+          keysOff={!besideTile.keys}
           hidden={hideCard}
         >
           <GroupCard
@@ -3610,7 +3621,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CardSheet>
       )}
       {world && realmOrder?.step === 'menu' && !selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={false} hidden={hideCard}>
+        <CardSheet phone={phone} dock={dock} pinnedPeek={false} hidden={hideCard}>
           <SelectionCard
             rel="own"
             title={realmOrder.at ? `Build at ${realmOrder.at.x}, ${realmOrder.at.y}` : 'Build'}
@@ -3654,7 +3665,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CardSheet>
       )}
       {world && realmOrder?.step === 'script' && !selectedTile && !starting && (
-        <CardSheet phone={phone} pinnedPeek={false} hidden={hideCard}>
+        <CardSheet phone={phone} dock={dock} pinnedPeek={false} hidden={hideCard}>
           <RealmScriptCard
             scripts={scripts}
             onRun={(scriptId) => realmScriptOrder({ kind: 'runScript', scriptId })}
@@ -3663,7 +3674,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CardSheet>
       )}
       {world && realmOrder?.step === 'relocate' && !selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={false} hidden={hideCard}>
+        <CardSheet phone={phone} dock={dock} pinnedPeek={false} hidden={hideCard}>
           <RealmRelocateCard
             choices={realmRelocateChoices(
               { cities: knownCities, buildings: knownBuildings, residents: world.residents },
@@ -3683,7 +3694,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CardSheet>
       )}
       {world && who && realmOrder && !selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={false} hidden={hideCard}>
+        <CardSheet phone={phone} dock={dock} pinnedPeek={false} hidden={hideCard}>
           <WhoList
             key={who.key}
             title={who.title}
@@ -3758,7 +3769,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         />
       )}
       {status === 'updated' && (
-        <CentredDialog title="The game was updated">
+        <CentredDialog title="The game was updated" tone="news">
           <p>A new version of the game is out. Reload the page to play on.</p>
           <div className="hud-dialog-actions">
             <button type="button" className="primary" onClick={() => window.location.reload()}>
@@ -3768,7 +3779,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CentredDialog>
       )}
       {takeover && (
-        <CentredDialog title="Your heir has taken over">
+        <CentredDialog title="Your heir has taken over" tone="bad">
           <p>
             Your Leader has died. {takeover.heir} is your Leader now and leads your realm on from{' '}
             {takeover.city}, under its name, with its standing, contracts and alliance.

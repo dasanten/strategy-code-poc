@@ -17,7 +17,6 @@ import {
   TAB_LABELS,
   type ArmyTab,
 } from './residents-view.js'
-import { CardTabs, SelectionCard } from './SelectionCard.js'
 import { PanelHead } from './drawer-head.js'
 import { relationshipClass } from './theme.js'
 
@@ -36,7 +35,7 @@ function armyDoing(army: Army, names: Map<string, string>): string {
 }
 
 /**
- * The Player's armies (`CONTEXT.md`: Army): form one from their residents, and open one as a card
+ * The Player's armies (`CONTEXT.md`: Army): form one from their residents, and open one in the tab
  * (ADR 0012: header and tabs, like the resident card). Its Orders walk or guard a tile picked on
  * the map, attack or follow a resident in sight, stop, or disband; Members and Supply say who is
  * in it and which carriages feed it; Script runs one. Every change is an order the server checks
@@ -110,6 +109,7 @@ export function ArmiesPanel({
     return (
       <button
         type="button"
+        className="btn sm grow"
         aria-pressed={on}
         onClick={() => onPick(on ? undefined : { armyId: army.id, kind })}
       >
@@ -126,46 +126,72 @@ export function ArmiesPanel({
       return [{ name: r.name, carriageId: o.carriageId, haul: o.kind === 'haul' }]
     })
 
+  /** An open army: its row, marked, then what it is, its tabs and the open one under it. */
   const card = (a: Army) => {
     const targetId = targets[a.id] ?? ''
     const choices = inSight.filter((r) => !a.memberIds.includes(r.id))
     const enemy = inSight.find((r) => r.id === targetId)?.owner !== realmId
+    const canAttack = targetId !== '' && enemy
     const wagons = wagonsOf(a)
     return (
-      <SelectionCard
-        rel="own"
-        title={a.name}
-        lines={[
-          <strong key="doing">{armyDoing(a, names)}</strong>,
-          `${a.memberIds.length} ${a.memberIds.length === 1 ? 'member' : 'members'} · ${
-            wagons.length === 0
-              ? 'no supply wagon'
-              : `${wagons.length} supply ${wagons.length === 1 ? 'wagon' : 'wagons'}`
-          }`,
-        ]}
-        onClose={() => setOpenId(null)}
-      >
-        <CardTabs tabs={ARMY_TABS} labels={TAB_LABELS} tab={tab} onTab={showTab} />
-        {tab === 'orders' && (
-          <>
-            <div className="sel-order-group">
-              <h3>Move</h3>
-              <div className="order-buttons" aria-label="Move">
-                {pickButton(a, 'armyWalkTo', 'Walk to…')}
-                {pickButton(a, 'armyGuard', 'Guard…')}
-                <button
-                  type="button"
-                  disabled={!a.order && !a.script}
-                  onClick={() => order({ kind: 'armyStop', armyId: a.id })}
-                >
-                  Stop
-                </button>
-              </div>
-            </div>
-            <div className="sel-order-group">
-              <h3>A resident in sight</h3>
-              <div className="order-buttons" aria-label="A resident in sight">
+      <div className="army-card" role="region" aria-label={a.name}>
+        <div className="rw sel army-row">
+          <span className="ic i-banner" aria-hidden="true" />
+          <span className="grow">
+            <span className="b">{a.name}</span>
+            <span className="under">{armyDoing(a, names)}</span>
+          </span>
+          <button
+            type="button"
+            className="btn sm sq"
+            aria-label={`Close ${a.name}`}
+            onClick={() => setOpenId(null)}
+          >
+            <span className="ic s16 i-x" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="army-card-body">
+          <div className="sec army-facts">
+            <span>
+              {a.memberIds.length} {a.memberIds.length === 1 ? 'member' : 'members'} ·{' '}
+              {wagons.length === 0
+                ? 'no supply wagon'
+                : `${wagons.length} supply ${wagons.length === 1 ? 'wagon' : 'wagons'}`}
+            </span>
+          </div>
+          <div className="tabs" role="tablist" aria-label={`${a.name}, tabs`}>
+            {ARMY_TABS.map((t) => (
+              <button
+                type="button"
+                key={t}
+                className={tab === t ? 'tab on' : 'tab'}
+                role="tab"
+                aria-selected={tab === t}
+                onClick={() => showTab(t)}
+              >
+                {TAB_LABELS[t]}
+              </button>
+            ))}
+          </div>
+          <div className="sec army-tab">
+            {tab === 'orders' && (
+              <>
+                <span className="lb">Move</span>
+                <div className="fx army-buttons" role="group" aria-label="Move">
+                  {pickButton(a, 'armyWalkTo', 'Walk to…')}
+                  {pickButton(a, 'armyGuard', 'Guard…')}
+                  <button
+                    type="button"
+                    className="btn sm grow"
+                    disabled={!a.order && !a.script}
+                    onClick={() => order({ kind: 'armyStop', armyId: a.id })}
+                  >
+                    Stop
+                  </button>
+                </div>
+                <span className="lb">A resident in sight</span>
                 <select
+                  className="in"
                   aria-label={`Target for ${a.name}`}
                   value={targetId}
                   onChange={(e) => setTargets({ ...targets, [a.id]: e.target.value })}
@@ -178,116 +204,141 @@ export function ArmiesPanel({
                     </option>
                   ))}
                 </select>
-                <button
-                  type="button"
-                  disabled={!targetId || !enemy}
-                  onClick={() => order({ kind: 'armyAttack', armyId: a.id, targetId })}
-                >
-                  Attack
-                </button>
-                <button
-                  type="button"
-                  disabled={!targetId}
-                  onClick={() => order({ kind: 'armyFollow', armyId: a.id, targetId })}
-                >
-                  Follow
-                </button>
-              </div>
-            </div>
-            <div className="sel-order-group">
-              <h3>Army</h3>
-              <div className="order-buttons" aria-label="Army">
-                <button type="button" onClick={() => order({ kind: 'disbandArmy', armyId: a.id })}>
-                  Disband
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-        {tab === 'members' && (
-          <ul className="sel-facts" aria-label="Members">
-            {a.memberIds.map((id) => (
-              <li key={id}>{names.get(id) ?? 'Someone out of sight'}</li>
-            ))}
-          </ul>
-        )}
-        {tab === 'supply' &&
-          (wagons.length === 0 ? (
-            <p className="muted small">
-              No supply wagon. A carriage driven after the army, or a haul route with the army as
-              its second stop, feeds it on the way.
-            </p>
-          ) : (
-            <ul className="sel-facts" aria-label="Supply wagons">
-              {supplyLines(wagons, (id) => {
-                const c = carriages.find((x) => x.id === id)
-                return c?.load ? spareFood({ residents: own }, { ...c, load: c.load }) : 0
-              }).map((l, i) => (
-                <li key={i}>{l}</li>
+                <div className="fx army-buttons" role="group" aria-label="A resident in sight">
+                  <button
+                    type="button"
+                    className={canAttack ? 'btn sm grow dng' : 'btn sm grow off'}
+                    disabled={!canAttack}
+                    onClick={() => order({ kind: 'armyAttack', armyId: a.id, targetId })}
+                  >
+                    Attack
+                  </button>
+                  <button
+                    type="button"
+                    className="btn sm grow"
+                    disabled={!targetId}
+                    onClick={() => order({ kind: 'armyFollow', armyId: a.id, targetId })}
+                  >
+                    Follow
+                  </button>
+                </div>
+                <span className="lb">Army</span>
+                <div className="fx army-buttons" role="group" aria-label="Army">
+                  <button
+                    type="button"
+                    className="btn sm"
+                    onClick={() => order({ kind: 'disbandArmy', armyId: a.id })}
+                  >
+                    Disband
+                  </button>
+                </div>
+              </>
+            )}
+            {tab === 'members' && (
+              <ul className="army-facts-list" aria-label="Members">
+                {a.memberIds.map((id) => (
+                  <li key={id}>{names.get(id) ?? 'Someone out of sight'}</li>
+                ))}
+              </ul>
+            )}
+            {tab === 'supply' &&
+              (wagons.length === 0 ? (
+                <p className="mu small">
+                  No supply wagon. A carriage driven after the army, or a haul route with the army
+                  as its second stop, feeds it on the way.
+                </p>
+              ) : (
+                <ul className="army-facts-list" aria-label="Supply wagons">
+                  {supplyLines(wagons, (id) => {
+                    const c = carriages.find((x) => x.id === id)
+                    return c?.load ? spareFood({ residents: own }, { ...c, load: c.load }) : 0
+                  }).map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ul>
               ))}
-            </ul>
-          ))}
-        {tab === 'script' && (
-          <>
-            <RunScript
-              script={a.script}
-              scripts={scripts}
-              label={`Script for ${a.name} to run`}
-              of={a.id}
-              onRunScript={(scriptId) => order({ kind: 'armyRunScript', armyId: a.id, scriptId })}
-            />
-            {a.script && scriptMemory?.(a.id)}
-          </>
-        )}
-      </SelectionCard>
+            {tab === 'script' && (
+              <>
+                <RunScript
+                  script={a.script}
+                  scripts={scripts}
+                  label={`Script for ${a.name} to run`}
+                  of={a.id}
+                  onRunScript={(scriptId) =>
+                    order({ kind: 'armyRunScript', armyId: a.id, scriptId })
+                  }
+                />
+                {a.script && scriptMemory?.(a.id)}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
     )
   }
 
   return (
-    <section className="alliance-panel" aria-label="Armies">
+    <section className="armies" aria-label="Armies">
       <PanelHead title="Armies">{armies.length === 0 ? 'none' : armies.length}</PanelHead>
       {armies.length > 0 && (
-        <ul className="alliance-list">
+        <ul className="army-list">
           {armies.map((a) => (
             <li key={a.id} className={`army ${relationshipClass('own')}`}>
               {open?.id === a.id ? (
                 card(a)
               ) : (
-                <button type="button" className="army-row" onClick={() => setOpenId(a.id)}>
-                  <strong>{a.name}</strong> · {armyDoing(a, names)}
+                <button
+                  type="button"
+                  className="rw people-row army-row"
+                  onClick={() => setOpenId(a.id)}
+                >
+                  <span className="ic i-banner" aria-hidden="true" />
+                  <span className="grow">
+                    <span className="b">{a.name}</span>
+                    <span className="under">{armyDoing(a, names)}</span>
+                  </span>
+                  <span
+                    className="mono mu"
+                    title={`${a.memberIds.length} ${a.memberIds.length === 1 ? 'member' : 'members'}`}
+                  >
+                    {a.memberIds.length}
+                  </span>
                 </button>
               )}
             </li>
           ))}
         </ul>
       )}
-      <form onSubmit={form}>
+      <form className="sec army-form" onSubmit={form}>
         <fieldset className="army-members">
-          <legend>Form an army</legend>
+          <legend className="px t16">Form an army</legend>
           {own.map((r) => (
-            <label key={r.id}>
+            <label key={r.id} className="fx">
               <input type="checkbox" checked={chosen.has(r.id)} onChange={() => toggle(r.id)} />
-              {r.name}
-              {armyNameOf.has(r.id) && (
-                <span className="muted small"> · {armyNameOf.get(r.id)}</span>
-              )}
+              <span className="grow">
+                {r.name}
+                {armyNameOf.has(r.id) && <span className="mu"> · {armyNameOf.get(r.id)}</span>}
+              </span>
             </label>
           ))}
         </fieldset>
-        <input
-          value={name}
-          maxLength={ARMY_NAME_MAX_LENGTH}
-          placeholder="Its name"
-          aria-label="Army name"
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <button type="submit" disabled={chosen.size === 0}>
-          Form
-        </button>
+        <div className="fx">
+          <input
+            className="in grow"
+            value={name}
+            maxLength={ARMY_NAME_MAX_LENGTH}
+            placeholder="Its name"
+            aria-label="Army name"
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          <button type="submit" className="btn primary" disabled={chosen.size === 0}>
+            Form
+          </button>
+        </div>
+        <p className="mu small">A resident given an order of their own leaves their army.</p>
+        {(error ?? pickError) && <p className="error">{error ?? pickError}</p>}
       </form>
-      <p className="muted small">A resident given an order of their own leaves their army.</p>
-      {(error ?? pickError) && <p className="error">{error ?? pickError}</p>}
     </section>
   )
 }
