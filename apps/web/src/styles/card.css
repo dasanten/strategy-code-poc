@@ -1488,6 +1488,10 @@ button.card-list-row:hover {
   top: 6px;
   right: 8px;
 }
+/* The tab strip leaves room for the button, so it never covers the last tab. */
+.cmd-main:has(> .cmd-grow) > .tabs {
+  padding-right: 118px;
+}
 
 /* The planner (`QueueBlock`): the toolbar, the steps in their brackets and the foot on the left,
    the Add step palette and its ask beside them. */
