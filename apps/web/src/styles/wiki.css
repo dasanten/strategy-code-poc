@@ -1,72 +1,155 @@
-/* ---------- Wiki (`CONTEXT.md`: Wiki): one readable page, a section per topic ---------- */
+/* ---------- Wiki (`CONTEXT.md`: Wiki; artboard `Wiki`): a header bar, the Contents beside the
+   sections on a wide screen and above them on a phone, each section a panel ---------- */
 .wiki {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 24px 16px 64px;
-  font-size: 14px;
+  /* The page's side margin: 16 px, or what centres 1200 px of content on a wide screen. */
+  --wiki-side: max(16px, calc((100% - 1200px) / 2));
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+  column-gap: 24px;
+  align-items: start;
+  padding: 0 var(--wiki-side) 64px;
+  background: var(--parch);
+  font-size: 15px;
   line-height: 1.55;
 }
-.wiki h1 {
-  margin: 0 0 8px;
-  font: 600 28px/1.2 var(--font-pixel);
-  letter-spacing: 0.02em;
+.wiki > * {
+  grid-column: 2;
+  margin: 0 0 24px;
 }
-.wiki h2 {
-  margin: 32px 0 8px;
-  padding-bottom: 4px;
-  font: 600 20px/1.2 var(--font-pixel);
-  letter-spacing: 0.02em;
-  border-bottom: 2px solid var(--ui-line);
+.wiki-head {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 0 calc(-1 * var(--wiki-side)) 24px;
+  padding: 8px var(--wiki-side);
+  border-width: 0 0 2px;
 }
-.wiki h2 a {
-  color: inherit;
-  text-decoration: none;
+.wiki-head h1 {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--gold);
 }
-.wiki h3 {
-  margin: 18px 0 6px;
-  font-size: 14px;
+/* Beside every section, staying in view while the page scrolls. Its rows are the sections' own,
+   so they keep no gap of their own (the sections' margin is the gap). */
+.wiki-toc {
+  grid-column: 1;
+  grid-row: 2 / span 40;
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+.wiki-toc ol {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 10px 10px 10px 34px;
+}
+.wiki-intro {
+  font-size: 17px;
 }
 .wiki a {
   color: var(--navy);
 }
+.wiki a:hover {
+  color: var(--ink);
+}
+
 .wiki-section {
   scroll-margin-top: 16px;
 }
-.wiki-toc ol {
-  columns: 2;
-  margin: 12px 0 0;
-  padding-left: 20px;
+.wiki-section > h2 {
+  margin: 0;
 }
-.wiki table {
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
-  margin: 8px 0;
-  border-collapse: collapse;
-  font-size: 13px;
+.wiki-section > .hd a {
+  color: inherit;
+  text-decoration: none;
 }
-.wiki th,
-.wiki td {
-  padding: 4px 10px;
-  text-align: left;
-  border-bottom: 2px solid var(--ui-line);
-  vertical-align: top;
+.wiki-section > .hd .mono {
+  font-weight: 400;
+  letter-spacing: 0;
 }
-.wiki th {
-  color: var(--ui-muted);
-  font-weight: 600;
+.wiki-text {
+  padding: 4px 16px 14px;
+}
+.wiki-text p,
+.wiki-text ul,
+.wiki-text ol {
+  margin: 10px 0;
+}
+.wiki-text h3 {
+  margin: 18px 0 6px;
+  font: 600 16px/1.2 var(--font-pixel);
+  letter-spacing: 0.02em;
+}
+.wiki-text h4 {
+  margin: 16px 0 6px;
+  font-size: 14px;
 }
 .wiki code {
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 0.85em;
 }
-.wiki pre {
+
+/* Tables scroll sideways in their frame instead of squeezing their columns on a phone. */
+.wiki-table {
   max-width: 100%;
   overflow-x: auto;
-  margin: 6px 0 12px;
-  padding: 8px 12px;
-  background: var(--ui-well);
-  border: 2px solid var(--ui-line);
-  font-size: 12.5px;
-  line-height: 1.5;
+  margin: 10px 0;
+  font-size: 13.5px;
+}
+.wiki-table .tb:has(th:nth-child(3)) {
+  min-width: 520px;
+}
+.wiki-table .tb td {
+  vertical-align: top;
+}
+
+/* Script examples in the script workshop's colours (`.code`). */
+.wiki-code {
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+}
+.wiki-code code {
+  font-size: inherit;
+}
+
+/* A phone: the Contents above the text, in two columns. */
+@media (max-width: 760px) {
+  .wiki {
+    grid-template-columns: minmax(0, 1fr);
+    font-size: 14px;
+  }
+  .wiki > * {
+    grid-column: 1;
+  }
+  .wiki-head {
+    grid-column: 1;
+  }
+  .wiki-toc {
+    grid-row: auto;
+    position: static;
+    max-height: none;
+  }
+  .wiki-toc ol {
+    display: block;
+    columns: 2;
+    /* The second column's numbers sit in this gap. */
+    column-gap: 40px;
+  }
+  .wiki-toc li {
+    break-inside: avoid;
+  }
+  .wiki-text {
+    padding: 2px 12px 12px;
+  }
 }
