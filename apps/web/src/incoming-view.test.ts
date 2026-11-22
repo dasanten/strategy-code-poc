@@ -68,7 +68,7 @@ describe('the notice of what was sent', () => {
     )
   })
 
-  it('goes once put away, while the drawer is open, and with nothing sent', () => {
+  it('goes once put away, while its tab is open, and with nothing sent', () => {
     expect(incomingNoticeLine(items, new Set(['o1', 'o2']), false)).toBeUndefined()
     expect(incomingNoticeLine(items, new Set(), true)).toBeUndefined()
     expect(incomingNoticeLine([], new Set(), false)).toBeUndefined()

@@ -855,13 +855,13 @@ describe('the rows of a card that stays open', () => {
 })
 
 describe('Escape', () => {
-  it('leaves the top-most thing first: pick mode, a panel, the tile card, the card, the drawer', () => {
-    const all = { pick: true, panel: true, tile: true, card: true, drawer: true }
+  it('leaves the top-most thing first: pick mode, a panel, the tile card, the card, the sidebar', () => {
+    const all = { pick: true, panel: true, tile: true, card: true, sidebar: true }
     expect(escapeStep(all)).toBe('pick')
     expect(escapeStep({ ...all, pick: false })).toBe('panel')
     expect(escapeStep({ ...all, pick: false, panel: false })).toBe('tile')
-    expect(escapeStep({ card: true, drawer: true })).toBe('card')
-    expect(escapeStep({ drawer: true })).toBe('drawer')
+    expect(escapeStep({ card: true, sidebar: true })).toBe('card')
+    expect(escapeStep({ sidebar: true })).toBe('sidebar')
     expect(escapeStep({})).toBeUndefined()
   })
 })
@@ -1591,7 +1591,7 @@ describe('horses on the tile card', () => {
     expect(tile({ horses: [foal], tick: at }).lists?.[0]?.rows[0]?.detail).toBe(
       'Speed 12, Strength 8, Endurance 10 · 3 game days old',
     )
-    // A stranger's horse shows its stats and age, but not how it fares, and isn't in the drawer.
+    // A stranger's horse shows its stats and age, but not how it fares, and isn't in the Horses tab.
     const theirs = unknown({ realmId: 'r-other', bornAt: at - TICKS_PER_GAME_YEAR })
     expect(tile({ horses: [theirs], tick: at }).lists?.[0]?.rows).toEqual([
       { id: 'h1', name: 'Rowan', detail: 'Speed 12, Strength 8, Endurance 10 · 1 year old' },
@@ -1835,7 +1835,7 @@ describe('horses on the tile card', () => {
         `Breeding: a foal in about ${STABLE_BREED_DAYS - 3} game days`,
       ]),
     )
-    // Its horses as rows with meters, each to open in the Horses drawer.
+    // Its horses as rows with meters, each to open in the Horses tab.
     expect(card.lists).toEqual([
       expect.objectContaining({
         title: 'Horses (yours)',

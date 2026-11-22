@@ -20,7 +20,7 @@ import type {
 import { onTheWay, onTheWayLine, sendable, tradersAt } from './city-view.js'
 import { Sending } from './CityInspector.js'
 import { GroupHead } from './diplomacy-parts.js'
-import { PanelHead } from './drawer-head.js'
+import { PanelHead } from './panel-head.js'
 import { GOOD_LABELS } from './goods-grid.js'
 import { incomingItems, type IncomingItem } from './incoming-view.js'
 import { AcceptOffer, PostOffer } from './Offers.js'

@@ -60,6 +60,19 @@ describe('contrast', () => {
       ['admin inspector link', p.navy, p.parch],
       ['queue block head', ui.text, p.tan],
       ['script memory name', p.fog, ui.code],
+      ['table head', p.bark, p.tan],
+      ['count on a token', p.ink, p.paper],
+      ['good name on hover', p.parch, p.ink],
+      ['phone menu button', ui.barText, p.slate],
+      ['tab name beside the sidebar strip', p.ink, p.paper],
+      ['error line in code', '#ffffff', p.blood],
+      ['added line in a script diff', '#ffffff', p.pine],
+      ['hovered card row', ui.text, ui.raisedHover],
+      ['code: keyword', p.gold, ui.code],
+      ['code: string', p.grass, ui.code],
+      ['code: number', p.cyan, ui.code],
+      ['code: comment, line number', p.fog, ui.code],
+      ['title on a dark bar', p.gold, ui.bar],
     ]
     for (const [name, fg, bg] of pairs) expect(contrast(fg, bg), name).toBeGreaterThanOrEqual(4.5)
   })

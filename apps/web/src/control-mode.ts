@@ -91,7 +91,7 @@ export interface Picked {
 
 /**
  * The control mode after something was picked: picking a resident, a group or an army some
- * other way than a map click (the Residents list, a saved group's key, the Armies drawer, a
+ * other way than a map click (the Residents list, a saved group's key, the Armies tab, a
  * notice) switches to unit control mode, where those are commanded.
  */
 export function modeAfterPick(mode: ControlMode, picked: Picked): ControlMode {

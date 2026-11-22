@@ -24,7 +24,7 @@ import {
 } from './contract-view.js'
 import { doingLine } from './doing-view.js'
 import { Choice } from './diplomacy-parts.js'
-import { PanelHead } from './drawer-head.js'
+import { PanelHead } from './panel-head.js'
 import { labelled, nameLabels } from './name-labels.js'
 
 /**

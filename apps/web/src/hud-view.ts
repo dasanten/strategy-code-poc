@@ -3,8 +3,8 @@ import type { Building, City, Good } from '@csp/shared-types'
 import { agoText } from './last-seen.js'
 
 /**
- * The groups of the sidebar's strip, in strip order (`CONTEXT.md`: Screen): the groups the tool
- * rail had.
+ * The groups of the sidebar's strip, in strip order (`CONTEXT.md`: Sidebar): People,
+ * Diplomacy, Realm.
  */
 export const SIDEBAR_GROUPS = [
   { id: 'people', label: 'People' },
@@ -15,8 +15,7 @@ export const SIDEBAR_GROUPS = [
 export type SidebarGroupId = (typeof SIDEBAR_GROUPS)[number]['id']
 
 /**
- * The sidebar's tabs (ADR 0044), in strip order, each in its group (`CONTEXT.md`: Screen): one for
- * each drawer the tool rail had, in the same order. Scripts is a `screen`: it opens the script
+ * The sidebar's tabs (ADR 0044), in strip order, each in its group (`CONTEXT.md`: Sidebar). Scripts is a `screen`: it opens the script
  * workshop over the map instead of a panel.
  */
 export const SIDE_TABS = [
@@ -56,7 +55,7 @@ export function toggleTab(open: OpenTab, clicked: SideTabId): OpenTab {
   return open === clicked ? undefined : clicked
 }
 
-/** The Diplomacy tab's own tabs, in order (`CONTEXT.md`: Tool rail). */
+/** The Diplomacy tab's own tabs, in order (`CONTEXT.md`: Sidebar). */
 export const DIPLOMACY_TABS = [
   { id: 'contracts', label: 'Contracts' },
   { id: 'demands', label: 'Demands' },
@@ -159,11 +158,11 @@ export function showBeside(
   left: number,
   right: number,
   strip = 0,
-): { left: number; right: number; closeDrawer: boolean } {
-  if (mapWidth - left - right >= MIN_OPEN_MAP) return { left, right, closeDrawer: false }
-  const closeDrawer = left > strip
-  if (mapWidth - strip - right >= MIN_OPEN_MAP) return { left: strip, right, closeDrawer }
-  return { left: 0, right: 0, closeDrawer }
+): { left: number; right: number; foldSidebar: boolean } {
+  if (mapWidth - left - right >= MIN_OPEN_MAP) return { left, right, foldSidebar: false }
+  const foldSidebar = left > strip
+  if (mapWidth - strip - right >= MIN_OPEN_MAP) return { left: strip, right, foldSidebar }
+  return { left: 0, right: 0, foldSidebar }
 }
 
 /** The goods the top bar shows, in this order (`CONTEXT.md`: Goods in the top bar). */

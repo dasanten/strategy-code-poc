@@ -1183,12 +1183,12 @@ export interface CardRow {
   shares?: number[]
   /**
    * What a click on the row opens: the card of one of the Player's residents, or one of their
-   * horses in the Horses drawer.
+   * horses in the Horses tab.
    */
   opens?: 'resident' | 'horse'
 }
 
-/** The meters a horse's or a resident's row has, as the Horses drawer and the resident card. */
+/** The meters a horse's or a resident's row has, as the Horses tab and the resident card. */
 const FARES_METERS = ['Health', 'Hunger'] as const
 
 /** The meters' shares for someone whose health and hunger the Player knows. */
@@ -1479,7 +1479,7 @@ export function riddenHorseLine(
  * right, then a row for each with its stats and age (`horseStatsText`), led for a Down horse by
  * that it is Down and how long it has left (`horseDownLine`), and its health and hunger
  * meters where the Player knows how it fares (`CONTEXT.md`: Seeing how someone fares). A click on
- * one of the Player's own opens it in the Horses drawer.
+ * one of the Player's own opens it in the Horses tab.
  */
 function horseLists(
   horses: SeenHorse[],
@@ -3031,11 +3031,11 @@ export function actionForKey<Id extends string>(
 /**
  * What Escape leaves, top-most first (`CONTEXT.md`: Picking a target): pick mode, an open panel
  * on the card (an order's, or the form before a script starts), the tile card, the resident or
- * group card, then the drawer.
+ * group card, then the open sidebar tab.
  */
-export type EscapeStep = 'pick' | 'panel' | 'tile' | 'card' | 'drawer'
+export type EscapeStep = 'pick' | 'panel' | 'tile' | 'card' | 'sidebar'
 
-const ESCAPE_ORDER: readonly EscapeStep[] = ['pick', 'panel', 'tile', 'card', 'drawer']
+const ESCAPE_ORDER: readonly EscapeStep[] = ['pick', 'panel', 'tile', 'card', 'sidebar']
 
 /** The top-most of what is open, which Escape leaves; undefined with nothing open. */
 export function escapeStep(open: Partial<Record<EscapeStep, boolean>>): EscapeStep | undefined {

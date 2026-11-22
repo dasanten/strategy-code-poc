@@ -8,11 +8,11 @@
   top: calc(var(--top-h) + var(--lane-h, 0px) + 12px);
   right: 12px;
   z-index: 1;
-  width: min(360px, calc(100vw - var(--rail-w) - 24px));
+  width: min(360px, calc(100vw - var(--strip-w) - 24px));
   max-height: calc(100% - var(--top-h) - var(--lane-h, 0px) - 24px);
   overflow: auto;
 }
-/* Hidden behind the wide drawer (`cardHidden`), as it was until the drawer closes. */
+/* Hidden behind the script workshop or the full Residents list (`cardHidden`). */
 .game-selection[hidden] {
   display: none;
 }
@@ -174,20 +174,6 @@
 .sel-tabs button {
   padding: 4px 6px;
   font-size: 0.8rem;
-}
-/* One kind of order on the Orders tab, under a quiet heading. */
-.sel-order-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.sel-order-group h3 {
-  margin: 0;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ui-muted);
 }
 /* The ⓘ on a building's card: a quiet toggle that opens what the building is for. */
 .sel-info {
@@ -371,12 +357,6 @@ button.card-list-row:hover {
   align-items: center;
   gap: 4px 8px;
   margin-top: 2px;
-}
-/* An inventory on the tile card, such as a carriage's load, under a small heading. */
-.card-goods {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 /* A carriage on the tile card (`CarriageView`): its load bar and goods, then labelled rows. */
 .card-carriage {
@@ -591,7 +571,7 @@ button.card-list-row:hover {
   cursor: pointer;
 }
 
-/* Order buttons in a drawer row are smaller than the inspector's touch targets. */
+/* Order buttons in a sidebar row are smaller than the inspector's touch targets. */
 .side-panel .order-buttons {
   gap: 4px;
   margin-top: 6px;
@@ -654,11 +634,6 @@ button.card-list-row:hover {
   flex-direction: column;
   gap: 10px;
 }
-.doing-now {
-  font-size: 1rem;
-  font-weight: 600;
-}
-
 .horse-pick {
   flex-direction: row;
   align-items: flex-start;
@@ -701,77 +676,6 @@ button.card-list-row:hover {
   min-height: 36px;
   min-width: 64px;
 }
-
-.warehouse-prices {
-  margin: 6px 8px 0;
-  font-size: 12px;
-  color: var(--ui-text);
-}
-.warehouse-prices p {
-  margin: 4px 0 0;
-}
-.warehouse-prices-place {
-  color: var(--ui-muted);
-}
-.warehouse-prices table {
-  margin-top: 4px;
-  border-collapse: collapse;
-  font-variant-numeric: tabular-nums;
-}
-.warehouse-prices caption {
-  text-align: left;
-  padding-bottom: 2px;
-  font-weight: 600;
-}
-.warehouse-prices th,
-.warehouse-prices td {
-  padding: 3px 10px 3px 0;
-  text-align: right;
-  font-weight: normal;
-  border-bottom: 2px solid var(--ui-line);
-}
-.warehouse-prices th[scope='row'],
-.warehouse-prices thead th:first-child {
-  text-align: left;
-}
-.warehouse-prices thead th {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ui-muted);
-}
-/* An NPC city's horses for sale (`CONTEXT.md`: Horse market): a block each. */
-.horse-offers {
-  margin: 4px 0 0;
-  padding: 0;
-  list-style: none;
-}
-.horse-offers li {
-  padding: 4px 0;
-  border-bottom: 2px solid var(--ui-line);
-}
-/* An NPC city's rates (`CONTEXT.md`: Swap): a button each, wrapping to the panel's width. */
-.swap-rates ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 4px 0 8px;
-  padding: 0;
-  list-style: none;
-}
-.swap-rates button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  text-align: left;
-}
-.swap-rates .good-icon svg {
-  display: block;
-  width: 16px;
-  height: 16px;
-}
-
 /* A good's icon beside its name: the wiki's goods table, trade prices (`CONTEXT.md`: Goods on
    cards). */
 .good-label {
@@ -1466,7 +1370,7 @@ button.card-list-row:hover {
   right: 8px;
   bottom: calc(max(var(--command-h, 0px), var(--map-dock-h, 0px)) + 8px);
   z-index: 1;
-  width: min(var(--card-dock-w), calc(100vw - var(--rail-w) - 24px));
+  width: min(var(--card-dock-w), calc(100vw - var(--strip-w) - 24px));
   display: flex;
   flex-direction: column;
   gap: 8px;

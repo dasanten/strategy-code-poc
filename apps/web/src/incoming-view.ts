@@ -41,14 +41,14 @@ export function incomingItems(
 
 /**
  * What the notice says of what the Player hasn't put away yet: the newest, and how many more.
- * Undefined with nothing new, or while the drawer that lists them is open.
+ * Undefined with nothing new, or while the sidebar tab that lists them is open.
  */
 export function incomingNoticeLine(
   items: readonly IncomingItem[],
   putAway: ReadonlySet<string>,
-  drawerOpen: boolean,
+  tabOpen: boolean,
 ): string | undefined {
-  if (drawerOpen) return undefined
+  if (tabOpen) return undefined
   const fresh = items.filter((i) => !putAway.has(i.id))
   const newest = fresh.at(-1)
   if (!newest) return undefined

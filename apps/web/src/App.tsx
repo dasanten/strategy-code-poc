@@ -135,7 +135,7 @@ import {
   type GoodsPick,
   type OpenTab,
 } from './hud-view.js'
-import { cityPlace, cityScale } from './cities-drawer-view.js'
+import { cityPlace, cityScale } from './cities-tab-view.js'
 import {
   CentredDialog,
   DiplomacyTabs,
@@ -493,7 +493,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // nothing else to do there, and where in the window it was pressed.
   const [tileMenu, setTileMenu] = useState<{ x: number; y: number; at: { x: number; y: number } }>()
   const closeTileMenu = useCallback(() => setTileMenu(undefined), [])
-  // The horse last picked in the Horses drawer, to mark its row among others on the same tile.
+  // The horse last picked in the Horses tab, to mark its row among others on the same tile.
   const [pickedHorseId, setPickedHorseId] = useState<string>()
   // The resident card's open tab and panel, kept here so they stay as the Player picks others;
   // the tab is also remembered in this browser (ADR 0012).
@@ -709,7 +709,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // A script to open in the library, such as the one a resident's task runs; `at` reopens it.
   const [scriptToOpen, setScriptToOpen] = useState<ScriptToOpen>()
   // A place to show on the map, such as one from the realm log or a resident picked in the list:
-  // asked for, then centred between the open drawer and the selection card once they are drawn.
+  // asked for, then centred between the open sidebar tab and the selection card once they are drawn.
   // A place to show on the map; `zoom` picks the zoom from the one now (the zoom stays without).
   const [toShow, setToShow] = useState<{ x: number; y: number; zoom?: (scale: number) => number }>()
   const [focus, setFocus] = useState<{
@@ -730,7 +730,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const demandsShown = showsTab(sidebar, 'demands')
   const offersShown = showsTab(sidebar, 'directOffers')
   // The notice of demands sent to the realm (`CONTEXT.md`: Demand), until the Player dismisses it
-  // or has them in front of them in the drawer.
+  // or has them in front of them in the sidebar.
   const [demandsPutAway, setDemandsPutAway] = useState<ReadonlySet<string>>(new Set())
   const demands = world?.diplomacy.demands
   const homeRealm = world?.home.realmId
@@ -747,7 +747,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       ? demandNoticeLine(demands, homeRealm, demandsPutAway, demandsShown)
       : undefined
   // The notice of what others sent the realm (`CONTEXT.md`: Notices), until the Player dismisses it
-  // or has it in front of them in the drawer.
+  // or has it in front of them in the sidebar.
   const [incomingPutAway, setIncomingPutAway] = useState<ReadonlySet<string>>(new Set())
   const incoming = useMemo(
     () => (world ? incomingItems(world.diplomacy, world.home.realmId) : []),
@@ -761,8 +761,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (offersShown) putIncomingAway()
   }, [offersShown, putIncomingAway])
   const incomingNotice = incomingNoticeLine(incoming, incomingPutAway, offersShown)
-  // What the Player hasn't seen in a drawer yet, for the marks on the rail and the Diplomacy tabs
-  // (`CONTEXT.md`: Tool rail): what was sent to the realm, seen once its tab was in front of them,
+  // What the Player hasn't seen in a sidebar tab yet, for the marks on its strip and the Diplomacy tabs
+  // (`CONTEXT.md`: Sidebar): what was sent to the realm, seen once its tab was in front of them,
   // and realm log lines newer than the last one they had open.
   const [seenIds, setSeenIds] = useState<SeenIds>(NOTHING_SEEN)
   const sent = useMemo(
@@ -809,7 +809,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setTakeoverSeen(takeover.seq)
   }
   const foldSidebar = useCallback(() => setOpenTab(undefined), [setOpenTab])
-  // The Residents drawer opened fully (`CONTEXT.md`: Residents list); closing it goes back.
+  // The Residents tab opened fully (`CONTEXT.md`: Residents list); closing it goes back.
   const [residentsFull, setResidentsFull] = useState(false)
   const fullList = residentsFull && openTab === 'residents'
   useEffect(() => {
@@ -959,7 +959,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     return () => window.removeEventListener('keydown', onKey)
   }, [controlMode, switchControlMode])
   // Picking a resident, a group or an army some other way than a map click (the Residents list,
-  // a saved group's key, the Armies drawer, a notice) switches to unit control mode.
+  // a saved group's key, the Armies tab, a notice) switches to unit control mode.
   const openArmy = world?.armies.find((a) => a.id === openArmyId)
   const pickedArmy = armyPick !== undefined || openArmy !== undefined
   // One card in the command bar at a time: a resident or group picked closes the army's.
@@ -971,7 +971,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (next !== controlMode) setControlMode(next)
   }, [controlMode, selectedIds.length, pickedArmy, setControlMode])
   // Escape leaves the top-most thing first: pick mode, an open panel (the form before a script
-  // starts among them), the tile card, the resident or group card, then the drawer. A card
+  // starts among them), the tile card, the resident or group card, then the open sidebar tab. A card
   // hidden behind the script workshop or the full list is passed over, so Escape closes what is
   // in front of it.
   const hideCard = cardHidden(openTab, fullList)
@@ -996,9 +996,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         tile: shownCard && tileOpen,
         card: shownCard && (anySelected || realmCard || armyOpen),
       })
-      // With nothing else open, the drawer's own Escape closes it.
+      // With nothing else open, the sidebar's own Escape closes it.
       if (!step) return
-      // Ahead of the drawer's own Escape, which would close it too.
+      // Ahead of the sidebar's own Escape, which would close it too.
       e.stopImmediatePropagation()
       if (step === 'pick') return cancelPick()
       if (step === 'panel') {
@@ -1018,7 +1018,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!toShow) return
     const covered = mapCovered()
     const shown = showBeside(window.innerWidth, covered.left, covered.right, covered.strip)
-    if (shown.closeDrawer) foldSidebar()
+    if (shown.foldSidebar) foldSidebar()
     setFocus({ ...toShow, cover: shown })
   }, [toShow, foldSidebar])
   const showOnMap = (x: number, y: number) => setToShow({ x, y })
@@ -1114,7 +1114,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setStarting({ script, params, values, ...(atWork ? { base: values } : {}), start })
     return true
   }
-  // The city picked on the map or opened in the Cities drawer.
+  // The city picked on the map or opened in the Cities tab.
   const [openCityId, setOpenCityId] = useState<string>()
   // The warehouse or storage Trade here scrolls the open city to; a new object each press.
   const [tradeAt, setTradeAt] = useState<{ buildingId: string }>()
@@ -2550,7 +2550,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <PhoneMenu
           open={openTab}
           onToggle={(id) => setOpenTab((open) => toggleTab(open, id))}
-          marked={marks.rail}
+          marked={marks.strip}
           goods={goods}
           leader={leader?.name}
           heir={heirShown}
@@ -2564,7 +2564,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       )}
       <Sidebar
         open={openTab}
-        marked={marks.rail}
+        marked={marks.strip}
         phone={phone}
         full={fullList}
         onToggle={(id) => setOpenTab((open) => toggleTab(open, id))}
@@ -2796,7 +2796,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               openId={openCityId}
               onOpen={(id) => {
                 setOpenCityId(id)
-                // Opening a row shows the city on the map, outlined (`CONTEXT.md`: Cities drawer).
+                // Opening a row shows the city on the map, outlined (`CONTEXT.md`: Cities tab).
                 const at = id && cityPlace(id, knownCities, knownBuildings)
                 if (at) setToShow({ ...at, zoom: cityScale })
               }}

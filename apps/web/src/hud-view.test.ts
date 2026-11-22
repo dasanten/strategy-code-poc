@@ -32,7 +32,7 @@ import {
 } from './hud-view.js'
 
 describe('the sidebar', () => {
-  it('has a tab for every drawer the tool rail had, once each', () => {
+  it('has a tab for every list of the People, Diplomacy and Realm groups, once each', () => {
     const labels = SIDE_TABS.map((t) => t.label)
     for (const tool of [
       'Residents',
@@ -48,7 +48,7 @@ describe('the sidebar', () => {
     expect(new Set(SIDE_TABS.map((t) => t.id)).size).toBe(SIDE_TABS.length)
   })
 
-  it('puts every tab in exactly one group, in the tool rail order', () => {
+  it('puts every tab in exactly one group, in their order', () => {
     const groups = sidebarGroups()
     expect(groups.map((g) => g.id)).toEqual(SIDEBAR_GROUPS.map((g) => g.id))
     expect(groups.flatMap((g) => g.tabs.map((t) => t.id))).toEqual(SIDE_TABS.map((t) => t.id))
@@ -170,7 +170,7 @@ describe('the sidebar', () => {
     // The Residents tab covers 428 px on the left, the card 372 px on the right, of 1280.
     const view = { width: 1280, height: 800 }
     const cover = showBeside(view.width, 428, 372)
-    expect(cover.closeDrawer).toBe(false)
+    expect(cover.foldSidebar).toBe(false)
     const cam = centreBeside(2806, 3427, cover, 24, 5760)
     // The resident's tile shows in the middle of 428..908, not of the whole screen.
     const [sx, sy] = tileToScreen(cam, view, 5760, 2806.5, 3427.5)
@@ -179,25 +179,25 @@ describe('the sidebar', () => {
   })
 
   it('shows a place between the open sidebar and the card', () => {
-    expect(showBeside(1280, 0, 0)).toEqual({ left: 0, right: 0, closeDrawer: false })
-    expect(showBeside(1280, 428, 0)).toEqual({ left: 428, right: 0, closeDrawer: false })
-    expect(showBeside(1024, 428, 372)).toEqual({ left: 428, right: 372, closeDrawer: false })
+    expect(showBeside(1280, 0, 0)).toEqual({ left: 0, right: 0, foldSidebar: false })
+    expect(showBeside(1280, 428, 0)).toEqual({ left: 428, right: 0, foldSidebar: false })
+    expect(showBeside(1024, 428, 372)).toEqual({ left: 428, right: 372, foldSidebar: false })
     const room = 1024 - 428 - MIN_OPEN_MAP
-    expect(showBeside(1024, 428, room)).toEqual({ left: 428, right: room, closeDrawer: false })
+    expect(showBeside(1024, 428, room)).toEqual({ left: 428, right: room, foldSidebar: false })
     // Folded, the strip alone covers the map's left edge.
-    expect(showBeside(1280, 56, 372, 56)).toEqual({ left: 56, right: 372, closeDrawer: false })
+    expect(showBeside(1280, 56, 372, 56)).toEqual({ left: 56, right: 372, foldSidebar: false })
   })
 
   it('folds a sidebar that leaves too little map, and uses the whole screen if need be', () => {
     // Sidebar and card leave 100 px: folded to the strip there is room beside the card.
-    expect(showBeside(900, 428, 372)).toEqual({ left: 0, right: 372, closeDrawer: true })
-    expect(showBeside(900, 428, 372, 56)).toEqual({ left: 56, right: 372, closeDrawer: true })
+    expect(showBeside(900, 428, 372)).toEqual({ left: 0, right: 372, foldSidebar: true })
+    expect(showBeside(900, 428, 372, 56)).toEqual({ left: 56, right: 372, foldSidebar: true })
     // A phone: the tab covers the map, and the card nearly all of it.
-    expect(showBeside(375, 375, 0)).toEqual({ left: 0, right: 0, closeDrawer: true })
-    expect(showBeside(375, 375, 351)).toEqual({ left: 0, right: 0, closeDrawer: true })
+    expect(showBeside(375, 375, 0)).toEqual({ left: 0, right: 0, foldSidebar: true })
+    expect(showBeside(375, 375, 351)).toEqual({ left: 0, right: 0, foldSidebar: true })
     // Folded already and a card that leaves too little: the whole screen.
-    expect(showBeside(375, 0, 351)).toEqual({ left: 0, right: 0, closeDrawer: false })
-    expect(showBeside(500, 56, 351, 56)).toEqual({ left: 0, right: 0, closeDrawer: false })
+    expect(showBeside(375, 0, 351)).toEqual({ left: 0, right: 0, foldSidebar: false })
+    expect(showBeside(500, 56, 351, 56)).toEqual({ left: 0, right: 0, foldSidebar: false })
   })
 })
 

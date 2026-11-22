@@ -1,6 +1,6 @@
 import type { DeliveryView, RealmEvent } from '@csp/shared-types'
 import { describeDelivery, describeEvent, logDays, type EventPlace } from './realm-log.js'
-import { PanelHead } from './drawer-head.js'
+import { PanelHead } from './panel-head.js'
 import { Icon } from './Icon.js'
 
 /**

@@ -10,7 +10,7 @@ import {
 import { formatGameTime, formatGameTimeShort } from './shared/time.js'
 import { useMapDockHeight } from './Dock.js'
 import type { FirstDay, TraderVisit } from '@csp/shared-types'
-import { DrawerStatus } from './drawer-head.js'
+import { PanelStatus } from './panel-head.js'
 import { zealShown } from './zeal.js'
 import {
   REALM_BAR_HINT,
@@ -510,9 +510,9 @@ export function PhoneMenu({
 }
 
 /**
- * The Diplomacy drawer's tabs (`CONTEXT.md`: Tool rail). Every tab's panel stays mounted and only
+ * The Diplomacy tab's tabs (`CONTEXT.md`: Sidebar). Every tab's panel stays mounted and only
  * the picked one shows, so a panel keeps what the Player typed into it; only that one puts its
- * count beside the drawer's title.
+ * count beside the tab's title.
  */
 export function DiplomacyTabs({
   tab,
@@ -526,7 +526,7 @@ export function DiplomacyTabs({
   marked?: ReadonlySet<DiplomacyTab>
   panels: Record<DiplomacyTab, ReactNode>
 }) {
-  const status = useContext(DrawerStatus)
+  const status = useContext(PanelStatus)
   return (
     <>
       <div className="tabs diplomacy-tabs" role="tablist" aria-label="Diplomacy">
@@ -554,9 +554,9 @@ export function DiplomacyTabs({
           aria-labelledby={`diplomacy-tab-${t.id}`}
           hidden={tab !== t.id}
         >
-          <DrawerStatus.Provider value={tab === t.id ? status : null}>
+          <PanelStatus.Provider value={tab === t.id ? status : null}>
             {panels[t.id]}
-          </DrawerStatus.Provider>
+          </PanelStatus.Provider>
         </div>
       ))}
     </>
@@ -664,7 +664,7 @@ export function HorseOfferNotice({
 
 /**
  * What others sent the Player and they haven't seen yet (`CONTEXT.md`: Notices): who sent what.
- * Opening its drawer or dismissing it puts it away; the things themselves wait in the drawer.
+ * Opening its sidebar tab or dismissing it puts it away; the things themselves wait in the tab.
  */
 export function IncomingNotice({
   line,
@@ -708,8 +708,8 @@ export function NoticeLane({ phone, children }: { phone: boolean; children: Reac
     const lane = ref.current
     const game = lane?.closest<HTMLElement>('.game')
     if (!lane || !game) return
-    const rail = parseFloat(getComputedStyle(game).getPropertyValue('--rail-w')) || 0
-    const next = laneSpot(window.innerWidth, rail, mapCovered(), phone)
+    const strip = parseFloat(getComputedStyle(game).getPropertyValue('--strip-w')) || 0
+    const next = laneSpot(window.innerWidth, strip, mapCovered(), phone)
     setSpot((was) =>
       was && was.left === next.left && was.right === next.right && was.band === next.band
         ? was

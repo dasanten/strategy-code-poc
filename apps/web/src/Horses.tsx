@@ -4,9 +4,9 @@ import type { SeenHorse } from '@csp/shared-types'
 import { useEffect, useRef } from 'react'
 import { horseLines, horseNeed, type HorseGroup, type HorseLines } from './horses-view.js'
 import { horseAgeText } from './selection-view.js'
-import { PanelHead } from './drawer-head.js'
+import { PanelHead } from './panel-head.js'
 
-/** Meter colour by how full it is, as in the Residents drawer: low a warning, half a caution. */
+/** Meter colour by how full it is, as in the Residents tab: low a warning, half a caution. */
 export const meterClass = (share: number) => (share < 0.25 ? 'low' : share < 0.5 ? 'mid' : 'ok')
 
 export const pct = (share: number) => `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`
@@ -22,7 +22,7 @@ export function Meter({ label, share }: { label: string; share: number | undefin
 }
 
 /**
- * The realm's horses (`CONTEXT.md`: Horses drawer), one row each under the stable they stand in,
+ * The realm's horses (`CONTEXT.md`: Horses tab), one row each under the stable they stand in,
  * or Hitched, Ridden or Loose (see `groupHorses`), laid out like the Residents tab: name with
  * where it is under it (first that it is Down or hungry, in the warning colour), Speed · Strength ·
  * Endurance, age, health and hunger; on a phone two lines each (`horseLines`). Clicking a row

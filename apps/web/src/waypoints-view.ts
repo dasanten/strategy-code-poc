@@ -2,7 +2,7 @@ import { WAYPOINTS_MAX } from '@csp/balance'
 import type { Waypoint } from '@csp/shared-types'
 
 /*
- * What the Waypoints drawer and the map's tile menu show (`CONTEXT.md`: Waypoint), as plain
+ * What the Waypoints tab and the map's tile menu show (`CONTEXT.md`: Waypoint), as plain
  * functions of the Player's waypoints.
  */
 
@@ -12,12 +12,12 @@ export function suggestedWaypointName(held: readonly Pick<Waypoint, 'name'>[]): 
   for (let n = 1; ; n++) if (!taken.has(`Waypoint ${n}`)) return `Waypoint ${n}`
 }
 
-/** The drawer head's count: how many the Player holds of the most they may. */
+/** The Waypoints tab head's count: how many the Player holds of the most they may. */
 export function waypointCount(held: readonly unknown[]): string {
   return `${held.length} of ${WAYPOINTS_MAX}`
 }
 
-/** Where a waypoint is, as a row in the drawer shows it. */
+/** Where a waypoint is, as a row in the Waypoints tab shows it. */
 export const waypointPlace = (w: Pick<Waypoint, 'x' | 'y'>) => `tile ${w.x}, ${w.y}`
 
 /**

@@ -8,7 +8,7 @@ import type {
   SeenResident,
 } from '@csp/shared-types'
 import { doingLine, interruptedLine, scriptLine } from './doing-view.js'
-import { PanelHead } from './drawer-head.js'
+import { PanelHead } from './panel-head.js'
 import {
   AGE_OPTIONS,
   COLUMN_LABELS,
@@ -51,7 +51,7 @@ const COLUMN_HEADINGS: Partial<Record<ListColumn, string>> = {
 }
 
 /**
- * The Residents drawer opened fully (`CONTEXT.md`: Residents list): the realm's residents with
+ * The Residents tab opened fully (`CONTEXT.md`: Residents list): the realm's residents with
  * their stats, skills, gear, what they carry and what they are doing, a row each, or a compact card
  * each on a phone. Only the rows in view are drawn (`rowWindow`), so hundreds stay smooth. It opens
  * with the picked resident in view; tapping a row opens that resident. It can be searched, filtered
@@ -97,7 +97,7 @@ export function ResidentsFullList({
   onSelect: (id: string) => void
   /** Picks these residents as a Group on the map, in the list's order. */
   onPick: (ids: string[]) => void
-  /** Back to the drawer's short list. */
+  /** Back to the tab's short list. */
   onClose: () => void
   phone?: boolean
 }) {

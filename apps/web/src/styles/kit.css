@@ -122,7 +122,7 @@ body {
   --ui-text: var(--ui-bar-text);
   --ui-muted: var(--ui-bar-muted);
 }
-/* A dark bar (top bar, rail, realm bar): words in parchment, plain buttons on dark. */
+/* A dark bar (top bar, sidebar strip, realm bar): words in parchment, plain buttons on dark. */
 .bar {
   --ui-text: var(--ui-bar-text);
   --ui-muted: var(--ui-bar-muted);
@@ -566,7 +566,7 @@ label > select {
   font: 600 11px/1.2 var(--font-ui);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--wood);
+  color: var(--bark);
   background: var(--tan);
   border-bottom: 2px solid var(--clay);
   white-space: nowrap;
@@ -627,7 +627,7 @@ label > select {
   width: 34px;
   margin-right: 12px;
   text-align: right;
-  color: var(--steel);
+  color: var(--fog);
 }
 
 /* ---------- Map tokens: a square, its ring in the relationship colour ---------- */

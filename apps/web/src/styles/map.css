@@ -130,7 +130,7 @@
 .notice-lane {
   position: absolute;
   top: calc(var(--top-h) + 10px);
-  left: calc(var(--rail-w) + 12px);
+  left: calc(var(--strip-w) + 12px);
   right: 12px;
   z-index: 3;
   display: flex;

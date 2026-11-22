@@ -782,10 +782,11 @@ export function Wiki() {
           (Residents, Horses, Armies), Diplomacy, and Realm (Cities, Waypoints, Scripts, Realm log);
           one is open at a time, and the sidebar folds to its strip of tabs. The <b>command bar</b>{' '}
           along the bottom holds the card of whatever you picked (a resident, a group, an army): its
-          header on the left, its tabs and orders beside it, and the minimap and the map’s buttons
-          at its right end. The <b>dock</b> on the right holds a tile’s card, the who-list and the
-          realm order cards, so a tile and a resident can be open together. A panel an order opens
-          (Goods, Build, Haul route, …) opens above the command bar.
+          header on the left, its tabs and orders beside it. The <b>map dock</b> bottom right, at
+          the command bar’s right end, holds the minimap and the map’s buttons. The <b>dock</b> on
+          the right holds a tile’s card, the who-list and the realm order cards, so a tile and a
+          resident can be open together. A panel an order opens (Goods, Build, Haul route, …) opens
+          above the command bar.
         </p>
         <p>
           Scripts on the sidebar opens the <b>script workshop</b>, a screen of its own over the map,
@@ -1004,12 +1005,12 @@ export function Wiki() {
           browser remembers how you left them.
         </p>
         <p>
-          The top bar shows the Food, Wood, Stone and Coins held in your storages, for what you pick
-          beside them: Entire realm, outpost storages included, or one of your cities by name.
-          Stables, carriages and piles don’t count. A storage in sight counts as it is now, one out
-          of sight with what you last saw in it; then ≈ beside the goods says that part of the total
-          is that old, and how old. Your browser remembers the pick; a city no longer yours goes
-          back to Entire realm.
+          The top bar shows the Food, Wood, Stone, Coal, Steel and Coins held in your storages, for
+          what you pick beside them: Entire realm, outpost storages included, or one of your cities
+          by name. Stables, carriages and piles don’t count. A storage in sight counts as it is now,
+          one out of sight with what you last saw in it; then ≈ beside the goods says that part of
+          the total is that old, and how old. Your browser remembers the pick; a city no longer
+          yours goes back to Entire realm.
         </p>
         <p>
           On a phone the command bar is a sheet at the bottom of the screen. Drag its handle to show

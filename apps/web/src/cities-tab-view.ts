@@ -9,7 +9,7 @@ import { housingRoom } from './shared/city.js'
 import { GOODS } from './shared/world.js'
 import type { Relationship } from './theme.js'
 
-/** The Cities drawer's lists, in this order (`CONTEXT.md`: Cities drawer). */
+/** The Cities tab's lists, in this order (`CONTEXT.md`: Cities tab). */
 export const CITY_LISTS = [
   { id: 'own', title: 'Your cities' },
   { id: 'inSight', title: 'Others in sight' },
@@ -18,7 +18,7 @@ export const CITY_LISTS = [
 export type CityListId = (typeof CITY_LISTS)[number]['id']
 
 /**
- * A city's row in the Cities drawer: its name, and whose it is in that relation's colour; for the
+ * A city's row in the Cities tab: its name, and whose it is in that relation's colour; for the
  * Player's own cities residents against housing and the key goods in its storages, for one last
  * seen how long ago. An occupation stays on the row.
  */
@@ -36,7 +36,7 @@ export interface CityRow {
   occupation?: OccupationView
 }
 
-/** The sections an opened city shows, in this order (`CONTEXT.md`: Cities drawer). */
+/** The sections an opened city shows, in this order (`CONTEXT.md`: Cities tab). */
 export const CITY_SECTIONS = [
   { id: 'overview', title: 'Overview' },
   { id: 'stock', title: 'Stock' },
@@ -119,7 +119,7 @@ function rowRelationship(city: Pick<City, 'realmId' | 'tradeOrg'>, viewer: Viewe
   return 'otherRealm'
 }
 
-/** What the drawer knows: cities and buildings in sight and those last seen, residents in sight. */
+/** What the Cities tab knows: cities and buildings in sight and those last seen, residents in sight. */
 export interface CitiesKnown {
   cities: readonly City[]
   buildings: readonly Building[]
@@ -131,7 +131,7 @@ export interface CitiesKnown {
 }
 
 /**
- * The Cities drawer's lists (`CONTEXT.md`: Cities drawer): the Player's own cities in sight, the
+ * The Cities tab's lists (`CONTEXT.md`: Cities tab): the Player's own cities in sight, the
  * others in sight and those last seen, each by name. A list with no cities is left out.
  */
 export function cityLists(
@@ -182,7 +182,7 @@ export function cityLists(
 }
 
 /**
- * Where the map centres for a city opened in the Cities drawer (`CONTEXT.md`: Cities drawer): its
+ * Where the map centres for a city opened in the Cities tab (`CONTEXT.md`: Cities tab): its
  * town hall, in sight or as last seen. Undefined while the Player knows no town hall for it.
  */
 export function cityPlace(
@@ -196,7 +196,7 @@ export function cityPlace(
 }
 
 /**
- * The closest zoom a city opened in the Cities drawer shows at: just inside the far tier, where a
+ * The closest zoom a city opened in the Cities tab shows at: just inside the far tier, where a
  * city's area is outlined as picking it on the map does (ADR 0008). Further out stays as it is.
  */
 export const CITY_SCALE = FAR_SCALE - 1

@@ -82,7 +82,7 @@ import { carriedShort } from './residents-view.js'
 import { lastSeenText, type LastSeen } from './last-seen.js'
 import { horseStatsText } from './selection-view.js'
 import { HOW_TO_TRADE_PATH } from './wiki-view.js'
-import { PanelHead } from './drawer-head.js'
+import { PanelHead } from './panel-head.js'
 import {
   cityLists,
   cityOverview,
@@ -90,7 +90,7 @@ import {
   cityStock,
   type CityRow,
   type CitySectionId,
-} from './cities-drawer-view.js'
+} from './cities-tab-view.js'
 import { relationshipClass } from './theme.js'
 import { tradeStandingLine } from './standing-view.js'
 import { Icon } from './Icon.js'
@@ -259,7 +259,7 @@ export function CityInspector({
     if (section) section.open = true
     at?.scrollIntoView({ block: 'start' })
   }, [scrollTo])
-  /** A city in sight, Player's own or another's, opened in sections (`CONTEXT.md`: Cities drawer). */
+  /** A city in sight, Player's own or another's, opened in sections (`CONTEXT.md`: Cities tab). */
   const inSightItem = (row: CityRow) => {
     const v = views.find((c) => c.id === row.id)!
     const head = <CityRowHead row={row} open={openId === v.id} onOpen={onOpen} />
@@ -583,7 +583,7 @@ export function CityInspector({
   )
 }
 
-/** One headed section of an opened city, open until the Player folds it (`CONTEXT.md`: Cities drawer). */
+/** One headed section of an opened city, open until the Player folds it (`CONTEXT.md`: Cities tab). */
 function CitySection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <details className="city-section" open>
@@ -605,7 +605,7 @@ function ListHead({ title, count }: { title: string; count: number }) {
   )
 }
 
-/** One of the Cities drawer's lists under its title and count (`CONTEXT.md`: Cities drawer). */
+/** One of the Cities tab's lists under its title and count (`CONTEXT.md`: Cities tab). */
 function CityList({
   title,
   rows,
@@ -626,7 +626,7 @@ function CityList({
 }
 
 /**
- * A city's row in the Cities drawer, two lines (`CONTEXT.md`: Cities drawer): its name and whose it
+ * A city's row in the Cities tab, two lines (`CONTEXT.md`: Cities tab): its name and whose it
  * is in that relation's colour; under them the Player's own city's residents against housing and
  * the key goods in its storages, or how long ago a city was last seen. An occupation stays under it.
  */
