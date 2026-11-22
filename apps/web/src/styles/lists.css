@@ -320,35 +320,6 @@ button.residents-row.selected:hover {
   border-left: 3px solid var(--rel, transparent);
   border-bottom: 2px solid var(--ui-line);
 }
-.realm-log-list {
-  font-size: 12px;
-}
-.realm-log-list li {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 10px;
-  line-height: 1.45;
-}
-.realm-log-list li time {
-  color: var(--ui-muted);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-.realm-log-list li.info {
-  --rel: var(--rel-alliance);
-}
-.realm-log-list li.warn {
-  --rel: var(--ui-warn);
-}
-.realm-log-list li.bad {
-  --rel: var(--ui-bad);
-}
-.realm-log-list li button.place {
-  margin-left: 6px;
-  padding: 0 6px;
-  font-size: 11px;
-  color: var(--text-rel-alliance);
-}
 .alliance-list li {
   display: flex;
   flex-wrap: wrap;
@@ -375,72 +346,194 @@ button.residents-row.selected:hover {
   flex: 1;
   min-width: 0;
 }
-.city-list {
-  list-style: none;
-  margin: 4px 0 12px;
+/* Realm: Cities, Waypoints, Realm log (T119.13) */
+/* The three Realm tabs run their rows and sections edge to edge, as the artboards draw them
+   (`Side-Cities`, `Side-Cities-Trade`, `Side-Waypoints`, `Side-Log`). */
+.side-panel:is([data-tab='cities'], [data-tab='waypoints'], [data-tab='realmLog']) .side-body {
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  font-size: 12px;
 }
-.city-list > li {
+.city-inspector :is(p, h2, h3, h4, ul, ol),
+.waypoints :is(p, ul),
+.realm-log :is(p, ol, ul) {
+  margin: 0;
+}
+.city-inspector :is(ul, ol),
+.waypoints ul,
+.realm-log :is(ol, ul) {
+  padding: 0;
+  list-style: none;
+}
+/* Section titles are the kit's pixel face, not the sidebar's small uppercase headings. */
+.side-panel[data-tab='cities'] h3.px {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ui-text);
+}
+.city-inspector h4.b {
+  font-size: 13px;
+}
+
+/* Cities: the debt warning, then the lists, each row a dot in whose colour, name and whose. */
+.city-debt {
+  background: color-mix(in srgb, var(--red) 25%, var(--paper));
+}
+.city-row {
   border-bottom: 2px solid var(--ui-line);
-  padding: 2px 0 6px;
 }
-.city-list > li > button {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
+.city-row.sel {
+  background: var(--sun);
+}
+.city-row-open {
   width: 100%;
-  min-height: 32px;
-  text-align: left;
   border: 0;
   background: transparent;
   box-shadow: none;
-  font-weight: 600;
-}
-.city-list > li > button span {
-  color: var(--ui-muted);
+  text-align: left;
   font-weight: 400;
 }
-/* A Cities drawer row (`CONTEXT.md`: Cities drawer): whose it is in that relation's colour, and
-   under the name an own city's residents against housing and key goods, or when last seen. */
-.city-list > li > button .city-row-whose {
+.city-row-open:hover:not(:disabled) {
+  background: var(--ui-raised);
+}
+.city-row.sel .city-row-open:hover:not(:disabled) {
+  background: transparent;
+}
+.city-row-whose {
   color: var(--rel-text, var(--ui-muted));
 }
 .city-row-facts {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 10px;
-  margin: 0;
-  padding: 0 8px;
-  color: var(--ui-muted);
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 10px 6px 28px;
 }
 /* An opened city's headed, collapsible sections (`CONTEXT.md`: Cities drawer). */
-.city-section {
-  margin: 6px 0 0;
-  border-top: 2px solid var(--ui-line);
-}
 .city-section > summary {
   cursor: pointer;
-  padding: 6px 8px 2px;
+}
+.city-section-body .sec {
+  border-top: 2px solid var(--ui-line);
+}
+.city-section-body > .sec:first-child,
+.city-section-body > :first-child > .sec:first-child {
+  border-top: 0;
+}
+.city-gates {
+  gap: 6px;
+}
+/* Prices: the two lists side by side, one under the other when the tab is narrow. */
+.city-price-lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+.city-price-none .lb {
+  margin-right: 4px;
+}
+/* The trade forms: fields side by side, a narrow box for a number, long buttons that wrap. */
+.city-fields {
+  align-items: flex-end;
+}
+.city-units {
+  flex: none;
+  width: 80px;
+}
+.city-units input,
+.city-fields select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.city-go {
+  align-self: stretch;
+  padding: 8px 10px;
+  text-align: left;
+  white-space: normal;
+}
+.city-service,
+.city-rates,
+.city-sending {
+  gap: 6px;
+}
+.city-rates ul {
+  gap: 4px;
+}
+.city-rates .good-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+.city-horse-list {
+  gap: 6px;
+}
+.city-horse {
+  gap: 2px;
+}
+/* The offers at a storage (`StorageOffers`) under the same pixel title as the other blocks. */
+.city-offers .storage-offers > h4 {
+  margin: 0 0 6px;
+  font: 600 16px/1.2 var(--font-pixel);
+  color: var(--ui-text);
+}
+
+/* Waypoints: a row each, its name showing it on the map, then Pick, Rename and Remove. */
+.waypoint-picking {
+  background: var(--sun);
+}
+.waypoint {
+  flex-wrap: wrap;
+}
+.waypoint.renaming {
+  background: var(--paper);
+}
+.waypoints .waypoint-form {
+  flex: 1 1 100%;
+  flex-direction: column;
+  align-items: stretch;
+  margin: 0;
+}
+.waypoint-buttons {
+  flex: 1 1 100%;
+  min-width: 0;
+  gap: 4px;
+}
+.waypoint-show {
+  justify-content: flex-start;
+  overflow: hidden;
+}
+.waypoint-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.waypoint-mark {
+  color: var(--ui-muted);
+}
+
+/* Realm log: open deliveries, then each game day's events, newest first, tinted by tone. */
+.realm-log-deliveries {
+  gap: 6px;
+}
+.realm-log-event {
+  align-items: flex-start;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.realm-log-event time {
+  flex: none;
+  width: 44px;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--ui-muted);
 }
-.city-section-body {
-  padding-bottom: 4px;
+.realm-log-event.warn {
+  background: var(--sun);
 }
-.city-section-body > .goods-grid {
-  padding: 4px 8px 0;
+.realm-log-event.bad {
+  background: color-mix(in srgb, var(--red) 25%, var(--paper));
 }
-.city-details {
-  margin: 4px 0 0;
-  padding: 0 8px;
-  color: var(--ui-muted);
+.realm-log-places {
+  gap: 4px;
+  margin-top: 4px;
 }
 /* Who occupies a town hall and the game days left (`CONTEXT.md`: Occupying a town hall), on the
    tile card and in the city inspector; a warning on the Player's own city. */
@@ -449,9 +542,6 @@ button.residents-row.selected:hover {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--ui-text);
-}
-.city-list .occupation {
-  padding: 0 8px;
 }
 .occupation.warn {
   color: var(--ui-warn-text);
@@ -572,48 +662,6 @@ button.residents-row.selected:hover {
 .waypoint-form input {
   flex: 1;
   min-width: 0;
-}
-.waypoint-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  overflow: auto;
-}
-.waypoint-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 6px 0;
-  border-bottom: 2px solid var(--ui-line);
-}
-.waypoint-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.waypoint-head > button:not(.waypoint-name) {
-  padding: 2px 8px;
-  font-size: 12px;
-}
-.waypoint-name {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 2px 4px;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  text-align: left;
-}
-.waypoint-name .name {
-  font-weight: 600;
-  color: var(--ui-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
 }
 
 .storage-offers h4 {

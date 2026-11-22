@@ -1,6 +1,7 @@
 import { REALM_LOG_LENGTH } from '@csp/balance'
 import { TRADE_ORG_NAME } from './shared/trade-org.js'
 import { timeLeft } from './shared/estimates.js'
+import { gameTime } from './shared/time.js'
 import type {
   DeliveryView,
   HeirLapse,
@@ -1155,4 +1156,29 @@ function heirLapsedText(heir: string, why: HeirLapse): string {
     case 'becameLeader':
       return `Your heir ${heir} is your Leader now; your realm has no heir.`
   }
+}
+
+/** One game day of the realm log: its heading, and its events newest first with their clock time. */
+export interface LogDay {
+  /** "Year 1 · Day 131". */
+  day: string
+  events: { event: RealmEvent; time: string }[]
+}
+
+/**
+ * The realm log as its tab shows it: newest first, under a heading for each game day, each event
+ * with the hour and minute it happened (the top bar's game time, split at its clock).
+ */
+export function logDays(events: readonly RealmEvent[]): LogDay[] {
+  const days: LogDay[] = []
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i]!
+    const { year, day, hour, minute } = gameTime(event.tick)
+    const heading = `Year ${year} · Day ${day}`
+    const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+    const last = days[days.length - 1]
+    if (last?.day === heading) last.events.push({ event, time })
+    else days.push({ day: heading, events: [{ event, time }] })
+  }
+  return days
 }
