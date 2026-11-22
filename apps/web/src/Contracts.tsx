@@ -15,6 +15,7 @@ import type {
 import { ageInYears } from './shared/stats.js'
 import { isAt } from './shared/footprint.js'
 import {
+  contractChip,
   contractStatus,
   offerSummary,
   sideName,
@@ -22,6 +23,7 @@ import {
   type OfferSide,
 } from './contract-view.js'
 import { doingLine } from './doing-view.js'
+import { Choice } from './diplomacy-parts.js'
 import { PanelHead } from './drawer-head.js'
 import { labelled, nameLabels } from './name-labels.js'
 
@@ -146,12 +148,12 @@ export function ContractsPanel({
   }
 
   return (
-    <section className="alliance-panel" aria-label="Mercenary contracts">
+    <section className="dip" aria-label="Mercenary contracts">
       <PanelHead title="Mercenaries">
         {contracts.length === 0 ? 'none' : contracts.length}
       </PanelHead>
       {contracts.length > 0 && (
-        <ul className="alliance-list">
+        <ul className="dip-list">
           {contracts.map((c) => {
             const lender = c.lender.realmId === realmId
             const otherSide = lender ? c.hirer : c.lender
@@ -173,73 +175,83 @@ export function ContractsPanel({
               tick,
               cities,
             )
+            const chip = contractChip(c, realmId)
             return (
-              <li key={c.id} className="army">
-                <span>
-                  <strong>
+              <li key={c.id} className="sec">
+                <span className="fx">
+                  <span className="b grow">
                     {lender ? 'Rented to' : 'Hired from'} {sideName(otherSide, cities)}
-                  </strong>
-                  <br />
-                  {c.residents.map((r) => rented.get(r.id) ?? r.name).join(', ')}
-                  <br />
-                  <span className="muted small">
-                    {c.days} days at {c.pricePerWeek} Coins a week, paid into the{' '}
-                    {c.lender.realmId === TRADE_ORG ? 'warehouse' : 'storage'}
-                    {c.storage ? ` at ${c.storage.x}, ${c.storage.y}` : ' (gone)'} ·{' '}
-                    {contractStatus(c, realmId)}
                   </span>
+                  <span className={chip.tone ? `chip ${chip.tone}` : 'chip'}>{chip.text}</span>
                 </span>
-                <div className="order-buttons">
-                  {theirOffer && (
-                    <button
-                      type="button"
-                      onClick={() => order({ kind: 'acceptContract', contractId: c.id })}
-                    >
-                      Accept
-                    </button>
-                  )}
-                  {offered && (
-                    <button
-                      type="button"
-                      onClick={() => order({ kind: 'cancelContract', contractId: c.id })}
-                    >
-                      {theirOffer ? 'Decline' : 'Withdraw'}
-                    </button>
-                  )}
-                  {payers.map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() =>
-                        order({ kind: 'pay', residentId: r.id, contractId: c.id, weeks: 1 })
-                      }
-                    >
-                      {r.name} pays a week
-                    </button>
-                  ))}
-                </div>
+                {c.residents.length > 0 && (
+                  <span>{c.residents.map((r) => rented.get(r.id) ?? r.name).join(', ')}</span>
+                )}
+                <span className="mu small">
+                  {c.days} days at {c.pricePerWeek} Coins a week, paid into the{' '}
+                  {c.lender.realmId === TRADE_ORG ? 'warehouse' : 'storage'}
+                  {c.storage ? ` at ${c.storage.x}, ${c.storage.y}` : ' (gone)'}
+                </span>
+                {!offered && (
+                  <span className="fx">
+                    <span className="mt grow" aria-hidden="true">
+                      <i className="mid" style={{ width: `${chip.paid * 100}%` }} />
+                    </span>
+                    <span className="mono small">{contractStatus(c, realmId)}</span>
+                  </span>
+                )}
+                {(offered || payers.length > 0) && (
+                  <div className="fx wrap dip-buttons">
+                    {theirOffer && (
+                      <button
+                        type="button"
+                        className="btn sm pri grow"
+                        onClick={() => order({ kind: 'acceptContract', contractId: c.id })}
+                      >
+                        Accept
+                      </button>
+                    )}
+                    {offered && (
+                      <button
+                        type="button"
+                        className={theirOffer ? 'btn sm grow' : 'btn sm'}
+                        onClick={() => order({ kind: 'cancelContract', contractId: c.id })}
+                      >
+                        {theirOffer ? 'Decline' : 'Withdraw'}
+                      </button>
+                    )}
+                    {payers.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        className="btn sm gold"
+                        onClick={() =>
+                          order({ kind: 'pay', residentId: r.id, contractId: c.id, weeks: 1 })
+                        }
+                      >
+                        {r.name} pays a week
+                      </button>
+                    ))}
+                  </div>
+                )}
               </li>
             )
           })}
         </ul>
       )}
-      <form className="contract-form" onSubmit={offer} aria-label="New contract">
-        <h3>{hiring ? 'Ask to hire' : 'Offer for hire'}</h3>
-        <div className="contract-field" role="radiogroup" aria-label="What">
-          <span className="contract-label">What</span>
-          <span className="contract-choice">
-            <label>
-              <input type="radio" checked={!hiring} onChange={() => switchMode(false)} />
-              Rent out mine
-            </label>
-            <label>
-              <input type="radio" checked={hiring} onChange={() => switchMode(true)} />
-              Hire theirs
-            </label>
-          </span>
-        </div>
-        <label className="contract-field">
-          <span className="contract-label">{hiring ? 'From' : 'To'}</span>
+      <form className="sec dip-form" onSubmit={offer} aria-label="New contract">
+        <h3 className="px t16">{hiring ? 'Ask to hire' : 'Offer for hire'}</h3>
+        <Choice
+          label="What"
+          value={hiring}
+          options={[
+            { value: false, label: 'Rent out mine' },
+            { value: true, label: 'Hire theirs' },
+          ]}
+          onChange={switchMode}
+        />
+        <label className="fld">
+          <span className="lb">{hiring ? 'From' : 'To'}</span>
           <select
             value={other}
             onChange={(e) => {
@@ -265,68 +277,32 @@ export function ContractsPanel({
               ))}
           </select>
         </label>
-        {tradeOrg && (
-          <label className="contract-field">
-            <span className="contract-label">Soldiers</span>
-            <span>
-              <input
-                type="number"
-                min={1}
-                value={soldiers}
-                onChange={(e) => setSoldiers(Number(e.target.value))}
-              />{' '}
-              <span className="muted small">
-                at least {TRADE_ORG_ARMY.pricePerSoldierWeek} Coins a week each
-              </span>
-            </span>
-          </label>
-        )}
-        {npc && (
-          <label className="contract-field">
-            <span className="contract-label">Residents</span>
-            <span>
-              <input
-                type="number"
-                min={1}
-                max={Math.max(1, npc.hire!.spare)}
-                value={count}
-                onChange={(e) => setCount(Number(e.target.value))}
-              />{' '}
-              <span className="muted small">
-                {npc.hire!.spare === 0
-                  ? 'it can spare nobody now: it lends only its spare hands, and nobody while it weighs a demand, its town hall is occupied or your armed residents are near it'
-                  : `it can spare ${npc.hire!.spare}`}
-                , at least {npc.hire!.pricePerResidentWeek} Coins a week each
-              </span>
-            </span>
-          </label>
-        )}
         {!tradeOrg && !npc && (
-          <div className="contract-field">
-            <span className="contract-label">Residents</span>
+          <div className="fld" role="group" aria-label="Residents">
+            <span className="lb">Residents</span>
             {candidates.length === 0 ? (
-              <span className="muted small">
+              <span className="mu small">
                 {hiring ? (other ? 'None of theirs in sight' : 'Pick whom to hire from') : 'None'}
               </span>
             ) : (
-              <ul className="contract-residents" aria-label="Residents">
+              <ul className="dip-residents" aria-label="Residents">
                 {candidates.map((r) => (
                   <li key={r.id}>
-                    <label>
+                    <label className="dip-resident">
                       <input
                         type="checkbox"
                         checked={chosen.has(r.id)}
                         onChange={() => toggle(r.id)}
                       />
-                      <span className="contract-resident">
-                        <span>
+                      <span className="col">
+                        <span className="b">
                           {r.name}{' '}
-                          <span className="muted small">
+                          <span className="mu small">
                             · {Math.floor(ageInYears(r, tick))}
                             {cityName(r) ? ` · ${cityName(r)}` : ''}
                           </span>
                         </span>
-                        <small className="muted">
+                        <small className="mu">
                           {doingLine(r, { scripts, buildings, residents: inSight, horses, cities })}
                         </small>
                       </span>
@@ -337,33 +313,69 @@ export function ContractsPanel({
             )}
           </div>
         )}
-        <label className="contract-field">
-          <span className="contract-label">For</span>
-          <span>
+        <div className="fx dip-numbers">
+          {tradeOrg && (
+            <label className="fld grow">
+              <span className="lb">Soldiers</span>
+              <input
+                type="number"
+                className="mono"
+                min={1}
+                value={soldiers}
+                onChange={(e) => setSoldiers(Number(e.target.value))}
+              />
+            </label>
+          )}
+          {npc && (
+            <label className="fld grow">
+              <span className="lb">Residents</span>
+              <input
+                type="number"
+                className="mono"
+                min={1}
+                max={Math.max(1, npc.hire!.spare)}
+                value={count}
+                onChange={(e) => setCount(Number(e.target.value))}
+              />
+            </label>
+          )}
+          <label className="fld grow">
+            <span className="lb">For · game days</span>
             <input
               type="number"
+              className="mono"
               min={1}
               max={CONTRACT_MAX_DAYS}
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
-            />{' '}
-            game days
-          </span>
-        </label>
-        <label className="contract-field">
-          <span className="contract-label">Price</span>
-          <span>
+            />
+          </label>
+          <label className="fld grow">
+            <span className="lb">Coins a week</span>
             <input
               type="number"
+              className="mono"
               min={1}
               value={price}
               onChange={(e) => setPrice(Number(e.target.value))}
-            />{' '}
-            Coins a week
+            />
+          </label>
+        </div>
+        {tradeOrg && (
+          <span className="mu small">
+            At least {TRADE_ORG_ARMY.pricePerSoldierWeek} Coins a week each.
           </span>
-        </label>
-        <label className="contract-field">
-          <span className="contract-label">Paid into</span>
+        )}
+        {npc && (
+          <span className="mu small">
+            {npc.hire!.spare === 0
+              ? 'It can spare nobody now: it lends only its spare hands, and nobody while it weighs a demand, its town hall is occupied or your armed residents are near it'
+              : `It can spare ${npc.hire!.spare}`}
+            , at least {npc.hire!.pricePerResidentWeek} Coins a week each.
+          </span>
+        )}
+        <label className="fld">
+          <span className="lb">Paid into</span>
           <select value={storageId} onChange={(e) => setStorageId(e.target.value)}>
             <option value="">Pay into the {tradeOrg ? 'warehouse' : 'storage'}…</option>
             {storages.map((b) => (
@@ -373,18 +385,18 @@ export function ContractsPanel({
             ))}
           </select>
         </label>
-        <p className="contract-summary" aria-live="polite">
+        <p className="well dip-summary" aria-live="polite">
           {summary.text}
         </p>
-        <button type="submit" className="primary" disabled={!summary.complete}>
+        <button type="submit" className="btn pri" disabled={!summary.complete}>
           {hiring ? 'Ask' : 'Offer'}
         </button>
       </form>
-      <p className="muted small">
+      {error && <p className="error dip-error">{error}</p>}
+      <p className="sec mu small dip-foot">
         Each week is paid in advance; a week left unpaid breaks the contract and the mercenaries
         walk home.
       </p>
-      {error && <p className="error">{error}</p>}
     </section>
   )
 }

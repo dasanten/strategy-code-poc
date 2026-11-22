@@ -1,9 +1,3 @@
-/* The Diplomacy drawer's tabs: the kit's tabs (`.tabs`), right under the drawer's header bar. */
-.diplomacy-tabs {
-  flex-wrap: wrap;
-  margin: -10px -16px 10px;
-}
-
 /* People: Residents, full list, Horses, Armies (T119.11) */
 /* The People tabs (`Residents.tsx`, `ResidentsFullList.tsx`, `Horses.tsx`, `Armies.tsx`; artboards
    `Main`, `Residents-Full`, `Side-Horses`, `Side-Armies`): the kit's rows (`.rw`) edge to edge
@@ -447,105 +441,6 @@ button.people-row.sel:hover:not(:disabled) {
   color: var(--ui-warn-text);
 }
 
-/* The Contracts form (`CONTEXT.md`: Mercenary contract): one field a line, its label on the left,
-   the residents as a list with their Doing, and the offer as it will read under them. */
-.contract-form,
-.side-panel form.contract-form {
-  display: grid;
-  gap: 8px;
-  margin: 8px 0;
-}
-.contract-form h3 {
-  margin: 4px 0 0;
-}
-.contract-field {
-  display: grid;
-  grid-template-columns: 5.5em minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-}
-.contract-field select {
-  min-width: 0;
-}
-.contract-field input[type='number'] {
-  width: 64px;
-}
-.contract-label {
-  font-size: 12px;
-  color: var(--ui-muted);
-}
-.contract-choice {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-}
-.contract-residents {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 2px;
-  max-height: 14rem;
-  overflow-y: auto;
-}
-.contract-residents label {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 6px;
-  align-items: start;
-}
-.contract-resident {
-  display: grid;
-  min-width: 0;
-}
-.contract-form > button {
-  justify-self: start;
-}
-.contract-summary {
-  margin: 4px 0 0;
-  padding: 8px;
-  background: var(--ui-raised);
-  color: var(--ui-text);
-}
-/* A demand's note (`CONTEXT.md`: Demand): the sender's words as they wrote them, line breaks and
-   long words kept inside the drawer. */
-.demand-note {
-  margin: 4px 0;
-  padding: 6px 8px;
-  border-left: 3px solid var(--ui-line-strong);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.demand-form textarea {
-  width: 100%;
-  box-sizing: border-box;
-  resize: vertical;
-}
-.demand-goods {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 4px;
-}
-.demand-goods li {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-.demand-goods select {
-  min-width: 0;
-  flex: 1 1 8em;
-}
-.demand-goods input[type='number'] {
-  width: 72px;
-}
-.game.phone .contract-field {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 2px;
-}
-
 .waypoint-form {
   display: flex;
   flex-direction: column;
@@ -612,27 +507,163 @@ button.people-row.sel:hover:not(:disabled) {
   margin-bottom: 6px;
 }
 
-.offer-post input[type='number'],
-.offer-accept input[type='number'] {
-  width: 4.5em;
+/* Diplomacy (T119.12) */
+/* The Diplomacy tab's own tabs: the kit's tabs (`.tabs`), right under the sidebar's header bar. */
+.diplomacy-tabs {
+  flex-wrap: wrap;
+  margin: -10px -14px 0;
 }
-
-/* What others sent the Player, and what they sent, under Direct offers. */
-.incoming-list {
+/* A Diplomacy tab (`Side-Diplomacy`, `Side-Contracts`, `Side-Alliance`, `Side-Standing`): kit
+   sections and group heads from edge to edge of the sidebar, each form a paper section, the
+   tab's rule of thumb in a footer. */
+.dip {
+  display: flex;
+  flex-direction: column;
+  margin: 0 -14px -14px;
+}
+.dip p {
+  margin: 0;
+}
+.dip-list,
+.dip-members,
+.dip-goods,
+.dip-residents,
+.dip-directives {
   list-style: none;
-  margin: 0 0 10px;
+  margin: 0;
   padding: 0;
 }
-
-.incoming-list li {
-  padding: 6px 0;
-  border-bottom: 2px solid var(--ui-line);
+.dip-list > li + li,
+.dip-list + .sec,
+.dip > table + .sec {
+  border-top: 2px solid var(--tan);
 }
-
-.incoming-list p {
-  margin: 4px 0;
+.side-panel[data-tab='diplomacy'] .dip h3 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ui-text);
 }
-
-.incoming-list strong {
+.dip-form {
+  background: var(--paper);
+}
+.dip-foot {
+  line-height: 1.5;
+}
+.dip-error {
+  padding: 6px 10px 0;
+}
+/* Buttons that keep their own width at the start of a section, not across it. */
+.dip-start,
+.dip-form > button[type='submit'],
+.offer-go {
+  align-self: flex-start;
+}
+.dip-buttons {
+  gap: 4px;
+}
+/* A field and its button on one line, the button level with the field. */
+.dip-bottom {
+  align-items: flex-end;
+}
+/* A label holding its words and a short number on one line ("Deadline [3] game days"). */
+.dip-inline,
+.offer-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.dip-units,
+.offer-num {
+  width: 64px;
+}
+.dip-numbers {
+  align-items: flex-end;
+}
+.dip-numbers input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.dip-goods li .btn.sq {
+  flex: none;
+}
+.dip-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+/* The residents to rent or hire: a tick, then name, age and city over their Doing. */
+.dip-residents {
+  display: grid;
+  gap: 2px;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+.dip-resident {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--ui-text);
+}
+.dip-resident > input {
+  margin-top: 2px;
+}
+.dip-resident .col {
+  gap: 0;
+  min-width: 0;
+}
+.dip-summary {
+  padding: 6px 8px;
+  color: var(--ui-text);
+}
+/* A demand's note (`CONTEXT.md`: Demand): the sender's words as they wrote them, line breaks and
+   long words kept inside the sidebar. */
+.demand-note {
+  margin: 0;
+  padding: 6px 8px;
+  border-left: 3px solid var(--ui-line-strong);
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.dip-list .b {
+  overflow-wrap: anywhere;
+}
+/* An alliance's members and its army: a mark or icon, the name, chips, then the button. */
+.dip-members {
+  gap: 6px;
+}
+.dip-members > li {
+  gap: 6px 8px;
+}
+/* A city asking to join stands out until it is answered. */
+.dip-asks {
+  background: var(--sun);
+}
+/* The Standing list: name and mark over the bar, then how they regard the Player and back. */
+.dip-standings td .mt {
+  margin-top: 4px;
+}
+.dip-standings td.n {
+  white-space: nowrap;
+}
+.dip-standings .mt > .flat {
+  background: var(--fog);
+}
+.dip-directives .well {
+  padding: 8px;
+  border-color: var(--blood);
+  line-height: 1.5;
+}
+/* Accepting or posting an offer (`Offers.tsx`), here and in a city's trade section. */
+.offer-accept,
+.offer-post {
+  gap: 6px;
+}
+.offer-fields {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.offer-fields > .fld {
+  min-width: 120px;
 }
