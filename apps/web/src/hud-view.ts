@@ -16,8 +16,8 @@ export type SidebarGroupId = (typeof SIDEBAR_GROUPS)[number]['id']
 
 /**
  * The sidebar's tabs (ADR 0044), in strip order, each in its group (`CONTEXT.md`: Screen): one for
- * each drawer the tool rail had, in the same order. Scripts opens wide until it becomes the script
- * workshop.
+ * each drawer the tool rail had, in the same order. Scripts is a `screen`: it opens the script
+ * workshop over the map instead of a panel.
  */
 export const SIDE_TABS = [
   { id: 'residents', label: 'Residents', group: 'people' },
@@ -26,13 +26,13 @@ export const SIDE_TABS = [
   { id: 'diplomacy', label: 'Diplomacy', group: 'diplomacy' },
   { id: 'cities', label: 'Cities', group: 'realm' },
   { id: 'waypoints', label: 'Waypoints', group: 'realm' },
-  { id: 'scripts', label: 'Scripts', group: 'realm', wide: true },
+  { id: 'scripts', label: 'Scripts', group: 'realm', screen: true },
   { id: 'realmLog', label: 'Realm log', group: 'realm' },
 ] as const satisfies readonly {
   id: string
   label: string
   group: SidebarGroupId
-  wide?: boolean
+  screen?: boolean
 }[]
 
 export type SideTabEntry = (typeof SIDE_TABS)[number]
@@ -86,9 +86,12 @@ export const FOLDED: Sidebar = {
   tab: DIPLOMACY_TABS[0].id,
 }
 
-/** Opens the tab, or folds the sidebar with undefined; the Diplomacy tab stays. */
+/**
+ * Opens the tab, or folds the sidebar with undefined; the Diplomacy tab stays. A screen (the
+ * script workshop) is never the tab the fold button unfolds to: leaving it goes back to the map.
+ */
 export function withOpen(sidebar: Sidebar, open: OpenTab): Sidebar {
-  return { ...sidebar, open, last: open ?? sidebar.last }
+  return { ...sidebar, open, last: open && !isScreen(open) ? open : sidebar.last }
 }
 
 /** The strip's fold button: folds the open sidebar, or unfolds it to the tab open last. */
@@ -131,13 +134,16 @@ export function rememberedSidebar(kept: string | null, phone = false): Sidebar {
   }
   if (typeof parsed !== 'object' || parsed === null) return FOLDED
   const { open, last } = parsed as { open?: unknown; last?: unknown }
-  const unfoldsTo = isTabId(last) ? last : FOLDED.last
+  const unfoldsTo = isTabId(last) && !isScreen(last) ? last : FOLDED.last
   return withOpen({ ...FOLDED, last: unfoldsTo }, isTabId(open) && !phone ? open : undefined)
 }
 
-/** Whether the tab opens wide (the script editor needs the room, until the script workshop). */
-export function isWide(id: SideTabId): boolean {
-  return SIDE_TABS.some((t) => t.id === id && 'wide' in t && t.wide)
+/**
+ * Whether the tab is a screen of its own over the map (`CONTEXT.md`: Screen) rather than a panel
+ * in the sidebar: Scripts, the script workshop. The map and the command bar are hidden behind it.
+ */
+export function isScreen(id: SideTabId): boolean {
+  return SIDE_TABS.some((t) => t.id === id && 'screen' in t && t.screen)
 }
 
 /** The least map, in pixels, the open sidebar and the card must leave between them for a place. */
@@ -283,7 +289,7 @@ export function rememberGoodsPick(
   }
 }
 
-/** How wide (px) the Player can drag the sidebar's panel (the wide Scripts tab has its own). */
+/** How wide (px) the Player can drag the sidebar's panel. */
 export const SIDE_WIDTH = { min: 280, max: 640, initial: 380 } as const
 
 /** A panel width the Player dragged to or the browser remembered, kept within the limits. */

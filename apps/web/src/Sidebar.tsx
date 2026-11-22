@@ -14,7 +14,7 @@ import { Icon, NONE_MARKED, UnseenMark } from './Hud.js'
 import {
   SIDE_TABS,
   SIDE_WIDTH,
-  isWide,
+  isScreen,
   rememberedSidebar,
   rememberedSideWidth,
   sideWidth,
@@ -34,7 +34,8 @@ import { PHONE_QUERY } from './sheet-view.js'
  * the top bar.
  *
  * Every tab's content is a `SideTab` child, mounted always and shown only while open, so a panel
- * keeps what the Player typed into it, and the script library its list, while folded.
+ * keeps what the Player typed into it while folded. The Scripts tab is a screen (`isScreen`): its
+ * button opens the script workshop over the map, and the sidebar stays folded behind it.
  */
 
 /** What a `SideTab` needs from its sidebar. */
@@ -71,20 +72,19 @@ export function Sidebar({
   /** The `SideTab`s, in any order: the strip has its own. */
   children: ReactNode
 }) {
-  const wide = open !== undefined && isWide(open)
-  const className = [
-    'side pn',
-    open ? 'unfolded' : 'folded',
-    wide && 'wide',
-    open && full && 'full',
-  ]
+  // A screen (the script workshop) opens over the whole map, not in the panel: behind it the
+  // sidebar stays folded to its strip, with the screen's button pressed.
+  const panel = open !== undefined && !isScreen(open) ? open : undefined
+  const className = ['side pn', panel ? 'unfolded' : 'folded', panel && full && 'full']
     .filter(Boolean)
     .join(' ')
   return (
     <aside className={className} aria-label="Sidebar">
       {!phone && <SideStrip open={open} marked={marked} onToggle={onToggle} onFold={onFold} />}
-      <SideFrame.Provider value={{ open, close: onClose, phone }}>{children}</SideFrame.Provider>
-      {!phone && open && !wide && !full && <SideEdge />}
+      <SideFrame.Provider value={{ open: panel, close: onClose, phone }}>
+        {children}
+      </SideFrame.Provider>
+      {!phone && panel && !full && <SideEdge />}
     </aside>
   )
 }

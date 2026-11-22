@@ -1476,23 +1476,8 @@ button.card-list-row:hover {
   grid-column: 1 / -1;
 }
 
-/* The panel an order opens, above the bar on the left (T119.8 and T119.9 finish it). */
-.cmd-panel {
-  position: absolute;
-  left: 0;
-  bottom: calc(100% + 8px);
-  width: min(560px, 100%);
-  max-height: calc(100vh - var(--top-h) - var(--command-h, 0px) - 24px);
-  display: flex;
-  flex-direction: column;
-}
-.cmd-panel-body {
-  min-height: 0;
-  overflow: auto;
-}
-.cmd-panel-body > .sel-panel {
-  padding: 10px;
-}
+/* The panel an order opens (`.opanel`, `.cmd-panel` above the bar) is styled under "Order
+   panels" at the end of this file. */
 
 /* On a phone the bar is the bottom sheet: header over the tabs, kinds stacked, two to a row. */
 .game-selection.sheet .cmd-bar {
@@ -1523,6 +1508,242 @@ button.card-list-row:hover {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Order panels: shell, goods, gear, move, people (T119.8)
+   ---------------------------------------------------------------------------------------------
+   The shell (`OrderPanel` in CommandBar.tsx; ADR 0044, `CONTEXT.md`: Screen): a kit panel with a
+   wood header bar (title, note, the order's key, ✕), a body that scrolls inside itself and an
+   optional footer. On a desktop it opens above the command bar (`.cmd-panel`), placed by
+   `CommandBar` over the order that opened it (inline `left`); on a phone under its order in the
+   sheet (`.opanel-inline`). Widths by size (`panelSize`, `PANEL_WIDTHS`). The sections inside are
+   `.inspector-block`s, drawn as the kit's `.sec`; `PanelFoot` is a section's confirm row. */
+.opanel {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  max-width: 100%;
+  font-family: var(--font-ui);
+}
+.opanel.cmd-panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 1;
+  max-height: calc(100vh - var(--top-h, 44px) - var(--command-h, 0px) - 24px);
+}
+.opanel-sm {
+  width: 340px;
+}
+.opanel-md {
+  width: 420px;
+}
+.opanel-lg {
+  width: 560px;
+}
+.opanel.opanel-inline {
+  width: auto;
+}
+.opanel-head {
+  flex: none;
+}
+.opanel-title {
+  overflow-wrap: anywhere;
+}
+.opanel-note {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 12px/1.2 var(--font-ui);
+}
+.opanel-note .chip {
+  font-size: 11px;
+}
+.opanel-key {
+  flex: none;
+  margin: 0;
+}
+.opanel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.opanel-inline .opanel-body {
+  overflow: visible;
+}
+.opanel-foot {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 2px solid var(--tan);
+}
+.opanel-body > .sel-panel {
+  padding: 0;
+  gap: 0;
+}
+/* Each section as the kit's `.sec`, a tan rule between them. */
+.opanel-body .inspector-block {
+  padding: 10px;
+  gap: 8px;
+}
+.opanel-body .inspector-block + .inspector-block {
+  border-top: 2px solid var(--tan);
+}
+.opanel-body p {
+  margin: 0;
+}
+/* A section's heading as the kit's label (`.lb`), its note or button beside it. */
+.opanel-body .panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.opanel-body .panel-head h3 {
+  flex: 1 1 auto;
+  margin: 0;
+  font: 600 11px/1.2 var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+/* Buttons at the kit's size in a panel; the old touch-target minimums are the sheet's below. */
+.opanel-body .order-buttons {
+  align-items: center;
+  gap: 6px;
+}
+.opanel-body .order-buttons button {
+  min-height: 0;
+  min-width: 0;
+}
+.opanel-body select {
+  max-width: 100%;
+}
+.opanel-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* A section's confirm row (`PanelFoot`): the main button takes the room, kept in view as the
+   section scrolls by. */
+.opanel-confirm {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: 0 -10px;
+  padding: 4px 10px;
+  background: var(--parch);
+}
+.opanel-confirm > button:first-of-type {
+  flex: 1 1 auto;
+}
+.opanel-units {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.opanel .amount {
+  width: 56px;
+  min-height: 0;
+}
+/* Choices that each give the order at once: Board at …, the gear to put on. */
+.opanel-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.opanel-choices button {
+  gap: 4px;
+}
+.opanel .horse-pick {
+  padding: 2px 0;
+}
+.opanel .run-script {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.opanel .run-script select {
+  flex: 1 1 160px;
+}
+
+/* Goods: Equipped, then each inventory as a goods grid (`GoodsPick`), the good tapped on a line
+   of its own with an amount and what to do with it. */
+.opanel .equipment-slots {
+  gap: 4px;
+}
+.opanel .equipment-slots li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.equipment-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.goods-spot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.goods-spot + .goods-spot {
+  margin-top: 4px;
+}
+.goods-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.goods-pick-cell {
+  gap: 3px;
+}
+.goods-pick-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+}
+
+/* Haul route: the goods each way as toggles, the Food kept, then the other stop. */
+.haul-goods {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.haul-goods-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.haul-goods-grid button {
+  gap: 4px;
+}
+.haul-keep {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.haul-on-route {
+  align-self: flex-start;
+}
+
+/* On a phone the panel opens under its order in the sheet; its buttons keep a finger's size. */
+.game-selection.sheet .opanel-inline {
+  margin: 2px 0 8px;
+}
+.game-selection.sheet .opanel-body button,
+.game-selection.sheet .opanel-body select,
+.game-selection.sheet .opanel-body input:not([type='checkbox']) {
+  min-height: 40px;
+}
 /* Dock: tile cards (T119.5) ----------
    The dock on the right (`Dock`, ADR 0044; artboard Card-Tile): tile cards, the who-list and
    realm order cards (`CardSheet` with `dock`), so a tile and a resident's command bar are open
