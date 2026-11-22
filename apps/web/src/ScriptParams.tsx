@@ -404,7 +404,7 @@ export function StartParamsForm({
           if (e.key === 'Escape') onCancel()
         }}
       >
-        <h2 className="hd">Start {script}</h2>
+        <h2 className="hd hd-go">Start {script}</h2>
         <div className="start-params-rows">
           {fromWorkplace && (
             <p className="muted small">

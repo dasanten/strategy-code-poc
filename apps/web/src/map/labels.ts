@@ -1,11 +1,11 @@
 import { Container, Graphics, Text } from 'pixi.js'
-import { THEME } from '../theme.js'
+import { THEME, hex } from '../theme.js'
 import { GLYPH_COLOR } from './tokens.js'
 
 /** Label text size in pixels; labels keep their size at every zoom. */
 const LABEL_SIZE = 12
-/** The pill behind a label: dark like the token badges (ADR 0008). */
-const PILL_COLOR = 0x0e1419
+/** The pill behind a label: the palette's ink, as the HUD's name tags (`.tag`, ADR 0044). */
+const PILL_COLOR = hex(THEME.palette.ink)
 const PILL_ALPHA = 0.82
 
 interface Label {
