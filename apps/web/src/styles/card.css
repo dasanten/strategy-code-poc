@@ -1,5 +1,6 @@
-/* The selection card (ADR 0008): a dark translucent inspector docked top right over the map,
-   its left edge in the relationship colour of what is selected, actions as rows with keys. */
+/* The selection card (ADR 0008): tile cards, the who-list and realm order cards, docked top
+   right over the map until the dock (T119.5) takes them, actions as rows with keys. A resident's
+   or a group's card is the command bar along the bottom (`.game-command`, at the end). */
 .game-selection {
   position: absolute;
   /* Below the notice lane while it is a band across the screen (`NoticeLane`). */
@@ -1304,4 +1305,242 @@ button.card-list-row:hover {
 /* The orders in as few rows as fit on a phone. */
 .game.phone .hud-realm-bar button {
   padding: 4px 7px;
+}
+
+/* ---------- The command bar (`CONTEXT.md`: Screen; `CommandBar.tsx`, ADR 0044) ----------
+   A resident's or a group's card along the bottom: header on the left (`.cmd-head`), tabs, the
+   open tab (`.cmd-body`) and the status line (`.cmd-status`) beside it (`.cmd-main`). Its right
+   end is left free for the map dock (`--dock-w`, set in map.css). `CardSheet` measures it
+   into `--command-h` on `.game`, so the sidebar stops above it. A panel an order opens
+   (`.cmd-panel`) sits above it. On a phone it is the bottom sheet instead (`.game-selection`). */
+.game-command {
+  position: absolute;
+  left: 8px;
+  right: calc(var(--dock-w, 236px) + 16px);
+  bottom: 8px;
+  z-index: 3;
+}
+.game-command[hidden] {
+  display: none;
+}
+.cmd-bar {
+  display: flex;
+  height: min(264px, 38vh);
+  min-height: 180px;
+  box-sizing: border-box;
+  font-family: var(--font-ui);
+}
+.cmd-head {
+  flex: none;
+  width: 280px;
+  box-sizing: border-box;
+  padding: 10px;
+  border-right: 2px solid var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+}
+.cmd-who {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+/* The figure in its relationship colour (`.rel-*` on the bar sets `--rel`). */
+.cmd-figure {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  box-sizing: border-box;
+  background: var(--ink);
+  border: 4px solid var(--rel, var(--rel-own));
+}
+.cmd-title {
+  flex: 1;
+  min-width: 0;
+}
+.cmd-title .name-line {
+  gap: 6px;
+}
+.cmd-title .name-line h2 {
+  font-size: 22px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.cmd-head .sel-line {
+  font-size: 12px;
+}
+.cmd-close {
+  flex: none;
+}
+/* Health and Hunger one line each: label, meter, value. */
+.cmd-head .vitals {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+.cmd-head .vital {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+.cmd-head .vital-head {
+  display: contents;
+  font-size: 12px;
+}
+.cmd-head .vital-head .mono {
+  order: 2;
+}
+.cmd-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cmd-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cmd-status {
+  flex: none;
+  padding: 4px 10px;
+  border-top: 2px solid var(--tan);
+}
+.cmd-status p {
+  margin: 0;
+}
+/* Pick mode: only the header shows; the room the rest took stays dead (`.sel-dead`). */
+.cmd-bar.cmd-shrunk {
+  background: transparent;
+  box-shadow: none;
+  border-style: dashed;
+}
+.cmd-bar.cmd-shrunk .cmd-head {
+  background: var(--parch);
+}
+
+/* The Orders tab (`OrderGrid`): kinds side by side in columns (`orderColumns`), a wide column
+   two buttons to a row; the grid scrolls inside the bar when they don't fit. */
+.cmd-orders {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.cmd-col {
+  flex: 1 1 0;
+  min-width: 112px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cmd-col.wide {
+  flex-grow: 2;
+  min-width: 228px;
+}
+.cmd-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* A kind's heading, as the kit's label (`.lb`). */
+.cmd-group h3 {
+  margin: 0;
+  font: 600 11px/1.2 var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+/* An order and the Customise beside it, when it has one. */
+.cmd-order {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+.cmd-order > button:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: auto;
+  min-height: 24px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+  white-space: normal;
+  line-height: 1.2;
+}
+/* The key cap after the label, though first in the button for screen readers. */
+.cmd-order kbd {
+  order: 1;
+}
+.cmd-order .sel-more {
+  order: 2;
+  font-size: 10px;
+}
+.cmd-order .sel-reason {
+  display: block;
+  font: 400 11px/1.2 var(--font-ui);
+}
+.cmd-order > .customise {
+  flex: none;
+}
+/* An order's panel under its order, on a phone. */
+.cmd-grid > .sel-panel-under {
+  grid-column: 1 / -1;
+}
+
+/* The panel an order opens, above the bar on the left (T119.8 and T119.9 finish it). */
+.cmd-panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: min(560px, 100%);
+  max-height: calc(100vh - var(--top-h) - var(--command-h, 0px) - 24px);
+  display: flex;
+  flex-direction: column;
+}
+.cmd-panel-body {
+  min-height: 0;
+  overflow: auto;
+}
+.cmd-panel-body > .sel-panel {
+  padding: 10px;
+}
+
+/* On a phone the bar is the bottom sheet: header over the tabs, kinds stacked, two to a row. */
+.game-selection.sheet .cmd-bar {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  flex-direction: column;
+  overflow: auto;
+  border-top: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.game-selection.sheet .cmd-head {
+  width: auto;
+  border-right: 0;
+  overflow: visible;
+}
+.game-selection.sheet .cmd-body {
+  overflow: visible;
+}
+.game-selection.sheet .cmd-orders {
+  flex-direction: column;
+  align-items: stretch;
+}
+.game-selection.sheet .cmd-col {
+  min-width: 0;
+}
+.game-selection.sheet .cmd-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
