@@ -161,7 +161,7 @@ import { ResidentsFullList } from './ResidentsFullList.js'
 import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
 import { groupHorses } from './horses-view.js'
 import { HorsesList } from './Horses.js'
-import { Founding } from './Founding.js'
+import { Founding, RealmEnded } from './Founding.js'
 import {
   appendRequest,
   appendToEach,
@@ -2483,7 +2483,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             land={landShown}
           />
         ) : (
-          <p className="game-waiting">Waiting for the server…</p>
+          <div className="game-waiting">
+            <p className="waiting-panel pn fx">
+              <span className="ic i-clock" aria-hidden="true" />
+              <span className="px t16">Waiting for the server…</span>
+            </p>
+          </div>
         )}
       </section>
       <TopBar
@@ -3780,19 +3785,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           </div>
         </CentredDialog>
       )}
-      {world && realmEnded(world.events) && (
-        <CentredDialog title="Your realm has ended">
-          <p>
-            Your Leader has died and your realm has ended. The realm log says what became of your
-            cities. You start afresh with a new Leader and a new starting city.
-          </p>
-          <div className="hud-dialog-actions">
-            <button type="button" className="primary" onClick={() => window.location.reload()}>
-              Start afresh
-            </button>
-          </div>
-        </CentredDialog>
-      )}
+      {world && realmEnded(world.events) && <RealmEnded />}
     </div>
   )
   return (
