@@ -2,7 +2,7 @@ import { RALLY_PACE } from '@csp/balance'
 import { FIRST_DAY_LINES } from './shared/first-day.js'
 import { aboutTime } from './shared/estimates.js'
 import type { FirstDay, FirstDayLine, TraderVisit } from '@csp/shared-types'
-import { isWide, type OpenTab } from './hud-view.js'
+import { isScreen, type OpenTab } from './hud-view.js'
 
 /**
  * The notices that share the lane under the top bar (`CONTEXT.md`: Notices), besides the pick
@@ -40,11 +40,11 @@ export function traderVisitLine(v: TraderVisit, tick: number): string {
 }
 
 /**
- * Whether the selection card is hidden: the wide Scripts drawer and the full Residents list
- * (`fullList`) leave no room for it. It stays as it was, and closing them brings it back.
+ * Whether the selection card is hidden: the script workshop covers it and the full Residents list
+ * (`fullList`) leaves no room for it. It stays as it was, and closing them brings it back.
  */
 export function cardHidden(open: OpenTab, fullList = false): boolean {
-  return open !== undefined && (isWide(open) || fullList)
+  return open !== undefined && (isScreen(open) || fullList)
 }
 
 /** The least width, in pixels, the lane needs over the map between the drawer and the card. */
