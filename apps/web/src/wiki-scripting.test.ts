@@ -43,7 +43,8 @@ describe('the Wiki’s Script parameters topic', () => {
     expect(checkScript(PARAM_DEFAULT_EXAMPLE)).toEqual([])
     expect(scriptWarnings(PARAM_DEFAULT_EXAMPLE, false)).toEqual([])
     const html = renderToStaticMarkup(createElement(Wiki))
-    expect(html).toContain('param rounds: number = 5')
+    // The example is highlighted, so its text is split by the colours' tags.
+    expect(html.replace(/<[^>]+>/g, '')).toContain('param rounds: number = 5')
   })
 
   it('shows param comments, which the card shows, without syntax errors or warnings', () => {

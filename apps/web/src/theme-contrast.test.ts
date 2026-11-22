@@ -54,6 +54,10 @@ describe('contrast', () => {
       ['pick banner', ui.text, p.sun],
       ['pick banner, its hint', ui.muted, p.sun],
       ['first-day link', p.navy, ui.panel],
+      ['admin header bar', ui.barText, p.night],
+      ['admin header bar, muted', ui.barMuted, p.night],
+      ['admin title', p.cyan, p.night],
+      ['admin inspector link', p.navy, p.parch],
     ]
     for (const [name, fg, bg] of pairs) expect(contrast(fg, bg), name).toBeGreaterThanOrEqual(4.5)
   })

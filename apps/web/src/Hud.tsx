@@ -626,7 +626,8 @@ export function DiplomacyTabs({
  * covers, all the sidebar leaves when folded. The map fills the window, so screen edges measure it.
  */
 export function mapCovered(): { left: number; right: number; strip: number } {
-  // A bottom sheet covers the bottom of the map, not its right side; a hidden card none of it.
+  // A bottom sheet and the command bar (`.game-command`) cover the bottom of the map, not its right
+  // side; a hidden card none of it. Only a tile card or realm order card covers the right.
   const card = document
     .querySelector('.game-selection:not(.sheet):not([hidden])')
     ?.getBoundingClientRect()
