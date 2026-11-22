@@ -143,6 +143,11 @@
   .wiki-toc ol {
     display: block;
     columns: 2;
+    /* The second column's numbers sit in this gap. */
+    column-gap: 40px;
+  }
+  .wiki-toc li {
+    break-inside: avoid;
   }
   .wiki-text {
     padding: 2px 12px 12px;
