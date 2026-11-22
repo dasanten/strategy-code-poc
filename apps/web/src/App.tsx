@@ -824,14 +824,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * The Script tab's live view of the script a resident or army runs (`CONTEXT.md`: Debugging a
    * script): how it last ran, and its memory.
    */
+  const scriptRunInfo = (id: string, scriptId: number) => (
+    <ScriptRunInfo
+      run={runs.get(id)}
+      tick={world?.tick ?? 0}
+      onOpenError={({ version, line, column }) => openScript(scriptId, { version, line, column })}
+    />
+  )
+  const scriptMemoryTree = (id: string) => (
+    <ScriptMemoryTree id={id} memory={memories.get(id)} watch={watchScript} />
+  )
   const scriptDebug = (id: string, scriptId: number) => (
     <>
-      <ScriptRunInfo
-        run={runs.get(id)}
-        tick={world?.tick ?? 0}
-        onOpenError={({ version, line, column }) => openScript(scriptId, { version, line, column })}
-      />
-      <ScriptMemoryTree id={id} memory={memories.get(id)} watch={watchScript} />
+      {scriptRunInfo(id, scriptId)}
+      {scriptMemoryTree(id)}
     </>
   )
   // What the map waits for while an order that needs a target is given (ADR 0012: pick mode).
@@ -3498,7 +3504,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   />
                 )
               }
-              scriptMemory={selected.script && scriptDebug(selected.id, selected.script.scriptId)}
+              scriptRun={selected.script && scriptRunInfo(selected.id, selected.script.scriptId)}
+              scriptMemory={selected.script && scriptMemoryTree(selected.id)}
               scriptLog={
                 <ScriptLog
                   id={selected.id}

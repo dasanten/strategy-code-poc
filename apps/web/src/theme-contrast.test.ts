@@ -58,6 +58,8 @@ describe('contrast', () => {
       ['admin header bar, muted', ui.barMuted, p.night],
       ['admin title', p.cyan, p.night],
       ['admin inspector link', p.navy, p.parch],
+      ['queue block head', ui.text, p.tan],
+      ['script memory name', p.fog, ui.code],
     ]
     for (const [name, fg, bg] of pairs) expect(contrast(fg, bg), name).toBeGreaterThanOrEqual(4.5)
   })

@@ -1,37 +1,158 @@
-/* A running script's memory on the Script tab: a quiet, read-only tree. */
-.memory-tree {
+/* Queue, Stats and Script tabs (T119.10) ----------
+   The Script tab of the command bar (`CONTEXT.md`: Debugging a script; artboard
+   `Card-Stats-Script`): what they run and how it last ran, the Defence and Alarm script pickers,
+   the script's params, its memory and their script log, in columns side by side (`.script-col`)
+   that each scroll inside the bar. In the phone's sheet the columns stack. The tab itself is laid
+   out in card.css's block of the same name. */
+.script-tab {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: -8px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+.script-col {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+/* A column with nothing in it (a script without params) takes no room. */
+.script-col:empty {
+  display: none;
+}
+.script-col + .script-col {
+  border-left: 2px solid var(--tan);
+}
+.script-tab h3 {
   margin: 0;
-  padding: 0;
-  list-style: none;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  overflow-wrap: anywhere;
 }
-.memory-name {
-  color: var(--ui-muted);
+.script-tab p {
+  margin: 0;
 }
-/* How a running script last ran: its steps, and its last error as a link to the line. */
+.script-tab .order-buttons button {
+  min-height: 0;
+  min-width: 0;
+}
+/* Runs Work · version 4 · edited by you, and Edit. */
+.task-script {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* How it last ran: waiting, the steps used against the budget with its meter, the last error. */
+.script-run {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.script-run-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+}
+.script-run-info p {
+  margin: 0;
+}
 .script-steps {
-  margin: 0;
   font-family: var(--font-mono);
 }
 .script-steps.out-of-steps {
   color: var(--ui-warn-text);
-}
-.script-error {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  width: 100%;
-  text-align: left;
-  border-left: 3px solid var(--ui-bad);
+  font-weight: 600;
 }
 .script-error-message {
-  color: var(--ui-bad);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
   overflow-wrap: anywhere;
+}
+/* Defence and Alarm script: the picker as wide as the column. */
+.script-pick select {
+  width: 100%;
+}
+/* A param: its name and type, its buttons beside; what it is for and the value it uses under. */
+.script-param {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 6px;
+  align-items: center;
+}
+.script-param-name {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.script-param > .buttons {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.script-param > :not(.script-param-name, .buttons) {
+  grid-column: 1 / -1;
+}
+.script-param .amount {
+  width: 56px;
+  height: 24px;
+}
+.script-param select {
+  max-width: 10em;
+  height: 24px;
+}
+.script-params {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.script-params p {
+  margin: 0;
+}
+/* The script's memory, read-only: a code block, names quieter than values. */
+.memory-tree {
+  margin: 0;
+  padding: 6px 8px;
+  list-style: none;
+  font-size: 12px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.memory-name {
+  color: var(--fog);
+}
+/* Their script log, newest first. */
+.script-log-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+/* In the phone's sheet the columns stack and the sheet scrolls. */
+.game-selection.sheet .script-tab {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.game-selection.sheet .script-col {
+  overflow: visible;
+}
+.game-selection.sheet .script-col + .script-col {
+  border-left: 0;
+  border-top: 2px solid var(--tan);
+}
+.game-selection.sheet .script-tab button {
+  min-height: 36px;
 }
 
 /* The form before a script starts: the rows scroll between its title and Start and Cancel. */
@@ -147,17 +268,6 @@
 .game.phone .start-param-why {
   width: 28px;
   height: 28px;
-}
-
-/* A script param: its name and what it is for, the value the script uses, the field's buttons. */
-.script-params .goods-row {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  margin: 4px 0;
-}
-/* Under the row, across it: the rest of the row fills the first line. */
-.param-purpose {
-  grid-column: 1 / -1;
-  grid-row: 2;
 }
 
 /* ---------- The script workshop (ADR 0044; `ScriptLibrary`) ----------
