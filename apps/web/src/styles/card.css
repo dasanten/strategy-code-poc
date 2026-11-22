@@ -1,6 +1,7 @@
-/* The selection card (ADR 0008): tile cards, the who-list and realm order cards, docked top
-   right over the map until the dock (T119.5) takes them, actions as rows with keys. A resident's
-   or a group's card is the command bar along the bottom (`.game-command`, at the end). */
+/* The selection card: tile cards, the who-list and realm order cards, actions as rows with keys.
+   On a desktop they sit in the dock on the right (`.game-dock`, "Dock: tile cards" at the end);
+   this places one top right only until the dock has mounted. A resident's or a group's card is
+   the command bar along the bottom (`.game-command`). */
 .game-selection {
   position: absolute;
   /* Below the notice lane while it is a band across the screen (`NoticeLane`). */
@@ -63,13 +64,6 @@
   border-top: 0;
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
 }
-.inspector.sel-card {
-  gap: 12px;
-  padding: 14px 14px 12px;
-  border-left-width: 6px;
-  color: var(--ui-text);
-  font-family: var(--font-ui);
-}
 /* Shrunk while the map waits for a target: the room the card took stays, lightly drawn, and
    swallows clicks so none lands on the map by accident (`CONTEXT.md`: Picking a target). */
 .inspector.sel-card.sel-shrunk {
@@ -80,34 +74,6 @@
 .sel-dead {
   flex: 1 1 auto;
   background: repeating-linear-gradient(135deg, transparent 0 10px, var(--tan) 10px 12px);
-}
-.sel-head {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-}
-.sel-title {
-  flex: 1;
-  min-width: 0;
-}
-.sel-icon {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 3px solid currentColor;
-  background: var(--ui-ink);
-  color: var(--fog);
-}
-.sel-icon svg {
-  display: block;
-  width: 20px;
-  height: 20px;
-}
-.sel-title .name-line h2 {
-  font-size: 1.15rem;
-  line-height: 1.2;
 }
 .sel-line {
   font-size: 0.8rem;
@@ -1765,4 +1731,85 @@ button.card-list-row:hover {
 .game-selection.sheet .opanel-body select,
 .game-selection.sheet .opanel-body input:not([type='checkbox']) {
   min-height: 40px;
+}
+/* Dock: tile cards (T119.5) ----------
+   The dock on the right (`Dock`, ADR 0044; artboard Card-Tile): tile cards, the who-list and
+   realm order cards (`CardSheet` with `dock`), so a tile and a resident's command bar are open
+   together. It runs from under the top bar (and the notice band) down to above the map dock
+   (`--map-dock-h`, measured by `Dock`) and the command bar (`--command-h`), `--card-dock-w` wide;
+   its cards stack at the top, each scrolling once it runs out of room. Empty, it lets clicks
+   through to the map. On a phone there is no dock: the card is the bottom sheet (`.sheet`). */
+.game {
+  --card-dock-w: 340px;
+}
+.game-dock {
+  position: absolute;
+  top: calc(var(--top-h) + var(--lane-h, 0px) + 8px);
+  right: 8px;
+  bottom: calc(max(var(--command-h, 0px), var(--map-dock-h, 0px)) + 8px);
+  z-index: 1;
+  width: min(var(--card-dock-w), calc(100vw - var(--rail-w) - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.game-dock > * {
+  pointer-events: auto;
+}
+.game-dock > .game-selection {
+  position: static;
+  flex: 0 1 auto;
+  width: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+}
+
+/* A card in the dock (`SelectionCard`): a wood header bar with the owner's square (`.dot`), the
+   icon of what it is, the title and close, then one section of facts, blocks and orders. */
+.inspector.sel-card {
+  gap: 0;
+  padding: 0;
+  font-family: var(--font-ui);
+}
+/* The header stays in view while a long card scrolls in the dock or the sheet. */
+.game-selection .sel-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.sel-title {
+  margin: 0;
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+.sel-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+.sel-icon svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.sel-body {
+  flex: 1 1 auto;
+  gap: 10px;
+  font-size: 13px;
+}
+/* The first line says whose it is ("Yours", "NPC city", "Last seen …"), as the artboard's bold
+   first line. */
+.sel-body > .sel-line:first-child {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+/* The card's blocks (a site, a list, a carriage, goods, the orders) apart from each other as the
+   artboard's sections are, by a tan rule. */
+.sel-body > :is(.inspector-block, .card-site, .card-list, .card-carriage, .sel-actions) + * {
+  padding-top: 10px;
+  border-top: 2px solid var(--tan);
 }

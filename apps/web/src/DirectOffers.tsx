@@ -19,6 +19,7 @@ import type {
 } from '@csp/shared-types'
 import { onTheWay, onTheWayLine, sendable, tradersAt } from './city-view.js'
 import { Sending } from './CityInspector.js'
+import { GroupHead } from './diplomacy-parts.js'
 import { PanelHead } from './drawer-head.js'
 import { GOOD_LABELS } from './goods-grid.js'
 import { incomingItems, type IncomingItem } from './incoming-view.js'
@@ -50,12 +51,12 @@ export function IncomingList({
   if (items.length === 0) return null
   return (
     <>
-      <h3>Sent to you</h3>
-      <ul className="incoming-list">
+      <GroupHead count={items.length}>Sent to you</GroupHead>
+      <ul className="dip-list">
         {items.map((item) => (
-          <li key={item.id}>
-            <strong>{item.line}</strong>
-            <p className="muted small">Lapses in {aboutTime(item.lapsesAt - tick)}.</p>
+          <li key={item.id} className="sec">
+            <span className="b">{item.line}</span>
+            <span className="mu small">Lapses in {aboutTime(item.lapsesAt - tick)}.</span>
             {actions(item)}
           </li>
         ))}
@@ -98,18 +99,20 @@ function AnswerOffer({
     return (
       <>
         <p className="small">{carriedDetails(offer, side.realmId)}</p>
-        <div className="order-buttons">
+        <div className="fx wrap dip-buttons">
           <button
             type="button"
+            className="btn sm pri grow"
             onClick={() => void sendOrder({ kind: 'acceptCarriedOffer', offerId: offer.id })}
           >
             Accept
           </button>
-          <button type="button" onClick={() => onShowPlace(x, y)}>
+          <button type="button" className="btn sm" onClick={() => onShowPlace(x, y)}>
             Show on map
           </button>
           <button
             type="button"
+            className="btn sm"
             onClick={() => void sendOrder({ kind: 'declineOffer', offerId: offer.id })}
           >
             Decline
@@ -150,12 +153,13 @@ function AnswerOffer({
           }
         />
       )}
-      <div className="order-buttons">
-        <button type="button" onClick={() => onShowPlace(x, y)}>
+      <div className="fx wrap dip-buttons">
+        <button type="button" className="btn sm" onClick={() => onShowPlace(x, y)}>
           Show on map
         </button>
         <button
           type="button"
+          className="btn sm"
           onClick={() => void sendOrder({ kind: 'declineOffer', offerId: offer.id })}
         >
           Decline
@@ -241,7 +245,7 @@ export function DirectOffersPanel({
   const fromStorage = fromCity && deliveryStorage(seen, fromCity.id)
 
   return (
-    <section className="alliance-panel" aria-label="Direct offers">
+    <section className="dip" aria-label="Direct offers">
       <PanelHead title="Direct offers">{offers.length === 0 ? 'none' : offers.length}</PanelHead>
       <IncomingList
         items={incoming}
@@ -258,25 +262,26 @@ export function DirectOffersPanel({
       />
       {sent.length > 0 && (
         <>
-          <h3>Sent by you</h3>
-          <ul className="incoming-list">
+          <GroupHead count={sent.length}>Sent by you</GroupHead>
+          <ul className="dip-list">
             {sent.map((o) => (
-              <li key={o.id}>
-                <strong>
+              <li key={o.id} className="sec">
+                <span className="b">
                   To {o.to.realmId === TRADE_ORG ? o.to.realm : `the realm of ${o.to.realm}`}:{' '}
                   {(o.direct.carried
                     ? carriedLine(o, GOOD_LABELS)
                     : offerTerms(o, GOOD_LABELS)
                   ).toLowerCase()}
-                </strong>
-                <p className="muted small">
+                </span>
+                <span className="mu small">
                   {o.direct.carried
                     ? carriedDetails(o, realmId)
                     : `${offerStands(o, GOOD_LABELS)}, at ${offerPlace(o)}.`}{' '}
                   Lapses in {aboutTime(o.direct.lapsesAt - tick)}.
-                </p>
+                </span>
                 <button
                   type="button"
+                  className="btn sm dip-start"
                   onClick={() => void send({ kind: 'takeDownOffer', offerId: o.id })}
                 >
                   Take down
@@ -286,10 +291,10 @@ export function DirectOffersPanel({
           </ul>
         </>
       )}
-      <div className="contract-form" aria-label="New direct offer">
-        <h3>Send a direct offer</h3>
-        <label className="contract-field">
-          <span className="contract-label">To</span>
+      <div className="sec dip-form" role="group" aria-label="New direct offer">
+        <h3 className="px t16">Send a direct offer</h3>
+        <label className="fld">
+          <span className="lb">To</span>
           <select value={toId} onChange={(e) => setToId(e.target.value)}>
             <option value="">
               {knownRealms.length === 0 ? 'You know of no other realm' : 'Send to…'}
@@ -302,8 +307,8 @@ export function DirectOffersPanel({
           </select>
         </label>
         {!noCaravans && (
-          <label className="contract-field">
-            <span className="contract-label">How</span>
+          <label className="fld">
+            <span className="lb">How</span>
             <select
               value={how}
               aria-label="How the goods change hands"
@@ -318,8 +323,8 @@ export function DirectOffersPanel({
         {feeBy ? (
           fromCity && fromStorage ? (
             <>
-              <label className="contract-field">
-                <span className="contract-label">From</span>
+              <label className="fld">
+                <span className="lb">From</span>
                 <select value={fromCity.id} onChange={(e) => setFromCityId(e.target.value)}>
                   {fromCities.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -328,8 +333,8 @@ export function DirectOffersPanel({
                   ))}
                 </select>
               </label>
-              <label className="contract-field">
-                <span className="contract-label">To their city</span>
+              <label className="fld">
+                <span className="lb">To their city</span>
                 <select value={toCity?.id ?? ''} onChange={(e) => setToCityId(e.target.value)}>
                   {toCities.length === 0 && <option value="">No storage of theirs in sight</option>}
                   {toCities.map((c) => (
@@ -369,12 +374,12 @@ export function DirectOffersPanel({
               />
             </>
           ) : (
-            <p className="small muted">You have no city with a finished storage to pick up from.</p>
+            <p className="small mu">You have no city with a finished storage to pick up from.</p>
           )
         ) : storage ? (
           <>
-            <label className="contract-field">
-              <span className="contract-label">At</span>
+            <label className="fld">
+              <span className="lb">At</span>
               <select value={storage.id} onChange={(e) => setStorageId(e.target.value)}>
                 {storages.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -392,15 +397,15 @@ export function DirectOffersPanel({
             />
           </>
         ) : (
-          <p className="small muted">You have no finished storage to set goods aside at.</p>
+          <p className="small mu">You have no finished storage to set goods aside at.</p>
         )}
       </div>
-      <p className="muted small">
+      {error && <p className="error dip-error">{error}</p>}
+      <p className="sec mu small dip-foot">
         Only they can accept it, and they see it at once wherever they are: in person at the
         storage, or from anywhere when the Trade Org carries it. At most{' '}
         {DIRECT_OFFERS_TO_ONE_REALM} can stand to one realm.
       </p>
-      {error && <p className="error">{error}</p>}
     </section>
   )
 }

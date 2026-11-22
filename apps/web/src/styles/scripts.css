@@ -160,195 +160,249 @@
   grid-row: 2;
 }
 
-/* The script editor: the library beside a full-height editor. */
-.script-library {
+/* ---------- The script workshop (ADR 0044; `ScriptLibrary`) ----------
+   A screen of its own over the map and the command bar: its bar across the top, then the library
+   on the left, the editor in the middle and History (or the New script form) on the right. On a
+   phone the three are steps, one at a time, picked by the tabs under the bar. */
+.workshop {
+  position: fixed;
+  inset: 0;
+  /* Over the map, the top bar, the sidebar, the card and the notices; under a dialog. */
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  background: var(--parch);
+  color: var(--ui-text);
+}
+.workshop[hidden] {
+  display: none;
+}
+.workshop-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--top-h, 44px);
+  box-sizing: border-box;
+  padding: 0 10px;
+  border-width: 0 0 2px;
+}
+.workshop-title {
+  margin: 0;
+  color: var(--gold);
+  white-space: nowrap;
+}
+.workshop-bar .k {
+  margin-left: 6px;
+}
+/* The steps are for a phone only. */
+.workshop-steps {
+  display: none;
+}
+.workshop-body {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: 270px minmax(0, 1fr) 310px;
 }
-.side-panel .script-list h3:first-child {
-  margin-top: 4px;
-}
-.script-list {
+
+/* The library: New script, then the default scripts and the Player's own, each with its line. */
+.workshop-library {
   min-height: 0;
   overflow-y: auto;
-  padding-right: 12px;
-  border-right: 2px solid var(--ui-line);
+  border-right: 2px solid var(--ink);
 }
-.script-list > ul:first-of-type {
+.workshop-library ul,
+.workshop-side ul {
   list-style: none;
   margin: 0;
   padding: 0;
+}
+/* Each script is a row (.rw) that is a button: the row's look, not a button's. */
+.workshop-pick {
+  width: 100%;
+  height: auto;
+  justify-content: flex-start;
+  border-width: 0 0 2px;
+  border-style: solid;
+  border-color: var(--tan);
+  box-shadow: none;
+  color: var(--ui-text);
+  font-weight: 400;
+  text-align: left;
+}
+.workshop-pick:not(.sel) {
+  background: transparent;
+}
+.workshop-pick:hover:not(.sel) {
+  background: var(--paper);
+}
+.workshop-pick.sel:hover:not(:disabled) {
+  background: var(--sun);
+}
+.workshop-pick .grow {
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
-.script-list > ul:first-of-type button {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-  padding: 7px 8px;
-  text-align: left;
-  border: 0;
-  border-left: 3px solid transparent;
-  border-bottom: 2px solid var(--ui-line);
-  background: transparent;
-  box-shadow: none;
-}
-.script-list > ul:first-of-type button span {
+.workshop-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.script-list > ul:first-of-type button.on {
-  background: var(--sun);
-  border-left-color: var(--ink);
-  font-weight: 600;
-}
-.script-list small {
-  color: var(--ui-muted);
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
-}
-.script-main {
+
+/* The editor: the script's head, the default's diff, the code, and the check with Save. */
+.workshop-editor {
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
-.script-head {
+.workshop-head {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--tan);
 }
-.side-panel form.script-head,
-.script-head form {
+.workshop-rename {
+  flex: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin: 0;
 }
-.script-head strong {
-  font-size: 15px;
-}
-.script-template {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-}
-.script-help {
-  display: flex;
-  gap: 10px;
-}
-.script-head > span {
-  color: var(--ui-muted);
-}
-.script-main .editor {
+.workshop-rename .in {
   flex: 1;
-  min-height: 260px;
-  overflow: hidden;
-  border: 2px solid var(--ink);
+  min-width: 0;
+  max-width: 360px;
 }
-.script-foot {
+.workshop-diff {
+  flex: none;
+  padding: 0 12px 8px;
+  border-bottom: 2px solid var(--tan);
+}
+.workshop-diff summary {
+  padding: 6px 0;
+  cursor: pointer;
+}
+.workshop-diff .code {
+  max-height: 200px;
+  margin: 0 0 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+/* A line the game's default added: green, as the kit's removed line (.e) is red. */
+.workshop-diff .code .add {
+  background: var(--pine);
+  color: #fff;
+}
+.workshop-diff p {
+  margin: 0;
+}
+.workshop-editor .editor {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.workshop-foot {
+  flex: none;
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  padding: 8px 12px;
+  border-top: 2px solid var(--ink);
+  background: var(--paper);
 }
-.diagnostics {
-  flex: 1;
+.workshop-foot p {
   margin: 0;
-  font-family: var(--font-mono);
+}
+.workshop-foot .diagnostics {
+  max-height: 8em;
+  overflow: auto;
   font-size: 12px;
   white-space: pre-wrap;
-  color: var(--ui-live);
 }
-.diagnostics.has-errors {
-  color: var(--ui-bad);
-}
-.diagnostics.has-warnings {
+.workshop-foot .diagnostics.warn {
   color: var(--ui-warn-text);
+  font-weight: 600;
 }
-.default-changed {
-  font-size: 12px;
-  color: var(--ui-muted);
-}
-.script-diff {
-  margin: 4px 0;
-  max-height: 200px;
-  overflow: auto;
-  font-family: var(--font-mono);
-}
-.script-diff .added {
-  color: var(--ui-live);
-}
-.script-diff .removed {
-  color: var(--ui-bad);
-}
-.script-message {
-  margin: 0;
-  color: var(--ui-muted);
-}
-.script-history {
-  font-size: 12px;
-}
-.script-history li {
+
+/* On the right: History, a row a version, or the New script form. */
+.workshop-side {
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  border-left: 2px solid var(--ink);
 }
-.script-history li > span:first-child {
+.workshop-side .sec > .btn {
+  align-self: flex-start;
+}
+.workshop-version {
+  flex-wrap: wrap;
+}
+.workshop-version time {
+  font-variant-numeric: tabular-nums;
+}
+.workshop-version-actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 8px;
-}
-.script-history-actions {
-  display: flex;
   gap: 4px;
 }
-.script-history-head {
+.workshop-new {
+  background: var(--paper);
+  border-bottom: 2px solid var(--tan);
+}
+.workshop-new p {
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  .workshop-body {
+    grid-template-columns: 220px minmax(0, 1fr) 260px;
+  }
+}
+
+/* On a phone: one step at a time, the step tabs under the bar. */
+.game.phone .workshop-steps {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  flex: none;
+}
+.game.phone .workshop-bar {
   gap: 8px;
+  padding: 0 6px;
+  overflow-x: auto;
 }
-.script-history-head button {
-  padding: 2px 8px;
-  font-size: 11px;
+.game.phone .workshop-bar .k,
+.game.phone .workshop-bar .ic,
+.game.phone .workshop-title {
+  display: none;
 }
-.script-history-actions button {
-  padding: 2px 8px;
-  font-size: 11px;
+.game.phone .workshop-body {
+  display: block;
 }
-.script-history li.active {
-  --rel: var(--ui-live);
+.game.phone .workshop-body > * {
+  display: none;
+  height: 100%;
+  box-sizing: border-box;
+  border: 0;
 }
-.script-history li.has-errors {
-  --rel: var(--ui-bad);
+.game.phone .workshop[data-step='library'] .workshop-library {
+  display: block;
 }
-.script-history time,
-.script-history em {
-  color: var(--ui-muted);
+.game.phone .workshop[data-step='editor'] .workshop-editor,
+.game.phone .workshop[data-step='side'] .workshop-side {
+  display: flex;
 }
-.script-history time {
-  flex-basis: 100%;
-  font-size: 11px;
+.game.phone .workshop-foot {
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
 }
-@media (max-width: 760px) {
-  .script-library {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-  .script-list {
-    max-height: 30vh;
-    padding: 0 0 8px;
-    border-right: 0;
-    border-bottom: 2px solid var(--ui-line);
-  }
+/* At 16px a phone doesn't zoom the page when the field takes focus. */
+.game.phone .workshop input,
+.game.phone .workshop select {
+  font-size: 16px;
 }

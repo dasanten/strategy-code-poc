@@ -227,7 +227,7 @@ export function CityInspector({
       onSend({ residentId: s.residentId, carriageId: s.carriageId, x: place.x, y: place.y }),
   })
   const offersAt = (s: SeenBuilding) => (
-    <div key={s.id} data-trade-at={s.id}>
+    <div key={s.id} className="sec city-offers" data-trade-at={s.id}>
       <StorageOffers
         storage={s}
         own={buildingRealm({ cities }, s) === realmId}
@@ -290,36 +290,46 @@ export function CityInspector({
     const body: Record<CitySectionId, ReactNode> = {
       overview: (
         <>
-          <p className="city-details">
-            {overview.residents} {overview.residents === 1 ? 'resident' : 'residents'} in sight ·
-            housing for {overview.housing}
-          </p>
-          {overview.buildings.length > 0 && (
+          <div className="sec">
             <p className="city-details">
-              {overview.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}
+              {overview.residents} {overview.residents === 1 ? 'resident' : 'residents'} in sight ·
+              housing for {overview.housing}
             </p>
-          )}
-          <TemperamentLine temperament={city.temperament} />
-          <MoodLine stance={city.stance} against={city.retaliatingAgainst} />
-          <Reaction city={city} />
+            {overview.buildings.length > 0 && (
+              <p className="city-details">
+                {overview.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}
+              </p>
+            )}
+            <TemperamentLine temperament={city.temperament} />
+            <MoodLine stance={city.stance} against={city.retaliatingAgainst} />
+            <Reaction city={city} />
+          </div>
           <Buying
             buy={describeBuying(city, { residents, buildings }, realmId)}
             onBuy={(buyerId) => onBuyCity(buyerId, v.id)}
           />
         </>
       ),
-      stock: <GoodsGrid items={stock} label={`Stock in ${v.name}`} />,
+      stock: (
+        <div className="sec">
+          <GoodsGrid items={stock} label={`Stock in ${v.name}`} />
+        </div>
+      ),
       trade: (
         <>
-          {howToTrade && (
-            <p className="small trade-wiki">
-              {/* A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki). */}
-              <a href={HOW_TO_TRADE_PATH} target="_blank" rel="noopener">
-                How to trade
-              </a>
-            </p>
+          {(howToTrade || standing !== undefined) && (
+            <div className="sec">
+              {howToTrade && (
+                <p className="trade-wiki">
+                  {/* A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki). */}
+                  <a href={HOW_TO_TRADE_PATH} target="_blank" rel="noopener">
+                    How to trade
+                  </a>
+                </p>
+              )}
+              <TradeStanding line={standing} />
+            </div>
           )}
-          <TradeStanding line={standing} />
           {warehousesInSight(
             cities.find((c) => c.id === v.id)!,
             { cities, buildings },
@@ -374,7 +384,7 @@ export function CityInspector({
                 onTrade={onTrade}
               />
               {noCaravans && (
-                <p className="small muted">
+                <p className="sec mu">
                   The Trade Org HQ has fallen: no caravans run, so no deliveries or transfers.
                 </p>
               )}
@@ -468,20 +478,24 @@ export function CityInspector({
           ))}
           {traderStopsAt(v, traders, traderVisits).map((s) => (
             <div key={s.id} data-trade-at={s.id}>
-              {!s.unseen && (
+              {s.unseen ? (
+                <div className="sec">
+                  <h3 className="px t16">Wandering trader</h3>
+                  <p className="mu">
+                    A wandering trader stands at ({s.x}, {s.y}). It goes on in{' '}
+                    {aboutTime(Math.max(0, s.until - tick))}.
+                  </p>
+                  <Sending warehouse={s} place="wandering trader" {...sending(s)} />
+                </div>
+              ) : (
                 <Prices
                   warehouse={s}
                   lists={tradeLists(s, { buildings })}
                   place="Wandering trader"
+                  note={`It goes on in ${aboutTime(Math.max(0, s.until - tick))}.`}
                 />
               )}
-              <p className="small muted">
-                {s.unseen && `A wandering trader stands at (${s.x}, ${s.y}). `}It goes on in{' '}
-                {aboutTime(Math.max(0, s.until - tick))}.
-              </p>
-              {s.unseen ? (
-                <Sending warehouse={s} place="wandering trader" {...sending(s)} />
-              ) : (
+              {!s.unseen && (
                 <Trading
                   warehouse={s}
                   goods={tradedGoods(s, tradeLists(s, { buildings }))}
@@ -532,7 +546,7 @@ export function CityInspector({
         {views.length === 0 ? 'none in sight' : `${views.length} in sight`}
       </PanelHead>
       {debt > 0 && (
-        <p className="occupation warn">
+        <p className="sec bad city-debt">
           You owe the Trade Organization {debt} Coins. A resident can pay at any of its warehouses.
         </p>
       )}
@@ -545,10 +559,7 @@ export function CityInspector({
         ))}
       {outposts.length > 0 && (
         <>
-          <div className="panel-head">
-            <h2>Outpost storages</h2>
-            <span>{outposts.length}</span>
-          </div>
+          <ListHead title="Outpost storages" count={outposts.length} />
           {outposts.map(offersAt)}
         </>
       )}
@@ -575,9 +586,21 @@ export function CityInspector({
 function CitySection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <details className="city-section" open>
-      <summary>{title}</summary>
+      <summary className="rw grp">
+        <span className="b grow">{title}</span>
+      </summary>
       <div className="city-section-body">{children}</div>
     </details>
+  )
+}
+
+/** A list's title and count, as a group row of the kit. */
+function ListHead({ title, count }: { title: string; count: number }) {
+  return (
+    <div className="rw grp">
+      <h2 className="lb grow">{title}</h2>
+      <span className="mono">{count}</span>
+    </div>
   )
 }
 
@@ -593,11 +616,8 @@ function CityList({
 }) {
   return (
     <>
-      <div className="panel-head">
-        <h2>{title}</h2>
-        <span>{rows.length}</span>
-      </div>
-      <ul className="city-list" aria-label={title}>
+      <ListHead title={title} count={rows.length} />
+      <ul className="city-rows" aria-label={title}>
         {children}
       </ul>
     </>
@@ -618,32 +638,40 @@ function CityRowHead({
   open: boolean
   onOpen: (id: string | undefined) => void
 }) {
+  const facts = row.goods || row.ago || row.occupation
   return (
-    <>
+    <div className={open ? 'city-row sel' : 'city-row'}>
       <button
         type="button"
-        className="city-row"
+        className="rw city-row-open"
         aria-expanded={open}
         onClick={() => onOpen(open ? undefined : row.id)}
       >
-        <strong>{row.name}</strong>
-        <span className="city-row-whose">{row.whose}</span>
+        <span className="dot" aria-hidden="true" />
+        <span className="grow">
+          <span className="b">{row.name}</span> ·{' '}
+          <span className="city-row-whose">{row.whose}</span>
+          {row.housing && (
+            <span className="mono" aria-label="Residents against housing">
+              {' '}
+              · {row.housing.residents}/{row.housing.room} residents
+            </span>
+          )}
+        </span>
+        <span aria-hidden="true">{open ? '▾' : '▸'}</span>
       </button>
-      {row.housing && (
+      {facts && (
         <div className="city-row-facts">
-          <span className="mono" aria-label="Residents against housing">
-            {row.housing.residents}/{row.housing.room} residents
-          </span>
           {row.goods && <GoodsGrid items={row.goods} label={`Goods in ${row.name}`} />}
+          {row.ago && <span className="mu">Seen {row.ago}</span>}
+          {row.occupation && (
+            <p className={`occupation${row.occupation.warning ? ' warn' : ''}`}>
+              {row.occupation.text}
+            </p>
+          )}
         </div>
       )}
-      {row.ago && <p className="city-row-facts muted">Seen {row.ago}</p>}
-      {row.occupation && (
-        <p className={`occupation${row.occupation.warning ? ' warn' : ''}`}>
-          {row.occupation.text}
-        </p>
-      )}
-    </>
+    </div>
   )
 }
 
@@ -677,7 +705,7 @@ function RememberedCity({
   const storages = npcStoragesInSight(city, lastSeen)
   const body: Partial<Record<CitySectionId, ReactNode>> = {
     overview: (
-      <>
+      <div className="sec">
         <p className="city-details">{lastSeenText(city.seenAt, tick)}</p>
         <TemperamentLine temperament={city.temperament} />
         <p className="city-details">Housing for {overview.housing}</p>
@@ -686,7 +714,8 @@ function RememberedCity({
             {overview.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}
           </p>
         )}
-      </>
+        <p className="mu">Read only: as you last saw it.</p>
+      </div>
     ),
     trade: (
       <>
@@ -742,11 +771,7 @@ function TemperamentLine({ temperament }: { temperament: Temperament | undefined
  */
 function TradeStanding({ line }: { line: string | undefined }) {
   if (!line) return null
-  return (
-    <p className="small" aria-label="Standing here">
-      {line}
-    </p>
-  )
+  return <p aria-label="Standing here">{line}</p>
 }
 
 /**
@@ -756,14 +781,14 @@ function TradeStanding({ line }: { line: string | undefined }) {
 function Reaction({ city }: { city: SeenCity }) {
   if (!city.refuses && !city.wontSell) return null
   return (
-    <div className="city-reaction" aria-label="Reaction">
+    <div className="col city-reaction" aria-label="Reaction">
       {city.refuses && (
-        <p>
+        <p className="bad">
           It holds you in low standing: it won’t trade with you or hire out to you, and its gates
           are shut to your residents.
         </p>
       )}
-      {city.wontSell && <p>It won’t sell itself to you.</p>}
+      {city.wontSell && <p className="bad">It won’t sell itself to you.</p>}
     </div>
   )
 }
@@ -776,24 +801,31 @@ function Buying({ buy, onBuy }: { buy: BuyView | undefined; onBuy: (buyerId: str
   if (!buy) return null
   const enough = buy.coins >= buy.price
   return (
-    <div className="city-buying" aria-label="Buying">
-      <p>
-        Price: <strong>{buy.price} coins</strong>
-      </p>
-      {buy.townHall && !buy.buyerId && (
-        <p className="small muted">
-          To buy it, bring residents carrying the coins to its town hall at ({buy.townHall.x},{' '}
-          {buy.townHall.y}).
-        </p>
-      )}
-      {buy.buyerId && (
-        <p>
-          Your residents at its town hall carry {buy.coins} coins.{' '}
-          <button type="button" disabled={!enough} onClick={() => onBuy(buy.buyerId!)}>
+    <div className="sec city-buying" aria-label="Buying">
+      <div className="fx wrap">
+        <div className="grow">
+          <p className="b">Price: {buy.price} coins</p>
+          {buy.townHall && !buy.buyerId && (
+            <p className="mu">
+              To buy it, bring residents carrying the coins to its town hall at ({buy.townHall.x},{' '}
+              {buy.townHall.y}).
+            </p>
+          )}
+          {buy.buyerId && (
+            <p className="mu">Your residents at its town hall carry {buy.coins} coins.</p>
+          )}
+        </div>
+        {buy.buyerId && (
+          <button
+            type="button"
+            className={enough ? 'btn sm gold' : 'btn sm off'}
+            disabled={!enough}
+            onClick={() => onBuy(buy.buyerId!)}
+          >
             Buy for {buy.price} coins
           </button>
-        </p>
-      )}
+        )}
+      </div>
     </div>
   )
 }
@@ -808,15 +840,15 @@ function Gates({
 }) {
   if (gates.length === 0) return null
   return (
-    <ul className="city-gates" aria-label="Gates">
+    <ul className="sec city-gates" aria-label="Gates">
       {gates.map((g) => {
         const open = !isClosed(g)
         return (
-          <li key={g.id}>
-            <span>
-              Gate at ({g.x}, {g.y}): {open ? 'open' : 'closed'}
-            </span>{' '}
-            <button type="button" onClick={() => onSetGate(g.id, !open)}>
+          <li key={g.id} className="fx">
+            <span className="grow">
+              Gate at ({g.x}, {g.y}): <span className="b">{open ? 'open' : 'closed'}</span>
+            </span>
+            <button type="button" className="btn sm" onClick={() => onSetGate(g.id, !open)}>
               {open ? 'Close' : 'Open'}
             </button>
           </li>
@@ -835,28 +867,34 @@ function Prices({
   warehouse,
   lists,
   place = 'Warehouse',
+  note,
 }: {
   warehouse: WarehouseView
   lists: TradeLists
   /** What it is called: a Trade Org warehouse, an NPC city's storage or a wandering trader. */
   place?: 'Warehouse' | 'Storage' | 'Wandering trader'
+  /** A line under the place's name, such as when a wandering trader goes on. */
+  note?: string
 }) {
   const at = `${place} at (${warehouse.x}, ${warehouse.y})`
   return (
-    <div className="warehouse-prices" aria-label={at}>
-      <p className="warehouse-prices-place">{at}</p>
-      <PriceList
-        title="You can buy"
-        lines={lists.canBuy}
-        none={lists.takesOnlyListed ? 'It has nothing to spare.' : 'Nothing.'}
-      />
-      <PriceList
-        title="You can sell"
-        lines={lists.canSell}
-        none={lists.takesOnlyListed ? 'It takes nothing.' : 'Nothing.'}
-      />
+    <div className="sec city-prices" aria-label={at}>
+      <h3 className="px t16">{at}</h3>
+      {note && <p className="mu">{note}</p>}
+      <div className="city-price-lists">
+        <PriceList
+          title="You can buy"
+          lines={lists.canBuy}
+          none={lists.takesOnlyListed ? 'It has nothing to spare.' : 'Nothing.'}
+        />
+        <PriceList
+          title="You can sell"
+          lines={lists.canSell}
+          none={lists.takesOnlyListed ? 'It takes nothing.' : 'Nothing.'}
+        />
+      </div>
       {lists.takesOnlyListed && lists.canSell.length > 0 && (
-        <p className="small muted">It takes nothing else.</p>
+        <p className="mu">It takes nothing else.</p>
       )}
     </div>
   )
@@ -874,33 +912,38 @@ export function PriceList({
 }) {
   if (lines.length === 0) {
     return (
-      <p className="small">
-        <strong>{title}:</strong> {none}
+      <p className="city-price-none">
+        <span className="lb">{title}</span> {none}
       </p>
     )
   }
   const units = lines.some((l) => l.units !== undefined)
   return (
-    <table aria-label={title}>
-      <caption>{title}</caption>
+    <table className="tb" aria-label={title}>
       <thead>
         <tr>
-          <th scope="col">Good</th>
-          {units && <th scope="col">Units</th>}
-          <th scope="col">Coins each</th>
+          <th scope="col">{title}</th>
+          {units && (
+            <th scope="col" className="n">
+              Units
+            </th>
+          )}
+          <th scope="col" className="n">
+            Coins each
+          </th>
         </tr>
       </thead>
       <tbody>
         {lines.map((l) => (
           <tr key={l.good}>
-            <th scope="row">
+            <td>
               <span className="good-label">
                 <GoodIcon good={l.good} />
                 {GOOD_LABELS[l.good]}
               </span>
-            </th>
-            {units && <td>{l.units ?? ''}</td>}
-            <td>{l.price}</td>
+            </td>
+            {units && <td className="n">{l.units ?? ''}</td>}
+            <td className="n">{l.price}</td>
           </tr>
         ))}
       </tbody>
@@ -1013,10 +1056,16 @@ function Trading({
   if (!picked) return null
   if (!resident) {
     return (
-      <>
-        <Rates rates={rates} hint="Pick one to send someone to swap it." onPick={setRate} />
+      <div className="sec city-trading">
+        <h3 className="px t16">Sending a trader</h3>
+        <Rates
+          rates={rates}
+          hint="Pick one to send someone to swap it."
+          picked={(r) => r === rate}
+          onPick={setRate}
+        />
         {rate && (
-          <p className="small rate-picked">
+          <p className="rate-picked">
             To swap{' '}
             {rateText(
               rate,
@@ -1027,7 +1076,7 @@ function Trading({
           </p>
         )}
         <Sending warehouse={warehouse} place={place} {...sending} />
-      </>
+      </div>
     )
   }
   const label = GOOD_LABELS[picked].toLowerCase()
@@ -1063,81 +1112,95 @@ function Trading({
     sellText = tradeText('sell', label, quote.sell, !!carriage)
   }
   return (
-    <div className="warehouse-trading" aria-label="Trading">
-      <label>
-        Trader{' '}
-        <select value={resident.id} onChange={(e) => setResidentId(e.target.value)}>
-          {traders.residents.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {traders.carriages.length > 0 && (
-        <label>
-          With{' '}
-          <select value={carriageId} onChange={(e) => setCarriageId(e.target.value)}>
-            <option value="">their hands</option>
-            {traders.carriages.map((k) => (
-              <option key={k.id} value={k.id}>
-                carriage {k.id}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      <p className="small muted trader-holds">
-        {holderText(quote.holder, picked, label, carriage?.id)}
-      </p>
-      <label>
-        Good{' '}
-        <select value={picked} onChange={(e) => setGood(e.target.value as PricedGood)}>
-          {goods.map((g) => (
-            <option key={g} value={g}>
-              {GOOD_LABELS[g]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Units{' '}
-        <input
-          type="number"
-          min={1}
-          step={1}
-          value={units}
-          onChange={(e) => setUnits(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
-        />
-      </label>
-      {deliveryCities.length > 0 && (
-        <div className="trade-service" aria-label="Delivery">
-          <h3>Delivery</h3>
-          <p className="small muted">
-            A caravan brings what you buy to your city’s storage, or fetches what you sell from it,
-            for a fee.
-          </p>
-          <label>
-            City{' '}
-            <select value={cityId} onChange={(e) => setCityId(e.target.value)}>
-              <option value="">none, carry it here</option>
-              {deliveryCities.map((c) => (
-                <option key={c.id} value={c.id}>
-                  to or from {c.name}
+    <>
+      <div className="sec city-trading" aria-label="Trading">
+        <h3 className="px t16">Trading</h3>
+        <div className="fx city-fields">
+          <label className="fld grow">
+            <span className="lb">Trader</span>
+            <select value={resident.id} onChange={(e) => setResidentId(e.target.value)}>
+              {traders.residents.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
                 </option>
               ))}
             </select>
           </label>
+          {traders.carriages.length > 0 && (
+            <label className="fld grow">
+              <span className="lb">With</span>
+              <select value={carriageId} onChange={(e) => setCarriageId(e.target.value)}>
+                <option value="">their hands</option>
+                {traders.carriages.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    carriage {k.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
-      )}
-      <p>
-        <button type="button" disabled={!canBuy} onClick={() => trade('buy')}>
+        <p className="trader-holds">{holderText(quote.holder, picked, label, carriage?.id)}</p>
+        <div className="fx city-fields">
+          <label className="fld grow">
+            <span className="lb">Good</span>
+            <select value={picked} onChange={(e) => setGood(e.target.value as PricedGood)}>
+              {goods.map((g) => (
+                <option key={g} value={g}>
+                  {GOOD_LABELS[g]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="fld city-units">
+            <span className="lb">Units</span>
+            <input
+              type="number"
+              className="mono"
+              min={1}
+              step={1}
+              value={units}
+              onChange={(e) => setUnits(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+            />
+          </label>
+        </div>
+        {deliveryCities.length > 0 && (
+          <div className="col city-service" aria-label="Delivery">
+            <h4 className="b">Delivery</h4>
+            <p className="mu">
+              A caravan brings what you buy to your city’s storage, or fetches what you sell from
+              it, for a fee.
+            </p>
+            <label className="fld">
+              <span className="lb">City</span>
+              <select value={cityId} onChange={(e) => setCityId(e.target.value)}>
+                <option value="">none, carry it here</option>
+                {deliveryCities.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    to or from {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+        <button
+          type="button"
+          className="primary city-go"
+          disabled={!canBuy}
+          onClick={() => trade('buy')}
+        >
           {buyText}
-        </button>{' '}
-        <button type="button" disabled={!canSell} onClick={() => trade('sell')}>
+        </button>
+        <button
+          type="button"
+          className="primary city-go"
+          disabled={!canSell}
+          onClick={() => trade('sell')}
+        >
           {sellText}
         </button>
-      </p>
+      </div>
       {swapGoods.length > 0 && (
         <Swapping
           goods={swapGoods}
@@ -1156,7 +1219,7 @@ function Trading({
           }
         />
       )}
-    </div>
+    </>
   )
 }
 
@@ -1196,60 +1259,63 @@ function Swapping({
   if (!give) return null
   const quote = preview(give, want, units)
   return (
-    <div className="trade-service" aria-label="Swap">
-      <h3>Swap</h3>
-      <p className="small muted">
+    <div className="sec city-trading" aria-label="Swap">
+      <h3 className="px t16">Swap</h3>
+      <p className="mu">
         Goods for goods, no coins needed: you hand over enough to pay for what you want, at its
         prices, and what is over comes back in coins as far as it holds them.
       </p>
       <Rates
         rates={rates}
         hint="Pick one to fill in the swap below."
+        picked={(r) => r.want === want && r.give === give && r.units === units}
         onPick={(r) => {
           setWant(r.want)
           setGive(r.give)
           setUnits(r.units)
         }}
       />
-      <label>
-        Want{' '}
-        <select value={want} onChange={(e) => setWant(e.target.value as PricedGood)}>
-          {goods.map((g) => (
-            <option key={g} value={g}>
-              {GOOD_LABELS[g]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Units{' '}
-        <input
-          type="number"
-          min={1}
-          step={1}
-          value={units}
-          onChange={(e) => setUnits(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
-        />
-      </label>
-      <label>
-        Give{' '}
-        <select value={give} onChange={(e) => setGive(e.target.value as PricedGood)}>
-          {gives.map((g) => (
-            <option key={g} value={g}>
-              {GOOD_LABELS[g]} ({Math.floor(holds[g] ?? 0)} held)
-            </option>
-          ))}
-        </select>
-      </label>
-      <p>
-        <button
-          type="button"
-          disabled={quote.units === 0}
-          onClick={() => onSwap(give, want, units)}
-        >
-          {swapText(GOOD_LABELS[give].toLowerCase(), GOOD_LABELS[want].toLowerCase(), quote)}
-        </button>
-      </p>
+      <div className="fx wrap city-fields">
+        <label className="fld grow">
+          <span className="lb">Want</span>
+          <select value={want} onChange={(e) => setWant(e.target.value as PricedGood)}>
+            {goods.map((g) => (
+              <option key={g} value={g}>
+                {GOOD_LABELS[g]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="fld city-units">
+          <span className="lb">Units</span>
+          <input
+            type="number"
+            className="mono"
+            min={1}
+            step={1}
+            value={units}
+            onChange={(e) => setUnits(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+          />
+        </label>
+        <label className="fld grow">
+          <span className="lb">Give</span>
+          <select value={give} onChange={(e) => setGive(e.target.value as PricedGood)}>
+            {gives.map((g) => (
+              <option key={g} value={g}>
+                {GOOD_LABELS[g]} ({Math.floor(holds[g] ?? 0)} held)
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <button
+        type="button"
+        className="primary city-go"
+        disabled={quote.units === 0}
+        onClick={() => onSwap(give, want, units)}
+      >
+        {swapText(GOOD_LABELS[give].toLowerCase(), GOOD_LABELS[want].toLowerCase(), quote)}
+      </button>
     </div>
   )
 }
@@ -1261,24 +1327,32 @@ function Swapping({
 function Rates({
   rates,
   hint,
+  picked,
   onPick,
 }: {
   rates: SwapRate[]
   /** What picking one does. */
   hint: string
+  /** Whether a rate is the one filled in now, shown pressed. */
+  picked?: (rate: SwapRate) => boolean
   onPick: (rate: SwapRate) => void
 }) {
   if (rates.length === 0) return null
   return (
-    <div className="swap-rates" aria-label="Rates">
-      <h3>Rates</h3>
-      <p className="small muted">
+    <div className="col city-rates" aria-label="Rates">
+      <h4 className="lb">Rates</h4>
+      <p className="mu">
         You give what it is short of for what it has spare, at today’s prices. {hint}
       </p>
-      <ul>
+      <ul className="fx wrap">
         {rates.map((r) => (
           <li key={`${r.give}:${r.want}`}>
-            <button type="button" onClick={() => onPick(r)}>
+            <button
+              type="button"
+              className="btn sm"
+              aria-pressed={picked?.(r) ?? false}
+              onClick={() => onPick(r)}
+            >
               <GoodIcon good={r.give} />
               {rateText(r, GOOD_LABELS[r.give].toLowerCase(), GOOD_LABELS[r.want].toLowerCase())}
               <GoodIcon good={r.want} />
@@ -1323,10 +1397,10 @@ function HorseMarket({
   const resident = traders.find((r) => r.id === residentId) ?? traders[0]
   const at = `Stable at (${stable.x}, ${stable.y})`
   return (
-    <div className="warehouse-prices horse-market" aria-label={at}>
-      <p className="warehouse-prices-place">{at}</p>
+    <div className="sec city-horses" aria-label={at}>
+      <h3 className="px t16">Horse market · {at}</h3>
       {stable.horses.length > 0 && (
-        <ul className="horse-offers" aria-label="Horses">
+        <ul className="col city-horse-list" aria-label="Horses">
           {stable.horses.map((h) => (
             <HorseOfferRow
               key={h.horseId}
@@ -1340,8 +1414,9 @@ function HorseMarket({
           ))}
         </ul>
       )}
+      {stable.toSell.length > 0 && <h4 className="lb">Your horses</h4>}
       {stable.toSell.length > 0 && (
-        <ul className="horse-offers" aria-label="Your horses">
+        <ul className="col city-horse-list" aria-label="Your horses">
           {stable.toSell.map((h) => (
             <HorseOfferRow
               key={h.horseId}
@@ -1358,8 +1433,8 @@ function HorseMarket({
       {resident ? (
         <>
           {traders.length > 1 && (
-            <label>
-              Trader{' '}
+            <label className="fld">
+              <span className="lb">Trader</span>
               <select value={resident.id} onChange={(e) => setResidentId(e.target.value)}>
                 {traders.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -1369,7 +1444,7 @@ function HorseMarket({
               </select>
             </label>
           )}
-          <p className="small muted trader-holds">
+          <p className="mu trader-holds">
             {resident.name} holds {Math.floor(resident.carried.coins ?? 0)} coins.
           </p>
         </>
@@ -1396,24 +1471,28 @@ function HorseOfferRow({
   problem: string | undefined
   onTrade: (trade: HorseTradeRequest) => void
 }) {
+  const ok = problem === undefined
   return (
-    <li>
-      <strong>{offer.name}</strong>: <strong>{offer.price} coins</strong>
-      <br />
-      <span className="small">{horseStatsText(offer, tick)}</span>
-      {resident && (
-        <>
+    <li className="col city-horse">
+      <div className="fx wrap">
+        <span className="ic i-horse" aria-hidden="true" />
+        <span className="grow">
+          <span className="b">{offer.name}</span> · {offer.price} coins
           <br />
+          <span className="mu">{horseStatsText(offer, tick)}</span>
+        </span>
+        {resident && (
           <button
             type="button"
-            disabled={problem !== undefined}
+            className={!ok ? 'btn sm off' : verb === 'Buy' ? 'btn sm gold' : 'btn sm'}
+            disabled={!ok}
             onClick={() => onTrade({ residentId: resident.id, horseId: offer.horseId })}
           >
             {verb} {offer.name} for {offer.price} coins
           </button>
-        </>
-      )}
-      {problem && <p className="small muted">{problem}.</p>}
+        )}
+      </div>
+      {problem && <p className="mu">{problem}.</p>}
     </li>
   )
 }
@@ -1445,18 +1524,18 @@ export function Sending({
   const keyOf = (s: SendView) => `${s.residentId}:${s.carriageId ?? ''}`
   const picked = sendable.find((s) => keyOf(s) === key) ?? sendable[0]
   return (
-    <div className="warehouse-sending" aria-label="Sending a trader">
+    <div className="col city-sending" aria-label="Sending a trader">
       {going.length > 0 ? (
         going.map((line) => <p key={line}>{line}.</p>)
       ) : (
-        <p className="small muted">
+        <p>
           Nobody of yours is at the {place} at ({warehouse.x}, {warehouse.y}) to trade.
         </p>
       )}
       {picked ? (
-        <p>
-          <label>
-            Send{' '}
+        <div className="fx city-fields">
+          <label className="fld grow">
+            <span className="lb">Send</span>
             <select value={keyOf(picked)} onChange={(e) => setKey(e.target.value)}>
               {sendable.map((s) => (
                 <option key={keyOf(s)} value={keyOf(s)}>
@@ -1465,13 +1544,13 @@ export function Sending({
                 </option>
               ))}
             </select>
-          </label>{' '}
-          <button type="button" onClick={() => onSend(picked)}>
+          </label>
+          <button type="button" className="btn pri" onClick={() => onSend(picked)}>
             Send
           </button>
-        </p>
+        </div>
       ) : (
-        <p className="small muted">Nobody of yours in sight to send.</p>
+        <p className="mu">Nobody of yours in sight to send.</p>
       )}
     </div>
   )
@@ -1519,52 +1598,97 @@ function Transferring({
         ? `Send ${quote.units} ${label} from ${from.name} for a ${quote.fee}-coin fee`
         : `${from.name} hasn’t the ${label} or the fee`
   return (
-    <div className="city-transfer trade-service" aria-label="Transfer">
-      <h3>Transfer</h3>
-      <p className="small muted">
+    <div className="sec city-trading" aria-label="Transfer">
+      <h3 className="px t16">Transfer</h3>
+      <p className="mu">
         A caravan fetches goods or coins from one of your cities and brings them to this city, for a
         fee.
       </p>
-      <label>
-        From{' '}
-        <select value={from.id} onChange={(e) => setFromId(e.target.value)}>
-          {fromCities.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
+      <div className="fx wrap city-fields">
+        <label className="fld grow">
+          <span className="lb">From</span>
+          <select value={from.id} onChange={(e) => setFromId(e.target.value)}>
+            {fromCities.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="fld grow">
+          <span className="lb">Good</span>
+          <select value={good} onChange={(e) => setGood(e.target.value as Good)}>
+            {GOODS.map((g) => (
+              <option key={g} value={g}>
+                {GOOD_LABELS[g]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="fld city-units">
+          <span className="lb">Units</span>
+          <input
+            type="number"
+            className="mono"
+            min={1}
+            step={1}
+            value={units}
+            onChange={(e) => setUnits(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+          />
+        </label>
+      </div>
+      <button
+        type="button"
+        className="primary city-go"
+        disabled={quote?.units === 0}
+        onClick={() => onTransfer({ fromCityId: from.id, toCityId: to.id, good, units })}
+      >
+        {text}
+      </button>
+      <p className="mu">to {to.name}, by Trade Org caravan</p>
+    </div>
+  )
+}
+
+/** Who pays at a warehouse, and from their hands or a carriage there. */
+function PayerFields({
+  traders,
+  residentId,
+  carriageId,
+  onResident,
+  onCarriage,
+}: {
+  traders: TradersView
+  residentId: string
+  carriageId: string
+  onResident: (id: string) => void
+  onCarriage: (id: string) => void
+}) {
+  return (
+    <div className="fx city-fields">
+      <label className="fld grow">
+        <span className="lb">Payer</span>
+        <select value={residentId} onChange={(e) => onResident(e.target.value)}>
+          {traders.residents.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
             </option>
           ))}
         </select>
       </label>
-      <label>
-        Good{' '}
-        <select value={good} onChange={(e) => setGood(e.target.value as Good)}>
-          {GOODS.map((g) => (
-            <option key={g} value={g}>
-              {GOOD_LABELS[g]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Units{' '}
-        <input
-          type="number"
-          min={1}
-          step={1}
-          value={units}
-          onChange={(e) => setUnits(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
-        />
-      </label>
-      <p>
-        <button
-          type="button"
-          disabled={quote?.units === 0}
-          onClick={() => onTransfer({ fromCityId: from.id, toCityId: to.id, good, units })}
-        >
-          {text}
-        </button>{' '}
-        <span className="small muted">to {to.name}, by Trade Org caravan</span>
-      </p>
+      {traders.carriages.length > 0 && (
+        <label className="fld grow">
+          <span className="lb">With</span>
+          <select value={carriageId} onChange={(e) => onCarriage(e.target.value)}>
+            <option value="">their hands</option>
+            {traders.carriages.map((k) => (
+              <option key={k.id} value={k.id}>
+                carriage {k.id}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
     </div>
   )
 }
@@ -1590,49 +1714,37 @@ function BuyingOff({
   const carriage = traders.carriages.find((k) => k.id === carriageId)
   if (!resident) {
     return (
-      <p className="small muted">
-        To buy off the admin directive against you, bring a resident here with its price in coins.
-      </p>
+      <div className="sec city-trading">
+        <h3 className="px t16">Buying off</h3>
+        <p className="mu">
+          To buy off the admin directive against you, bring a resident here with its price in coins.
+        </p>
+      </div>
     )
   }
   const coins = (carriage ? carriage.load : resident.carried).coins ?? 0
   return (
-    <div className="warehouse-trading" aria-label="Buying off">
-      <label>
-        Payer{' '}
-        <select value={resident.id} onChange={(e) => setResidentId(e.target.value)}>
-          {traders.residents.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {traders.carriages.length > 0 && (
-        <label>
-          With{' '}
-          <select value={carriageId} onChange={(e) => setCarriageId(e.target.value)}>
-            <option value="">their hands</option>
-            {traders.carriages.map((k) => (
-              <option key={k.id} value={k.id}>
-                carriage {k.id}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
+    <div className="sec city-trading" aria-label="Buying off">
+      <h3 className="px t16">Buying off</h3>
+      <PayerFields
+        traders={traders}
+        residentId={resident.id}
+        carriageId={carriageId}
+        onResident={setResidentId}
+        onCarriage={setCarriageId}
+      />
       {directives.map((d) => (
-        <p key={d.id}>
-          <button
-            type="button"
-            disabled={coins < d.price!}
-            onClick={() => onBuyOff(resident.id, d.id, carriage?.id ?? null)}
-          >
-            {coins < d.price!
-              ? `Buying off the directive (${d.reason}) takes ${d.price} coins`
-              : `Pay ${d.price} coins to buy off the directive (${d.reason})`}
-          </button>
-        </p>
+        <button
+          key={d.id}
+          type="button"
+          className="primary city-go"
+          disabled={coins < d.price!}
+          onClick={() => onBuyOff(resident.id, d.id, carriage?.id ?? null)}
+        >
+          {coins < d.price!
+            ? `Buying off the directive (${d.reason}) takes ${d.price} coins`
+            : `Pay ${d.price} coins to buy off the directive (${d.reason})`}
+        </button>
       ))}
     </div>
   )
@@ -1659,57 +1771,47 @@ function PayingDebt({
   const resident = traders.residents.find((r) => r.id === residentId) ?? traders.residents[0]
   const carriage = traders.carriages.find((k) => k.id === carriageId)
   if (!resident) {
-    return <p className="small muted">To pay your debt, bring a resident here with coins.</p>
+    return (
+      <div className="sec city-trading">
+        <h3 className="px t16">Paying debt</h3>
+        <p className="mu">To pay your debt, bring a resident here with coins.</p>
+      </div>
+    )
   }
   const most = Math.min(debt, Math.floor((carriage ? carriage.load : resident.carried).coins ?? 0))
   const coins = Math.min(wanted ?? most, most)
   return (
-    <div className="warehouse-trading" aria-label="Paying the debt">
-      <label>
-        Payer{' '}
-        <select value={resident.id} onChange={(e) => setResidentId(e.target.value)}>
-          {traders.residents.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {traders.carriages.length > 0 && (
-        <label>
-          With{' '}
-          <select value={carriageId} onChange={(e) => setCarriageId(e.target.value)}>
-            <option value="">their hands</option>
-            {traders.carriages.map((k) => (
-              <option key={k.id} value={k.id}>
-                carriage {k.id}
-              </option>
-            ))}
-          </select>
+    <div className="sec city-trading" aria-label="Paying the debt">
+      <h3 className="px t16">Paying debt</h3>
+      <PayerFields
+        traders={traders}
+        residentId={resident.id}
+        carriageId={carriageId}
+        onResident={setResidentId}
+        onCarriage={setCarriageId}
+      />
+      <div className="fx city-fields">
+        <label className="fld city-units">
+          <span className="lb">Coins</span>
+          <input
+            type="number"
+            className="mono"
+            min={1}
+            max={most}
+            value={coins}
+            disabled={most < 1}
+            onChange={(e) => setWanted(Math.floor(Number(e.target.value)))}
+          />
         </label>
-      )}
-      <label>
-        Coins{' '}
-        <input
-          type="number"
-          min={1}
-          max={most}
-          value={coins}
-          disabled={most < 1}
-          onChange={(e) => setWanted(Math.floor(Number(e.target.value)))}
-        />
-      </label>
-      <p>
-        <button
-          type="button"
-          disabled={coins < 1}
-          onClick={() => onPayDebt(resident.id, coins, carriage?.id ?? null)}
-        >
-          {most < 1
-            ? 'No coins to pay your debt with'
-            : `Pay ${coins} of the ${debt} Coins you owe`}
-        </button>
-      </p>
+      </div>
+      <button
+        type="button"
+        className="primary city-go"
+        disabled={coins < 1}
+        onClick={() => onPayDebt(resident.id, coins, carriage?.id ?? null)}
+      >
+        {most < 1 ? 'No coins to pay your debt with' : `Pay ${coins} of the ${debt} Coins you owe`}
+      </button>
     </div>
   )
 }
