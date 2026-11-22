@@ -779,36 +779,42 @@ button.card-list-row:hover {
   height: 16px;
 }
 
-/* The realm bar along the bottom of the map in realm control mode (`CONTEXT.md`: Realm order). */
-.hud-realm-bar {
+/* The realm bar (`RealmBar`; `CONTEXT.md`: Realm order, Screen; artboard Game-Realm): in realm
+   control mode it takes the command bar's place along the bottom, left of the map dock, a heading
+   and the hint over a row of big order buttons. `RealmBar` measures it into `--command-h`. */
+.realm-bar {
   position: absolute;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 8px;
+  right: calc(var(--dock-w, 236px) + 16px);
+  bottom: 8px;
   z-index: 3;
-  width: max-content;
-  max-width: min(680px, calc(100vw - var(--rail-w) - 220px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  font-family: var(--font-ui);
+}
+.realm-bar-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
+  align-items: baseline;
+  gap: 4px 12px;
 }
-/* On a line of its own under the orders. */
-.hud-realm-bar-hint {
-  flex: 1 1 100%;
+.realm-bar-head .px {
+  flex: 1 1 auto;
+}
+.realm-bar-hint {
   color: var(--ui-muted);
   white-space: normal;
 }
-.hud-realm-bar button {
-  flex: none;
-  padding: 4px 12px;
-  font-weight: 600;
+.realm-bar-orders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
-.hud-realm-bar button.on {
-  background: var(--gold);
-  box-shadow: inset 2px 2px 0 var(--orange);
-  color: var(--ink);
+.realm-bar-orders .btn {
+  flex: none;
 }
 /* The who-list (`CONTEXT.md`: Who-list): one row a resident, nearest first, can't-take greyed. */
 .who-choice {
@@ -900,21 +906,27 @@ button.card-list-row:hover {
 .who-actions {
   margin-top: 8px;
 }
-/* On a phone above the map buttons and the minimap button, clear of the notices up top. */
-.game.phone .hud-realm-bar {
+/* On a phone above the map buttons and the minimap button, clear of the notices up top: no
+   heading, the hint small, the orders in as few rows as fit. */
+.game.phone .realm-bar {
   bottom: calc(var(--sheet-h, 0px) + 12px + 44px + 6px + 36px + 8px);
-  left: 8px;
   right: 8px;
-  transform: none;
-  width: auto;
-  max-width: none;
-  padding: 5px 10px;
-  font-size: 12px;
-  gap: 4px 6px;
+  gap: 4px;
+  padding: 6px 8px;
 }
-/* The orders in as few rows as fit on a phone. */
-.game.phone .hud-realm-bar button {
-  padding: 4px 7px;
+.game.phone .realm-bar-head .px {
+  display: none;
+}
+.game.phone .realm-bar-hint {
+  font-size: 12px;
+}
+.game.phone .realm-bar-orders {
+  gap: 4px;
+}
+.game.phone .realm-bar-orders .btn.lg {
+  height: 36px;
+  padding: 0 8px;
+  font-size: 13px;
 }
 
 /* ---------- The command bar (`CONTEXT.md`: Screen; `CommandBar.tsx`, ADR 0044) ----------
@@ -1903,3 +1915,68 @@ button.card-list-row:hover {
 .game-selection.sheet .queue-insert:not(.set, .move) button {
   top: -14px;
 }
+/* Realm control mode and the army card (T119.7) ----------
+   The who-list (`WhoList`; artboard Game-Realm) in the dock: rows ruled as the kit's (`.rw`),
+   Now | After as one switch, the can't rows saying why in red, and Cancel and Confirm in a footer
+   that stays in view while the card scrolls. In the dock the whole card scrolls, not the list. */
+.who-row label {
+  padding: 6px 2px;
+  border-bottom-color: var(--tan);
+}
+.who-when {
+  gap: 0;
+  border-bottom-color: var(--tan);
+}
+.who-cant label {
+  opacity: 0.7;
+}
+.who-cant .who-doing {
+  color: var(--ui-bad);
+}
+.who-more {
+  width: auto;
+  margin: 8px 0 0;
+}
+.game-dock .who-list {
+  max-height: none;
+  overflow: visible;
+}
+.who-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px -10px -10px;
+  padding: 8px 10px;
+  border-top: 2px solid var(--ink);
+  background: var(--paper);
+}
+.who-again {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The Orders block on a building's, carriage's or vessel's card in realm control mode
+   (`BuildingOrders`, `VehicleOrders`), headed as the card's other blocks are; a tile's realm
+   orders (`RealmTileOrders`) two to a row. */
+.realm-orders .panel-head h3 {
+  margin: 0;
+}
+.realm-tile-orders .order-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.realm-tile-orders .order-buttons button {
+  min-width: 0;
+}
+
+/* An army's card in the command bar (`ArmyCard`): members and wagons under its name, the target
+   picker over Attack and Follow, Members and Supply as plain lists. */
+.cmd-head .army-facts {
+  color: var(--ui-text);
+}
+.army-orders .cmd-group > select {
+  width: 100%;
+}
+/* End of realm control mode and the army card (T119.7) */
