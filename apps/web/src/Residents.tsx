@@ -158,12 +158,11 @@ import {
   type StepGroup,
 } from './queue-view.js'
 import { copy, paste, pickStep, useClipboardEmpty } from './planner-clipboard.js'
+import { toolbarCount } from './command-tabs-view.js'
 import {
   followInsert,
   InsertPointContext,
   PlannerFlowContext,
-  PLAN_STEP_ICONS,
-  REPEAT_ICON,
   STEP_KIND_TYPE,
 } from './step-palette-view.js'
 import { canMoveTo, insertPoints, moveItems } from './queue-brackets-view.js'
@@ -425,12 +424,13 @@ function TaskScript({
   const script = scripts.find((s) => s.id === scriptId)
   const note = !script?.task ? '' : script.followsDefault ? 'the game’s default' : 'edited by you'
   return (
-    <div className="task-script goods-row">
-      <span className="small">
+    <div className="task-script">
+      <span className="grow">
         Runs <strong>{script?.name ?? 'a script'}</strong>
+        {script && script.activeVersion !== null && ` · version ${script.activeVersion}`}
+        {note && <span className="muted small"> · {note}</span>}
       </span>
-      <span className="muted small">{note}</span>
-      <button type="button" onClick={() => onEdit(scriptId)} disabled={!script}>
+      <button type="button" className="btn sm" onClick={() => onEdit(scriptId)} disabled={!script}>
         Edit
       </button>
     </div>
@@ -469,10 +469,16 @@ export function QueueBlock({
   palette,
   rounds,
   branches,
+  mark,
+  foot,
 }: {
   queue: Pick<QueuePlan, 'items' | 'loop' | 'nextStepId'>
-  /** The Add step palette, right under the steps (`CONTEXT.md`: Planner blocks). */
+  /** The Add step palette, beside the steps (`CONTEXT.md`: Planner blocks). */
   palette?: ReactNode
+  /** Said after the title at the head of the toolbar: a draft's "not started". */
+  mark?: ReactNode
+  /** Under the steps: Start queue and Discard draft, Give to all, or Edit as draft. */
+  foot?: ReactNode
   /** The id of the step being done, in a running queue. */
   currentId?: number
   /** The round each block around the current step is on, by block id, in a running queue. */
@@ -593,107 +599,122 @@ export function QueueBlock({
   }
   let n = 0
   return (
-    <section className="inspector-block" aria-label={title}>
-      <div className="order-buttons queue-tools">
-        <button type="button" disabled={picked.length === 0} onClick={copyPicked}>
-          Copy
-        </button>
-        <button type="button" disabled={clipboardEmpty} onClick={pasteSteps}>
-          Paste
-        </button>
-        <button
-          type="button"
-          disabled={!wrapped}
-          title="Wrap the picked steps, in a row, in a repeat block"
-          onClick={repeat}
-        >
-          Repeat
-        </button>
-        <button
-          type="button"
-          disabled={q.items.length === 0}
-          title={
-            running
-              ? 'Remove every step but the current one and turn loop off: the queue ends after it'
-              : 'Remove every step'
-          }
-          onClick={clear}
-        >
-          Clear
-        </button>
-        {realm && (
-          <SavedQueueTools
-            realm={realm}
-            steps={q.items}
-            onLoad={(loaded) => add(undefined, loaded)}
-            oneButton
-          />
-        )}
-        <button
-          type="button"
-          aria-label="How the planner works"
-          aria-expanded={help}
-          onClick={() => setHelp(!help)}
-        >
-          ?
-        </button>
-        {picked.length > 0 && <span className="small muted">{picked.length} picked</span>}
-      </div>
-      {help && (
-        <p className="muted small">
-          Tap a step to pick it (Shift for a range), then Copy; Paste puts the copies after the
-          picked step. Drag a step or block to move it, into or out of a bracket, or pick it and tap
-          Move here; focus it and press Alt+↑ or Alt+↓. Drag a step kind from Add step to put it
-          where you drop it. Loop is the outer bracket, its switch in its head. Working, hauling,
-          teaching and training never end on their own, so they need a duration unless they are
-          last: tap the duration to set it. Repeat wraps the picked steps in a block done so many
-          times in a row, or forever; a round in which none of its steps could start ends it, and a
-          running queue shows the round it is on. If (in Add step’s Flow) puts the picked steps
-          under a condition, checked once when its turn comes; Else moves other picked steps into
-          its Else part, run when the condition doesn’t hold. A queue holds up to {QUEUE_MAX_STEPS}{' '}
-          steps and blocks as written, nested up to {QUEUE_MAX_DEPTH} deep. Saved… keeps the steps
-          in this browser under a name, and loads a saved queue’s steps at the end. Clear empties a
-          draft; on a running queue it keeps only the current step and turns loop off, so the queue
-          ends after it.
-        </p>
-      )}
-      {hasBlocks(q.items) && (
-        <p className={`small ${over ? 'queue-unrolled-over' : 'muted'}`}>
-          {over ? `Too long: ${over}.` : `${written} of ${QUEUE_MAX_STEPS} steps and blocks.`}
-        </p>
-      )}
-      <div className={`queue-bracket queue-loop-bracket${q.loop ? ' on' : ''}`}>
-        <div className="queue-bracket-head">
-          <label className="small queue-loop">
-            <input
-              type="checkbox"
-              checked={q.loop}
-              onChange={(e) => edit(q.items, e.target.checked)}
-            />{' '}
-            <span aria-hidden="true">⟲</span> Loop
-          </label>
-          <span className="small muted">
-            {q.loop ? 'from the top again after the last step' : 'ends after the last step'}
-          </span>
+    <section className="queue-planner" aria-label={title}>
+      <div className="queue-list">
+        <div className="queue-tools">
+          <span className="px t16">{title}</span>
+          {mark}
+          <span className="grow" />
+          <button
+            type="button"
+            className="btn sm"
+            disabled={picked.length === 0}
+            onClick={copyPicked}
+          >
+            Copy
+          </button>
+          <button type="button" className="btn sm" disabled={clipboardEmpty} onClick={pasteSteps}>
+            Paste
+          </button>
+          <button
+            type="button"
+            className="btn sm"
+            disabled={!wrapped}
+            title="Wrap the picked steps, in a row, in a repeat block"
+            onClick={repeat}
+          >
+            Repeat
+          </button>
+          <button
+            type="button"
+            className="btn sm"
+            disabled={q.items.length === 0}
+            title={
+              running
+                ? 'Remove every step but the current one and turn loop off: the queue ends after it'
+                : 'Remove every step'
+            }
+            onClick={clear}
+          >
+            Clear
+          </button>
+          {realm && (
+            <SavedQueueTools
+              realm={realm}
+              steps={q.items}
+              onLoad={(loaded) => add(undefined, loaded)}
+              oneButton
+            />
+          )}
+          <button
+            type="button"
+            className="btn sm sq"
+            aria-label="How the planner works"
+            aria-expanded={help}
+            onClick={() => setHelp(!help)}
+          >
+            ?
+          </button>
+          {(picked.length > 0 || hasBlocks(q.items)) && (
+            <span className={`small ${over ? 'queue-unrolled-over' : 'muted'}`}>
+              {toolbarCount(picked.length, hasBlocks(q.items) ? { written, over } : undefined)}
+            </span>
+          )}
         </div>
-        <ol className="queue-steps" tabIndex={-1} onKeyDown={onKey}>
-          {renderItems(q.items, 0)}
-          {(picked.length > 0 || dragging) && point(undefined)}
-        </ol>
+        {help && (
+          <p className="well small queue-help">
+            Tap a step to pick it (Shift for a range), then Copy; Paste puts the copies after the
+            picked step. Drag a step or block to move it, into or out of a bracket, or pick it and
+            tap Move here; focus it and press Alt+↑ or Alt+↓. Drag a step kind from Add step to put
+            it where you drop it. Loop is the outer bracket, its switch in its head. Working,
+            hauling, teaching and training never end on their own, so they need a duration unless
+            they are last: tap the duration to set it. Repeat wraps the picked steps in a block done
+            so many times in a row, or forever; a round in which none of its steps could start ends
+            it, and a running queue shows the round it is on. If (in Add step’s Flow) puts the
+            picked steps under a condition, checked once when its turn comes; Else moves other
+            picked steps into its Else part, run when the condition doesn’t hold. A queue holds up
+            to {QUEUE_MAX_STEPS} steps and blocks as written, nested up to {QUEUE_MAX_DEPTH} deep.
+            Saved… keeps the steps in this browser under a name, and loads a saved queue’s steps at
+            the end. Clear empties a draft; on a running queue it keeps only the current step and
+            turns loop off, so the queue ends after it.
+          </p>
+        )}
+        <div className={`queue-bracket queue-loop-bracket${q.loop ? ' on' : ''}`}>
+          <div className="queue-bracket-head">
+            <label className="small queue-loop">
+              <input
+                type="checkbox"
+                checked={q.loop}
+                onChange={(e) => edit(q.items, e.target.checked)}
+              />{' '}
+              <span aria-hidden="true">⟲</span> Loop
+            </label>
+            <span className="small muted">
+              {q.loop ? 'from the top again after the last step' : 'ends after the last step'}
+            </span>
+          </div>
+          <ol className="queue-steps" tabIndex={-1} onKeyDown={onKey}>
+            {renderItems(q.items, 0)}
+            {(picked.length > 0 || dragging) && point(undefined)}
+          </ol>
+        </div>
+        {foot}
       </div>
       {palette && (
-        <PlannerFlowContext.Provider
-          value={{
-            ...(wrapped ? { repeat } : {}),
-            ...(wrapped && kept?.start
-              ? { wrapIf: () => kept.start?.('if', undefined, { wrap: picked }) }
-              : {}),
-            ifDone,
-            ...(insertAt === undefined ? {} : { after: insertAt }),
-          }}
-        >
-          {palette}
-        </PlannerFlowContext.Provider>
+        <div className="queue-palette">
+          <PlannerFlowContext.Provider
+            value={{
+              ...(wrapped ? { repeat } : {}),
+              ...(wrapped && kept?.start
+                ? { wrapIf: () => kept.start?.('if', undefined, { wrap: picked }) }
+                : {}),
+              ifDone,
+              ...(insertAt === undefined ? {} : { after: insertAt }),
+            }}
+          >
+            {palette}
+          </PlannerFlowContext.Provider>
+        </div>
       )}
     </section>
   )
@@ -746,6 +767,7 @@ export function QueueBlock({
       >
         <button
           type="button"
+          className="btn sm"
           aria-label={
             moving
               ? `Move the picked steps ${after === undefined ? 'to the end' : 'here'}`
@@ -803,9 +825,7 @@ export function QueueBlock({
         data-depth={depth}
       >
         <div className="queue-bracket-head" {...rowProps(id)}>
-          <span className="queue-step-icon" aria-hidden="true">
-            {REPEAT_ICON}
-          </span>
+          <span className="ic s16 i-loop queue-step-icon" aria-hidden="true" />
           <RepeatCount
             repeat={block.repeat}
             steps={stepCount(block.items)}
@@ -824,15 +844,16 @@ export function QueueBlock({
               : {})}
           />
           <span className="buttons">
-            <button type="button" onClick={() => edit(unwrap(q.items, id))}>
+            <button type="button" className="btn sm" onClick={() => edit(unwrap(q.items, id))}>
               Unwrap
             </button>
             <button
               type="button"
+              className="btn sm sq"
               aria-label="Remove the block and its steps"
               onClick={() => edit(removeItem(q.items, id))}
             >
-              ✕
+              <span className="ic s16 i-x" aria-hidden="true" />
             </button>
           </span>
         </div>
@@ -849,24 +870,22 @@ export function QueueBlock({
     const isPicked = picked.includes(id)
     const taken = branches?.get(id)
     const toElse = intoElse(q.items, picked, id)
-    const runs = <span className="queue-branch small"> · running</span>
+    const runs = <span className="chip g queue-branch">running</span>
     return (
       <li
         className={`queue-bracket queue-if-bracket${isPicked ? ' picked' : ''}`}
         data-depth={depth}
       >
         <div className="queue-bracket-head" {...rowProps(id)}>
-          <span className="queue-step-icon" aria-hidden="true">
-            {PLAN_STEP_ICONS.if}
-          </span>
           <span className="small queue-step-label">
-            If {conditionLabel(block.if, names)}
+            <strong>If</strong> {conditionLabel(block.if, names)}
             {taken === 'then' && runs}
           </span>
           <span className="buttons">
             {kept?.start && (
               <button
                 type="button"
+                className="btn sm"
                 title="Change the condition"
                 onClick={() =>
                   kept.start?.('if', undefined, { blockId: id, condition: draftOf(block.if) })
@@ -877,6 +896,7 @@ export function QueueBlock({
             )}
             <button
               type="button"
+              className="btn sm"
               disabled={!toElse}
               title={
                 toElse
@@ -887,15 +907,16 @@ export function QueueBlock({
             >
               Else
             </button>
-            <button type="button" onClick={() => edit(unwrap(q.items, id))}>
+            <button type="button" className="btn sm" onClick={() => edit(unwrap(q.items, id))}>
               Unwrap
             </button>
             <button
               type="button"
+              className="btn sm sq"
               aria-label="Remove the block and its steps"
               onClick={() => edit(removeItem(q.items, id))}
             >
-              ✕
+              <span className="ic s16 i-x" aria-hidden="true" />
             </button>
           </span>
         </div>
@@ -903,7 +924,8 @@ export function QueueBlock({
         {block.else && (
           <>
             <div className="queue-bracket-head queue-else-head small">
-              Else{taken === 'else' && runs}
+              <strong>Else</strong>
+              {taken === 'else' && runs}
             </div>
             <ol className="queue-steps">{renderItems(block.else, depth + 1)}</ol>
           </>
@@ -925,9 +947,7 @@ export function QueueBlock({
         {...rowProps(id)}
       >
         <div className="queue-step-head">
-          <span className="queue-step-icon" aria-hidden="true">
-            {STEP_ICONS[step.group]}
-          </span>
+          <span className={`ic s16 queue-step-icon ${STEP_ICONS[step.group]}`} aria-hidden="true" />
           <span
             className="small queue-step-label"
             title={step.gone ? `${step.gone}: it will be skipped` : step.label}
@@ -939,8 +959,13 @@ export function QueueBlock({
             <DurationChip row={step} onSet={(minutes) => edit(timeItem(q.items, id, minutes))} />
           )}
           <span className="buttons">
-            <button type="button" aria-label="Remove" onClick={() => edit(removeItem(q.items, id))}>
-              ✕
+            <button
+              type="button"
+              className="btn sm sq"
+              aria-label="Remove"
+              onClick={() => edit(removeItem(q.items, id))}
+            >
+              <span className="ic s16 i-x" aria-hidden="true" />
             </button>
           </span>
         </div>
@@ -1008,7 +1033,7 @@ function RepeatCount({
   return (
     <span className="small queue-step-minutes">
       <label>
-        Repeat{' '}
+        <strong>Repeat</strong>{' '}
         <select aria-label="How it repeats" value={mode} onChange={(e) => pick(e.target.value)}>
           <option value="times">×</option>
           <option value="forever">forever</option>
@@ -1035,7 +1060,12 @@ function RepeatCount({
         <>
           <span className="queue-step-label">{conditionLabel(until, names)}</span>{' '}
           {onUntil && (
-            <button type="button" title="Change the condition" onClick={() => onUntil(until)}>
+            <button
+              type="button"
+              className="btn sm"
+              title="Change the condition"
+              onClick={() => onUntil(until)}
+            >
               Change
             </button>
           )}
@@ -1100,6 +1130,7 @@ export function SavedQueueTools({
         {oneButton && (
           <button
             type="button"
+            className="btn sm"
             title="Save these steps under a name, or load saved ones"
             aria-expanded={open === 'both'}
             onClick={() => toggle('both')}
@@ -1108,18 +1139,28 @@ export function SavedQueueTools({
           </button>
         )}
         {!oneButton && steps.length > 0 && (
-          <button type="button" aria-expanded={open === 'save'} onClick={() => toggle('save')}>
+          <button
+            type="button"
+            className="btn sm"
+            aria-expanded={open === 'save'}
+            onClick={() => toggle('save')}
+          >
             Save…
           </button>
         )}
         {!oneButton && (
-          <button type="button" aria-expanded={open === 'load'} onClick={() => toggle('load')}>
+          <button
+            type="button"
+            className="btn sm"
+            aria-expanded={open === 'load'}
+            onClick={() => toggle('load')}
+          >
             Load…
           </button>
         )}
       </div>
       {(open === 'save' || (open === 'both' && steps.length > 0)) && (
-        <form className="saved-queues-save" onSubmit={onSave}>
+        <form className="saved-queues-save well" onSubmit={onSave}>
           <input
             aria-label="Name to save the queue under"
             placeholder="Name, such as Mine run"
@@ -1128,7 +1169,7 @@ export function SavedQueueTools({
             autoFocus
             onChange={(e) => setName(e.target.value)}
           />
-          <button type="submit" disabled={!name.trim()}>
+          <button type="submit" className="btn sm" disabled={!name.trim()}>
             {taken ? 'Overwrite' : 'Save'}
           </button>
           {taken && (
@@ -1138,9 +1179,9 @@ export function SavedQueueTools({
       )}
       {(open === 'load' || open === 'both') &&
         (saved.length === 0 ? (
-          <p className="muted small">No queues saved in this browser yet.</p>
+          <p className="muted small saved-queues-none">No queues saved in this browser yet.</p>
         ) : (
-          <ul className="saved-queues-list">
+          <ul className="saved-queues-list well">
             {saved.map((s) => (
               <li key={s.name}>
                 <span className="small">
@@ -1153,6 +1194,7 @@ export function SavedQueueTools({
                 <span className="buttons">
                   <button
                     type="button"
+                    className="btn sm"
                     onClick={() => {
                       onLoad(loadQueue(queues, s.name))
                       setOpen(undefined)
@@ -1162,6 +1204,7 @@ export function SavedQueueTools({
                   </button>
                   <button
                     type="button"
+                    className="btn sm"
                     aria-label={`Delete ${s.name}`}
                     onClick={() => keep(removeQueue(queues, s.name))}
                   >
@@ -1185,7 +1228,7 @@ export function PasteSteps({ onPaste }: { onPaste: (steps: PlanItem[]) => void }
   if (empty) return null
   return (
     <div className="order-buttons">
-      <button type="button" onClick={() => onPaste(paste())}>
+      <button type="button" className="btn sm" onClick={() => onPaste(paste())}>
         Paste
       </button>
     </div>
@@ -1218,29 +1261,32 @@ export function GivePlan({
 }) {
   const problem = planProblem(plan.items)
   return (
-    <>
-      <div className="order-buttons">
-        <button type="button" className="primary" disabled={problem !== undefined} onClick={onGive}>
-          {give}
-        </button>
-        <button type="button" onClick={onDiscard}>
-          {discard}
-        </button>
-      </div>
+    <div className="queue-foot">
       <p className={`small ${problem && plan.items.length > 0 ? 'queue-unrolled-over' : 'muted'}`}>
         {problem && plan.items.length > 0 ? `Can’t give it yet: ${problem}.` : note}
       </p>
-    </>
+      <button type="button" className="btn sm" onClick={onDiscard}>
+        {discard}
+      </button>
+      <button
+        type="button"
+        className="btn sm pri"
+        disabled={problem !== undefined}
+        onClick={onGive}
+      >
+        {give}
+      </button>
+    </div>
   )
 }
 
-/** A step's icon by the kind of order it is, as the Orders tab groups them. */
+/** A step's icon (the kit's `.i-…` class) by the kind of order it is, as the Orders tab groups them. */
 const STEP_ICONS: Record<StepGroup, string> = {
-  move: '➜',
-  work: '⚒',
-  goods: '▣',
-  scripts: '{}',
-  flow: '⏳',
+  move: 'i-walk',
+  work: 'i-hammer',
+  goods: 'i-box',
+  scripts: 'i-code',
+  flow: 'i-clock',
 }
 
 /**
@@ -1268,7 +1314,7 @@ function DurationChip({
     return (
       <button
         type="button"
-        className={`small queue-step-chip${row.minutes === undefined ? ' needed' : ''}`}
+        className={`btn sm queue-step-chip${row.minutes === undefined ? ' dng needed' : ''}`}
         title="Duration in game minutes"
         onClick={() => setEditing(true)}
       >
@@ -2067,6 +2113,7 @@ export function GroupCard({
       ]}
       onClose={onClose}
       collapsed={collapsed}
+      tall={tab === 'queue'}
       tabs={<CardTabs tabs={GROUP_TABS} labels={TAB_LABELS} tab={tab} onTab={showTab} />}
       panel={
         tab === 'orders' && ((shown && openPanel) || buildPanel)
@@ -2145,67 +2192,78 @@ export function GroupCard({
         </ul>
       )}
       {tab === 'script' && (
-        <>
-          <ul className="sel-facts" aria-label="Scripts they run">
-            {scriptsRun(residents.map((r) => scriptName(r, scripts))).map((l) => (
-              <li key={l}>{l}</li>
-            ))}
-          </ul>
-          <section className="inspector-block" aria-label="Run script">
-            <RunScript
-              script={undefined}
-              scripts={scripts}
-              label="Script for all of them to run"
-              customisable
-              onRunScript={(scriptId) => onOrder({ kind: 'runScript', scriptId })}
-            />
-          </section>
-          <DefenceScript
-            picked={groupDefenceScript(residents)}
-            scripts={scripts}
-            label="Defence script for all of them"
-            onPick={(scriptId) => onOrder({ kind: 'setDefenceScript', scriptId })}
-          />
-          <AlarmScript
-            picked={groupAlarmScript(residents)}
-            scripts={scripts}
-            label="Alarm script for all of them"
-            onPick={(scriptId) => onOrder({ kind: 'setAlarmScript', scriptId })}
-          />
-          {numberParams.length > 0 && (
-            <section className="inspector-block" aria-label="Script params">
-              <div className="script-params">
-                {numberParams.map(({ name, scriptIds, default: fallback }) => (
-                  <div key={name} className="goods-row">
-                    <span className="small">
-                      <strong>{name}</strong> <span className="muted">(number)</span>
-                    </span>
-                    <NumberField
-                      name={name}
-                      value={undefined}
-                      fallback={fallback}
-                      onSet={(v) =>
-                        onOrder({ kind: 'setNumber', name, value: v ?? null, scriptIds })
-                      }
-                    />
-                    <span className="buttons">
-                      <button
-                        type="button"
-                        onClick={() => onOrder({ kind: 'setNumber', name, value: null, scriptIds })}
-                      >
-                        Clear
-                      </button>
-                    </span>
-                  </div>
+        <div className="script-tab">
+          <div className="script-col">
+            <section className="sec script-runs" aria-label="Run script">
+              <ul className="sel-facts" aria-label="Scripts they run">
+                {scriptsRun(residents.map((r) => scriptName(r, scripts))).map((l) => (
+                  <li key={l}>{l}</li>
                 ))}
-              </div>
-              <p className="muted small">
-                Sets it for each one running a script with it. Type a number and press Enter.
-              </p>
-              {foodHint && <p className="muted small">{foodHint}</p>}
+              </ul>
+              <RunScript
+                script={undefined}
+                scripts={scripts}
+                label="Script for all of them to run"
+                customisable
+                onRunScript={(scriptId) => onOrder({ kind: 'runScript', scriptId })}
+              />
             </section>
+          </div>
+          <div className="script-col">
+            <DefenceScript
+              picked={groupDefenceScript(residents)}
+              scripts={scripts}
+              label="Defence script for all of them"
+              onPick={(scriptId) => onOrder({ kind: 'setDefenceScript', scriptId })}
+            />
+            <AlarmScript
+              picked={groupAlarmScript(residents)}
+              scripts={scripts}
+              label="Alarm script for all of them"
+              onPick={(scriptId) => onOrder({ kind: 'setAlarmScript', scriptId })}
+            />
+          </div>
+          {numberParams.length > 0 && (
+            <div className="script-col">
+              <section className="sec" aria-label="Script params">
+                <div className="script-params">
+                  <h3 className="px t16">Params</h3>
+                  {numberParams.map(({ name, scriptIds, default: fallback }) => (
+                    <div key={name} className="script-param">
+                      <span className="script-param-name">
+                        <strong className="mono">{name}</strong>{' '}
+                        <span className="chip">number</span>
+                      </span>
+                      <span className="buttons">
+                        <NumberField
+                          name={name}
+                          value={undefined}
+                          fallback={fallback}
+                          onSet={(v) =>
+                            onOrder({ kind: 'setNumber', name, value: v ?? null, scriptIds })
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="btn sm"
+                          onClick={() =>
+                            onOrder({ kind: 'setNumber', name, value: null, scriptIds })
+                          }
+                        >
+                          Clear
+                        </button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="muted small">
+                  Sets it for each one running a script with it. Type a number and press Enter.
+                </p>
+                {foodHint && <p className="muted small">{foodHint}</p>}
+              </section>
+            </div>
           )}
-        </>
+        </div>
       )}
       {creative}
     </CommandBar>
@@ -2358,6 +2416,7 @@ export function ResidentCard({
   sections,
   onSections,
   scriptParams,
+  scriptRun,
   scriptMemory,
   scriptLog,
   onStore,
@@ -2595,6 +2654,8 @@ export function ResidentCard({
   onSections: (sections: CardSections<ActionId>) => void
   /** The fields for the params of the script they run (`ScriptParamFields`), if any. */
   scriptParams?: ReactNode
+  /** How the script they run last ran (`ScriptRunInfo`), for the Player running it. */
+  scriptRun?: ReactNode
   /** The memory of the script they run (`ScriptMemoryTree`), for the Player running it. */
   scriptMemory?: ReactNode
   /** Their script log (`ScriptLog`), for the Player owning them, running a script or not. */
@@ -3388,6 +3449,7 @@ export function ResidentCard({
       }
       onClose={onClose}
       collapsed={collapsed}
+      tall={tab === 'queue'}
       tabs={
         <div className="tabs sel-tabs" role="tablist" aria-label="Card">
           {CARD_TABS.map((t) => (
@@ -3441,137 +3503,164 @@ export function ResidentCard({
       )}
       {tab === 'queue' &&
         (queuePlan && onPlanQueue ? (
-          <>
-            <p className="small queue-draft-mark">
-              {r.queue
-                ? 'Draft, not started: the queue runs on until you start it.'
-                : 'Draft, not started'}
-            </p>
-            <QueueBlock
-              title="Draft"
-              queue={queuePlan}
-              currentId={r.queue?.current}
-              doing={doingLine(r, {
-                scripts,
-                buildings,
-                residents,
-                horses,
-                cities,
-                arrives: arrivesIn?.(r),
-              })}
-              scripts={scripts}
-              buildings={buildings}
-              lastSeen={lastSeen}
-              waypoints={waypoints}
-              cities={cities}
-              onEdit={(items, loop) => onPlanQueue(editPlan(queuePlan, items, loop))}
-              realm={realmId}
-              palette={addStep}
-            />
-            <GivePlan
-              plan={queuePlan}
-              give="Start queue"
-              discard="Discard draft"
-              note="Start queue makes their queue this draft, repeat blocks and all; the step they are on keeps going if it is still in it."
-              onGive={() => onGivePlan?.()}
-              onDiscard={() => onPlanQueue(undefined)}
-            />
-          </>
+          <QueueBlock
+            title="Draft"
+            mark={
+              <>
+                <span className="chip y">Draft, not started</span>
+                {r.queue && (
+                  <span className="small muted">the queue runs on until you start it.</span>
+                )}
+              </>
+            }
+            queue={queuePlan}
+            currentId={r.queue?.current}
+            doing={doingLine(r, {
+              scripts,
+              buildings,
+              residents,
+              horses,
+              cities,
+              arrives: arrivesIn?.(r),
+            })}
+            scripts={scripts}
+            buildings={buildings}
+            lastSeen={lastSeen}
+            waypoints={waypoints}
+            cities={cities}
+            onEdit={(items, loop) => onPlanQueue(editPlan(queuePlan, items, loop))}
+            realm={realmId}
+            palette={addStep}
+            foot={
+              <GivePlan
+                plan={queuePlan}
+                give="Start queue"
+                discard="Discard draft"
+                note="Start queue makes their queue this draft, repeat blocks and all; the step they are on keeps going if it is still in it."
+                onGive={() => onGivePlan?.()}
+                onDiscard={() => onPlanQueue(undefined)}
+              />
+            }
+          />
         ) : r.queue && onEditQueue ? (
-          <>
-            {r.queue.name && (
-              <p className="small queue-name">
-                <strong>{r.queue.name}</strong>
+          <QueueBlock
+            title={r.queue.name ?? 'Queue'}
+            queue={planOf(r.queue)}
+            currentId={r.queue.current}
+            rounds={roundsOf(r.queue)}
+            branches={branchesOf(r.queue)}
+            running
+            doing={doingLine(r, {
+              scripts,
+              buildings,
+              residents,
+              horses,
+              cities,
+              arrives: arrivesIn?.(r),
+            })}
+            scripts={scripts}
+            buildings={buildings}
+            lastSeen={lastSeen}
+            waypoints={waypoints}
+            cities={cities}
+            onEdit={onEditQueue}
+            realm={realmId}
+            palette={addStep}
+            foot={
+              onDraftQueue && (
+                <div className="queue-foot">
+                  <span className="grow" />
+                  <button type="button" className="btn sm" onClick={onDraftQueue}>
+                    Edit as draft
+                  </button>
+                </div>
+              )
+            }
+          />
+        ) : (
+          <section className="queue-planner" aria-label="Queue">
+            <div className="queue-list">
+              <div className="queue-tools">
+                <span className="px t16">Queue</span>
+                <span className="grow" />
+                {onEditQueue && <PasteSteps onPaste={(steps) => onEditQueue(steps)} />}
+                {onEditQueue && (
+                  <SavedQueueTools
+                    realm={realmId}
+                    steps={[]}
+                    onLoad={(steps) => onEditQueue(steps)}
+                  />
+                )}
+              </div>
+              <p className="muted small">
+                Nothing queued. Plan steps with Add step, paste copied ones or load a saved queue:
+                they wait as a draft until you press Start queue. Hold Shift with any order to queue
+                it at once.
               </p>
-            )}
-            <QueueBlock
-              title={r.queue.name ?? 'Queue'}
-              queue={planOf(r.queue)}
-              currentId={r.queue.current}
-              rounds={roundsOf(r.queue)}
-              branches={branchesOf(r.queue)}
-              running
-              doing={doingLine(r, {
-                scripts,
-                buildings,
-                residents,
-                horses,
-                cities,
-                arrives: arrivesIn?.(r),
-              })}
-              scripts={scripts}
-              buildings={buildings}
-              lastSeen={lastSeen}
-              waypoints={waypoints}
-              cities={cities}
-              onEdit={onEditQueue}
-              realm={realmId}
-              palette={addStep}
-            />
-            {onDraftQueue && (
-              <div className="order-buttons">
-                <button type="button" onClick={onDraftQueue}>
-                  Edit as draft
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <p className="muted small">
-              Nothing queued. Plan steps with Add step, paste copied ones or load a saved queue:
-              they wait as a draft until you press Start queue. Hold Shift with any order to queue
-              it at once.
-            </p>
-            {onEditQueue && <PasteSteps onPaste={(steps) => onEditQueue(steps)} />}
-            {onEditQueue && (
-              <SavedQueueTools realm={realmId} steps={[]} onLoad={(steps) => onEditQueue(steps)} />
-            )}
-          </>
+            </div>
+            {addStep && <div className="queue-palette">{addStep}</div>}
+          </section>
         ))}
-      {tab === 'queue' && !(queuePlan && onPlanQueue) && !(r.queue && onEditQueue) && addStep}
-      {tab === 'script' &&
-        (r.script ? (
-          <>
-            <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
+      {tab === 'script' && (
+        <div className="script-tab">
+          <div className="script-col">
+            <section className="sec script-runs" aria-label="Script they run">
+              {r.script ? (
+                <>
+                  <TaskScript
+                    scriptId={r.script.scriptId}
+                    scripts={scripts}
+                    onEdit={onEditScript}
+                  />
+                  {scriptRun}
+                </>
+              ) : (
+                <>
+                  <p className="muted small">Runs no script.</p>
+                  {actions.some((a) => a.id === 'script') && (
+                    <div className="order-buttons">
+                      <button
+                        type="button"
+                        className="btn sm"
+                        onClick={() => onSections({ ...sections, tab: 'orders', panel: 'script' })}
+                      >
+                        Run script…
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
             {defenceScript}
             {alarmScript}
-            {scriptParams}
-            {scriptMemory}
+          </div>
+          {r.script && <div className="script-col">{scriptParams}</div>}
+          <div className="script-col">
+            {r.script && scriptMemory}
             {scriptLog}
-          </>
-        ) : (
-          <>
-            <p className="muted small">Runs no script.</p>
-            {actions.some((a) => a.id === 'script') && (
-              <div className="order-buttons">
-                <button
-                  type="button"
-                  onClick={() => onSections({ ...sections, tab: 'orders', panel: 'script' })}
-                >
-                  Run script…
-                </button>
-              </div>
-            )}
-            {defenceScript}
-            {alarmScript}
-            {scriptLog}
-          </>
-        ))}
+          </div>
+        </div>
+      )}
       {tab === 'stats' && (
-        <>
-          <ul className="sel-facts">
-            <li>
-              {child ? 'Child' : 'Adult'} · {age} years · {home}
-              {r.riding ? ' · on horseback' : ''}
-              {r.aboard ? (isVesselId(r.aboard) ? ' · aboard a boat' : ' · aboard a carriage') : ''}
-            </li>
-            {grown && <li>{capitalised(grown)}</li>}
-            {family && <li>{family}</li>}
-          </ul>
-          <section className="inspector-block" aria-label="Stats">
-            <div className="panel-head">
-              <h3>Stats</h3>
+        <div className="stats-tab">
+          <section className="sec" aria-label="About them">
+            <ul className="sel-facts">
+              <li className="b">
+                {child ? 'Child' : 'Adult'} · {age} years · {home}
+                {r.riding ? ' · on horseback' : ''}
+                {r.aboard
+                  ? isVesselId(r.aboard)
+                    ? ' · aboard a boat'
+                    : ' · aboard a carriage'
+                  : ''}
+              </li>
+              {grown && <li>{capitalised(grown)}</li>}
+              {family && <li>{family}</li>}
+            </ul>
+          </section>
+          <section className="sec" aria-label="Stats">
+            <div className="fx">
+              <h3 className="px t16 grow">Stats</h3>
               <span className="small muted">base + trained (cap)</span>
             </div>
             {STAT_NAMES.map((s) => {
@@ -3580,18 +3669,29 @@ export function ResidentCard({
               return (
                 <div className="stat" key={s}>
                   <span>{STAT_LABELS[s]}</span>
-                  <span className="stat-bar" aria-hidden="true">
-                    <span className="base" style={{ width: pct(base / STAT_SCALE) }} />
-                    <span className="trained" style={{ width: pct(trained / STAT_SCALE) }} />
-                    <span className="cap" style={{ width: pct((cap - trained) / STAT_SCALE) }} />
+                  <span className="mt stat-bar" aria-hidden="true">
+                    <i className="stat-base" style={{ width: pct(base / STAT_SCALE) }} />
+                    <i className="stat-trained" style={{ width: pct(trained / STAT_SCALE) }} />
+                    <i className="stat-room" style={{ width: pct((cap - trained) / STAT_SCALE) }} />
                   </span>
-                  <span className="mono right">{statLine(base, trained, cap)}</span>
+                  <span className="mono">{statLine(base, trained, cap)}</span>
                 </div>
               )
             })}
+            <div className="stat-legend small muted" aria-hidden="true">
+              <span>
+                <span className="dot stat-base" /> base
+              </span>
+              <span>
+                <span className="dot stat-trained" /> trained
+              </span>
+              <span>
+                <span className="dot stat-room" /> room to the cap
+              </span>
+            </div>
           </section>
-          <section className="inspector-block" aria-label="Skills">
-            <h3>Skills</h3>
+          <section className="sec" aria-label="Skills">
+            <h3 className="px t16">Skills</h3>
             <div className="chips">
               {skills.length === 0 && <span className="chip">None yet</span>}
               {skills.map((s) => (
@@ -3602,7 +3702,7 @@ export function ResidentCard({
               ))}
             </div>
           </section>
-        </>
+        </div>
       )}
       {creative}
     </CommandBar>
@@ -4843,11 +4943,9 @@ export function DefenceScript({
   const choices = defenceChoices(scripts, picked)
   const value = picked === undefined ? '' : picked === null ? 'defend' : String(picked)
   return (
-    <section className="inspector-block" aria-label="Defence script">
-      <div className="goods-row">
-        <span className="small">
-          <strong>Defence script</strong>
-        </span>
+    <section className="sec script-pick" aria-label="Defence script">
+      <label className="fld">
+        <span className="lb">Defence script</span>
         <select
           aria-label={label}
           value={value}
@@ -4865,7 +4963,7 @@ export function DefenceScript({
             </option>
           ))}
         </select>
-      </div>
+      </label>
       <p className="muted small">
         What they run when struck. Once it ends, they go on with what they were doing.
       </p>
@@ -4893,11 +4991,9 @@ export function AlarmScript({
   const value = picked === undefined ? '' : picked === null ? 'alarm' : String(picked)
   const pick = (v: string) => onPick(v === 'alarm' ? null : v === 'none' ? 'none' : Number(v))
   return (
-    <section className="inspector-block" aria-label="Alarm script">
-      <div className="goods-row">
-        <span className="small">
-          <strong>Alarm script</strong>
-        </span>
+    <section className="sec script-pick" aria-label="Alarm script">
+      <label className="fld">
+        <span className="lb">Alarm script</span>
         <select aria-label={label} value={value} onChange={(e) => pick(e.target.value)}>
           {picked === undefined && (
             <option value="" disabled>
@@ -4912,7 +5008,7 @@ export function AlarmScript({
             </option>
           ))}
         </select>
-      </div>
+      </label>
       <p className="muted small">
         What they run when an alarm reaches them at home. Alarm (default) is for the armed. Once it
         ends, they go on with what they were doing.

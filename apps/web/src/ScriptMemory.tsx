@@ -25,12 +25,12 @@ export function ScriptMemoryTree({
   if (!memory) return null
   const { rows, cut } = memoryRows(memory)
   return (
-    <div className="sel-order-group script-memory">
-      <h3>Memory</h3>
+    <section className="sec script-memory" aria-label="Memory">
+      <h3 className="px t16">Memory</h3>
       {rows.length === 0 ? (
         <p className="muted small">Empty: the script keeps nothing between ticks yet.</p>
       ) : (
-        <ul className="memory-tree" aria-label="Script memory">
+        <ul className="code memory-tree" aria-label="Script memory">
           {rows.map((r, i) => (
             <li key={i} style={{ paddingLeft: `${r.depth * 12}px` }}>
               <span className="memory-name">{r.name}</span>{' '}
@@ -44,6 +44,6 @@ export function ScriptMemoryTree({
           {cut} more not shown. A script keeps up to {SCRIPT_MEMORY_MAX} characters.
         </p>
       )}
-    </div>
+    </section>
   )
 }
