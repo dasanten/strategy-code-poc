@@ -809,7 +809,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (openTab !== 'residents') setResidentsFull(false)
   }, [openTab])
   useEscapeCloses(openTab, foldSidebar)
-  /** Opens a script in the library, at a version and line when given. */
+  /** Opens a script in the script workshop, at a version and line when given. */
   const openScript = (id: number, where?: Omit<ScriptToOpen, 'id' | 'at'>) => {
     setScriptToOpen({ id, at: Date.now(), ...where })
     setOpenTab('scripts')
@@ -953,7 +953,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }, [controlMode, selectedIds.length, pickedArmy, setControlMode])
   // Escape leaves the top-most thing first: pick mode, an open panel (the form before a script
   // starts among them), the tile card, the resident or group card, then the drawer. A card
-  // hidden behind the wide drawer is passed over, so Escape closes the drawer in front of it.
+  // hidden behind the script workshop or the full list is passed over, so Escape closes what is
+  // in front of it.
   const hideCard = cardHidden(openTab, fullList)
   const shownCard = !hideCard
   const anySelected = selectedIds.length > 0
@@ -2796,8 +2797,6 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               }
             />,
           )}
-        {/* Mounted before the world arrives too: it loads the scripts the inspector can run. */}
-        {sideTab('scripts', <ScriptLibrary onScripts={setScripts} toOpen={scriptToOpen} />)}
         {world &&
           sideTab(
             'realmLog',
@@ -2809,6 +2808,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             />,
           )}
       </Sidebar>
+      {/* The script workshop, a screen over the map that the Scripts tab opens (ADR 0044). Mounted
+          before the world arrives too, and while closed: it loads the scripts the inspector can
+          run. */}
+      <ScriptLibrary
+        open={openTab === 'scripts'}
+        onClose={foldSidebar}
+        onScripts={setScripts}
+        toOpen={scriptToOpen}
+      />
       {/* Every notice in one lane under the top bar (`CONTEXT.md`: Notices). */}
       <NoticeLane phone={phone}>
         {/* First in the lane under the top bar, so the notices stack below it. */}

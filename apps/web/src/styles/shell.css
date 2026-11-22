@@ -234,10 +234,6 @@
 .side-panel[hidden] {
   display: none;
 }
-/* The Scripts tab is nearly the whole screen, its library beside the editor. */
-.side.wide .side-panel {
-  width: min(1280px, calc(100vw - var(--rail-w) - 16px));
-}
 /* The full Residents list takes all of it. */
 .side.full .side-panel {
   width: calc(100vw - var(--rail-w) - 16px);
@@ -263,10 +259,6 @@
   min-height: 0;
   overflow: auto;
   padding: 10px 14px 14px;
-}
-.side.wide .side-body {
-  display: flex;
-  flex-direction: column;
 }
 /* The drag handle on the open panel's right edge (`SideEdge`), over the sidebar's border. */
 .side-edge {
@@ -341,7 +333,6 @@
   display: none;
 }
 .game.phone .side-panel,
-.game.phone .side.wide .side-panel,
 .game.phone .side.full .side-panel {
   width: 100%;
 }

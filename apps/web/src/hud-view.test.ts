@@ -14,7 +14,7 @@ import {
   goodsOldText,
   goodsPickCities,
   goodsPickOf,
-  isWide,
+  isScreen,
   keyGoods,
   openDiplomacy,
   rememberGoodsPick,
@@ -123,8 +123,21 @@ describe('the sidebar', () => {
     expect(foldOrUnfold(FOLDED).open).toBe('residents')
   })
 
-  it('opens wide only for Scripts', () => {
-    expect(SIDE_TABS.filter((t) => isWide(t.id)).map((t) => t.id)).toEqual(['scripts'])
+  it('opens a screen of its own only for Scripts, the script workshop', () => {
+    expect(SIDE_TABS.filter((t) => isScreen(t.id)).map((t) => t.id)).toEqual(['scripts'])
+  })
+
+  it('goes back to the map when the workshop is left, never unfolding to it', () => {
+    const before = withOpen(FOLDED, 'cities')
+    const workshop = withOpen(before, 'scripts')
+    expect(workshop).toMatchObject({ open: 'scripts', last: 'cities' })
+    const left = withOpen(workshop, undefined)
+    expect(left.open).toBeUndefined()
+    expect(foldOrUnfold(left).open).toBe('cities')
+    // A browser that kept the workshop as the tab to unfold to (before it was a screen).
+    expect(rememberedSidebar(JSON.stringify({ open: null, last: 'scripts' })).last).toBe(
+      'residents',
+    )
   })
 
   describe('across a reload', () => {
