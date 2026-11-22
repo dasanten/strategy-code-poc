@@ -134,21 +134,23 @@ export function TileMenu({
       aria-label="Tile menu"
       style={{ left: spot.left, top: spot.top }}
     >
-      <div className="panel-head">
-        <h3>Add waypoint here</h3>
-        <span className="small muted">{waypointPlace(tile)}</span>
+      <div className="hd">
+        <h3 className="grow">Add waypoint here</h3>
+        <span className="mono">{waypointPlace(tile)}</span>
       </div>
-      <WaypointNameForm
-        initial={suggestedWaypointName(held)}
-        submitLabel="Add waypoint"
-        problem={addProblem(held, tile.x, tile.y, size)}
-        onSubmit={async (name) => {
-          const turnedDown = await onAdd(name)
-          if (!turnedDown) onClose()
-          return turnedDown
-        }}
-        onCancel={onClose}
-      />
+      <div className="tile-menu-body">
+        <WaypointNameForm
+          initial={suggestedWaypointName(held)}
+          submitLabel="Add waypoint"
+          problem={addProblem(held, tile.x, tile.y, size)}
+          onSubmit={async (name) => {
+            const turnedDown = await onAdd(name)
+            if (!turnedDown) onClose()
+            return turnedDown
+          }}
+          onCancel={onClose}
+        />
+      </div>
     </div>
   )
 }

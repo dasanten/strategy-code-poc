@@ -52,7 +52,7 @@ function AdminLandLegend({ land }: { land: AdminLand }) {
   const ways = (kind: 'pass' | 'landBridge') => land.ways.filter((w) => w.kind === kind).length
   const free = land.sites.filter((s) => s.cityId === undefined).length
   return (
-    <ul className="admin-land-legend">
+    <ul className="pn admin-land-legend" aria-label="Land">
       {kinds.map(({ kind, count }) => (
         <li key={kind}>
           <span
@@ -222,7 +222,7 @@ export function AdminMap({
             onSelectCity={(id) => inspect({ kind: 'city', id })}
           />
         ) : (
-          <p className="admin-map-note">{error ?? 'Loading the map…'}</p>
+          <p className="admin-map-note mu">{error ?? 'Loading the map…'}</p>
         )}
         {inspecting && (
           <AdminInspector
@@ -234,13 +234,28 @@ export function AdminMap({
         )}
         {world && (
           <div className="admin-map-layers">
-            <button type="button" aria-pressed={showLand} onClick={() => setShowLand((s) => !s)}>
-              {showLand ? 'Show territory' : 'Show land'}
-            </button>
+            <div className="pn fx admin-layer-switch" role="group" aria-label="Map layer">
+              <button
+                type="button"
+                className="btn sm"
+                aria-pressed={showLand}
+                onClick={() => setShowLand(true)}
+              >
+                Show land
+              </button>
+              <button
+                type="button"
+                className="btn sm"
+                aria-pressed={!showLand}
+                onClick={() => setShowLand(false)}
+              >
+                Show territory
+              </button>
+            </div>
             {showLand && land && <AdminLandLegend land={land} />}
           </div>
         )}
-        {world && error && <p className="admin-map-note error">{error}</p>}
+        {world && error && <p className="pn admin-map-note error">{error}</p>}
       </div>
     </div>
   )

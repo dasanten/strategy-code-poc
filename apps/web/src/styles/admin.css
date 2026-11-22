@@ -1,87 +1,163 @@
-/* ---------- Admin page ---------- */
-.layout header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.5rem 1rem;
-  border-width: 0 0 2px;
-}
-.layout h1 {
-  font: 600 18px/1.2 var(--font-pixel);
-  letter-spacing: 0.02em;
-  margin: 0;
-}
-.layout main {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  padding: 1rem;
-}
-
-.admin-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  align-items: flex-start;
-}
-.admin-panel h2 {
-  margin: 0;
-}
-.admin-panel form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  align-items: flex-end;
-}
-.codes {
-  margin: 0;
-  padding-left: 1.2rem;
-}
-/* The admin panel's Tick health tab (ADR 0004): the last minute beside the last hour. */
-.tick-health-windows {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
-}
-.tick-health-window {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-.tick-health-window h3 {
-  margin: 0;
-}
-.tick-health table {
-  border-collapse: collapse;
-  font-variant-numeric: tabular-nums;
-}
-.tick-health th,
-.tick-health td {
-  padding: 2px 12px 2px 0;
-  text-align: right;
-}
-.tick-health tbody th {
-  text-align: left;
-  font-weight: normal;
-}
-.tick-health tr.slow {
-  color: var(--ui-bad);
-}
-/* The admin map fills the screen under the header (`CONTEXT.md`: admin map). */
+/* ---------- Admin panel (artboards Admin-Map, Admin-Lists, Admin-Tick) ----------
+   A page apart from the game, told apart at a glance: its header bar is night, not bark, and the
+   page under the panels is steel. Everything else is the kit's atoms, placed here. */
 .admin-page {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
+  background: var(--steel);
 }
-.admin-tabs button {
-  padding: 4px 14px;
+.admin-page h1,
+.admin-page h2,
+.admin-page h3,
+.admin-page p,
+.admin-page ul,
+.admin-page fieldset {
+  margin: 0;
+}
+.admin-page ul {
+  padding: 0;
+  list-style: none;
+}
+
+/* The header: key, title, tabs, then the way back, the account and Log out. */
+.admin-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 6px 12px;
+  background: var(--night);
+  border-width: 0 0 2px;
+  box-shadow: none;
+}
+.admin-head h1 {
+  color: var(--cyan);
   white-space: nowrap;
 }
-.layout main.admin-map-main {
+.admin-tabs {
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.admin-head-account {
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .admin-head-note {
+    display: none;
+  }
+}
+
+/* The Accounts, Directives and Tick health tabs: panels side by side, one column on a phone. */
+.admin-main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr));
+  gap: 16px;
+  padding: 16px;
+  align-items: start;
+}
+.admin-panel {
+  min-width: 0;
+}
+.admin-panel .sec {
+  align-items: flex-start;
+}
+.admin-panel .sec > .fld,
+.admin-panel .sec > .fx,
+.admin-panel .sec > fieldset,
+.admin-panel .sec > ul,
+.admin-panel .sec > p {
+  align-self: stretch;
+}
+.admin-codes {
+  padding: 8px;
+  align-self: stretch;
+}
+.admin-note {
+  padding: 8px;
+  align-self: stretch;
+}
+.admin-fields {
+  align-items: flex-end;
+}
+/* A checkbox with its words on one line, as tall as the field beside it. */
+.admin-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  font-size: 13px;
+  color: var(--ui-text);
+}
+.admin-number {
+  width: 90px;
+}
+.admin-goals {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.admin-goal-meter {
+  width: 120px;
+}
+.admin-goals-field {
+  padding: 10px;
+  border: 2px solid var(--tan);
+}
+.admin-goals-field legend {
+  padding: 0 4px;
+}
+
+/* Tick health: one window to a section, its tables under its title. */
+.tick-health {
+  grid-column: 1 / -1;
+  max-width: 760px;
+}
+.tick-health-window {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  overflow-x: auto;
+}
+.tick-health h3 {
+  font: 600 16px/1.2 var(--font-pixel);
+  letter-spacing: 0.02em;
+}
+.tick-health .tb thead th + th {
+  text-align: right;
+}
+.tick-health .tb td {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+/* Row names are <th> in the body: they read as cells, not as the table's head. */
+.tick-health .tb tbody th {
+  font: inherit;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ui-text);
+  background: none;
+  border-bottom: 2px solid var(--tan);
+}
+.tick-health .tb tr.slow th {
+  color: var(--ui-bad);
+  font-weight: 600;
+}
+
+/* ---------- The Map tab: the jump list beside the map, which fills the rest ---------- */
+.admin-map-main {
   position: relative;
   flex: 1;
   min-height: 0;
-  padding: 0;
 }
 .admin-map {
   position: absolute;
@@ -93,80 +169,80 @@
   flex: 1;
   min-width: 0;
 }
+.admin-map .map-view {
+  height: 100%;
+  min-height: 0;
+  border: 0;
+}
+
 .admin-jump {
-  width: 260px;
+  width: 300px;
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  background: var(--ui-panel);
+  background: var(--parch);
   border-right: 2px solid var(--ink);
   font-size: 13px;
 }
 .admin-jump input {
   width: 100%;
-  box-sizing: border-box;
 }
 .admin-jump-groups {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-}
-.admin-jump h3 {
-  margin: 10px 0 4px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ui-muted);
-}
-.admin-jump ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.admin-jump li.nested {
-  padding-left: 14px;
-}
-.admin-jump li button {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 4px 6px;
-  border: 0;
-  background: none;
-  box-shadow: none;
-  color: var(--ui-text);
-  text-align: left;
-  font: inherit;
-}
-.admin-jump li button:hover:not(:disabled) {
-  background: var(--ui-raised-hover);
-}
-.admin-jump li button[aria-current] {
-  background: var(--ui-raised-hover);
-  box-shadow: inset 4px 0 0 var(--rel-trade-org);
-}
-.admin-jump li button:disabled {
-  color: var(--ui-muted);
-}
-.admin-jump .name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.admin-jump .detail {
-  flex: none;
-  max-width: 50%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--ui-muted);
+  border-top: 2px solid var(--tan);
 }
 .admin-jump-note {
-  color: var(--ui-muted);
+  padding: 10px;
 }
+/* Each place is a row (.rw) that is a button: the row's look, not a button's. */
+.admin-jump-row {
+  width: 100%;
+  height: auto;
+  justify-content: flex-start;
+  border-width: 0 0 2px;
+  border-color: var(--tan);
+  border-style: solid;
+  box-shadow: none;
+  color: var(--ui-text);
+  font-weight: 400;
+  text-align: left;
+}
+.admin-jump-row:not(.sel) {
+  background: transparent;
+}
+.admin-jump-row:hover:not(:disabled, .sel) {
+  background: var(--paper);
+}
+.admin-jump-row:disabled {
+  border-style: solid;
+  opacity: 0.6;
+}
+.admin-jump-row.nested {
+  padding-left: 30px;
+}
+.admin-jump-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-jump-text .detail::before {
+  content: ' · ';
+}
+/* A realm: its name in bold, the account and alliance on a line of their own. */
+.admin-jump-row.realm .name {
+  font-weight: 600;
+}
+.admin-jump-row.realm .detail {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-jump-row.realm .detail::before {
+  content: none;
+}
+
 @media (max-width: 640px) {
   .admin-map {
     flex-direction: column;
@@ -178,90 +254,92 @@
     border-bottom: 2px solid var(--ink);
   }
 }
-.admin-map .map-view {
-  height: 100%;
-  min-height: 0;
-  border: 0;
-}
-.admin-map-note {
-  margin: 1rem;
-  color: var(--ui-muted);
-}
-.admin-map-note.error {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 4px 10px;
-  background: var(--ui-panel);
-  color: var(--text-rel-other-realm);
-  border: 2px solid var(--ink);
-}
 
+/* Over the map: the layer switch and land legend top middle, the inspector top right. */
 .admin-map-layers {
   position: absolute;
   top: 8px;
-  right: 8px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   gap: 6px;
 }
+.admin-layer-switch {
+  gap: 4px;
+  padding: 4px;
+}
 .admin-land-legend {
-  margin: 0;
   padding: 6px 10px;
-  list-style: none;
-  background: var(--ui-panel);
-  border: 2px solid var(--ink);
-  font-size: 0.85rem;
+  font-size: 12px;
+}
+.admin-land-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .admin-land-legend .swatch {
-  display: inline-block;
+  flex: none;
   width: 10px;
   height: 10px;
-  margin-right: 6px;
   box-sizing: border-box;
-  border: 1px solid var(--ink);
+  border: 2px solid var(--ink);
 }
 .admin-land-legend .swatch.mark {
   transform: rotate(45deg);
 }
+.admin-map-note {
+  margin: 1rem;
+}
+.admin-map-note.error {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 4px 10px;
+}
 
-/* The admin map's inspector: the selection card's look, docked top right, with no actions. */
 .admin-inspector {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 8px;
+  right: 8px;
   z-index: 1;
-  width: min(360px, calc(100% - 24px));
-  max-height: calc(100% - 24px);
+  width: min(360px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
+  box-sizing: border-box;
   overflow: auto;
 }
-.admin-inspector-rows {
-  margin: 0;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 12px;
-  font-size: 0.8rem;
+.admin-inspector .hd {
+  background: var(--night);
+  box-shadow: none;
 }
-.admin-inspector-rows > div {
-  display: contents;
-}
-.admin-inspector-rows dt {
-  color: var(--ui-muted);
-}
-.admin-inspector-rows dd {
-  margin: 0;
-  min-width: 0;
+.admin-inspector .hd h2 {
+  font: inherit;
   overflow-wrap: anywhere;
 }
-.admin-inspector-rows button.link {
+.admin-inspector .sec {
+  align-items: flex-start;
+}
+.admin-inspector-rows td {
+  overflow-wrap: anywhere;
+}
+.admin-inspector-rows td.lb {
+  width: 1%;
+  white-space: nowrap;
+  vertical-align: top;
+}
+/* A name on the card that inspects it instead: a link, not a button. */
+.admin-link {
   padding: 0;
   border: 0;
   background: none;
   box-shadow: none;
-  color: inherit;
+  color: var(--navy);
   font: inherit;
   text-decoration: underline;
-  cursor: pointer;
+}
+.admin-link:hover:not(:disabled) {
+  background: none;
 }

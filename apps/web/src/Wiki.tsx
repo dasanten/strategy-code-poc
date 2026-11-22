@@ -494,6 +494,7 @@ import {
   SCRIPT_LANGUAGE,
 } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
+import { highlightScript } from './wiki-code.js'
 
 /** A smelter's Steel recipe (`CONTEXT.md`: Coal): its second, after Iron. */
 const STEEL = RECIPES.smelter!.find((r) => 'steel' in r.output)!
@@ -562,12 +563,45 @@ type TopicId = (typeof WIKI_TOPICS)[number]['id']
 function Section({ id, children }: { id: TopicId; children: ReactNode }) {
   const title = WIKI_TOPICS.find((t) => t.id === id)!.title
   return (
-    <section id={id} className="wiki-section">
-      <h2>
-        <a href={`#${id}`}>{title}</a>
+    <section id={id} className="wiki-section pn">
+      <h2 className="hd">
+        <a className="grow" href={`#${id}`}>
+          {title}
+        </a>
+        <span className="mono small" aria-hidden="true">
+          #{id}
+        </span>
       </h2>
-      {children}
+      <div className="wiki-text">{children}</div>
     </section>
+  )
+}
+
+/** A table in the kit's style; on a narrow screen it scrolls sideways instead of squeezing. */
+function Table({ children }: { children: ReactNode }) {
+  return (
+    <div className="wiki-table">
+      <table className="tb">{children}</table>
+    </div>
+  )
+}
+
+/** A script example in the script workshop's colours. */
+function ScriptCode({ source }: { source: string }) {
+  return (
+    <pre className="code wiki-code">
+      <code>
+        {highlightScript(source).map((p, i) =>
+          p.kind ? (
+            <span key={i} className={p.kind}>
+              {p.text}
+            </span>
+          ) : (
+            p.text
+          ),
+        )}
+      </code>
+    </pre>
   )
 }
 
@@ -621,7 +655,7 @@ function apiDescription(n: ApiName): ReactNode {
 function ApiTable({ is }: { is: ApiName['is'] }) {
   const names = apiNames(false).filter((n) => n.is === is)
   return (
-    <table>
+    <Table>
       <thead>
         <tr>
           <th>{is === 'value' ? 'Name' : 'Call'}</th>
@@ -656,7 +690,7 @@ function ApiTable({ is }: { is: ApiName['is'] }) {
           )
         })}
       </tbody>
-    </table>
+    </Table>
   )
 }
 
@@ -712,37 +746,64 @@ export function Wiki() {
   ]
   return (
     <main className="wiki">
-      <header className="wiki-head">
-        <h1>Code Strategy Wiki</h1>
-        <p>
-          The game's rules in plain words, with its current numbers and what follows from them.
-          Figures are for an average resident (every stat at {num(avg)}, no skills) unless they say
-          otherwise. Times are game time first, real time after.
-        </p>
-        <nav className="wiki-toc" aria-label="Contents">
-          <ol>
-            {WIKI_TOPICS.map((t) => (
-              <li key={t.id}>
-                <a href={`#${t.id}`}>{t.title}</a>
-              </li>
-            ))}
-          </ol>
-        </nav>
+      {/* A grid: the header bar across the top, the Contents beside the sections on a wide
+          screen and above them on a phone (`styles/wiki.css`). */}
+      <header className="wiki-head bar">
+        <span className="ic s32 i-book" aria-hidden="true" />
+        <h1 className="px t22">Code Strategy Wiki</h1>
+        <span className="grow" />
+        <a className="btn dk" href="/">
+          To the game
+        </a>
       </header>
+      <nav className="wiki-toc pn" aria-label="Contents">
+        <div className="hd">Contents</div>
+        <ol>
+          {WIKI_TOPICS.map((t) => (
+            <li key={t.id}>
+              <a href={`#${t.id}`}>{t.title}</a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+      <p className="wiki-intro">
+        The game's rules in plain words, with its current numbers and what follows from them.
+        Figures are for an average resident (every stat at {num(avg)}, no skills) unless they say
+        otherwise. Times are game time first, real time after.
+      </p>
 
       <Section id="controls">
+        <h3>The screen</h3>
         <p>
-          Click one of your residents on the map to pick them and open their card. Each action on
-          the card shows its letter key; press it to run the action. The card opens with the orders
-          they can take. While it stays open, each row stays where it is: an order that stops being
-          possible (they walk off the farm they worked) stays in its place, greyed out, saying why,
-          and one that becomes possible is added at the end of its group. The rows are sorted afresh
-          once you pick something else. A group’s card has the same rows and keys.
+          The map fills the screen, with four places over it. The <b>top bar</b> along the top shows
+          the control mode, your realm, the clock, your goods, your Leader, Zeal and your heir. The{' '}
+          <b>sidebar</b> on the left has a tab for each of your lists, in three groups: People
+          (Residents, Horses, Armies), Diplomacy, and Realm (Cities, Waypoints, Scripts, Realm log);
+          one is open at a time, and the sidebar folds to its strip of tabs. The <b>command bar</b>{' '}
+          along the bottom holds the card of whatever you picked (a resident, a group, an army): its
+          header on the left, its tabs and orders beside it, and the minimap and the map’s buttons
+          at its right end. The <b>dock</b> on the right holds a tile’s card, the who-list and the
+          realm order cards, so a tile and a resident can be open together. A panel an order opens
+          (Goods, Build, Haul route, …) opens above the command bar.
+        </p>
+        <p>
+          Scripts on the sidebar opens the <b>script workshop</b>, a screen of its own over the map,
+          with your script library and its editor.
+        </p>
+        <h3>Picking and orders</h3>
+        <p>
+          Click one of your residents on the map to pick them and open their card in the command
+          bar. Each action on the card shows its letter key; press it to run the action. The card
+          opens with the orders they can take. While it stays open, each row stays where it is: an
+          order that stops being possible (they walk off the farm they worked) stays in its place,
+          greyed out, saying why, and one that becomes possible is added at the end of its group.
+          The rows are sorted afresh once you pick something else. A group’s card has the same rows
+          and keys.
         </p>
         <p>
           Escape leaves the top-most thing first: picking a target on the map, then a panel open on
-          the card (Build, Goods, Run script, …), then a tile’s card, then the resident’s or group’s
-          card, then the open drawer.
+          the card (Build, Goods, Run script, …), then a tile’s card in the dock, then the
+          resident’s or group’s card, then the open tab of the sidebar.
         </p>
         <p>
           In unit control mode, what a click picks on a tile goes in this order, at every zoom: one
@@ -765,19 +826,20 @@ export function Wiki() {
           and where, then who does it. There a click or tap on the map picks a building (a carriage,
           or a horse nobody rides, counts as one), else the bare tile: your residents are drawn but
           never picked, so a crowded tile is still easy to click, and a drag or the Select button
-          picks no group. The realm bar along the bottom of the map (above the map buttons on a
-          phone) is where those orders start.
+          picks no group. The realm bar, in the command bar’s place along the bottom (above the map
+          buttons on a phone), is where those orders start.
         </p>
         <p>
           <b>Build</b> on the realm bar opens the Build menu. Pick a kind (and Customise, if you
           like), then tap where it goes: the footprint shows under the pointer, marked where it
           doesn’t fit, and a tile it can’t go on says why and sends nobody. Then the <b>who-list</b>{' '}
-          opens: your residents nearest the place first, each with what they are doing and how long
-          their way there is. The nearest {num(WHO_SUGGESTS.build)} idle ones are already ticked;
-          change the ticks or just Confirm. With nobody idle, nobody is ticked and the list says so.
-          Those who can’t build (children, a partner carrying a child, or with no way there) come
-          last, greyed out, saying why. Those ticked walk there and build as a group sent with Build
-          would; hold Shift while confirming to pick the next place for another of the same kind.
+          opens in the dock: your residents nearest the place first, each with what they are doing
+          and how long their way there is. The nearest {num(WHO_SUGGESTS.build)} idle ones are
+          already ticked; change the ticks or just Confirm. With nobody idle, nobody is ticked and
+          the list says so. Those who can’t build (children, a partner carrying a child, or with no
+          way there) come last, greyed out, saying why. Those ticked walk there and build as a group
+          sent with Build would; hold Shift while confirming to pick the next place for another of
+          the same kind.
           <b>Road</b> and <b>Wall</b> beside it lay out a line the same way (see{' '}
           <a href="#building">Building</a>).
         </p>
@@ -847,9 +909,10 @@ export function Wiki() {
         <p>
           Switching to realm control mode lets go of the resident, group or army you had picked.
           Picking one some other way (a row or Pick these in the Residents list, a saved group’s
-          number key, the Armies drawer, a notice that opens a resident) switches back to unit
-          control mode.
+          number key, the Armies tab, a notice that opens a resident) switches back to unit control
+          mode.
         </p>
+        <h3>The sidebar</h3>
         <p>
           The sidebar on the left has a strip of tabs in three groups: People (Residents, Horses,
           Armies), Diplomacy, and Realm (Cities, Waypoints, Scripts, Realm log). One tab is open at
@@ -864,7 +927,7 @@ export function Wiki() {
           fills the screen, and the menu button shows the dot too.
         </p>
         <p>
-          The Residents drawer’s Open full list button opens the list across the screen, with
+          The Residents tab’s Open full list button opens the list across the screen, with
           everyone’s age, city, stats, skills, gear, what they carry, hunger, health and what they
           are doing. On a phone each resident is a small card. Tap one to open that resident’s card,
           which closes the full list. Stats there are what they count for now, old age included.
@@ -932,11 +995,12 @@ export function Wiki() {
           last saw as thin lines, and one emblem per city; middle adds buildings, nodes and
           residents; close shows each figure. Far out territory is filled in its owner’s colour,
           nearer in only its borders are drawn; the Region map button fills it at every zoom. The
-          readout bottom right names the terrain, the tile and the tier under the pointer. Above it
-          the minimap shows the terrain you explored, your cities, your residents and carriages away
+          map dock bottom right holds the minimap, the zoom and Centre buttons, Select, Region map
+          and Legend; its last line names the terrain, the tile and the tier under the pointer. The
+          minimap shows the terrain you explored, your cities, your residents and carriages away
           from them, and the cities you know, with the part on screen as a rectangle; click it to
-          look there. The minimap and the legend fold to buttons, and your browser remembers how you
-          left them.
+          look there. The minimap folds to a button, the legend opens over the dock, and your
+          browser remembers how you left them.
         </p>
         <p>
           The top bar shows the Food, Wood, Stone and Coins held in your storages, for what you pick
@@ -947,19 +1011,20 @@ export function Wiki() {
           back to Entire realm.
         </p>
         <p>
-          On a phone the card sits at the bottom of the screen. Drag its handle to show just its
-          header, half the screen or all of it; a tap on the handle goes one step up. While an order
-          waits for a target the card drops to its header. The menu button at the top left opens the
-          drawers, your goods, the wiki and Log out. The map’s buttons (Centre, Select, Region map)
-          sit in one row at the bottom left, just above the card; zoom by pinching. The Residents
-          and Horses drawers show each one in two lines: name and age, then what they are doing (or
-          where the horse is) with their meters.
+          On a phone the command bar is a sheet at the bottom of the screen. Drag its handle to show
+          just its header, half the screen or all of it; a tap on the handle goes one step up. While
+          an order waits for a target the card drops to its header. The menu button at the top left
+          opens the sidebar’s tabs, your goods, the wiki and Log out. The map’s buttons (Centre,
+          Select, Region map) sit in one row at the bottom left, just above the card; zoom by
+          pinching. The Residents and Horses tabs show each one in two lines: name and age, then
+          what they are doing (or where the horse is) with their meters.
         </p>
         <p>
           Terrain you have explored loads as you look at it. Until it is here it shows grey, and the
-          line at the bottom right says “Loading the map…”; dark is terrain you haven’t explored.
+          line in place of the readout says “Loading the map…”; dark is terrain you haven’t
+          explored.
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Keys</th>
@@ -988,7 +1053,7 @@ export function Wiki() {
               <td>Pick the group and centre the map on it</td>
             </tr>
           </tbody>
-        </table>
+        </Table>
         <p>Groups are kept in this browser, for each realm; another browser starts without them.</p>
         <p>
           With several picked, the group card gives each of them the same order, just as their own
@@ -1327,7 +1392,7 @@ export function Wiki() {
           each better than the iron one and as heavy; the Spear is iron only. The smith says which
           when given Work there, as for the iron ones.
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Gear</th>
@@ -1349,7 +1414,7 @@ export function Wiki() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
         <p>
           <strong>NPC cities and Steel.</strong> An NPC city that knows of a coal node wants a{' '}
           {NPC_STEEL_KIT.map((g) => goodName(g as Good).toLowerCase()).join(', ')} for each of its
@@ -1378,12 +1443,11 @@ export function Wiki() {
           names the heartland your city stands in.
         </p>
         <p>
-          Every starting site has a poor stone and iron node within{' '}
-          {num(STARTING_SITE_NODE_REACH)} tiles of its middle, and a poor forest node within{' '}
-          {num(STARTING_SITE_FOREST_REACH)} tiles, about{' '}
-          {duration(STARTING_SITE_FOREST_REACH * WALK_TICKS_PER_TILE)} on foot over Plains, so Wood
-          is close from the start. A heartland’s Forest lies in wide patches; where none lies near,
-          a small grove of Forest grows on its Plains, at most one every{' '}
+          Every starting site has a poor stone and iron node within {num(STARTING_SITE_NODE_REACH)}{' '}
+          tiles of its middle, and a poor forest node within {num(STARTING_SITE_FOREST_REACH)}{' '}
+          tiles, about {duration(STARTING_SITE_FOREST_REACH * WALK_TICKS_PER_TILE)} on foot over
+          Plains, so Wood is close from the start. A heartland’s Forest lies in wide patches; where
+          none lies near, a small grove of Forest grows on its Plains, at most one every{' '}
           {num(HEARTLAND_GROVE_SPACING)} tiles.
         </p>
         <p>
@@ -1402,9 +1466,9 @@ export function Wiki() {
           residents, your Leader among them, working the farm. Every grown one, your Leader too,
           carries {num(START_SPEARS)} iron Spear, so they are armed from the first tick and an alarm
           sends them to defend the city. Children get none, and no spare weapons lie in the storage.
-          Beside its Food and Coins, the storage holds {num(START_WOOD)} Wood and{' '}
-          {num(START_STONE)} Stone for a first building, and {num(START_TOOLS)} sets of Tools for
-          residents to fetch. NPC villages keep their own start.
+          Beside its Food and Coins, the storage holds {num(START_WOOD)} Wood and {num(START_STONE)}{' '}
+          Stone for a first building, and {num(START_TOOLS)} sets of Tools for residents to fetch.
+          NPC villages keep their own start.
         </p>
         <p>
           <strong>First steps.</strong> Before any camp or quarry stands, your residents can{' '}
@@ -1512,8 +1576,8 @@ export function Wiki() {
           back to, where your residents meet. Right-click a tile on the map, or long-press it on a
           touch screen, while no resident is picked and choose Add waypoint here; the card of any
           tile you click has Add waypoint too. Only you see your waypoints: on the map at every
-          zoom, on the minimap, and in the Waypoints drawer on the tool rail, where you can rename
-          one, centre the map on it or remove it. All of that is free and at once.
+          zoom, on the minimap, and in the Waypoints tab of the sidebar, where you can rename one,
+          centre the map on it or remove it. All of that is free and at once.
         </p>
         <p>
           You hold at most {num(WAYPOINTS_MAX)} waypoints, each with a name of up to{' '}
@@ -1524,9 +1588,9 @@ export function Wiki() {
         <p>
           A waypoint is a place like a tile. While an order waits for where to go or act (Walk to on
           a resident or group card, a place for a step in the queue planner), click a waypoint’s pin
-          on the map, or open the Waypoints drawer from the banner and press Pick beside it: the
-          order gets the waypoint’s tile. A queue step keeps that tile, so it still goes there if
-          you remove the waypoint later, and the queue names the waypoint while it is there.
+          on the map, or open the Waypoints tab from the banner and press Pick beside it: the order
+          gets the waypoint’s tile. A queue step keeps that tile, so it still goes there if you
+          remove the waypoint later, and the queue names the waypoint while it is there.
         </p>
         <p>
           Scripts see your waypoints with <code>waypoints()</code> and can put one down with{' '}
@@ -1592,7 +1656,7 @@ export function Wiki() {
           rider) mountain without a finished road. Two walls touching at a corner close the way like
           a straight stretch.
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Terrain</th>
@@ -1611,7 +1675,7 @@ export function Wiki() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
         <p>
           Each point of Agility above average walks {pct(AGILITY_SPEED_EFFECT)} faster and takes{' '}
           {pct(AGILITY_TERRAIN_EFFECT)} off a terrain's slowdown (slower below average), each by at
@@ -1942,7 +2006,7 @@ export function Wiki() {
           finished they work it without another order. Pick the site for Work on the card or as a
           queue step.
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Workplace</th>
@@ -1975,7 +2039,7 @@ export function Wiki() {
               )),
             )}
           </tbody>
-        </table>
+        </Table>
         <h3>Tools</h3>
         <p>
           <strong>Tools</strong> are a good a smithy makes: {num(forged('tools').input.iron ?? 0)}{' '}
@@ -2011,7 +2075,7 @@ export function Wiki() {
           warehouse pays when it buys. For smelters, mints and smithies, the value added is the
           output less what went into it, both at the base price.
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Job</th>
@@ -2035,7 +2099,7 @@ export function Wiki() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
         <p>
           Example: a miner with Strength {num(strong.stats.strength.base)} and Mining{' '}
           {num(strong.skills.mining ?? 0)} digs {num(outputPerDay('ironOre', 'mining', strong))}{' '}
@@ -2059,9 +2123,9 @@ export function Wiki() {
           at {num(RALLY_PACE)} times their pace, on top of their skill, Strength and Tools. Your
           Leader does no work of their own meanwhile. Zeal drains a game hour of rallying for every
           game hour, only while somebody is being rallied. It doesn't fill while the order runs,
-          even when nobody is at work, and fills again once the rally ends; the building's card
-          says about how long it lasts. Only work is faster: not walking, carrying,
-          fetching, training or fighting.
+          even when nobody is at work, and fills again once the rally ends; the building's card says
+          about how long it lasts. Only work is faster: not walking, carrying, fetching, training or
+          fighting.
         </p>
         <p>
           It ends when you stop it or give your Leader another order, when they leave the building,
@@ -2106,10 +2170,9 @@ export function Wiki() {
           <code>storage</code>, else the nearest storage of your realm, and come back. Several
           gatherers take different tiles. Out of sight they go by what you last saw there: a tile
           someone built on since looks free until it comes into sight, and then they pick the next
-          one. With no such tile left in reach they store what they carry
-          and end, saying why. The usual food params work as in Work. In a script,{' '}
-          <code>gather(good)</code> gathers on the tile you stand on, and a tile’s{' '}
-          <code>pickedOver</code> says whether its patch is gone.
+          one. With no such tile left in reach they store what they carry and end, saying why. The
+          usual food params work as in Work. In a script, <code>gather(good)</code> gathers on the
+          tile you stand on, and a tile’s <code>pickedOver</code> says whether its patch is gone.
         </p>
       </Section>
 
@@ -2141,7 +2204,7 @@ export function Wiki() {
           is never kept between starts. With no building there, Tear down ends and your realm log
           says why.
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Building</th>
@@ -2169,7 +2232,7 @@ export function Wiki() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
         <h3>Decay and repairing</h3>
         <p>
           Every finished building, wall, gate and road slowly loses its <strong>condition</strong>,
@@ -2206,7 +2269,7 @@ export function Wiki() {
           at the turn of each day, so the HQ and its trading posts never fall to ruin while it
           stands.
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Building</th>
@@ -2236,7 +2299,7 @@ export function Wiki() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
         <h3>Ruins and collapse</h3>
         <p>
           A building nobody repaired, once it has lost all its condition, becomes a{' '}
@@ -2394,7 +2457,7 @@ export function Wiki() {
           its health and hunger and how long the Food on board feeds it. Another realm's carriage
           shows only how heavily it is loaded, and its horse without how it fares.
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Goods</th>
@@ -2416,7 +2479,7 @@ export function Wiki() {
               ))}
             </tr>
           </tbody>
-        </table>
+        </Table>
         <p>
           Cards show goods as these icons, each with its amount; hover over one, or press and hold
           it on a phone, for its name. That goes for every inventory: what a resident carries, a
@@ -2429,7 +2492,7 @@ export function Wiki() {
           fetching, or on the way.
         </p>
         <h3>Moving goods, per game hour</h3>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Terrain</th>
@@ -2456,7 +2519,7 @@ export function Wiki() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
         <p>
           A road tile takes {goods(BUILD_MATERIALS.road ?? {})} and{' '}
           {duration(buildCosts().find((b) => b.kind === 'road')!.buildTicks)} of one builder's work.
@@ -2511,7 +2574,7 @@ export function Wiki() {
           Food in reach, so put Food down on its tile or right next to it, or Feed it (below). Once
           it has eaten, it gets up with {num(HORSE_WAKE_HEALTH)} health of {num(MAX_HEALTH)} and
           heals from there. When the time is up first, it dies. Its token lies on its side, the
-          Horses drawer, the stable and the tile card say it is Down and how long is left, and your
+          Horses tab, the stable and the tile card say it is Down and how long is left, and your
           realm log says when one of your horses goes Down and when one dies.
         </p>
         <h3>Feeding a horse</h3>
@@ -2562,11 +2625,11 @@ export function Wiki() {
           on the tile card, the stable, the carriage it pulls, its rider's card and the realm log,
           and scripts see it as <code>horse.name</code>.
         </p>
-        <h3>Horses drawer</h3>
+        <h3>Horses tab</h3>
         <p>
-          The <strong>Horses</strong> button on the tool rail (in the menu on a phone) opens a list
-          of your realm's horses, like the Residents drawer does for residents. They are grouped by
-          where they stand: under each stable they are in (by its city), then Hitched to a carriage,
+          The <strong>Horses</strong> tab of the sidebar (in the menu on a phone) opens a list of
+          your realm's horses, like the Residents tab does for residents. They are grouped by where
+          they stand: under each stable they are in (by its city), then Hitched to a carriage,
           Ridden and Loose. Each row shows the horse's name and where it is (“Pulling the carriage
           Ann drives”), its Speed, Strength and Endurance, its age, and its health and hunger. Click
           a row to centre the map on the horse and open the card of its tile, or of its rider.
@@ -2584,7 +2647,7 @@ export function Wiki() {
           {pct(HORSE_ENDURANCE_EFFECT)} less Food (more below), at most {pct(HORSE_ENDURANCE_LIMIT)}
           .
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Stat</th>
@@ -2603,7 +2666,7 @@ export function Wiki() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
         <h3>Riding</h3>
         <p>
           A resident on a tile with a free horse can mount it, and dismount anywhere; the horse
@@ -2720,7 +2783,7 @@ export function Wiki() {
           {num(DELIVERY_FEE_PER_KG_TILE, 5)} coins for each kg and tile. A transfer to another realm
           costs {num(TRANSFER_FEE_FACTOR)} times a delivery's fee over the caravan's whole way.
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Load</th>
@@ -2739,7 +2802,7 @@ export function Wiki() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
         <p>
           Caravans walk with {num(CARAVAN_ESCORTS)} escorts, one more for every{' '}
           {num(CARAVAN_ROBBERIES_PER_ESCORT)} robberies of their route, at most{' '}
@@ -3034,7 +3097,7 @@ export function Wiki() {
         </p>
         <h3>Direct offers</h3>
         <p>
-          Under <strong>Direct offers</strong> in the Diplomacy drawer you can send an offer to one
+          Under <strong>Direct offers</strong> in the Diplomacy tab you can send an offer to one
           realm you know of: one you see residents of, an ally, one whose city you have seen, one
           with a standing either way, or your side in a contract, demand or direct offer. Name a
           storage of yours, and the goods are set aside there as for any offer. They hear at once
@@ -3186,7 +3249,7 @@ export function Wiki() {
           treats it as its visiting trader: a spare hand brings over its surplus and buys what the
           city is short of, Food included but never a weapon.
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Good</th>
@@ -3206,9 +3269,9 @@ export function Wiki() {
               )
             })}
           </tbody>
-        </table>
+        </Table>
         <h3>How Iron's price follows stock</h3>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Stock, in floors</th>
@@ -3235,7 +3298,7 @@ export function Wiki() {
               )
             })}
           </tbody>
-        </table>
+        </Table>
         <h3>NPC cities</h3>
         <p>
           When the world is made, NPC cities are placed region by region, wherever there is room: in
@@ -3464,11 +3527,12 @@ export function Wiki() {
           {num(NPC_WALL_STONE_SET_ASIDE_TILES)} tiles of stone wall for it: its roads, repairs and
           trade leave that Stone, a founding party's Stone counts only above it, and only its walls
           spend it. It never counts as short: its spare hands refill it working for surplus, so the
-          wall doesn't pull them off other work. It upgrades a tile at a time once it holds a builder's trip of Stone it may
-          spend, from what it sets aside or beyond its reserve, while its road crew is in and its
-          wall is not moving out. A town with none builds a quarry for it, and its spare hands work it. A
-          new outer wall it puts up when it grows is of stone once its old one was. Villages,
-          starting cities and the Trade Organization's cities stay wooden.
+          wall doesn't pull them off other work. It upgrades a tile at a time once it holds a
+          builder's trip of Stone it may spend, from what it sets aside or beyond its reserve, while
+          its road crew is in and its wall is not moving out. A town with none builds a quarry for
+          it, and its spare hands work it. A new outer wall it puts up when it grows is of stone
+          once its old one was. Villages, starting cities and the Trade Organization's cities stay
+          wooden.
         </p>
         <h3>Trading posts and the HQ</h3>
         <p>
@@ -3519,9 +3583,10 @@ export function Wiki() {
           {num(NPC_ESCORT_TOWN_RESIDENTS)} residents or more, a town, sends{' '}
           {num(NPC_TRADER_ESCORTS)} soldier with each trader as their escort, of the soldiers beyond
           those on its town hall and at its gates; a village's trader goes alone. The escort keeps
-          pace with the trader: the trader waits for an escort fallen behind, and one gone ahead waits
-          for the trader. It fights whoever goes for them and comes home with them. Nothing else protects them on the way; a trader not back after{' '}
-          {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may send another.
+          pace with the trader: the trader waits for an escort fallen behind, and one gone ahead
+          waits for the trader. It fights whoever goes for them and comes home with them. Nothing
+          else protects them on the way; a trader not back after {days(NPC_TRADER_GIVE_UP_DAYS)} is
+          given up, and the city may send another.
         </p>
         <p>
           The same trader goes to a Player's offer within {num(NPC_OFFER_REACH)} tiles, ahead of any
@@ -3547,19 +3612,18 @@ export function Wiki() {
           party, none of its building spends the party's Wood and Stone: walls, repairs and other
           buildings wait until it holds what they need above its reserve and the party's, but its
           farms, lumber camps and quarries go ahead, and meanwhile it builds whatever else it wants
-          that doesn't wait. The same holds once its daughter stands, for
-          the Wood and Stone the daughter still lacks of the party's load, until its storage
-          stands. Its walls may spend the Stone its reserve sets aside for them.
-          Its workplaces come first as well: its spare hands go on a road crew, scout and work at
-          its workplaces for surplus, and only those left over gather for the party. Past{' '}
-          {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less for each{' '}
-          {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}. A dip
-          below its reserve only restarts that wait if it lasts longer than{' '}
-          {days(NPC_FULL_DIP_DAYS)}, though nobody sets out during one. A full city founds a
-          daughter. Once a game day it looks for a free Plains site {num(NPC_CITY_MIN_DISTANCE)} to{' '}
-          {num(NPC_FOUND_REACH)} tiles away, with room for a village and on no realm's territory,
-          nearest a node of a material it has none of in reach. A founding party of{' '}
-          {num(NPC_VILLAGE.residents)} adults, one more for each{' '}
+          that doesn't wait. The same holds once its daughter stands, for the Wood and Stone the
+          daughter still lacks of the party's load, until its storage stands. Its walls may spend
+          the Stone its reserve sets aside for them. Its workplaces come first as well: its spare
+          hands go on a road crew, scout and work at its workplaces for surplus, and only those left
+          over gather for the party. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a
+          game day less for each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least{' '}
+          {days(NPC_FULL_DAYS_LEAST)}. A dip below its reserve only restarts that wait if it lasts
+          longer than {days(NPC_FULL_DIP_DAYS)}, though nobody sets out during one. A full city
+          founds a daughter. Once a game day it looks for a free Plains site{' '}
+          {num(NPC_CITY_MIN_DISTANCE)} to {num(NPC_FOUND_REACH)} tiles away, with room for a village
+          and on no realm's territory, nearest a node of a material it has none of in reach. A
+          founding party of {num(NPC_VILLAGE.residents)} adults, one more for each{' '}
           {num(NPC_FOUND_RESIDENTS_PER_MEMBER)} residents past {num(NPC_FOUND_VILLAGE_RESIDENTS)} up
           to {num(NPC_FOUND_PARTY_MOST)}, sets out. One in{' '}
           {num(Math.round(1 / NPC_FOUND_ESCORT_SHARE))} of them, rounded down and at least one, is a
@@ -3570,21 +3634,22 @@ export function Wiki() {
           twice the walk and {days(NPC_FOUND_FOOD_DAYS)} there, with as many more adults as it takes
           to carry all of it. They come from its spare hands and its workers near home first, then
           from its farmers beyond those who feed it; while too few are at hand, its workers far out
-          come home to set out and wait there. With too few hands to carry all of it, the party
-          sets out once it holds the town hall's materials and its Food, and the city sends a
-          second wave of carriers after it with the rest, as hands come free: while the town hall
-          is going up they join the party, and once the daughter stands they carry what it still
-          lacks to it, until its storage stands. Until then the daughter's own builders also
-          fetch what it lacks from the mother's storage, with Food for the way, and that is no
-          theft. Like the party, they stay as the daughter's residents. Hands sent back from far workplaces leave them, and none of them goes back to
-          work there while called home. One too full for their own Food puts
-          down what crowds it out at the storage first, so nobody sets out without it. The party builds the town hall, which founds the daughter: an NPC city of
-          its own with a name from the game. It then builds its storage, a farm and a house, and
-          once its storage holds the Wood of its reserve, its first wall, a ring{' '}
-          {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its home. Mother and daughter start at
-          a standing of {num(NPC_FOUND_STANDING)} toward each other, which fades like any other, and
-          share nothing. A party whose town hall doesn't stand after {days(NPC_FOUND_GIVE_UP_DAYS)}{' '}
-          gives up and walks home. Trading posts and the Trade Organization's HQ never found cities.
+          come home to set out and wait there. With too few hands to carry all of it, the party sets
+          out once it holds the town hall's materials and its Food, and the city sends a second wave
+          of carriers after it with the rest, as hands come free: while the town hall is going up
+          they join the party, and once the daughter stands they carry what it still lacks to it,
+          until its storage stands. Until then the daughter's own builders also fetch what it lacks
+          from the mother's storage, with Food for the way, and that is no theft. Like the party,
+          they stay as the daughter's residents. Hands sent back from far workplaces leave them, and
+          none of them goes back to work there while called home. One too full for their own Food
+          puts down what crowds it out at the storage first, so nobody sets out without it. The
+          party builds the town hall, which founds the daughter: an NPC city of its own with a name
+          from the game. It then builds its storage, a farm and a house, and once its storage holds
+          the Wood of its reserve, its first wall, a ring {num(Math.floor(NPC_VILLAGE.size / 2))}{' '}
+          tiles round its home. Mother and daughter start at a standing of {num(NPC_FOUND_STANDING)}{' '}
+          toward each other, which fades like any other, and share nothing. A party whose town hall
+          doesn't stand after {days(NPC_FOUND_GIVE_UP_DAYS)} gives up and walks home. Trading posts
+          and the Trade Organization's HQ never found cities.
         </p>
         <h3>What drives an NPC city</h3>
         <p>
@@ -3780,7 +3845,7 @@ export function Wiki() {
           crime, take what was stolen from where the thief fell and carry it into the city's
           storage. A thief who gets further off is let go, and the soldiers go back to their posts.
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Crime</th>
@@ -3797,7 +3862,7 @@ export function Wiki() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
         <p>
           Trade raises it too: a point for every {num(STANDING_NPC_TRADE_COINS_PER_POINT)} coins
           with an NPC city, every {num(STANDING_TRADE_COINS_PER_POINT)} with the Trade Organization
@@ -3964,9 +4029,9 @@ export function Wiki() {
           A demand tells another realm what you want and by when: <strong>a named city</strong> of
           theirs, or <strong>goods or Coins</strong>, with a note of at most{' '}
           {num(DEMAND_NOTE_MAX_LENGTH)} characters and a deadline of up to {days(DEMAND_MAX_DAYS)}.
-          Open <strong>Demands</strong> in the Diplomacy drawer to send one or to answer one.
-          Scripts can too (<code>sendDemand</code>, <code>acceptDemand</code>,{' '}
-          <code>declineDemand</code>, <code>demands</code>).
+          Open <strong>Demands</strong> in the Diplomacy tab to send one or to answer one. Scripts
+          can too (<code>sendDemand</code>, <code>acceptDemand</code>, <code>declineDemand</code>,{' '}
+          <code>demands</code>).
         </p>
         <ul>
           <li>
@@ -4006,7 +4071,7 @@ export function Wiki() {
             {num(DEMAND_YIELD_RESPECT_TIMES)} times its own side, and at least{' '}
             {num(DEMAND_YIELD_RESPECT_MIN)}, for {days(OUTWEIGH_HOLD_DAYS)} without a break: a real
             army that stays at the gate wins a city without a fight, a crowd with spears or an army
-            walking through doesn't. Until then it <strong>wavers</strong>, and the Demands drawer
+            walking through doesn't. Until then it <strong>wavers</strong>, and the Demands tab
             shows how long is left; a planning pass on which your force doesn't outweigh it that far
             starts the time again from nothing. Your walls and fighters out of its sight don't
             count. It joins your realm as a persuaded city does, or sets what it holds of the goods
@@ -4054,7 +4119,7 @@ export function Wiki() {
           Each point of Agility dodges {pct(DODGE_PER_AGILITY)} of blows, at most {pct(DODGE_LIMIT)}
           . Combat skill grows by {num(COMBAT_SKILL_PER_BLOW)} with every blow struck or taken.
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Gear</th>
@@ -4084,7 +4149,7 @@ export function Wiki() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
         <p>
           An average resident hits for {num(unarmed)} with bare fists, {num(sword)} with a sword,{' '}
           {num(steelSword)} with a steel sword, and {num(swordSkilled)} with a sword at full Combat
@@ -4112,7 +4177,7 @@ export function Wiki() {
           like any other and goes in no slot. A smithy makes each, the smith saying which as for the
           other gear:
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Good</th>
@@ -4135,7 +4200,7 @@ export function Wiki() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
         <h3>Ranged combat</h3>
         <p>
           An armed resident with a Bow or Crossbow equipped <strong>shoots</strong> anyone they may
@@ -4149,7 +4214,7 @@ export function Wiki() {
           through part of them. Strength adds nothing to a shot; Combat skill makes a Bow much
           better, a Crossbow only a little.
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>Weapon</th>
@@ -4172,7 +4237,7 @@ export function Wiki() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
         <p>
           <strong>Archers by default.</strong> Struck, an archer's Defend default shoots back from
           where they stand, walking only until the one who struck them is in reach. On an alarm, the
@@ -4554,7 +4619,7 @@ export function Wiki() {
           Organization (an alliance’s members share one). Zoomed far out it is filled in; at the
           middle and close zoom only its borders show, unless the Region map button is on.
         </p>
-        <table>
+        <Table>
           <thead>
             <tr>
               <th>City</th>
@@ -4578,7 +4643,7 @@ export function Wiki() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       </Section>
 
       <Section id="language">
@@ -4590,11 +4655,7 @@ export function Wiki() {
           <div key={rule.title}>
             <h3>{rule.title}</h3>
             <p>{withCode(rule.text)}</p>
-            {rule.example && (
-              <pre>
-                <code>{rule.example}</code>
-              </pre>
-            )}
+            {rule.example && <ScriptCode source={rule.example} />}
           </div>
         ))}
       </Section>
@@ -4649,7 +4710,7 @@ export function Wiki() {
               <code>{name}</code>
             </h4>
             <p>{withCode(view.description)}</p>
-            <table>
+            <Table>
               <thead>
                 <tr>
                   <th>Field</th>
@@ -4670,7 +4731,7 @@ export function Wiki() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
         ))}
       </Section>
@@ -4682,11 +4743,11 @@ export function Wiki() {
           down as <code>params.name</code>. A <code>param</code> line anywhere else is a syntax
           error.
         </p>
-        <pre>
-          <code>{`param storage: storage
-if (params.storage != null) { store(["wood"], params.storage) }`}</code>
-        </pre>
-        <table>
+        <ScriptCode
+          source={`param storage: storage
+if (params.storage != null) { store(["wood"], params.storage) }`}
+        />
+        <Table>
           <thead>
             <tr>
               <th>Type</th>
@@ -4703,7 +4764,7 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
         <ul>
           <li>
             Starting at once: giving a task or Run script starts it in one tap, with the values the
@@ -4737,9 +4798,7 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             Each field says the value the script uses: the one picked, else a <code>number</code>{' '}
             param's default, a default script's target the one on their tile, or what the comment
             says after <code>none:</code>.
-            <pre>
-              <code>{PARAM_COMMENT_EXAMPLE}</code>
-            </pre>
+            <ScriptCode source={PARAM_COMMENT_EXAMPLE} />
           </li>
           <li>
             A group's card sets a <code>number</code> param for each of them running a script with
@@ -4767,17 +4826,13 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             <code>choice</code> param may have one too, one of its words: <code>= north</code> after
             its list. A <code>building</code>, <code>storage</code> or <code>waypoint</code> param
             can't have one.
-            <pre>
-              <code>{PARAM_DEFAULT_EXAMPLE}</code>
-            </pre>
+            <ScriptCode source={PARAM_DEFAULT_EXAMPLE} />
           </li>
           <li>
             A <code>choice</code> param lists the words it can be in brackets after its type, each
             once; a default that is not one of them is a syntax error. A <code>waypoint</code> param
             is one of your waypoints.
-            <pre>
-              <code>{PARAM_CHOICE_EXAMPLE}</code>
-            </pre>
+            <ScriptCode source={PARAM_CHOICE_EXAMPLE} />
           </li>
           <li>
             The Work default has <code>workplace</code>: the workplace to work, the one they stand
@@ -4884,11 +4939,11 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           </li>
         </ul>
         <p>
-          The Library has its caps too: it holds at most {num(SCRIPT_LIBRARY_MAX_SCRIPTS)} scripts,
-          your default scripts among them, and each script keeps at most {num(SCRIPT_MAX_VERSIONS)}{' '}
-          versions. A save past either is refused and says so next to the Save button: delete old
-          versions, or whole scripts, to make room. The versions the game adds to a default script
-          you haven’t edited don’t count against you.
+          Your script library has its caps too: it holds at most {num(SCRIPT_LIBRARY_MAX_SCRIPTS)}{' '}
+          scripts, your default scripts among them, and each script keeps at most{' '}
+          {num(SCRIPT_MAX_VERSIONS)} versions. A save past either is refused and says so next to the
+          Save button: delete old versions, or whole scripts, to make room. The versions the game
+          adds to a default script you haven’t edited don’t count against you.
         </p>
         <p>
           To debug a script, open the Script tab of a resident or army running it: it shows the
@@ -4899,9 +4954,9 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           The Script tab also shows the steps the script used last tick out of its{' '}
           {num(SCRIPT_STEP_BUDGET)}, marked when it ran out, and its last runtime error with the
           line and how long ago. The error stays until the script ends or you save a new version;
-          click it to open that line in the Library. Errors still go into the realm log as well.
-          Should the game itself hit an error running a script, that script ends as if it had called{' '}
-          <code>end()</code>, your realm log says so once, and everything else goes on.
+          click it to open that line in the script workshop. Errors still go into the realm log as
+          well. Should the game itself hit an error running a script, that script ends as if it had
+          called <code>end()</code>, your realm log says so once, and everything else goes on.
         </p>
         <p>
           The Script tab of your resident also shows their script log, newest first: the lines their
@@ -4924,9 +4979,7 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         {Object.entries(DEFAULT_SCRIPTS).map(([task, s]) => (
           <div key={task}>
             <h3>{s.name}</h3>
-            <pre>
-              <code>{s.source}</code>
-            </pre>
+            <ScriptCode source={s.source} />
           </div>
         ))}
       </Section>
