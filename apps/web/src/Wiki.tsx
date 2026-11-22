@@ -1378,11 +1378,12 @@ export function Wiki() {
           names the heartland your city stands in.
         </p>
         <p>
-          Every starting site has a poor stone and iron node within {num(STARTING_SITE_NODE_REACH)}{' '}
-          tiles of its middle, and a poor forest node within {num(STARTING_SITE_FOREST_REACH)}{' '}
-          tiles, about {duration(STARTING_SITE_FOREST_REACH * WALK_TICKS_PER_TILE)} on foot over
-          Plains, so Wood is close from the start. A heartland’s Forest lies in wide patches; where
-          none lies near, a small grove of Forest grows on its Plains, at most one every{' '}
+          Every starting site has a poor stone and iron node within{' '}
+          {num(STARTING_SITE_NODE_REACH)} tiles of its middle, and a poor forest node within{' '}
+          {num(STARTING_SITE_FOREST_REACH)} tiles, about{' '}
+          {duration(STARTING_SITE_FOREST_REACH * WALK_TICKS_PER_TILE)} on foot over Plains, so Wood
+          is close from the start. A heartland’s Forest lies in wide patches; where none lies near,
+          a small grove of Forest grows on its Plains, at most one every{' '}
           {num(HEARTLAND_GROVE_SPACING)} tiles.
         </p>
         <p>
@@ -1401,9 +1402,9 @@ export function Wiki() {
           residents, your Leader among them, working the farm. Every grown one, your Leader too,
           carries {num(START_SPEARS)} iron Spear, so they are armed from the first tick and an alarm
           sends them to defend the city. Children get none, and no spare weapons lie in the storage.
-          Beside its Food and Coins, the storage holds {num(START_WOOD)} Wood and {num(START_STONE)}{' '}
-          Stone for a first building, and {num(START_TOOLS)} sets of Tools for residents to fetch.
-          NPC villages keep their own start.
+          Beside its Food and Coins, the storage holds {num(START_WOOD)} Wood and{' '}
+          {num(START_STONE)} Stone for a first building, and {num(START_TOOLS)} sets of Tools for
+          residents to fetch. NPC villages keep their own start.
         </p>
         <p>
           <strong>First steps.</strong> Before any camp or quarry stands, your residents can{' '}
@@ -2058,9 +2059,9 @@ export function Wiki() {
           at {num(RALLY_PACE)} times their pace, on top of their skill, Strength and Tools. Your
           Leader does no work of their own meanwhile. Zeal drains a game hour of rallying for every
           game hour, only while somebody is being rallied. It doesn't fill while the order runs,
-          even when nobody is at work, and fills again once the rally ends; the building's card says
-          about how long it lasts. Only work is faster: not walking, carrying, fetching, training or
-          fighting.
+          even when nobody is at work, and fills again once the rally ends; the building's card
+          says about how long it lasts. Only work is faster: not walking, carrying,
+          fetching, training or fighting.
         </p>
         <p>
           It ends when you stop it or give your Leader another order, when they leave the building,
@@ -2105,9 +2106,10 @@ export function Wiki() {
           <code>storage</code>, else the nearest storage of your realm, and come back. Several
           gatherers take different tiles. Out of sight they go by what you last saw there: a tile
           someone built on since looks free until it comes into sight, and then they pick the next
-          one. With no such tile left in reach they store what they carry and end, saying why. The
-          usual food params work as in Work. In a script, <code>gather(good)</code> gathers on the
-          tile you stand on, and a tile’s <code>pickedOver</code> says whether its patch is gone.
+          one. With no such tile left in reach they store what they carry
+          and end, saying why. The usual food params work as in Work. In a script,{' '}
+          <code>gather(good)</code> gathers on the tile you stand on, and a tile’s{' '}
+          <code>pickedOver</code> says whether its patch is gone.
         </p>
       </Section>
 
@@ -3462,12 +3464,11 @@ export function Wiki() {
           {num(NPC_WALL_STONE_SET_ASIDE_TILES)} tiles of stone wall for it: its roads, repairs and
           trade leave that Stone, a founding party's Stone counts only above it, and only its walls
           spend it. It never counts as short: its spare hands refill it working for surplus, so the
-          wall doesn't pull them off other work. It upgrades a tile at a time once it holds a
-          builder's trip of Stone it may spend, from what it sets aside or beyond its reserve, while
-          its road crew is in and its wall is not moving out. A town with none builds a quarry for
-          it, and its spare hands work it. A new outer wall it puts up when it grows is of stone
-          once its old one was. Villages, starting cities and the Trade Organization's cities stay
-          wooden.
+          wall doesn't pull them off other work. It upgrades a tile at a time once it holds a builder's trip of Stone it may
+          spend, from what it sets aside or beyond its reserve, while its road crew is in and its
+          wall is not moving out. A town with none builds a quarry for it, and its spare hands work it. A
+          new outer wall it puts up when it grows is of stone once its old one was. Villages,
+          starting cities and the Trade Organization's cities stay wooden.
         </p>
         <h3>Trading posts and the HQ</h3>
         <p>
@@ -3518,10 +3519,9 @@ export function Wiki() {
           {num(NPC_ESCORT_TOWN_RESIDENTS)} residents or more, a town, sends{' '}
           {num(NPC_TRADER_ESCORTS)} soldier with each trader as their escort, of the soldiers beyond
           those on its town hall and at its gates; a village's trader goes alone. The escort keeps
-          pace with the trader: the trader waits for an escort fallen behind, and one gone ahead
-          waits for the trader. It fights whoever goes for them and comes home with them. Nothing
-          else protects them on the way; a trader not back after {days(NPC_TRADER_GIVE_UP_DAYS)} is
-          given up, and the city may send another.
+          pace with the trader: the trader waits for an escort fallen behind, and one gone ahead waits
+          for the trader. It fights whoever goes for them and comes home with them. Nothing else protects them on the way; a trader not back after{' '}
+          {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may send another.
         </p>
         <p>
           The same trader goes to a Player's offer within {num(NPC_OFFER_REACH)} tiles, ahead of any
@@ -3547,18 +3547,19 @@ export function Wiki() {
           party, none of its building spends the party's Wood and Stone: walls, repairs and other
           buildings wait until it holds what they need above its reserve and the party's, but its
           farms, lumber camps and quarries go ahead, and meanwhile it builds whatever else it wants
-          that doesn't wait. The same holds once its daughter stands, for the Wood and Stone the
-          daughter still lacks of the party's load, until its storage stands. Its walls may spend
-          the Stone its reserve sets aside for them. Its workplaces come first as well: its spare
-          hands go on a road crew, scout and work at its workplaces for surplus, and only those left
-          over gather for the party. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a
-          game day less for each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least{' '}
-          {days(NPC_FULL_DAYS_LEAST)}. A dip below its reserve only restarts that wait if it lasts
-          longer than {days(NPC_FULL_DIP_DAYS)}, though nobody sets out during one. A full city
-          founds a daughter. Once a game day it looks for a free Plains site{' '}
-          {num(NPC_CITY_MIN_DISTANCE)} to {num(NPC_FOUND_REACH)} tiles away, with room for a village
-          and on no realm's territory, nearest a node of a material it has none of in reach. A
-          founding party of {num(NPC_VILLAGE.residents)} adults, one more for each{' '}
+          that doesn't wait. The same holds once its daughter stands, for
+          the Wood and Stone the daughter still lacks of the party's load, until its storage
+          stands. Its walls may spend the Stone its reserve sets aside for them.
+          Its workplaces come first as well: its spare hands go on a road crew, scout and work at
+          its workplaces for surplus, and only those left over gather for the party. Past{' '}
+          {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less for each{' '}
+          {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}. A dip
+          below its reserve only restarts that wait if it lasts longer than{' '}
+          {days(NPC_FULL_DIP_DAYS)}, though nobody sets out during one. A full city founds a
+          daughter. Once a game day it looks for a free Plains site {num(NPC_CITY_MIN_DISTANCE)} to{' '}
+          {num(NPC_FOUND_REACH)} tiles away, with room for a village and on no realm's territory,
+          nearest a node of a material it has none of in reach. A founding party of{' '}
+          {num(NPC_VILLAGE.residents)} adults, one more for each{' '}
           {num(NPC_FOUND_RESIDENTS_PER_MEMBER)} residents past {num(NPC_FOUND_VILLAGE_RESIDENTS)} up
           to {num(NPC_FOUND_PARTY_MOST)}, sets out. One in{' '}
           {num(Math.round(1 / NPC_FOUND_ESCORT_SHARE))} of them, rounded down and at least one, is a
@@ -3569,22 +3570,21 @@ export function Wiki() {
           twice the walk and {days(NPC_FOUND_FOOD_DAYS)} there, with as many more adults as it takes
           to carry all of it. They come from its spare hands and its workers near home first, then
           from its farmers beyond those who feed it; while too few are at hand, its workers far out
-          come home to set out and wait there. With too few hands to carry all of it, the party sets
-          out once it holds the town hall's materials and its Food, and the city sends a second wave
-          of carriers after it with the rest, as hands come free: while the town hall is going up
-          they join the party, and once the daughter stands they carry what it still lacks to it,
-          until its storage stands. Until then the daughter's own builders also fetch what it lacks
-          from the mother's storage, with Food for the way, and that is no theft. Like the party,
-          they stay as the daughter's residents. Hands sent back from far workplaces leave them, and
-          none of them goes back to work there while called home. One too full for their own Food
-          puts down what crowds it out at the storage first, so nobody sets out without it. The
-          party builds the town hall, which founds the daughter: an NPC city of its own with a name
-          from the game. It then builds its storage, a farm and a house, and once its storage holds
-          the Wood of its reserve, its first wall, a ring {num(Math.floor(NPC_VILLAGE.size / 2))}{' '}
-          tiles round its home. Mother and daughter start at a standing of {num(NPC_FOUND_STANDING)}{' '}
-          toward each other, which fades like any other, and share nothing. A party whose town hall
-          doesn't stand after {days(NPC_FOUND_GIVE_UP_DAYS)} gives up and walks home. Trading posts
-          and the Trade Organization's HQ never found cities.
+          come home to set out and wait there. With too few hands to carry all of it, the party
+          sets out once it holds the town hall's materials and its Food, and the city sends a
+          second wave of carriers after it with the rest, as hands come free: while the town hall
+          is going up they join the party, and once the daughter stands they carry what it still
+          lacks to it, until its storage stands. Until then the daughter's own builders also
+          fetch what it lacks from the mother's storage, with Food for the way, and that is no
+          theft. Like the party, they stay as the daughter's residents. Hands sent back from far workplaces leave them, and none of them goes back to
+          work there while called home. One too full for their own Food puts
+          down what crowds it out at the storage first, so nobody sets out without it. The party builds the town hall, which founds the daughter: an NPC city of
+          its own with a name from the game. It then builds its storage, a farm and a house, and
+          once its storage holds the Wood of its reserve, its first wall, a ring{' '}
+          {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its home. Mother and daughter start at
+          a standing of {num(NPC_FOUND_STANDING)} toward each other, which fades like any other, and
+          share nothing. A party whose town hall doesn't stand after {days(NPC_FOUND_GIVE_UP_DAYS)}{' '}
+          gives up and walks home. Trading posts and the Trade Organization's HQ never found cities.
         </p>
         <h3>What drives an NPC city</h3>
         <p>
