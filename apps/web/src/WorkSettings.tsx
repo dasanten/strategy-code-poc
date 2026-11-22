@@ -69,25 +69,25 @@ export function WorkSettings({
     <div className="sel-info work-settings">
       <button
         type="button"
-        className="sel-info-toggle"
+        className="sel-info-toggle work-settings-toggle"
         aria-expanded={open}
         onClick={() => {
           setOpen(!open)
           remember(!open)
         }}
       >
-        <span aria-hidden="true">⚙</span> Work settings
+        <span className="ic s16 i-gear" aria-hidden="true" />
+        <span className="grow">Work settings</span>
         <span className="sel-more" aria-hidden="true">
           {open ? '▾' : '▸'}
         </span>
       </button>
       {open && (
-        <div aria-label="Work settings">
-          <label className="goods-row">
-            <span className="small">
-              <strong>Work script</strong>
-            </span>
+        <div className="work-settings-body" aria-label="Work settings">
+          <label className="fld">
+            <span className="lb">Work script</span>
             <select
+              className="in"
               aria-label="Work script"
               value={script?.id ?? ''}
               disabled={choices.length === 0}
@@ -116,9 +116,9 @@ export function WorkSettings({
               onClear={onClear}
             />
           ) : (
-            script && <p className="muted small">{script.name} takes no settings here.</p>
+            script && <p className="mu small">{script.name} takes no settings here.</p>
           )}
-          <p className="muted small">Only your realm sees these.</p>
+          <p className="mu small">Only your realm sees these.</p>
         </div>
       )}
     </div>

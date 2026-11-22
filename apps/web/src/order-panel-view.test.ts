@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PANEL_WIDTHS, panelLeft, panelSize, panelTitle } from './order-panel-view.js'
+import { PANEL_WIDTHS, orderTone, panelLeft, panelSize, panelTitle } from './order-panel-view.js'
 
 describe('panelSize', () => {
   it('opens Goods and Build wide, short forms narrow, the rest in between', () => {
@@ -9,6 +9,14 @@ describe('panelSize', () => {
     expect(panelSize('makeLeader')).toBe('sm')
     expect(panelSize('haul')).toBe('md')
     expect(panelSize('walls')).toBe('md')
+  })
+
+  it('opens Gather and Teach narrow, Work, Tear down and Breed horses in between', () => {
+    expect(panelSize('gather')).toBe('sm')
+    expect(panelSize('teach')).toBe('sm')
+    expect(panelSize('work')).toBe('md')
+    expect(panelSize('tearDown')).toBe('md')
+    expect(panelSize('breed')).toBe('md')
   })
 
   it('has a width for each size, widest last', () => {
@@ -41,5 +49,19 @@ describe('panelLeft', () => {
 
   it('sits at the left end when the bar is narrower than the panel', () => {
     expect(panelLeft(200, 560, 400)).toBe(0)
+  })
+})
+
+describe('orderTone', () => {
+  it('makes Rally the crew gold and a siege machine’s blow danger red', () => {
+    expect(orderTone('rally')).toBe('gold')
+    expect(orderTone('ram')).toBe('dng')
+    expect(orderTone('throw')).toBe('dng')
+  })
+
+  it('leaves every other order plain', () => {
+    expect(orderTone('work')).toBeUndefined()
+    expect(orderTone('tearDown')).toBeUndefined()
+    expect(orderTone('crew')).toBeUndefined()
   })
 })

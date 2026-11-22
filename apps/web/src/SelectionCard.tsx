@@ -54,6 +54,7 @@ import {
 import { Meter, meterClass, pct } from './Horses.js'
 import { WaypointNameForm, addProblem } from './Waypoints.js'
 import { suggestedWaypointName } from './waypoints-view.js'
+import { orderTone } from './order-panel-view.js'
 import { SHEET_OPENS_AT, nextSheet, snapSheet, stepSheet, type SheetHeight } from './sheet-view.js'
 
 /**
@@ -442,12 +443,17 @@ export function ActionRows<Id extends string>({
       {actions.map((a) => {
         const on = a.active || (a.opens && open === a.id)
         const why = `${ids}-${a.id}`
+        const tone = orderTone(a.id)
         return (
           <Fragment key={a.id}>
             <div className={grid ? 'cmd-order' : 'sel-action'}>
               <button
                 type="button"
-                className={grid ? `btn sm fill${on ? ' on' : ''}` : on ? 'on' : ''}
+                className={
+                  grid
+                    ? `btn sm fill${on ? ' on' : ''}${tone ? ` ${tone}` : ''}`
+                    : `${on ? 'on' : ''}${tone ? ` btn ${tone}` : ''}`.trim()
+                }
                 aria-label={a.label}
                 aria-describedby={a.reason ? why : undefined}
                 aria-pressed={a.opens || a.active !== undefined ? !!on : undefined}
@@ -799,6 +805,8 @@ export function TileCard({
         <ActionRows
           actions={actions}
           open={shown}
+          // A siege machine's orders two to a row, as on the artboard's Ram card.
+          grid={card.machine?.own ? { wide: true } : undefined}
           onAction={(a) => {
             if (a.opens) setOpen(shown === a.id ? undefined : a.id)
             if (a.id === 'sendHere') onSendHere()

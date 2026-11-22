@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { BUILDABLE, buildMenu } from './shared/building.js'
 import { Terrain } from './shared/terrain.js'
 import type { Building, BuildingKind, City, KnownNode } from '@csp/shared-types'
-import { buildMenuGroups, canChooseKind, kindProblemOn, workSpan } from './build-menu-view.js'
+import {
+  buildMenuGroups,
+  buildingSprite,
+  canChooseKind,
+  kindProblemOn,
+  workSpan,
+} from './build-menu-view.js'
+import { BUILD_GROUPS } from './shared/building-info.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { buildHereProblem } from './selection-view.js'
 
@@ -194,5 +201,30 @@ describe('the Build menu with no tile picked yet (realm control mode)', () => {
     )
     const forest = forestAt(50, 50)
     expect(kindProblemOn('lumberCamp', forest, problem(forest))).toBeUndefined()
+  })
+})
+
+describe('the Build menu’s pixel sprites', () => {
+  it('has a slice of the pixel sheets for every kind in the menu', () => {
+    for (const kind of BUILD_GROUPS.flatMap((g) => g.kinds)) {
+      expect(buildingSprite(kind), kind).toBeDefined()
+    }
+  })
+
+  it('takes a building from the buildings sheet, a tower by its material', () => {
+    expect(buildingSprite('smithy')).toMatchObject({ sheet: 'buildings', slice: 'smithy' })
+    expect(buildingSprite('tower')?.slice).toBe('tower-wood')
+    expect(buildingSprite('tower', 'stone')?.slice).toBe('tower-stone')
+  })
+
+  it('draws a carriage, vessel or siege machine from the units sheet', () => {
+    expect(buildingSprite('carriage')).toMatchObject({ sheet: 'units', slice: 'carriage' })
+    expect(buildingSprite('ram')).toMatchObject({ sheet: 'units', slice: 'ram' })
+  })
+
+  it('shows a wall, gate or road as one of its tile pieces, of the material picked', () => {
+    expect(buildingSprite('wall')).toMatchObject({ sheet: 'tiles', slice: 'wall-wood-straight' })
+    expect(buildingSprite('gate', 'stone')?.slice).toBe('gate-stone-ew')
+    expect(buildingSprite('road')).toMatchObject({ sheet: 'tiles', slice: 'road-straight' })
   })
 })
