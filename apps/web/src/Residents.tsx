@@ -130,7 +130,7 @@ import {
   type ResidentGroup,
   type ResidentLines,
 } from './residents-view.js'
-import { GOOD_LABELS, carriedItems } from './goods-grid.js'
+import { GOOD_LABELS, carriedItems, goodsAmount } from './goods-grid.js'
 import {
   equipmentLine,
   equipmentSlots,
@@ -139,7 +139,7 @@ import {
   swapChoices,
   type SlotView,
 } from './equipment-view.js'
-import { GoodsGrid } from './GoodsGrid.js'
+import { GoodIcon, GoodsGrid } from './GoodsGrid.js'
 import { BuildMenu } from './BuildMenu.js'
 import { workSpan } from './build-menu-view.js'
 import { doingLine, interruptedLine, scriptLine } from './doing-view.js'
@@ -243,7 +243,8 @@ import {
   useKeptRows,
 } from './SelectionCard.js'
 import { rallyProblem } from './zeal.js'
-import { CommandBar, OrderGrid } from './CommandBar.js'
+import { CommandBar, OrderGrid, PanelFoot, type OrderPanelSpec } from './CommandBar.js'
+import { panelSize, panelTitle } from './order-panel-view.js'
 import { HorsePick } from './HorsePick.js'
 import {
   orderGroupOf,
@@ -1838,7 +1839,7 @@ export function GroupCard({
     <>
       {shown === 'board' && (
         <section className="inspector-block" aria-label="Board carriage">
-          <div className="order-buttons">
+          <div className="opanel-choices">
             {carriages.map(({ carriage, seats }) => (
               <button
                 type="button"
@@ -1878,15 +1879,19 @@ export function GroupCard({
       )}
       {shown === 'feed' && (
         <section className="inspector-block" aria-label="Feed">
-          <div className="order-buttons">
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={feedUnits}
-              aria-label="Units of Food each"
-              onChange={(e) => setFeedUnits(Number(e.target.value))}
-            />
+          <PanelFoot>
+            <label className="opanel-units">
+              Units each
+              <input
+                className="amount mono"
+                type="number"
+                min={1}
+                step={1}
+                value={feedUnits}
+                aria-label="Units of Food each"
+                onChange={(e) => setFeedUnits(Number(e.target.value))}
+              />
+            </label>
             <button
               type="button"
               className="primary"
@@ -1898,7 +1903,10 @@ export function GroupCard({
             >
               Feed
             </button>
-          </div>
+          </PanelFoot>
+          {(!Number.isInteger(feedUnits) || feedUnits < 1) && (
+            <span className="muted small">Units: a whole number, 1 or more.</span>
+          )}
           <p className="muted small">
             Each with Food in hand next to someone Down or a horse that isn’t full feeds them, one
             for each: someone Down eats a unit at once and wakes at low health, a horse eats until
@@ -1908,7 +1916,7 @@ export function GroupCard({
       )}
       {shown === 'equip' && (
         <section className="inspector-block" aria-label="Equip">
-          <div className="order-buttons">
+          <div className="opanel-choices">
             {groupSwapChoices(residents).map((c) => (
               <button
                 key={c.good}
@@ -1918,6 +1926,7 @@ export function GroupCard({
                   onOrder({ kind: 'equip', good: c.good })
                 }}
               >
+                <GoodIcon good={c.good} />
                 {c.label}
               </button>
             ))}
@@ -1930,7 +1939,8 @@ export function GroupCard({
       )}
       {shown === 'fetch' && (
         <section className="inspector-block" aria-label="Fetch">
-          <div className="order-buttons">
+          <label className="fld">
+            <span className="lb">Good</span>
             <select
               aria-label="Good to fetch"
               value={good}
@@ -1942,7 +1952,13 @@ export function GroupCard({
                 </option>
               ))}
             </select>
-            <button type="button" onClick={() => onOrder({ kind: 'fetch', good })}>
+          </label>
+          <PanelFoot>
+            <button
+              type="button"
+              className="primary"
+              onClick={() => onOrder({ kind: 'fetch', good })}
+            >
               Fetch
             </button>
             <button
@@ -1952,7 +1968,7 @@ export function GroupCard({
             >
               Fetch from…
             </button>
-          </div>
+          </PanelFoot>
           <p className="muted small">
             Each fetches as much as fits from the nearest storage or carriage holding it, or from
             the storage, stable or carriage picked on the map.
@@ -2014,66 +2030,78 @@ export function GroupCard({
       )}
     </>
   )
+  const shownRow = rows.find((a) => a.id === shown)
+  // The open order's panel as the shell shows it (`OrderPanel`).
+  const shownSpec: OrderPanelSpec | undefined =
+    shown && openPanel
+      ? {
+          title: panelTitle(shownRow?.label ?? ''),
+          ...(shownRow ? { keyCap: shownRow.key } : {}),
+          size: panelSize(shown),
+          body: openPanel,
+          onClose: closePanel,
+        }
+      : undefined
   // Build's tile picked: its menu opens where an order's panel does (`CommandBar`).
   const buildPanel = tab === 'orders' && buildAt && !picking && (
-        <section className="inspector-block" aria-label="Build" ref={buildBlock}>
-          <div className="panel-head">
-            <h3>Build</h3>
-            <span className="small muted">
-              at {buildAt.x}, {buildAt.y}
-            </span>
-          </div>
-          {buildAt.site ? (
-            <div className="order-buttons">
-              <button
-                type="button"
-                className="primary"
-                onClick={() =>
-                  onOrder({
-                    kind: 'build',
-                    building: buildAt.site!.kind,
-                    at: { x: buildAt.site!.x, y: buildAt.site!.y },
-                    ...(buildAt.site!.material === 'stone' ? { material: 'stone' as const } : {}),
-                  })
-                }
-              >
-                All help build the {BUILDING_NAMES[buildAt.site.kind].toLowerCase()}
-              </button>
-              <CustomiseButton
-                order={taskStart('build')}
-                of="Build"
-                give={() =>
-                  onOrder({
-                    kind: 'build',
-                    building: buildAt.site!.kind,
-                    at: { x: buildAt.site!.x, y: buildAt.site!.y },
-                    ...(buildAt.site!.material === 'stone' ? { material: 'stone' as const } : {}),
-                  })
-                }
-              />
-            </div>
-          ) : (
-            <BuildMenu
-              // Another tile starts with nothing tapped.
-              key={`${buildAt.x},${buildAt.y}`}
-              node={buildAt.node}
-              terrain={buildAt.terrain}
-              buildProblem={buildAt.problem}
-              onBuild={(kind, material) =>
-                onOrder({
-                  kind: 'build',
-                  building: kind,
-                  at: { x: buildAt.x, y: buildAt.y },
-                  ...(material ? { material } : {}),
-                })
-              }
-            />
-          )}
-          <p className="muted small">
-            Each walks there; the first lays out the site and the others join it.
-          </p>
-        </section>
-      )
+    <section className="inspector-block" aria-label="Build" ref={buildBlock}>
+      <div className="panel-head">
+        <h3>Build</h3>
+        <span className="small muted">
+          at {buildAt.x}, {buildAt.y}
+        </span>
+      </div>
+      {buildAt.site ? (
+        <div className="order-buttons">
+          <button
+            type="button"
+            className="primary"
+            onClick={() =>
+              onOrder({
+                kind: 'build',
+                building: buildAt.site!.kind,
+                at: { x: buildAt.site!.x, y: buildAt.site!.y },
+                ...(buildAt.site!.material === 'stone' ? { material: 'stone' as const } : {}),
+              })
+            }
+          >
+            All help build the {BUILDING_NAMES[buildAt.site.kind].toLowerCase()}
+          </button>
+          <CustomiseButton
+            order={taskStart('build')}
+            of="Build"
+            give={() =>
+              onOrder({
+                kind: 'build',
+                building: buildAt.site!.kind,
+                at: { x: buildAt.site!.x, y: buildAt.site!.y },
+                ...(buildAt.site!.material === 'stone' ? { material: 'stone' as const } : {}),
+              })
+            }
+          />
+        </div>
+      ) : (
+        <BuildMenu
+          // Another tile starts with nothing tapped.
+          key={`${buildAt.x},${buildAt.y}`}
+          node={buildAt.node}
+          terrain={buildAt.terrain}
+          buildProblem={buildAt.problem}
+          onBuild={(kind, material) =>
+            onOrder({
+              kind: 'build',
+              building: kind,
+              at: { x: buildAt.x, y: buildAt.y },
+              ...(material ? { material } : {}),
+            })
+          }
+        />
+      )}
+      <p className="muted small">
+        Each walks there; the first lays out the site and the others join it.
+      </p>
+    </section>
+  )
   return (
     <CommandBar
       rel="own"
@@ -2088,7 +2116,13 @@ export function GroupCard({
       panel={
         tab === 'orders' && ((shown && openPanel) || buildPanel)
           ? {
-              title: buildPanel ? 'Build' : (rows.find((a) => a.id === shown)?.label ?? ''),
+              ...(buildPanel
+                ? {
+                    title: 'Build',
+                    note: `at ${buildAt!.x}, ${buildAt!.y}`,
+                    size: panelSize('build'),
+                  }
+                : (shownSpec ?? { title: '' })),
               body: (
                 <>
                   {shown && openPanel}
@@ -2116,7 +2150,7 @@ export function GroupCard({
           groups={rowGroups(rows, groupButtonGroup)}
           open={shown}
           onAction={act}
-          panel={openPanel || undefined}
+          panel={shownSpec}
           beside={(a) => {
             const task = GROUP_ROW_TASKS[a.id]
             return (
@@ -2638,6 +2672,7 @@ export function ResidentCard({
   const child = !canWork(r, tick)
   // Children pick up and put down only Food (`CONTEXT.md`: Child).
   const refused = (good: Good) => !canHandle(r, tick, [good])
+  const childWhy = child ? 'Children handle Food only.' : undefined
   const family = familyLine(r, residents, tick)
   // A queue the game gave under a name (the stable hand's "Farm and feed") goes into the saved
   // queues once (`CONTEXT.md`: Starting city, Saved queue).
@@ -2791,7 +2826,7 @@ export function ResidentCard({
       : (cities.find((c) => c.id === r.cityId)?.name ?? 'a city out of sight')
   // The open order's panel, above the command bar or on a phone under its order (`CommandBar`).
   const openPanel = shown && (
-    <div className="sel-panel well">
+    <div className="sel-panel">
       {shown === 'haul' && (carriage || boatToRow) && (
         <HaulBlock
           adult={!child}
@@ -2882,9 +2917,10 @@ export function ResidentCard({
             Crew sail the ship and take no room; a passenger rides along and counts against its
             load.
           </p>
-          <div className="order-buttons">
+          <PanelFoot>
             <button
               type="button"
+              className="primary"
               disabled={child}
               title={child ? 'children can’t crew a ship' : undefined}
               onClick={() => onBoard(boatToBoard.id, true)}
@@ -2894,7 +2930,8 @@ export function ResidentCard({
             <button type="button" onClick={() => onBoard(boatToBoard.id, false)}>
               As passenger
             </button>
-          </div>
+          </PanelFoot>
+          {child && <p className="muted small">A child can’t crew a ship.</p>}
         </section>
       )}
       {shown === 'hitch' && toHitch && (
@@ -2930,11 +2967,15 @@ export function ResidentCard({
             <ul className="equipment-slots">
               {equipmentSlots(r.equipped, r.condition).map((s) => {
                 const choices = onEquip ? swapChoices(s.slot, r.carried, r.equipped) : []
+                const worn = r.equipped?.[s.slot]
                 return (
                   <li key={s.slot}>
-                    <span className="muted small">{s.label}</span>{' '}
-                    <span className={s.item ? undefined : 'muted'}>{s.item ?? 'empty'}</span>
-                    {s.condition && <span className="muted small"> ({s.condition})</span>}
+                    <span className="equipment-icon">{worn && <GoodIcon good={worn} />}</span>
+                    <span className="grow">
+                      <strong>{s.label}</strong> ·{' '}
+                      <span className={s.item ? undefined : 'muted'}>{s.item ?? 'empty'}</span>
+                      {s.condition && <span className="muted small"> ({s.condition})</span>}
+                    </span>
                     {choices.length > 0 && (
                       <select
                         aria-label={`Swap into the ${s.label.toLowerCase()} slot`}
@@ -2950,7 +2991,11 @@ export function ResidentCard({
                       </select>
                     )}
                     {onEquip && s.item && (
-                      <button type="button" onClick={() => onEquip(s.slot, null)}>
+                      <button
+                        type="button"
+                        className="btn sm"
+                        onClick={() => onEquip(s.slot, null)}
+                      >
                         Take off
                       </button>
                     )}
@@ -2968,46 +3013,43 @@ export function ResidentCard({
           <section className="inspector-block" aria-label="Carrying">
             <div className="panel-head">
               <h3>Carrying</h3>
-              <span className="mono small">
-                {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
-              </span>
+              {onStore && carried.length > 0 && (
+                <button type="button" className="btn sm" onClick={onStore}>
+                  Store all
+                </button>
+              )}
             </div>
+            {onStore && carried.length > 0 && (
+              <p className="muted small">
+                Store all: at the nearest storage, keeping their own Food.
+              </p>
+            )}
             {carried.length === 0 && (
               <p className="muted small">
                 Nothing. Residents eat only what they carry; at home they take meals from storage.
               </p>
             )}
-            {onStore && carried.length > 0 && (
-              <div className="order-buttons">
-                <button type="button" onClick={onStore}>
-                  Store all
-                </button>
-                <span className="muted small">at the nearest storage, keeping their own Food</span>
-              </div>
-            )}
-            {carried.map(([good, units]) => (
-              <GoodsRow
-                key={good}
-                good={good}
-                units={units}
-                byDefault={putAwayUnits(good, units)}
-                disabled={refused(good)}
-                actions={[
-                  { label: 'Drop', spot: ground },
-                  ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
-                  ...((needed[good] ?? 0) > 0 ? [{ label: 'Deliver', spot: atSite }] : []),
-                  ...((carriageNeeded[good] ?? 0) > 0
-                    ? [{ label: 'Deliver to carriage site', spot: atCarriageSite }]
-                    : []),
-                  ...((roadNeeded[good] ?? 0) > 0
-                    ? [{ label: 'Deliver to road', spot: atRoadSite }]
-                    : []),
-                  ...(carriage ? [{ label: 'Load', spot: onCarriage }] : []),
-                  ...(boat ? [{ label: 'Load into boat', spot: inBoat }] : []),
-                ]}
-                onAct={onDrop}
-              />
-            ))}
+            <GoodsPick
+              label="Carrying"
+              goods={carried}
+              byDefault={putAwayUnits}
+              refused={refused}
+              refusedWhy={childWhy}
+              actions={(good) => [
+                { label: 'Drop', spot: ground },
+                ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
+                ...((needed[good] ?? 0) > 0 ? [{ label: 'Deliver', spot: atSite }] : []),
+                ...((carriageNeeded[good] ?? 0) > 0
+                  ? [{ label: 'Deliver to carriage site', spot: atCarriageSite }]
+                  : []),
+                ...((roadNeeded[good] ?? 0) > 0
+                  ? [{ label: 'Deliver to road', spot: atRoadSite }]
+                  : []),
+                ...(carriage ? [{ label: 'Load', spot: onCarriage }] : []),
+                ...(boat ? [{ label: 'Load into boat', spot: inBoat }] : []),
+              ]}
+              onAct={onDrop}
+            />
           </section>
           {(pile ||
             storage ||
@@ -3028,6 +3070,7 @@ export function ResidentCard({
                 spot={ground}
                 onPickUp={onPickUp}
                 refused={refused}
+                refusedWhy={childWhy}
               />
               {storage && (
                 <TileGoods
@@ -3040,6 +3083,7 @@ export function ResidentCard({
                   spot={inStorage}
                   onPickUp={onPickUp}
                   refused={refused}
+                  refusedWhy={childWhy}
                 />
               )}
               {site && (
@@ -3049,6 +3093,7 @@ export function ResidentCard({
                   spot={atSite}
                   onPickUp={onPickUp}
                   refused={refused}
+                  refusedWhy={childWhy}
                 />
               )}
               {carriageSite && (
@@ -3058,6 +3103,7 @@ export function ResidentCard({
                   spot={atCarriageSite}
                   onPickUp={onPickUp}
                   refused={refused}
+                  refusedWhy={childWhy}
                 />
               )}
               {roadSite && (
@@ -3067,6 +3113,7 @@ export function ResidentCard({
                   spot={atRoadSite}
                   onPickUp={onPickUp}
                   refused={refused}
+                  refusedWhy={childWhy}
                 />
               )}
               {carriage && (
@@ -3076,6 +3123,7 @@ export function ResidentCard({
                   spot={onCarriage}
                   onPickUp={onPickUp}
                   refused={refused}
+                  refusedWhy={childWhy}
                 />
               )}
               {boat?.load && (
@@ -3087,6 +3135,7 @@ export function ResidentCard({
                   spot={inBoat}
                   onPickUp={onPickUp}
                   refused={refused}
+                  refusedWhy={childWhy}
                 />
               )}
               {storage && boat?.kind === 'ship' && storage.id === boat.dockedAt && onLoad && (
@@ -3099,6 +3148,7 @@ export function ResidentCard({
                     label="Load ship"
                     onPickUp={(_, goods) => onLoad(boat.id, goods, false)}
                     refused={refused}
+                    refusedWhy={childWhy}
                   />
                   <TileGoods
                     title="From the ship into the haven"
@@ -3107,6 +3157,7 @@ export function ResidentCard({
                     label="Unload"
                     onPickUp={(_, goods) => onLoad(boat.id, goods, true)}
                     refused={refused}
+                    refusedWhy={childWhy}
                   />
                 </>
               )}
@@ -3118,6 +3169,7 @@ export function ResidentCard({
                   spot={{ kind: 'resident', residentId: d.id }}
                   onPickUp={onPickUp}
                   refused={refused}
+                  refusedWhy={childWhy}
                 />
               ))}
             </section>
@@ -3129,6 +3181,7 @@ export function ResidentCard({
       )}
       {shown === 'feed' && onFeed && (
         <FeedBlock
+          titled={false}
           targets={toFeedNear}
           food={r.carried.food ?? 0}
           onFeed={(targetId, units) => {
@@ -3157,9 +3210,6 @@ export function ResidentCard({
       )}
       {shown === 'script' && (
         <section className="inspector-block" aria-label="Run script">
-          <div className="panel-head">
-            <h3>Run script</h3>
-          </div>
           <RunScript
             script={r.script}
             scripts={scripts}
@@ -3172,7 +3222,6 @@ export function ResidentCard({
       {shown === 'relocate' && relocate && onRelocate && (
         <RelocateBlock
           resident={r}
-          home={home}
           choices={relocate.choices}
           onRelocate={(cityId) => {
             setPanel(undefined)
@@ -3182,18 +3231,19 @@ export function ResidentCard({
       )}
       {shown === 'makeLeader' && makeLeader && (
         <section className="inspector-block" aria-label="Make Leader">
-          <div className="panel-head">
-            <h3>Make Leader</h3>
-          </div>
+          {makeLeader.heir && (
+            <div className="panel-head">
+              <h3>Make Leader</h3>
+            </div>
+          )}
           <p className="small">
             Hand your realm to {r.name}? {leaderName ?? 'Your Leader'} stays on as an ordinary
             resident.
           </p>
-          {makeLeader.problem && <p className="muted small">{makeLeader.problem}.</p>}
-          <div className="order-buttons">
+          <PanelFoot>
             <button
               type="button"
-              className="primary"
+              className="btn gold"
               disabled={!!makeLeader.problem}
               onClick={() => {
                 setPanel(undefined)
@@ -3205,7 +3255,8 @@ export function ResidentCard({
             <button type="button" onClick={() => setPanel(undefined)}>
               Cancel
             </button>
-          </div>
+          </PanelFoot>
+          {makeLeader.problem && <p className="muted small">{makeLeader.problem}.</p>}
         </section>
       )}
       {shown === 'makeLeader' && makeLeader?.heir && (
@@ -3216,7 +3267,7 @@ export function ResidentCard({
           {makeLeader.heir.named ? (
             <>
               <p className="small">{r.name} is your realm’s heir.</p>
-              <div className="order-buttons">
+              <PanelFoot>
                 <button
                   type="button"
                   onClick={() => {
@@ -3226,7 +3277,7 @@ export function ResidentCard({
                 >
                   Clear heir
                 </button>
-              </div>
+              </PanelFoot>
             </>
           ) : (
             <>
@@ -3234,8 +3285,7 @@ export function ResidentCard({
                 Name {r.name} your realm’s heir, to carry it on
                 {heirName ? ` in place of ${heirName}` : ''}? Free and at once, from anywhere.
               </p>
-              {makeLeader.heir.problem && <p className="muted small">{makeLeader.heir.problem}.</p>}
-              <div className="order-buttons">
+              <PanelFoot>
                 <button
                   type="button"
                   className="primary"
@@ -3247,7 +3297,8 @@ export function ResidentCard({
                 >
                   Name {r.name} heir
                 </button>
-              </div>
+              </PanelFoot>
+              {makeLeader.heir.problem && <p className="muted small">{makeLeader.heir.problem}.</p>}
             </>
           )}
         </section>
@@ -3266,6 +3317,34 @@ export function ResidentCard({
       )}
     </div>
   )
+  const shownRow = rows.find((a) => a.id === shown)
+  const weapon = bestWeapon(r)
+  // What the panel's header says beside its title.
+  const notes: Partial<Record<ActionId, ReactNode>> = {
+    goods: (
+      <span className="mono">{carryLine(stockWeight(r.carried), carryCapacity(r, tick))}</span>
+    ),
+    feed: `${r.carried.food ?? 0} Food in hand`,
+    hitch: toHitch && `${toHitch.horses.length} free here`,
+    relocate: `from ${home}`,
+    rename: 'free, at once',
+    walls: 'break or climb',
+    attack: weapon ? `fights with a ${GOOD_LABELS[weapon].toLowerCase()}` : 'unarmed',
+  }
+  const panelSpec: OrderPanelSpec | undefined =
+    tab === 'orders' && shown && openPanel
+      ? {
+          title:
+            shown === 'makeLeader' && makeLeader?.heir
+              ? 'Leader and heir'
+              : panelTitle(shownRow?.label ?? ''),
+          note: notes[shown] || undefined,
+          ...(shownRow ? { keyCap: shownRow.key } : {}),
+          size: panelSize(shown),
+          body: openPanel,
+          onClose: () => setPanel(undefined),
+        }
+      : undefined
   return (
     <CommandBar
       rel={r.owner === realmId ? 'own' : 'alliance'}
@@ -3333,15 +3412,7 @@ export function ResidentCard({
           ))}
         </div>
       }
-      panel={
-        tab === 'orders' && shown && openPanel
-          ? {
-              title: rows.find((a) => a.id === shown)?.label ?? '',
-              body: openPanel,
-              onClose: () => setPanel(undefined),
-            }
-          : undefined
-      }
+      panel={panelSpec}
       status={
         (orderError || tab === 'orders') && (
           <p className="muted small" role="status">
@@ -3359,7 +3430,7 @@ export function ResidentCard({
           groups={rowGroups(rows, orderGroupOf)}
           open={shown}
           onAction={act}
-          panel={openPanel || undefined}
+          panel={panelSpec}
           beside={(a) => {
             const task = ROW_TASKS[a.id]
             return (
@@ -3583,46 +3654,55 @@ export function HaulBlock({
   }
   return (
     <section className="inspector-block" aria-label="Haul route">
-      <div className="panel-head">
-        <h3>Haul route</h3>
-        {onRoute && <span className="small muted">on a route</span>}
-      </div>
+      {onRoute && <span className="chip y haul-on-route">on a route</span>}
       {([false, true] as const).map((back) => (
-        <div key={String(back)}>
-          <span className="small muted">{back ? 'Back from there' : 'To the other stop'}</span>
-          <div className="chips">
-            {GOODS.map((g) => (
-              <label className="chip" key={g}>
-                <input
-                  type="checkbox"
-                  checked={(back ? returnGoods : goods).includes(g)}
-                  onChange={() => toggle(g, back)}
-                />{' '}
-                {GOOD_LABELS[g]}
-              </label>
-            ))}
+        <div className="haul-goods" key={String(back)}>
+          <span className="lb">{back ? 'Back from there' : 'To the other stop'}</span>
+          <div
+            className="haul-goods-grid"
+            role="group"
+            aria-label={back ? 'Goods back from there' : 'Goods to the other stop'}
+          >
+            {GOODS.map((g) => {
+              const on = (back ? returnGoods : goods).includes(g)
+              const other = (back ? goods : returnGoods).includes(g)
+              return (
+                <button
+                  type="button"
+                  className="btn sm"
+                  key={g}
+                  aria-pressed={on}
+                  title={other ? `${GOOD_LABELS[g]} goes the other way; tap to swap it` : undefined}
+                  onClick={() => toggle(g, back)}
+                >
+                  <GoodIcon good={g} />
+                  {GOOD_LABELS[g]}
+                </button>
+              )
+            })}
           </div>
         </div>
       ))}
-      <label className="small">
+      <span className="muted small">A good goes one way only.</span>
+      <label className="haul-keep">
         {ship
           ? 'Food kept for the crew'
           : byWater
             ? 'Food kept for the rower'
-            : 'Food kept for the horse'}{' '}
+            : 'Food kept for the horse'}
         <input
+          className="amount mono"
           type="number"
           min={0}
           step={1}
           value={keepFood}
           onChange={(e) => setKeepFood(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-          style={{ width: '4em' }}
         />
       </label>
-      <div className="order-buttons">
+      <PanelFoot>
         <button
           type="button"
-          className={picking ? 'primary' : ''}
+          className="primary"
           aria-pressed={picking}
           disabled={!adult || goods.length === 0}
           onClick={() => onHaulTo({ goods, returnGoods, keepFood })}
@@ -3635,7 +3715,14 @@ export function HaulBlock({
           disabled={!adult || goods.length === 0}
           give={() => onHaulTo({ goods, returnGoods, keepFood })}
         />
-      </div>
+      </PanelFoot>
+      {!adult ? (
+        <span className="muted small">A child can’t drive.</span>
+      ) : (
+        goods.length === 0 && (
+          <span className="muted small">Pick at least one good to take to the other stop.</span>
+        )
+      )}
       {ship ? (
         <p className="muted small">
           The captain moves the picked goods straight from this haven onto the ship, sails it with
@@ -4019,10 +4106,6 @@ function HitchBlock({
   const chosen = horses.some((h) => h.id === picked) ? picked : undefined
   return (
     <section className="inspector-block" aria-label="Hitch horse">
-      <div className="panel-head">
-        <h3>Hitch horse</h3>
-        <span className="small muted">{horses.length} free here</span>
-      </div>
       <p className="muted small">
         The horse you pick pulls the carriage at once; one already hitched stands free on the tile.
       </p>
@@ -4035,11 +4118,17 @@ function HitchBlock({
           onToggle={() => setPicked(chosen === h.id ? undefined : h.id)}
         />
       ))}
-      <div className="order-buttons">
-        <button type="button" disabled={!chosen} onClick={() => chosen && onHitch(chosen)}>
+      {!chosen && <span className="muted small">Tick the horse to hitch.</span>}
+      <PanelFoot>
+        <button
+          type="button"
+          className="primary"
+          disabled={!chosen}
+          onClick={() => chosen && onHitch(chosen)}
+        >
           Hitch
         </button>
-      </div>
+      </PanelFoot>
     </section>
   )
 }
@@ -4238,10 +4327,7 @@ function PairBlock({
   const expecting = resident.carrying || partner?.carrying
   return (
     <section className="inspector-block" aria-label="Pairing">
-      <div className="panel-head">
-        <h3>Pairing</h3>
-        <span className="small muted">one child per pair; pair again for another</span>
-      </div>
+      <p className="muted small">One child per pair; pair again for another.</p>
       {expecting ? (
         <p className="muted small">{familyLine(resident, residents, tick)}.</p>
       ) : (
@@ -4254,27 +4340,29 @@ function PairBlock({
           </p>
         )
       )}
-      <div className="order-buttons">
-        <select
-          aria-label="Partner"
-          value={partnerId}
-          onChange={(e) => setPartnerId(e.target.value)}
-        >
-          <option value="">Pick a partner…</option>
-          {choices.map((x) => (
-            <option key={x.id} value={x.id}>
-              {x.name}
-            </option>
-          ))}
-        </select>
+      <select aria-label="Partner" value={partnerId} onChange={(e) => setPartnerId(e.target.value)}>
+        <option value="">Pick a partner…</option>
+        {choices.map((x) => (
+          <option key={x.id} value={x.id}>
+            {x.name}
+          </option>
+        ))}
+      </select>
+      <PanelFoot>
         <button
           type="button"
+          className="primary"
           disabled={!partnerId || !!resident.carrying}
           onClick={() => onPair(partnerId)}
         >
           Pair
         </button>
-      </div>
+      </PanelFoot>
+      {resident.carrying ? (
+        <span className="muted small">Not while carrying a child.</span>
+      ) : (
+        !partnerId && <span className="muted small">Pick a partner first.</span>
+      )}
     </section>
   )
 }
@@ -4286,13 +4374,10 @@ function PairBlock({
  */
 function RelocateBlock({
   resident,
-  home,
   choices,
   onRelocate,
 }: {
   resident: Resident
-  /** The city they live in now, or "Homeless". */
-  home: string
   choices: RelocateChoice[]
   onRelocate: (cityId: string) => void
 }) {
@@ -4300,10 +4385,6 @@ function RelocateBlock({
   const going = o?.kind === 'relocate' ? choices.find((c) => c.id === o.cityId) : undefined
   return (
     <section className="inspector-block" aria-label="Relocate">
-      <div className="panel-head">
-        <h3>Relocate</h3>
-        <span className="small muted">from {home}</span>
-      </div>
       {going && <p className="muted small">Relocating to {going.name}.</p>}
       <p className="small">
         {resident.name} walks there and moves in on stepping into its area, if it still has free
@@ -4331,9 +4412,6 @@ function GroupRelocateBlock({
 }) {
   return (
     <section className="inspector-block" aria-label="Relocate">
-      <div className="panel-head">
-        <h3>Relocate</h3>
-      </div>
       {problem ? (
         <p className="muted small">Can’t relocate: {problem}.</p>
       ) : (
@@ -4406,12 +4484,9 @@ function RenameBlock({
   }
   return (
     <section className="inspector-block" aria-label="Rename">
-      <div className="panel-head">
-        <h3>Rename</h3>
-        <span className="small muted">free, at once</span>
-      </div>
-      <form onSubmit={submit}>
-        <div className="order-buttons">
+      <form className="opanel-form" onSubmit={submit}>
+        <label className="fld">
+          <span className="lb">New name</span>
           <input
             value={name}
             maxLength={RESIDENT_NAME_MAX_LENGTH}
@@ -4419,14 +4494,15 @@ function RenameBlock({
             onChange={(e) => setName(e.target.value)}
             required
           />
-        </div>
+        </label>
         {needsRealmName && (
           <>
             <p className="small">
               Your realm has no name yet: name it now. Others will know it by this name, and it
               never changes.
             </p>
-            <div className="order-buttons">
+            <label className="fld">
+              <span className="lb">Realm name</span>
               <input
                 value={realmName}
                 maxLength={REALM_NAME_MAX_LENGTH}
@@ -4435,14 +4511,15 @@ function RenameBlock({
                 onChange={(e) => setRealmName(e.target.value)}
                 required
               />
-            </div>
+            </label>
           </>
         )}
-        <div className="order-buttons">
+        <PanelFoot>
           <button type="submit" className="primary" disabled={!!problem}>
             Rename
           </button>
-        </div>
+        </PanelFoot>
+        {problem && <span className="muted small">Can’t rename yet: {problem}.</span>}
       </form>
     </section>
   )
@@ -4485,10 +4562,6 @@ function WallsBlock({
   const label = (w: Building) => (w.kind === 'gate' ? 'Gate' : 'Wall')
   return (
     <section className="inspector-block" aria-label="Walls">
-      <div className="panel-head">
-        <h3>Walls</h3>
-        <span className="small muted">break or climb</span>
-      </div>
       {breaking && (
         <Meter
           label={`Breaking the ${label(breaking).toLowerCase()} at ${breaking.x}, ${breaking.y}`}
@@ -4496,23 +4569,33 @@ function WallsBlock({
           share={wallStrengthLeft(breaking) / wallStrength(breaking)}
         />
       )}
-      <div className="order-buttons">
-        <select aria-label="Wall" value={wallId} onChange={(e) => setWallId(e.target.value)}>
-          <option value="">Pick a wall or gate…</option>
-          {choices.map(({ w, d }) => (
-            <option key={w.id} value={w.id}>
-              {label(w)} at {w.x}, {w.y} · {Math.round(d)} tiles
-              {w.damage ? ` · ${pct(w.damage / wallStrength(w))} broken` : ''}
-            </option>
-          ))}
-        </select>
-        <button type="button" disabled={!picked} onClick={() => onBreak(wallId)}>
+      <select aria-label="Wall" value={wallId} onChange={(e) => setWallId(e.target.value)}>
+        <option value="">Pick a wall or gate…</option>
+        {choices.map(({ w, d }) => (
+          <option key={w.id} value={w.id}>
+            {label(w)} at {w.x}, {w.y} · {Math.round(d)} tiles
+            {w.damage ? ` · ${pct(w.damage / wallStrength(w))} broken` : ''}
+          </option>
+        ))}
+      </select>
+      <PanelFoot>
+        <button
+          type="button"
+          className="btn dng"
+          disabled={!picked}
+          onClick={() => onBreak(wallId)}
+        >
           Break
         </button>
         <button type="button" disabled={!beside} onClick={() => onClimb(wallId)}>
           Climb
         </button>
-      </div>
+      </PanelFoot>
+      {!picked ? (
+        <span className="muted small">Pick a wall or gate first.</span>
+      ) : (
+        !beside && <span className="muted small">Climb: stand next to it first.</span>
+      )}
       <p className="muted small">
         Climbing takes a while, and a climber can’t dodge or strike back. Stand next to the wall to
         climb it.
@@ -4544,26 +4627,19 @@ function AttackBlock({
   const [targetId, setTargetId] = useState('')
   const o = resident.order
   const target = o?.kind === 'attack' ? others.find((x) => x.id === o.targetId) : undefined
-  const weapon = bestWeapon(resident)
   const choices = others
     .map((x) => ({ x, d: wrapDistance(mapSize, resident, x) }))
     .sort((a, b) => a.d - b.d)
     .slice(0, ATTACK_CHOICES)
   return (
     <section className="inspector-block" aria-label="Attack">
-      <div className="panel-head">
-        <h3>Attack</h3>
-        <span className="small muted">
-          {weapon ? `fights with a ${GOOD_LABELS[weapon].toLowerCase()}` : 'unarmed'}
-        </span>
-      </div>
       {o?.kind === 'attack' && !walls.some((w) => w.id === o.targetId) && (
         <p className="muted small">Attacking {target?.name ?? 'someone out of sight'}.</p>
       )}
       {choices.length === 0 ? (
         <p className="muted small">Nobody of another realm in sight.</p>
       ) : (
-        <div className="order-buttons">
+        <>
           <select
             aria-label="Target"
             value={targetId}
@@ -4576,10 +4652,18 @@ function AttackBlock({
               </option>
             ))}
           </select>
-          <button type="button" disabled={!targetId} onClick={() => onAttack(targetId)}>
-            Attack
-          </button>
-        </div>
+          <PanelFoot>
+            <button
+              type="button"
+              className="btn dng"
+              disabled={!targetId}
+              onClick={() => onAttack(targetId)}
+            >
+              Attack
+            </button>
+          </PanelFoot>
+          {!targetId && <span className="muted small">Pick someone to attack first.</span>}
+        </>
       )}
     </section>
   )
@@ -4592,6 +4676,7 @@ export function TileGoods({
   spot,
   onPickUp,
   refused,
+  refusedWhy,
   label = 'Pick up',
 }: {
   title: string
@@ -4602,55 +4687,90 @@ export function TileGoods({
   label?: string
   /** Whether the resident may not pick up this good, as a child anything but Food. */
   refused: (good: Good) => boolean
+  /** Why a refused good's buttons are greyed, said under them. */
+  refusedWhy?: string
 }) {
   const goods = goodsIn(stock)
   return (
-    <>
-      <div className="small muted">{title}</div>
-      {goods.length === 0 && <p className="muted small">Nothing.</p>}
-      {goods.map(([good, units]) => (
-        <GoodsRow
-          key={good}
-          good={good}
-          units={units}
-          byDefault={units}
-          disabled={refused(good)}
-          actions={[{ label, spot }]}
-          onAct={onPickUp}
-        />
-      ))}
-    </>
+    <div className="goods-spot">
+      <span className="b">{title}</span>
+      {goods.length === 0 && <span className="muted small">Nothing.</span>}
+      <GoodsPick
+        label={title}
+        goods={goods}
+        byDefault={(_, units) => units}
+        refused={refused}
+        refusedWhy={refusedWhy}
+        actions={() => [{ label, spot }]}
+        onAct={onPickUp}
+      />
+    </div>
   )
 }
 
 /**
- * One good with an amount and buttons that act on that many: `byDefault` until the Player types
- * an exact amount, which is honoured as typed (`CONTEXT.md`: Own food).
+ * An inventory in an order's panel as a goods grid (`CONTEXT.md`: Goods on cards): a cell per
+ * good with its icon and amount, its name on hover. The good tapped (the first until one is) gets
+ * a line under the grid with an amount and the buttons that act on that many: `byDefault` until
+ * the Player types an exact amount, which is honoured as typed (`CONTEXT.md`: Own food).
  */
-function GoodsRow({
-  good,
-  units,
+function GoodsPick({
+  label,
+  goods,
   byDefault,
-  disabled,
+  refused,
+  refusedWhy,
   actions,
   onAct,
 }: {
-  good: Good
-  units: number
-  byDefault: number
-  disabled: boolean
-  actions: { label: string; spot: GoodsSpot }[]
+  /** What the inventory is, for screen readers. */
+  label: string
+  goods: readonly (readonly [Good, number])[]
+  byDefault: (good: Good, units: number) => number
+  /** Whether the resident may not handle this good, as a child anything but Food. */
+  refused: (good: Good) => boolean
+  /** Why a refused good's buttons are greyed, said under them. */
+  refusedWhy?: string
+  actions: (good: Good) => { label: string; spot: GoodsSpot }[]
   onAct: (spot: GoodsSpot, goods: Stock) => void
 }) {
+  const [picked, setPicked] = useState<Good>()
   const [typed, setTyped] = useState<number>()
-  const amount = Math.min(typed ?? byDefault, units)
+  // A good picked may have gone since; the first stands in for it.
+  const entry = goods.find(([g]) => g === picked) ?? goods[0]
+  if (!entry) return null
+  const [good, units] = entry
+  const amount = Math.min(typed ?? byDefault(good, units), units)
+  const disabled = refused(good)
   return (
-    <div className="goods-row">
-      <span>{GOOD_LABELS[good]}</span>
-      <span className="mono">{units}</span>
-      <span className="buttons">
+    <div className="goods-pick">
+      <ul className="goods-grid" aria-label={label}>
+        {goods.map(([g, n]) => (
+          <li key={g}>
+            <button
+              type="button"
+              className="btn sm goods-pick-cell"
+              aria-pressed={g === good}
+              aria-label={`${GOOD_LABELS[g]}: ${goodsAmount(n)}`}
+              title={GOOD_LABELS[g]}
+              onClick={() => {
+                setPicked(g)
+                setTyped(undefined)
+              }}
+            >
+              <GoodIcon good={g} />
+              <span className="mono">{goodsAmount(n)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="goods-pick-line well">
+        <GoodIcon good={good} />
+        <span className="grow">
+          <strong>{GOOD_LABELS[good]}</strong> · {goodsAmount(units)}
+        </span>
         <input
-          className="amount"
+          className="amount mono"
           type="number"
           min={0}
           max={units}
@@ -4660,20 +4780,22 @@ function GoodsRow({
           disabled={disabled}
           onChange={(e) => setTyped(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
         />
-        {actions.map(({ label, spot }) => (
+        {actions(good).map(({ label: act, spot }) => (
           <button
-            key={label}
+            key={act}
             type="button"
+            className="btn sm"
             disabled={disabled || amount === 0}
             onClick={() => {
               onAct(spot, { [good]: amount })
               setTyped(undefined)
             }}
           >
-            {label}
+            {act}
           </button>
         ))}
-      </span>
+      </div>
+      {disabled && refusedWhy && <span className="muted small">{refusedWhy}</span>}
     </div>
   )
 }

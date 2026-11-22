@@ -1259,11 +1259,14 @@ export function FeedBlock({
   targets,
   food,
   onFeed,
+  titled = true,
 }: {
   targets: { id: string; name: string; horse?: true; down?: true }[]
   /** The Food in the feeding resident's hands. */
   food: number
   onFeed: (targetId: string, units: number) => void
+  /** With its own heading; off in an order's panel, whose header says it (`OrderPanel`). */
+  titled?: boolean
 }) {
   const [targetId, setTargetId] = useState(targets[0]?.id ?? '')
   const [units, setUnits] = useState(Math.max(1, Math.min(FEED_UNITS, food)))
@@ -1275,38 +1278,47 @@ export function FeedBlock({
   }
   return (
     <section className="inspector-block" aria-label="Feed">
-      <div className="panel-head">
-        <h3>Feed</h3>
-        <span className="small muted">{food} Food in hand</span>
-      </div>
-      <form onSubmit={submit}>
-        <div className="order-buttons">
-          {targets.length > 1 && (
-            <select
-              aria-label="Whom to feed"
-              value={target?.id ?? ''}
-              onChange={(e) => setTargetId(e.target.value)}
-            >
-              {targets.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {feedTargetLabel(t)}
-                </option>
-              ))}
-            </select>
-          )}
-          <input
-            type="number"
-            min={1}
-            max={food}
-            step={1}
-            value={units}
-            aria-label="Units of Food"
-            onChange={(e) => setUnits(Number(e.target.value))}
-          />
+      {titled && (
+        <div className="panel-head">
+          <h3>Feed</h3>
+          <span className="small muted">{food} Food in hand</span>
+        </div>
+      )}
+      <form className="opanel-form" onSubmit={submit}>
+        {targets.length > 1 && (
+          <select
+            aria-label="Whom to feed"
+            value={target?.id ?? ''}
+            onChange={(e) => setTargetId(e.target.value)}
+          >
+            {targets.map((t) => (
+              <option key={t.id} value={t.id}>
+                {feedTargetLabel(t)}
+              </option>
+            ))}
+          </select>
+        )}
+        <div className="opanel-confirm order-buttons">
+          <label className="opanel-units">
+            Units
+            <input
+              className="amount mono"
+              type="number"
+              min={1}
+              max={food}
+              step={1}
+              value={units}
+              aria-label="Units of Food"
+              onChange={(e) => setUnits(Number(e.target.value))}
+            />
+          </label>
           <button type="submit" className="primary" disabled={!fine}>
             {targets.length > 1 ? 'Feed' : `Feed ${target?.name}`}
           </button>
         </div>
+        {!fine && (
+          <span className="small muted">Units: a whole number from 1 to the {food} in hand.</span>
+        )}
         <p className="small muted">
           {target?.horse
             ? 'It eats until it is full, up to that many units, and gets up if it was Down; the rest stays in hand.'
