@@ -139,10 +139,10 @@ export function AcceptOffer({
   const carriage = traders.carriages.find((k) => k.id === carriageId)
   const { quote, text } = acceptPreview(offer, resident, carriage, times, tick, horses, GOOD_LABELS)
   return (
-    <div className="offer-accept">
-      <p>
-        <label>
-          Trader{' '}
+    <div className="col offer-accept">
+      <div className="fx offer-fields">
+        <label className="fld grow">
+          <span className="lb">Trader</span>
           <select value={resident.id} onChange={(e) => setResidentId(e.target.value)}>
             {traders.residents.map((r) => (
               <option key={r.id} value={r.id}>
@@ -150,10 +150,10 @@ export function AcceptOffer({
               </option>
             ))}
           </select>
-        </label>{' '}
+        </label>
         {traders.carriages.length > 0 && (
-          <label>
-            From{' '}
+          <label className="fld grow">
+            <span className="lb">From</span>
             <select value={carriage?.id ?? ''} onChange={(e) => setCarriageId(e.target.value)}>
               <option value="">their hands</option>
               {traders.carriages.map((k) => (
@@ -163,21 +163,23 @@ export function AcceptOffer({
               ))}
             </select>
           </label>
-        )}{' '}
-        <label>
-          {free ? 'Units' : 'Times'}{' '}
+        )}
+        <label className="fld">
+          <span className="lb">{free ? 'Units' : 'Times'}</span>
           <input
             type="number"
+            className="mono offer-num"
             min={1}
             max={offer.times}
             value={times}
             onChange={(e) => setTimes(Number(e.target.value))}
           />
         </label>
-      </p>
-      <p className="small muted">{text}</p>
+      </div>
+      <p className="small mu">{text}</p>
       <button
         type="button"
+        className="btn sm pri offer-go"
         disabled={quote.times === 0}
         onClick={() =>
           onAccept({
@@ -231,62 +233,75 @@ export function PostOffer({
     ? carried({ gives, givesUnits, wants, wantsUnits, times })
     : postPreview(storage, gives, givesUnits, wants, wantsUnits, times, GOOD_LABELS)
   return (
-    <div className="offer-post">
-      <p>
-        <label>
-          Gives{' '}
+    <div className="col offer-post">
+      <div className="fx offer-fields">
+        <label className="fld grow">
+          <span className="lb">Gives</span>
+          <span className="fx">
+            <input
+              type="number"
+              className="mono offer-num"
+              min={1}
+              value={givesUnits}
+              aria-label="Units given"
+              onChange={(e) => setGivesUnits(Number(e.target.value))}
+            />
+            <select
+              className="grow"
+              value={gives}
+              aria-label="Good given"
+              onChange={(e) => setGives(e.target.value as Good)}
+            >
+              {goodOptions(held)}
+            </select>
+          </span>
+        </label>
+        <label className="fld grow">
+          <span className="lb">Wants</span>
+          <span className="fx">
+            <input
+              type="number"
+              className="mono offer-num"
+              min={1}
+              value={wantsUnits}
+              aria-label="Units wanted"
+              onChange={(e) => setWantsUnits(Number(e.target.value))}
+            />
+            <select
+              className="grow"
+              value={wants}
+              aria-label="Good wanted"
+              onChange={(e) => setWants(e.target.value as Good)}
+            >
+              {goodOptions(GOODS)}
+            </select>
+          </span>
+        </label>
+      </div>
+      <p className="small mu">{text}</p>
+      <div className="fx">
+        <label className="offer-inline">
+          Times
           <input
             type="number"
-            min={1}
-            value={givesUnits}
-            aria-label="Units given"
-            onChange={(e) => setGivesUnits(Number(e.target.value))}
-          />{' '}
-          <select
-            value={gives}
-            aria-label="Good given"
-            onChange={(e) => setGives(e.target.value as Good)}
-          >
-            {goodOptions(held)}
-          </select>
-        </label>{' '}
-        <label>
-          Wants{' '}
-          <input
-            type="number"
-            min={1}
-            value={wantsUnits}
-            aria-label="Units wanted"
-            onChange={(e) => setWantsUnits(Number(e.target.value))}
-          />{' '}
-          <select
-            value={wants}
-            aria-label="Good wanted"
-            onChange={(e) => setWants(e.target.value as Good)}
-          >
-            {goodOptions(GOODS)}
-          </select>
-        </label>{' '}
-        <label>
-          Times{' '}
-          <input
-            type="number"
+            className="mono offer-num"
             min={1}
             value={times}
             onChange={(e) => setTimes(Number(e.target.value))}
           />
         </label>
-      </p>
-      <p className="small muted">{text}</p>
-      <button
-        type="button"
-        disabled={!canPost || !ready}
-        onClick={() =>
-          onPost({ storageId: storage.id, gives, givesUnits, wants, wantsUnits, times })
-        }
-      >
-        {action}
-      </button>
+        <span className="grow" />
+        <button
+          type="button"
+          className="btn pri"
+          disabled={!canPost || !ready}
+          onClick={() =>
+            onPost({ storageId: storage.id, gives, givesUnits, wants, wantsUnits, times })
+          }
+        >
+          {action}
+        </button>
+      </div>
     </div>
   )
 }
