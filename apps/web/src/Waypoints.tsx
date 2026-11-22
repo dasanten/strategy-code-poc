@@ -180,36 +180,39 @@ export function WaypointsPanel({
     <section className="waypoints" aria-label="Waypoints">
       <PanelHead title="Waypoints">{waypointCount(waypoints)}</PanelHead>
       {waypoints.length === 0 && (
-        <p className="muted">
+        <p className="sec mu">
           No waypoints yet. Right-click a tile on the map, or long-press it on a touch screen, to
           add one.
         </p>
       )}
       {onPick && waypoints.length > 0 && (
-        <p className="small muted">Pick a waypoint for the place the order waits for.</p>
+        <p className="sec b waypoint-picking">Pick a waypoint for the place the order waits for.</p>
       )}
       {error && (
-        <p className="small muted" role="status">
+        <p className="sec bad" role="status">
           Turned down: {error}
         </p>
       )}
-      <ul className="waypoint-list">
+      <ul className="waypoint-rows">
         {waypoints.map((w) => (
-          <li key={w.id} className="waypoint-row">
-            <div className="waypoint-head">
+          <li key={w.id} className={renaming === w.id ? 'rw waypoint renaming' : 'rw waypoint'}>
+            <div className="fx waypoint-buttons">
               <button
                 type="button"
-                className="waypoint-name"
+                className="btn sm grow waypoint-show"
                 title="Show on the map"
                 onClick={() => onCentre(w)}
               >
-                <span className="name">{w.name}</span>
-                <small className="muted">{waypointPlace(w)}</small>
+                <span className="waypoint-mark" aria-hidden="true">
+                  ◆
+                </span>
+                <span className="waypoint-label">{w.name}</span>
+                <span className="mono mu">{waypointPlace(w)}</span>
               </button>
               {onPick && (
                 <button
                   type="button"
-                  className="primary"
+                  className="btn sm pri"
                   aria-label={`Pick ${w.name}`}
                   onClick={() => onPick(w)}
                 >
@@ -218,6 +221,7 @@ export function WaypointsPanel({
               )}
               <button
                 type="button"
+                className="btn sm"
                 aria-pressed={renaming === w.id}
                 onClick={() => setRenaming(renaming === w.id ? undefined : w.id)}
               >
@@ -225,6 +229,7 @@ export function WaypointsPanel({
               </button>
               <button
                 type="button"
+                className="btn sm"
                 aria-label={`Remove ${w.name}`}
                 onClick={async () => setError(await onRemove(w))}
               >

@@ -1,4 +1,4 @@
-import { REALM_LOG_LENGTH } from '@csp/balance'
+import { REALM_LOG_LENGTH, TICKS_PER_GAME_DAY } from '@csp/balance'
 import type { HeirLapse, RealmEvent } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
@@ -6,6 +6,7 @@ import {
   describeDelivery,
   describeEvent,
   heirTakeover,
+  logDays,
   realmEnded,
   rememberTakeoverSeen,
   rememberedTakeoverSeen,
@@ -1220,5 +1221,29 @@ describe('realm log', () => {
     expect(next).toHaveLength(REALM_LOG_LENGTH)
     expect(next.at(-1)!.seq).toBe(101)
     expect(next[0]!.seq).toBe(2)
+  })
+})
+
+describe('the realm log by game day', () => {
+  const ev = (seq: number, tick: number) =>
+    ({ seq, tick, userId: 1, kind: 'hungry', name: 'Odo' }) as unknown as RealmEvent
+  const hour = TICKS_PER_GAME_DAY / 24
+
+  it('lists the newest day first, newest event first, each with its clock time', () => {
+    const days = logDays([
+      ev(1, 2 * hour),
+      ev(2, 9 * hour + hour / 4),
+      ev(3, TICKS_PER_GAME_DAY + 7 * hour + hour / 2),
+    ])
+    expect(days.map((d) => d.day)).toEqual(['Year 1 · Day 2', 'Year 1 · Day 1'])
+    expect(days[0]!.events.map((e) => [e.event.seq, e.time])).toEqual([[3, '07:30']])
+    expect(days[1]!.events.map((e) => [e.event.seq, e.time])).toEqual([
+      [2, '09:15'],
+      [1, '02:00'],
+    ])
+  })
+
+  it('has no days with no events', () => {
+    expect(logDays([])).toEqual([])
   })
 })
