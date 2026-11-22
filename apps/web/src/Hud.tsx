@@ -39,132 +39,14 @@ import {
 } from './notices-view.js'
 import type { ConnectionStatus } from './useWorld.js'
 import { WIKI_PATH } from './wiki-view.js'
+import { Icon } from './Icon.js'
+import { GoodIcon } from './GoodsGrid.js'
+import { TAB_ICONS, type UiIconName } from './ui-icons.js'
 
 /**
  * The HUD over the full-screen map (ADR 0044): the top bar, notices and dialogs; the sidebar is in
  * `Sidebar.tsx`.
  */
-
-/** Line-art icons, 24×24 in `currentColor`, for the sidebar and the top bar. */
-const ICONS: Record<SideTabId | DiplomacyTab | KeyGood | 'crown', ReactNode> = {
-  residents: (
-    <>
-      <circle cx="12" cy="6" r="3.2" fill="currentColor" />
-      <path d="M6 22c0-6 2.5-10 6-10s6 4 6 10z" fill="currentColor" />
-    </>
-  ),
-  horses: (
-    <>
-      <path d="M7 22l2-7-4-2 1-4 6-6 1 3c3 1 6 5 6 9v7" />
-      <path d="M12 3l3-1" />
-      <circle cx="10" cy="8" r="0.8" fill="currentColor" />
-    </>
-  ),
-  waypoints: (
-    <>
-      <path d="M12 22s-7-7.5-7-13a7 7 0 0 1 14 0c0 5.5-7 13-7 13z" />
-      <circle cx="12" cy="9" r="2.5" fill="currentColor" />
-    </>
-  ),
-  armies: (
-    <>
-      <path d="M6 22V2" />
-      <path d="M6 3h13l-3 4 3 4H6z" fill="currentColor" />
-    </>
-  ),
-  contracts: (
-    <>
-      <path d="M6 4h12v14a2 2 0 0 1-2 2H6" />
-      <path d="M6 4a2 2 0 0 0 0 4h2M6 20a2 2 0 0 1 0-4h10" />
-      <path d="M10 8h6M10 12h6" />
-    </>
-  ),
-  diplomacy: (
-    <>
-      <path d="M3 5h12v8H8l-3 3v-3H3z" />
-      <path d="M17 9h4v8h-2v3l-3-3h-5v-2" />
-    </>
-  ),
-  demands: (
-    <>
-      <path d="M5 4h14v16H5z" />
-      <path d="M12 7v7" />
-      <circle cx="12" cy="17" r="1" fill="currentColor" />
-    </>
-  ),
-  directOffers: (
-    <>
-      <path d="M3 6h18v12H3z" />
-      <path d="M3 7l9 6 9-6" />
-    </>
-  ),
-  alliance: (
-    <>
-      <path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z" />
-      <path d="M12 6v12M7 11h10" />
-    </>
-  ),
-  standing: (
-    <>
-      <path d="M12 3v18M7 21h10M4 7h16" />
-      <path d="M4 7l-3 7a3 3 0 0 0 6 0zM20 7l-3 7a3 3 0 0 0 6 0z" />
-    </>
-  ),
-  cities: (
-    <>
-      <path d="M3 21V8h3v2h2V8h3v13M13 21V8h3v2h2V8h3v13" />
-      <path d="M10 21v-4a2 2 0 0 1 4 0v4" />
-      <path d="M2 21h20" />
-    </>
-  ),
-  scripts: <path d="M8 6l-6 6 6 6M16 6l6 6-6 6M14 4l-4 16" />,
-  realmLog: (
-    <>
-      <path d="M5 3h11l3 3v15H5z" />
-      <path d="M8 9h8M8 13h8M8 17h5" />
-    </>
-  ),
-  food: (
-    <>
-      <path d="M12 22V8" />
-      <path d="M12 9c-3-1-4-3-4-6 3 0 4 2 4 6zM12 9c3-1 4-3 4-6-3 0-4 2-4 6z" />
-      <path d="M12 15c-3-1-4-3-4-5 3 0 4 2 4 5zM12 15c3-1 4-3 4-5-3 0-4 2-4 5z" />
-    </>
-  ),
-  wood: (
-    <>
-      <ellipse cx="18" cy="12" rx="3" ry="5" />
-      <path d="M18 7H6a3 5 0 0 0 0 10h12" />
-    </>
-  ),
-  stone: (
-    <>
-      <path d="M3 19l3-7 5-2 3 3 2-1 5 7z" />
-      <path d="M11 10l1 4-3 5" />
-    </>
-  ),
-  coal: (
-    <>
-      <path d="M3 19l2-6 5-2 3 3-1 5z" />
-      <path d="M12 19l2-7 5-1 2 8z" />
-      <path d="M8 9l2-4 4-1 2 4-3 2z" />
-    </>
-  ),
-  steel: (
-    <>
-      <path d="M3 19l3-6h12l3 6z" />
-      <path d="M9 16h6" />
-      <path d="M18 3v4M16 5h4" />
-    </>
-  ),
-  coins: (
-    <>
-      <circle cx="12" cy="12" r="8" />
-      <circle cx="12" cy="12" r="4.5" />
-    </>
-  ),
-  crown: <path d="M3 18l1-11 5 5 3-7 3 7 5-5 1 11z" fill="currentColor" />,
-}
 
 const GOOD_LABELS: Record<KeyGood, string> = {
   food: 'Food',
@@ -190,25 +72,6 @@ const STATUS_CHIPS: Record<ConnectionStatus, string> = {
   closed: 'r',
   throttled: 'r',
   updated: 'r',
-}
-
-export function Icon({ name, size = 18 }: { name: keyof typeof ICONS; size?: number }) {
-  return (
-    <svg
-      className="icon"
-      viewBox="0 0 24 24"
-      width={size}
-      height={size}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {ICONS[name]}
-    </svg>
-  )
 }
 
 /** The goods the top bar shows and the picker beside them (`CONTEXT.md`: Goods in the top bar). */
@@ -242,7 +105,7 @@ function Goods({ goods, className }: { goods: GoodsShown; className: string }) {
       </select>
       {KEY_GOODS.map((g) => (
         <span key={g} className="hud-good mono" title={GOOD_LABELS[g]}>
-          <Icon name={g} size={16} /> {Math.floor(goods.totals[g])}
+          <GoodIcon good={g} /> {Math.floor(goods.totals[g])}
         </span>
       ))}
       {/* The label above says it for those who can't see this. */}
@@ -411,12 +274,12 @@ function ControlSwitch({
 }
 
 /** The kit icon beside a realm bar order, where the artboard (`Game-Realm`) draws one. */
-const REALM_BAR_ICONS: Partial<Record<RealmBarOrder, string>> = {
-  build: 'i-hammer',
-  walkTo: 'i-walk',
-  explore: 'i-eye',
-  gather: 'i-pick',
-  runScript: 'i-code',
+const REALM_BAR_ICONS: Partial<Record<RealmBarOrder, UiIconName>> = {
+  build: 'build',
+  walkTo: 'walk',
+  explore: 'sight',
+  gather: 'gather',
+  runScript: 'script',
 }
 
 /** The gap, in pixels, between the realm bar and what stops above it. */
@@ -473,7 +336,7 @@ export function RealmBar({
               title={title}
               onClick={() => onOpen(id)}
             >
-              {icon && <span className={`ic ${icon}`} aria-hidden="true" />}
+              {icon && <Icon name={icon} />}
               {label}
             </button>
           )
@@ -563,7 +426,7 @@ export function PhoneMenu({
                       setShown(false)
                     }}
                   >
-                    <Icon name={d.id} size={18} /> {d.label}
+                    <Icon name={TAB_ICONS[d.id]} /> {d.label}
                     {marked.has(d.id) && <UnseenMark />}
                   </button>
                 ))}
@@ -572,7 +435,7 @@ export function PhoneMenu({
             {goods && <Goods goods={goods} className="hud-menu-goods" />}
             {leader && (
               <span className="hud-leader" title="Your Leader">
-                <Icon name="crown" size={15} /> {leader}
+                <Icon name="crown" size={16} /> {leader}
               </span>
             )}
             {heir !== undefined && (
@@ -640,7 +503,7 @@ export function DiplomacyTabs({
             className={tab === t.id ? 'tab on' : 'tab'}
             onClick={() => onTab(t.id)}
           >
-            <Icon name={t.id} size={15} /> {t.label}
+            <Icon name={TAB_ICONS[t.id]} size={16} /> {t.label}
             {marked.has(t.id) && <UnseenMark />}
           </button>
         ))}
@@ -715,7 +578,7 @@ export function CentredDialog({
     <div className="hud-backdrop">
       <div className="hud-dialog pn" role="alertdialog" aria-modal="true" aria-label={title}>
         <h2 className={`hd${tone ? ` hd-${tone}` : ''}`}>
-          {tone === 'bad' && <span className="ic s24 i-warn" aria-hidden="true" />}
+          {tone === 'bad' && <Icon name="warning" size={24} />}
           <span className="grow">{title}</span>
         </h2>
         {children}
@@ -749,7 +612,7 @@ export function HorseOfferNotice({
   }
   return (
     <aside className="pn notice hud-offer" role="status">
-      <span className="ic s24 i-horse" aria-hidden="true" />
+      <Icon name="horse" size={24} />
       <span className="notice-text b">
         {NUMBER_WORDS[horses] ?? horses} horses are waiting for you
         {refused && <span className="hud-offer-refused"> — {refused}</span>}
@@ -783,7 +646,7 @@ export function IncomingNotice({
         Open
       </button>
       <button type="button" className="btn sm sq" aria-label="Dismiss" onClick={onDismiss}>
-        <span className="ic s16 i-x" aria-hidden="true" />
+        <Icon name="close" size={16} />
       </button>
     </aside>
   )
@@ -961,7 +824,7 @@ export function FirstDayCard({
           title="Don't show again"
           onClick={onDismiss}
         >
-          <span className="ic s16 i-x" aria-hidden="true" />
+          <Icon name="close" size={16} />
         </button>
       </div>
       <div className="notice-text first-day-body">

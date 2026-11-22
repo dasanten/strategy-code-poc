@@ -11,6 +11,8 @@ import { panelLeft, type PanelSize } from './order-panel-view.js'
 import type { CardAction, OrderGroup } from './selection-view.js'
 import type { Relationship } from './theme.js'
 import { ActionRows, useInSheet, useSheetPeek } from './SelectionCard.js'
+import { Icon } from './Icon.js'
+import type { UiIconName } from './ui-icons.js'
 
 /**
  * The panel an order opens (`OrderPanel`): its title (the order's name), a short note beside it,
@@ -104,7 +106,7 @@ export function PanelFoot({ children }: { children: ReactNode }) {
  */
 export function CommandBar({
   rel,
-  icon = 'i-person',
+  icon = 'person',
   title,
   badge,
   lines,
@@ -118,8 +120,8 @@ export function CommandBar({
   children,
 }: {
   rel: Relationship
-  /** The kit icon in the figure: a resident by default, an army's banner. */
-  icon?: string
+  /** The UI icon in the figure: a resident by default, an army's banner. */
+  icon?: UiIconName
   title: string
   /** Leader or Heir. */
   badge?: string
@@ -178,7 +180,7 @@ export function CommandBar({
         <div className="cmd-head">
           <div className="cmd-who">
             <span className="cmd-figure" aria-hidden="true">
-              <span className={`ic s32 ${icon}`} />
+              <Icon name={icon} size={32} />
             </span>
             <div className="cmd-title">
               <div className="name-line">

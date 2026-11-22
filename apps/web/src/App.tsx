@@ -332,6 +332,7 @@ import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
 import { useLand } from './useLand.js'
 import { landMarks, regionAt } from './map/land.js'
+import { Icon } from './Icon.js'
 
 /**
  * The form shown before a script with params starts (`CONTEXT.md`: Script parameter, Before it
@@ -2501,7 +2502,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         ) : (
           <div className="game-waiting">
             <p className="waiting-panel pn fx">
-              <span className="ic i-clock" aria-hidden="true" />
+              <Icon name="clock" />
               <span className="px t16">Waiting for the server…</span>
             </p>
           </div>

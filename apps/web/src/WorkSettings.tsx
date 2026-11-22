@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ScriptParam, ScriptSummary, Waypoint, WorkplaceSettings } from '@csp/shared-types'
 import { ScriptParamFields } from './ScriptParams.js'
 import { workScriptOf, workScripts, workSettingsParams } from './work-settings-view.js'
+import { Icon } from './Icon.js'
 
 /** Where the browser remembers whether the Player left Work settings open. */
 const OPEN_KEY = 'csp.workSettingsOpen'
@@ -76,7 +77,7 @@ export function WorkSettings({
           remember(!open)
         }}
       >
-        <span className="ic s16 i-gear" aria-hidden="true" />
+        <Icon name="settings" size={16} />
         <span className="grow">Work settings</span>
         <span className="sel-more" aria-hidden="true">
           {open ? '▾' : '▸'}

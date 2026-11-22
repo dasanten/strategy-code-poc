@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import type { ResidentOrder, SeenResident } from '@csp/shared-types'
 import {
   ACTIVITY_ART,
@@ -11,6 +11,10 @@ import {
 import { CLOSE_SCALE, FAR_SCALE, type Camera } from './camera.js'
 import { RELATIONSHIP_COLORS, type BadgeLayer, type TokenLayer } from './tokens.js'
 import { drawUnits, mountSpot, type UnitWorld, type Where } from './unit-tokens.js'
+import { setArtStyle } from './art-style.js'
+
+// These tests look at the Painted tokens; Pixel (the default since ADR 0044) is in pixel-art.test.ts.
+beforeAll(() => setArtStyle('painted'))
 
 interface Placed {
   file: string

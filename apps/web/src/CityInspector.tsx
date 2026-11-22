@@ -93,6 +93,7 @@ import {
 } from './cities-drawer-view.js'
 import { relationshipClass } from './theme.js'
 import { tradeStandingLine } from './standing-view.js'
+import { Icon } from './Icon.js'
 
 /**
  * The city inspector: every city in sight (`CONTEXT.md`: City, NPC city), whose it is, and,
@@ -1475,7 +1476,7 @@ function HorseOfferRow({
   return (
     <li className="col city-horse">
       <div className="fx wrap">
-        <span className="ic i-horse" aria-hidden="true" />
+        <Icon name="horse" />
         <span className="grow">
           <span className="b">{offer.name}</span> · {offer.price} coins
           <br />

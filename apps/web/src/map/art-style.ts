@@ -14,8 +14,8 @@ export const ART_STYLE_NAMES: Record<ArtStyle, string> = {
   pixel: 'Pixel',
 }
 
-/** The style of a browser that has picked none. */
-export const DEFAULT_ART_STYLE: ArtStyle = 'painted'
+/** The style of a browser that has picked none (`CONTEXT.md`: Art style): Pixel. */
+export const DEFAULT_ART_STYLE: ArtStyle = 'pixel'
 
 const ART_STYLE_KEY = 'csp.artStyle'
 
@@ -49,7 +49,7 @@ export function rememberArtStyle(
 let current: ArtStyle | undefined
 const listeners = new Set<() => void>()
 
-/** The style the map and the goods icons draw in now. */
+/** The style the map draws in now. */
 export function artStyle(): ArtStyle {
   current ??= rememberedArtStyle()
   return current

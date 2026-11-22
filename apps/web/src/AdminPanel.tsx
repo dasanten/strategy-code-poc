@@ -25,6 +25,7 @@ import {
   directiveTargetFor,
   type AdminTab,
 } from './pages.js'
+import { Icon } from './Icon.js'
 
 /** What each admin tab is called. */
 const TAB_NAMES: Record<AdminTab, string> = {
@@ -85,7 +86,7 @@ export function AdminPage({ account, onLoggedOut }: { account: Account; onLogged
   return (
     <div className="admin-page">
       <header className="bar admin-head">
-        <span className="ic s24 i-key" aria-hidden="true" />
+        <Icon name="key" size={24} />
         <h1 className="px t18">Code Strategy admin</h1>
         {account.isAdmin && (
           <div className="fx admin-tabs" role="tablist">

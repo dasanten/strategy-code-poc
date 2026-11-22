@@ -69,9 +69,6 @@
 .hud-leader {
   font-weight: 600;
 }
-.hud-leader .icon {
-  color: var(--rel-own);
-}
 /* Part of the goods are as last seen (`CONTEXT.md`: Goods in the top bar): the bar has room for a
    mark with the words in its tooltip; the phone menu has no hover, and room for the words. */
 .hud-goods-old {

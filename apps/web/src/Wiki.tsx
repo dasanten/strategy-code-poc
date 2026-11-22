@@ -495,6 +495,7 @@ import {
 } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 import { highlightScript } from './wiki-code.js'
+import { Icon } from './Icon.js'
 
 /** A smelter's Steel recipe (`CONTEXT.md`: Coal): its second, after Iron. */
 const STEEL = RECIPES.smelter!.find((r) => 'steel' in r.output)!
@@ -749,7 +750,7 @@ export function Wiki() {
       {/* A grid: the header bar across the top, the Contents beside the sections on a wide
           screen and above them on a phone (`styles/wiki.css`). */}
       <header className="wiki-head bar">
-        <span className="ic s32 i-book" aria-hidden="true" />
+        <Icon name="book" size={32} />
         <h1 className="px t22">Code Strategy Wiki</h1>
         <span className="grow" />
         <a className="btn dk" href="/">

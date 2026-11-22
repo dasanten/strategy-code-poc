@@ -10,7 +10,9 @@ import {
   type SetStateAction,
 } from 'react'
 import { DrawerStatus } from './drawer-head.js'
-import { Icon, NONE_MARKED, UnseenMark } from './Hud.js'
+import { NONE_MARKED, UnseenMark } from './Hud.js'
+import { Icon } from './Icon.js'
+import { TAB_ICONS } from './ui-icons.js'
 import {
   SIDE_TABS,
   SIDE_WIDTH,
@@ -116,7 +118,7 @@ function SideStrip({
               data-tip={t.label}
               onClick={() => onToggle(t.id)}
             >
-              <Icon name={t.id} size={20} />
+              <Icon name={TAB_ICONS[t.id]} />
               {marked.has(t.id) && <UnseenMark />}
             </button>
           ))}

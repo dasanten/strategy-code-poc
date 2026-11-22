@@ -71,6 +71,25 @@ local SHEETS = {
     -- The hitched carriage is two tiles wide: the horse in front of the cart.
     { { "ram", 2 }, { "catapult", 2 }, { "carriage-hitched", 2, 1 } },
   },
+  -- The UI icons (ADR 0044), one tile each, named for what they mean. An icon not drawn yet shows
+  -- its placeholder (`apps/web/src/ui-icons.ts`).
+  ui = {
+    {
+      { "residents", 1 }, { "horses", 1 }, { "armies", 1 }, { "diplomacy", 1 }, { "cities", 1 },
+      { "waypoints", 1 }, { "scripts", 1 }, { "realm-log", 1 },
+    },
+    {
+      { "contracts", 1 }, { "demands", 1 }, { "direct-offers", 1 }, { "alliance", 1 },
+      { "standing", 1 },
+    },
+    { { "walk", 1 }, { "gather", 1 }, { "build", 1 }, { "goods", 1 }, { "script", 1 } },
+    {
+      { "close", 1 }, { "add", 1 }, { "check", 1 }, { "warning", 1 }, { "loop", 1 }, { "run", 1 },
+      { "stop", 1 }, { "clock", 1 }, { "find", 1 }, { "settings", 1 }, { "sight", 1 },
+      { "map", 1 }, { "health", 1 },
+    },
+    { { "crown", 1 }, { "banner", 1 }, { "city", 1 }, { "key", 1 }, { "book", 1 } },
+  },
 }
 
 -- The resident, one tile, drawn from the front. Layers bottom to top; the game stacks them.
@@ -153,7 +172,7 @@ local function makeResident()
   print("created " .. path .. " (" .. #RESIDENT_LAYERS .. " layers)")
 end
 
-for _, name in ipairs({ "buildings", "tiles", "goods", "units" }) do
+for _, name in ipairs({ "buildings", "tiles", "goods", "units", "ui" }) do
   makeSheet(name, SHEETS[name])
 end
 makeResident()

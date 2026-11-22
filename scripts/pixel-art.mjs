@@ -14,7 +14,7 @@ const SOURCE = 'art/pixel'
 const OUT = 'apps/web/src/assets/pixel'
 /** Where each named slice lies, as a module the web app imports. */
 const SLICES = 'apps/web/src/map/pixel-slices.ts'
-const SHEETS = ['buildings', 'tiles', 'units', 'goods']
+const SHEETS = ['buildings', 'tiles', 'units', 'goods', 'ui']
 /** The file whose layers stack into one figure. */
 const LAYERED = 'resident'
 
