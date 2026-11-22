@@ -1,5 +1,5 @@
 import type { ContractView, DemandView, DirectOfferView, RealmEvent } from '@csp/shared-types'
-import type { DiplomacyTab, DrawerId } from './hud-view.js'
+import type { DiplomacyTab, SideTabId } from './hud-view.js'
 
 /**
  * What the Player hasn't seen yet in a drawer (`CONTEXT.md`: Tool rail): what a notice would
@@ -53,9 +53,9 @@ export function newestLine(events: readonly Pick<RealmEvent, 'seq'>[]): number |
   return events.reduce<number | null>((max, e) => (max === null || e.seq > max ? e.seq : max), null)
 }
 
-/** Where the marks go: the rail buttons and the Diplomacy tabs holding something unseen. */
+/** Where the marks go: the sidebar's strip (`rail`) and Diplomacy tabs with something unseen. */
 export interface Marks {
-  rail: ReadonlySet<DrawerId>
+  rail: ReadonlySet<SideTabId>
   tabs: ReadonlySet<DiplomacyTab>
 }
 
@@ -74,7 +74,7 @@ export function unseenMarks(
   for (const tab of ['contracts', 'demands', 'directOffers'] as const) {
     if (sent[tab].some((id) => !seen[tab].has(id))) tabs.add(tab)
   }
-  const rail = new Set<DrawerId>()
+  const rail = new Set<SideTabId>()
   if (tabs.size > 0) rail.add('diplomacy')
   if (logSeenUpTo !== null && events.some((e) => e.seq > logSeenUpTo)) rail.add('realmLog')
   return { rail, tabs }

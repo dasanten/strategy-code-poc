@@ -375,17 +375,17 @@
   font-size: 13px;
 }
 
-/* The legend keeps clear of an open drawer: beside it, or out of sight beside a wide or full one
-   and on a phone, where drawers fill the screen. */
-.game:has(.hud-drawer:not([hidden])) .game-map .map-legend-panel,
-.game:has(.hud-drawer:not([hidden])) .game-map .map-legend-button {
-  left: calc(var(--rail-w) + min(var(--drawer-w, 380px), calc(100vw - var(--rail-w))) + 12px);
+/* The legend keeps clear of the open sidebar: beside it, or out of sight beside a wide or full tab
+   and on a phone, where a tab fills the screen. */
+.game:has(.side.unfolded) .game-map .map-legend-panel,
+.game:has(.side.unfolded) .game-map .map-legend-button {
+  left: calc(var(--rail-w) + min(var(--side-w, 380px), calc(100vw - var(--rail-w) - 16px)) + 12px);
 }
-.game:has(.hud-drawer.wide:not([hidden])) .game-map .map-legend-panel,
-.game:has(.hud-drawer.wide:not([hidden])) .game-map .map-legend-button,
-.game:has(.hud-drawer.full:not([hidden])) .game-map .map-legend-panel,
-.game:has(.hud-drawer.full:not([hidden])) .game-map .map-legend-button,
-.game.phone:has(.hud-drawer:not([hidden])) .game-map .map-legend-panel,
-.game.phone:has(.hud-drawer:not([hidden])) .game-map .map-legend-button {
+.game:has(.side.wide) .game-map .map-legend-panel,
+.game:has(.side.wide) .game-map .map-legend-button,
+.game:has(.side.full) .game-map .map-legend-panel,
+.game:has(.side.full) .game-map .map-legend-button,
+.game.phone:has(.side.unfolded) .game-map .map-legend-panel,
+.game.phone:has(.side.unfolded) .game-map .map-legend-button {
   display: none;
 }
