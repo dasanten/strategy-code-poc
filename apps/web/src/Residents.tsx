@@ -231,7 +231,7 @@ import {
 } from './script-run-view.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
-import { PanelHead } from './drawer-head.js'
+import { PanelHead } from './panel-head.js'
 import { labelled } from './name-labels.js'
 import {
   CardTabs,

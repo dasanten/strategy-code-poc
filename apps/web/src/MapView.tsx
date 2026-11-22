@@ -255,7 +255,7 @@ export function MapView({
   /**
    * A tile to centre the view on, such as a place named in the realm log, and the zoom to show it
    * at (the zoom in place if none); a new object each time. `cover` is how much of the map the
-   * open drawer and the selection card cover, to centre the tile between them. `zoom` picks the
+   * open sidebar tab and the dock cover, to centre the tile between them. `zoom` picks the
    * zoom from the one now, in place of `scale`.
    */
   focus?: {

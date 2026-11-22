@@ -47,7 +47,7 @@ const options = {
 const shape = (groups: ResidentGroup<{ id: string }>[]) =>
   groups.map((g) => [g.label, g.residents.map((x) => x.id)])
 
-describe('Residents drawer groups', () => {
+describe('Residents tab groups', () => {
   it('puts the home city first, the other cities by name, the homeless last', () => {
     const groups = groupResidents(
       [r('a', 'c3'), r('b', null), r('c', 'c2'), r('d', 'c1'), r('e', 'c3')],
@@ -100,7 +100,7 @@ describe('Residents drawer groups', () => {
   })
 })
 
-describe('Residents drawer head', () => {
+describe('Residents tab head', () => {
   const walk = { kind: 'walkTo' as const, target: { x: 1, y: 1 }, path: null, progress: 0 }
   it('counts residents, busy and idle', () => {
     const busy = { order: walk }
@@ -281,7 +281,9 @@ describe('residentLines', () => {
   it('marks the realm’s heir', () => {
     const lines = residentLines(edda, { leaderId: 'ann', heirId: 'edda', tick, doing: 'Idle' })
     expect(lines).toMatchObject({ leader: false, heir: true })
-    expect(residentLines(edda, { leaderId: 'ann', heirId: null, tick, doing: 'Idle' }).heir).toBe(false)
+    expect(residentLines(edda, { leaderId: 'ann', heirId: null, tick, doing: 'Idle' }).heir).toBe(
+      false,
+    )
   })
 
   it('keeps the hunger meter between empty and full', () => {

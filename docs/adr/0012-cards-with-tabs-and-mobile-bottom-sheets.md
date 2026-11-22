@@ -1,6 +1,7 @@
 # Cards with tabs, pick mode and mobile bottom sheets
 
-Status: decided (2026-10-28, with Daniel).
+Status: decided (2026-10-28, with Daniel). Where the card sits is replaced by ADR 0044 (the
+command bar and the dock); tabs, pick mode and bottom sheets stand.
 
 The resident card had grown to every order, the queue, stats and params open at once, and on a
 phone the card covered the map, so "walk to" was hard to use: there was nowhere left to tap.

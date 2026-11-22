@@ -58,7 +58,7 @@ const WORD_COLUMNS: readonly ListColumn[] = ['name', 'city', 'gear', 'doing']
 /** The direction a column is sorted in when it is first chosen. */
 const startsDescending = (column: ListColumn) => !WORD_COLUMNS.includes(column)
 
-/** The list as it opens at first: everyone, in the Residents drawer's order. */
+/** The list as it opens at first: everyone, in the Residents tab's order. */
 export const DEFAULT_CHOICE: ResidentsChoice = {
   search: '',
   weapons: 'any',
@@ -232,7 +232,7 @@ const words = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' 
 /**
  * The residents sorted by the chosen column. Whoever has nothing in it comes last in either
  * direction, and residents of the same value stay in the order they came in, so rows don't swap
- * back and forth. City sorts by the groups' order, the Residents drawer's: the home city first.
+ * back and forth. City sorts by the groups' order, the Residents tab's: the home city first.
  * `doing` is asked only when sorted by Doing, as it costs the most.
  */
 export function sortResidents(

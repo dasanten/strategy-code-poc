@@ -17,7 +17,7 @@ import {
   TAB_LABELS,
   type ArmyTab,
 } from './residents-view.js'
-import { PanelHead } from './drawer-head.js'
+import { PanelHead } from './panel-head.js'
 import { CommandBar } from './CommandBar.js'
 import { CardTabs } from './SelectionCard.js'
 import { relationshipClass } from './theme.js'

@@ -10,7 +10,7 @@ import type {
   SeenCarriage,
 } from '@csp/shared-types'
 import { GroupHead } from './diplomacy-parts.js'
-import { PanelHead } from './drawer-head.js'
+import { PanelHead } from './panel-head.js'
 import { relationshipClass } from './theme.js'
 import { Icon } from './Icon.js'
 
@@ -117,7 +117,7 @@ export function AlliancePanel({
 
   return (
     <section className="dip" aria-label="Alliance">
-      {/* In the drawer its name joins the count, right of the drawer's title. */}
+      {/* In the sidebar its name joins the count, right of the tab's title. */}
       <PanelHead title={alliance.name}>
         {alliance.name} ·{' '}
         {alliance.members.length === 1 ? '1 member' : `${alliance.members.length} members`}

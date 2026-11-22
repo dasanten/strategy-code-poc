@@ -10,7 +10,7 @@ import {
   cityPlace,
   cityScale,
   type CitiesKnown,
-} from './cities-drawer-view.js'
+} from './cities-tab-view.js'
 import { showBeside } from './hud-view.js'
 import { FAR_SCALE, zoomTier } from './map/camera.js'
 import { HOUSING_ROOM } from './shared/narrowed.js'
@@ -50,7 +50,7 @@ const known = (more: Partial<CitiesKnown> = {}): CitiesKnown => ({
   ...more,
 })
 
-describe('the Cities drawer’s lists', () => {
+describe('the Cities tab’s lists', () => {
   it('sorts cities into Your cities, Others in sight and Last seen, by name', () => {
     const lists = cityLists(
       known({
@@ -172,7 +172,7 @@ const cities = [
   { id: 'c2', townHallId: 'h2' },
 ]
 
-describe('opening a city in the Cities drawer', () => {
+describe('opening a city in the Cities tab', () => {
   it('centres on its town hall, in sight or last seen', () => {
     const inSight = [{ id: 'h1', x: 10, y: 20 }]
     const lastSeen = [{ id: 'h2', x: 90, y: 5 }]
@@ -192,11 +192,11 @@ describe('opening a city in the Cities drawer', () => {
     expect(cityScale(3)).toBe(3)
   })
 
-  it('centres in the map left free beside the open drawer', () => {
-    // The drawer covers the left; the city shows in the map beside it.
-    expect(showBeside(1280, 428, 0)).toEqual({ left: 428, right: 0, closeDrawer: false })
-    // A phone has no map beside the drawer: it closes so the city shows.
-    expect(showBeside(375, 375, 0)).toEqual({ left: 0, right: 0, closeDrawer: true })
+  it('centres in the map left free beside the open sidebar tab', () => {
+    // The sidebar covers the left; the city shows in the map beside it.
+    expect(showBeside(1280, 428, 0)).toEqual({ left: 428, right: 0, foldSidebar: false })
+    // A phone has no map beside the sidebar: it folds so the city shows.
+    expect(showBeside(375, 375, 0)).toEqual({ left: 0, right: 0, foldSidebar: true })
   })
 })
 

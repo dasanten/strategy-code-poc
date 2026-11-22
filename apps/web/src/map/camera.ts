@@ -92,7 +92,7 @@ export function zoomAt(
 
 /**
  * The camera that shows a tile in the middle of what is left of the screen when pixels on its
- * left (an open drawer) and right (the selection card) are covered, at the given zoom.
+ * left (the open sidebar tab) and right (the dock) are covered, at the given zoom.
  */
 export function centreBeside(
   tx: number,

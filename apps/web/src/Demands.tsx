@@ -39,7 +39,7 @@ import {
   waitLine,
 } from './demand-view.js'
 import { Choice, GroupHead } from './diplomacy-parts.js'
-import { PanelHead } from './drawer-head.js'
+import { PanelHead } from './panel-head.js'
 import { GOOD_LABELS } from './goods-grid.js'
 import type { LastSeenCity } from './last-seen.js'
 import { freeAtStorage, ownStorages } from './offers-view.js'

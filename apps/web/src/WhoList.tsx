@@ -81,7 +81,7 @@ export function WhoList({
   suggest: number
   /** A resident's Doing line. */
   doing: (id: string) => string
-  /** The realm's residents under their cities, as the Residents drawer has them, to filter. */
+  /** The realm's residents under their cities, as the Residents tab has them, to filter. */
   groups: readonly ResidentGroup<Resident>[]
   tick: number
   /**

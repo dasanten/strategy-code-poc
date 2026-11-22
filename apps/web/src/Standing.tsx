@@ -8,7 +8,7 @@ import {
   standingRelationship,
   standingWord,
 } from './standing-view.js'
-import { PanelHead } from './drawer-head.js'
+import { PanelHead } from './panel-head.js'
 import { relationshipClass } from './theme.js'
 import { aboutTime } from './shared/estimates.js'
 import { OUTWEIGH_HOLD_DAYS, TICKS_PER_GAME_DAY } from '@csp/balance'

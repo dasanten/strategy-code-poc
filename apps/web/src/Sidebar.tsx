@@ -9,7 +9,7 @@ import {
   type ReactNode,
   type SetStateAction,
 } from 'react'
-import { DrawerStatus } from './drawer-head.js'
+import { PanelStatus } from './panel-head.js'
 import { NONE_MARKED, UnseenMark } from './Hud.js'
 import { Icon } from './Icon.js'
 import { TAB_ICONS } from './ui-icons.js'
@@ -160,7 +160,7 @@ export function SideTab({ id, children }: { id: SideTabId; children: ReactNode }
         )}
       </div>
       <div className="side-body">
-        <DrawerStatus.Provider value={status}>{children}</DrawerStatus.Provider>
+        <PanelStatus.Provider value={status}>{children}</PanelStatus.Provider>
       </div>
     </section>
   )
@@ -168,7 +168,7 @@ export function SideTab({ id, children }: { id: SideTabId; children: ReactNode }
 
 /** Where the browser keeps the sidebar (`sidebarToKeep`) and its panel's width. */
 const SIDEBAR_KEY = 'csp.sidebar'
-// The drawers' key: a width dragged before the sidebar carries over.
+// The width's key from before the sidebar, kept so a width dragged then carries over.
 const WIDTH_KEY = 'csp.drawerWidth'
 
 function kept(key: string): string | null {

@@ -2,9 +2,9 @@ import type { ContractView, DemandView, DirectOfferView, RealmEvent } from '@csp
 import type { DiplomacyTab, SideTabId } from './hud-view.js'
 
 /**
- * What the Player hasn't seen yet in a drawer (`CONTEXT.md`: Tool rail): what a notice would
- * announce, and new lines of the realm log. A rail button and a Diplomacy tab show a mark while
- * theirs holds any of it; opening the drawer on that tab clears it.
+ * What the Player hasn't seen yet in a sidebar tab (`CONTEXT.md`: Sidebar): what a notice would
+ * announce, and new lines of the realm log. A sidebar tab's button and a Diplomacy tab show a mark while
+ * theirs holds any of it; opening the sidebar on that tab clears it.
  */
 
 /** The ids of what was sent to the realm that the Player has had in front of them, by tab. */
@@ -53,9 +53,9 @@ export function newestLine(events: readonly Pick<RealmEvent, 'seq'>[]): number |
   return events.reduce<number | null>((max, e) => (max === null || e.seq > max ? e.seq : max), null)
 }
 
-/** Where the marks go: the sidebar's strip (`rail`) and Diplomacy tabs with something unseen. */
+/** Where the marks go: the sidebar's strip (`strip`) and Diplomacy tabs with something unseen. */
 export interface Marks {
-  rail: ReadonlySet<SideTabId>
+  strip: ReadonlySet<SideTabId>
   tabs: ReadonlySet<DiplomacyTab>
 }
 
@@ -74,10 +74,10 @@ export function unseenMarks(
   for (const tab of ['contracts', 'demands', 'directOffers'] as const) {
     if (sent[tab].some((id) => !seen[tab].has(id))) tabs.add(tab)
   }
-  const rail = new Set<SideTabId>()
-  if (tabs.size > 0) rail.add('diplomacy')
-  if (logSeenUpTo !== null && events.some((e) => e.seq > logSeenUpTo)) rail.add('realmLog')
-  return { rail, tabs }
+  const strip = new Set<SideTabId>()
+  if (tabs.size > 0) strip.add('diplomacy')
+  if (logSeenUpTo !== null && events.some((e) => e.seq > logSeenUpTo)) strip.add('realmLog')
+  return { strip, tabs }
 }
 
 const LOG_SEEN_KEY = 'csp.realmLogSeen'

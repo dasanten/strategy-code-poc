@@ -277,39 +277,6 @@ button.people-row.sel:hover:not(:disabled) {
 }
 /* End of People (T119.11) */
 
-/* Rows in a drawer: a hairline under each, a left mark in the tone or relationship colour. */
-.realm-log-list,
-.alliance-list,
-.script-history {
-  list-style: none;
-  margin: 4px 0 12px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-.realm-log-list li,
-.alliance-list li,
-.script-history li {
-  padding: 7px 8px;
-  border-left: 3px solid var(--rel, transparent);
-  border-bottom: 2px solid var(--ui-line);
-}
-.alliance-list li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.alliance-list li > span {
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-.alliance-list li.invited {
-  color: var(--ui-muted);
-}
 /* Realm: Cities, Waypoints, Realm log (T119.13) */
 /* The three Realm tabs run their rows and sections edge to edge, as the artboards draw them
    (`Side-Cities`, `Side-Cities-Trade`, `Side-Waypoints`, `Side-Log`). */
@@ -372,7 +339,7 @@ button.people-row.sel:hover:not(:disabled) {
   gap: 4px;
   padding: 0 10px 6px 28px;
 }
-/* An opened city's headed, collapsible sections (`CONTEXT.md`: Cities drawer). */
+/* An opened city's headed, collapsible sections (`CONTEXT.md`: Cities tab). */
 .city-section > summary {
   cursor: pointer;
 }

@@ -152,7 +152,7 @@ export const useSheetPeek = () => useContext(SheetPeek)
 export const useInSheet = () => useContext(InSheet)
 
 /**
- * Whether the card's order keys are off: it is hidden behind the wide drawer (`cardHidden`), or
+ * Whether the card's order keys are off: it is hidden behind the script workshop or the full Residents list (`cardHidden`), or
  * it is the command bar under an open tile card, whose keys win (`CardSheet`'s `keysOff`).
  */
 const CardHidden = createContext(false)
@@ -201,7 +201,7 @@ export function CardSheet({
   keysOff?: boolean
   /** Held at peek while the map waits for a target for this card. */
   pinnedPeek: boolean
-  /** Hidden behind the wide drawer (`cardHidden`). */
+  /** Hidden behind the script workshop or the full Residents list (`cardHidden`). */
   hidden?: boolean
   children: ReactNode
 }) {
@@ -306,7 +306,7 @@ export function CardSheet({
  * The banner over the map while an order waits for its target (ADR 0012; `CONTEXT.md`: Picking a
  * target): what to pick, what is under the pointer and what the pick would do there (or else
  * more on what picking does), and Cancel, which Escape does too. On a touch screen, once a tap
- * has shown the preview, Confirm picks that tile. Waypoints opens the drawer to pick one of the
+ * has shown the preview, Confirm picks that tile. Waypoints opens its sidebar tab to pick one of the
  * Player's waypoints instead (`CONTEXT.md`: Waypoint).
  */
 export function PickBanner({
@@ -326,7 +326,7 @@ export function PickBanner({
   under?: string
   /** Picks the tile previewed by a tap, on a touch screen. */
   onConfirm?: () => void
-  /** Opens the Waypoints drawer; absent while the Player holds none or it is open. */
+  /** Opens the Waypoints tab; absent while the Player holds none or it is open. */
   onWaypoints?: () => void
   onCancel: () => void
 }) {
@@ -640,7 +640,7 @@ export function TileCard({
   onRenameHorse: (horseId: string, name: string) => void
   /** Picks one of the Player's residents, such as a carriage's passenger. */
   onSelectResident: (id: string) => void
-  /** Shows one of the Player's horses in the Horses drawer. */
+  /** Shows one of the Player's horses in the Horses tab. */
   onOpenHorse: (id: string) => void
   /** Orders a resident to unhitch the horse from a carriage (`CONTEXT.md`: Hitched horse). */
   onUnhitch: (carriageId: string, residentId: string) => void
@@ -1148,7 +1148,7 @@ function CardListBlock({
             key={row.id}
             className="card-list-row"
             style={style}
-            aria-label={`${row.name}: ${says}${row.opens === 'horse' ? 'show in the Horses drawer' : 'open their card'}`}
+            aria-label={`${row.name}: ${says}${row.opens === 'horse' ? 'show in the Horses tab' : 'open their card'}`}
             onClick={() => onOpen(row)}
           >
             {cells}

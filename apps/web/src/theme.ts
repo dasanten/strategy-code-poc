@@ -48,9 +48,9 @@ export const THEME = {
   ui: {
     /** The darkest tone: edges, the page behind the map, text on gold. */
     ink: EDG32.ink,
-    /** Bars: the top bar, the tool rail, the realm bar. */
+    /** Bars: the top bar, the sidebar strip, the realm bar. */
     bar: EDG32.bark,
-    /** Drawers, the card and dialogs. */
+    /** Panels: the sidebar, cards, the command bar and dialogs. */
     panel: EDG32.parch,
     /** Inputs. */
     well: '#fffaf0',

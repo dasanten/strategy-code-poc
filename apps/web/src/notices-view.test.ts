@@ -65,8 +65,8 @@ describe('the notice lane', () => {
   })
 })
 
-describe('the card behind a drawer', () => {
-  it('is hidden while the wide Scripts drawer is open', () => {
+describe('the card behind a screen', () => {
+  it('is hidden while the script workshop is open', () => {
     expect(cardHidden('scripts')).toBe(true)
   })
 
@@ -74,7 +74,7 @@ describe('the card behind a drawer', () => {
     expect(cardHidden('residents', true)).toBe(true)
   })
 
-  it('shows beside any other drawer and with none open', () => {
+  it('shows beside any other tab and with none open', () => {
     expect(cardHidden(undefined)).toBe(false)
     expect(cardHidden('residents')).toBe(false)
     expect(cardHidden('realmLog')).toBe(false)
@@ -82,38 +82,38 @@ describe('the card behind a drawer', () => {
 })
 
 describe('where the lane goes', () => {
-  const rail = 48
+  const strip = 48
 
-  it('sits over the map between the open drawer and the card', () => {
-    expect(laneSpot(1600, rail, { left: 428, right: 372 }, false)).toEqual({
+  it('sits over the map between the open sidebar tab and the card', () => {
+    expect(laneSpot(1600, strip, { left: 428, right: 372 }, false)).toEqual({
       left: 428 + LANE_GAP,
       right: 372 + LANE_GAP,
       band: false,
     })
   })
 
-  it('starts after the rail when no drawer is open, and at the edge with no card', () => {
-    expect(laneSpot(1600, rail, { left: 0, right: 0 }, false)).toEqual({
-      left: rail + LANE_GAP,
+  it('starts after the strip when no tab is open, and at the edge with no card', () => {
+    expect(laneSpot(1600, strip, { left: 0, right: 0 }, false)).toEqual({
+      left: strip + LANE_GAP,
       right: LANE_GAP,
       band: false,
     })
   })
 
   it('becomes a band under the top bar when the map between leaves too little room', () => {
-    // The wide drawer on a laptop screen, its card hidden.
-    const spot = laneSpot(1440, rail, { left: 1328, right: 0 }, false)
-    expect(spot).toEqual({ left: rail + LANE_GAP, right: LANE_GAP, band: true })
+    // A wide sidebar tab on a laptop screen, its card hidden.
+    const spot = laneSpot(1440, strip, { left: 1328, right: 0 }, false)
+    expect(spot).toEqual({ left: strip + LANE_GAP, right: LANE_GAP, band: true })
   })
 
   it('keeps over the map while exactly enough room is left', () => {
     const left = 400
     const right = 1000 - left - 2 * LANE_GAP - MIN_LANE_WIDTH
-    expect(laneSpot(1000, rail, { left, right }, false).band).toBe(false)
-    expect(laneSpot(1000, rail, { left: left + 1, right }, false).band).toBe(true)
+    expect(laneSpot(1000, strip, { left, right }, false).band).toBe(false)
+    expect(laneSpot(1000, strip, { left: left + 1, right }, false).band).toBe(true)
   })
 
-  it('is always a band on a phone, where drawers take the whole screen', () => {
+  it('is always a band on a phone, where sidebar tabs take the whole screen', () => {
     expect(laneSpot(390, 0, { left: 0, right: 0 }, true)).toEqual({
       left: LANE_GAP,
       right: LANE_GAP,

@@ -3,12 +3,12 @@ import { WAYPOINT_NAME_MAX_LENGTH } from '@csp/balance'
 import { addWaypointProblem } from './shared/waypoints.js'
 import { nameProblem } from './shared/names.js'
 import type { Waypoint } from '@csp/shared-types'
-import { PanelHead } from './drawer-head.js'
+import { PanelHead } from './panel-head.js'
 import { menuSpot, suggestedWaypointName, waypointCount, waypointPlace } from './waypoints-view.js'
 
 /*
  * Waypoints (`CONTEXT.md`: Waypoint): the Player's named markers. Added from the map's tile menu
- * (right-click or long-press) or the tile card, listed in the Waypoints drawer. Each change is an
+ * (right-click or long-press) or the tile card, listed in the Waypoints tab. Each change is an
  * order the server checks (`addWaypoint`, `renameWaypoint`, `removeWaypoint`); its answer shows
  * under the form when it turns one down.
  */
@@ -156,7 +156,7 @@ export function TileMenu({
 }
 
 /**
- * The Waypoints drawer (`CONTEXT.md`: Waypoint): the Player's waypoints, oldest first, each with
+ * The Waypoints tab (`CONTEXT.md`: Waypoint): the Player's waypoints, oldest first, each with
  * where it is. Its name centres the map on it; Rename and Remove act on it at once. While an
  * order waits for a place (`CONTEXT.md`: Picking a target), Pick gives it the waypoint's tile.
  */

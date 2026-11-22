@@ -78,7 +78,7 @@ describe('the notice', () => {
     )
   })
 
-  it('stays quiet for the sender, for what is put away and while the drawer is open', () => {
+  it('stays quiet for the sender, for what is put away and while its tab is open', () => {
     const one = [demand('a', 'r2', 'r1')]
     expect(demandNoticeLine(one, 'r2', noSet, false)).toBeUndefined()
     expect(demandNoticeLine(one, 'r1', new Set(['a']), false)).toBeUndefined()
@@ -377,7 +377,7 @@ describe('how the realm log tells goods handed over', () => {
   })
 })
 
-describe('the Demands drawer', () => {
+describe('the Demands tab', () => {
   it('shows the Trade Organization’s demand for a debt: its army follows, its caravan fetches', () => {
     const debt = demand('a', 'trade-org', 'r1', { terms: { kind: 'goods', goods: { coins: 40 } } })
     debt.from = { realmId: 'trade-org', realm: 'the Trade Organization' }
