@@ -3214,6 +3214,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <CardSheet
           phone={phone}
           pinnedPeek={pick !== undefined && pick.kind !== 'army'}
+          bar
           hidden={hideCard}
         >
           <InsertPointContext.Provider value={insertFor(selected.id)}>
@@ -3520,6 +3521,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <CardSheet
           phone={phone}
           pinnedPeek={pick?.kind === 'group' || pick?.kind === 'plan'}
+          bar
           hidden={hideCard}
         >
           <GroupCard
