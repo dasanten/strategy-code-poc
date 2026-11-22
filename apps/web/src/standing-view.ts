@@ -21,6 +21,18 @@ export function standingWord(value: number): string {
   return 'trusted'
 }
 
+/**
+ * A standing as a bar in the Standing tab: how far along −100 to +100 it is, in percent, and the
+ * meter fill its word takes (hostile low, wary mid, neutral plain, friendly and trusted ok). Only a
+ * picture of the number and the word beside it.
+ */
+export function standingBar(value: number): { percent: number; fill: 'low' | 'mid' | '' | 'ok' } {
+  const percent = Math.round((Math.max(-100, Math.min(100, value)) + 100) / 2)
+  const word = standingWord(value)
+  const fill = word === 'hostile' ? 'low' : word === 'wary' ? 'mid' : word === 'neutral' ? '' : 'ok'
+  return { percent, fill }
+}
+
 /** A standing as a signed number of points: "+12", "−30", "0". */
 export function formatStanding(value: number): string {
   if (value > 0) return `+${value}`

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import {
   DEMANDS_PER_GAME_DAY,
   DEMAND_DEFAULT_DAYS,
@@ -38,6 +38,7 @@ import {
   type HandOverPreview,
   waitLine,
 } from './demand-view.js'
+import { Choice, GroupHead } from './diplomacy-parts.js'
 import { PanelHead } from './drawer-head.js'
 import { GOOD_LABELS } from './goods-grid.js'
 import type { LastSeenCity } from './last-seen.js'
@@ -64,6 +65,7 @@ function HandOverGoods({
   realmId,
   npcCity,
   onAccept,
+  decline,
 }: {
   goods: Partial<Record<Good, number>>
   senderId: string
@@ -77,6 +79,8 @@ function HandOverGoods({
   /** An NPC city that demanded it: paid only by a Transfer to it (`CONTEXT.md`: NPC demand). */
   npcCity?: { id: string; name: string }
   onAccept: (handOver: DemandHandOver) => void
+  /** The Decline button, beside Accept. */
+  decline: ReactNode
 }) {
   const [way, setWay] = useState<DemandHandOver['way']>(npcCity ? 'transfer' : 'setAside')
   const [storageId, setStorageId] = useState('')
@@ -118,10 +122,10 @@ function HandOverGoods({
   }
 
   return (
-    <div className="demand-hand-over">
+    <div className="col dip-hand-over">
       {!noCaravans && !npcCity && (
-        <label className="contract-field">
-          <span className="contract-label">How</span>
+        <label className="fld">
+          <span className="lb">How</span>
           <select
             value={way}
             aria-label="How the goods go"
@@ -136,8 +140,8 @@ function HandOverGoods({
       )}
       {sending ? (
         <>
-          <label className="contract-field">
-            <span className="contract-label">From</span>
+          <label className="fld">
+            <span className="lb">From</span>
             <select value={fromCity?.id ?? ''} onChange={(e) => setFromCityId(e.target.value)}>
               {fromCities.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -147,8 +151,8 @@ function HandOverGoods({
             </select>
           </label>
           {!toTradeOrg && (
-            <label className="contract-field">
-              <span className="contract-label">To their city</span>
+            <label className="fld">
+              <span className="lb">To their city</span>
               <select value={toCity?.id ?? ''} onChange={(e) => setToCityId(e.target.value)}>
                 {toCities.length === 0 && <option value="">No storage of theirs in sight</option>}
                 {toCities.map((c) => (
@@ -162,8 +166,8 @@ function HandOverGoods({
         </>
       ) : (
         storage && (
-          <label className="contract-field">
-            <span className="contract-label">At</span>
+          <label className="fld">
+            <span className="lb">At</span>
             <select value={storage.id} onChange={(e) => setStorageId(e.target.value)}>
               {storages.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -174,20 +178,24 @@ function HandOverGoods({
           </label>
         )
       )}
-      <p className="small muted">{preview.text}</p>
-      <button
-        type="button"
-        disabled={!preview.canAccept}
-        onClick={() =>
-          onAccept(
-            sending
-              ? { way: 'transfer', fromCityId: fromCity!.id, toCityId: toCity?.id ?? '' }
-              : { way: 'setAside', storageId: storage!.id },
-          )
-        }
-      >
-        Accept
-      </button>
+      <p className="small mu">{preview.text}</p>
+      <div className="fx dip-buttons">
+        <button
+          type="button"
+          className="btn pri grow"
+          disabled={!preview.canAccept}
+          onClick={() =>
+            onAccept(
+              sending
+                ? { way: 'transfer', fromCityId: fromCity!.id, toCityId: toCity?.id ?? '' }
+                : { way: 'setAside', storageId: storage!.id },
+            )
+          }
+        >
+          Accept
+        </button>
+        {decline}
+      </div>
     </div>
   )
 }
@@ -270,88 +278,91 @@ export function DemandsPanel({
     setLines(lines.map((l, at) => (at === i ? line : l)))
 
   return (
-    <section className="alliance-panel" aria-label="Demands">
+    <section className="dip" aria-label="Demands">
       <PanelHead title="Demands">{demands.length === 0 ? 'none' : demands.length}</PanelHead>
       {incoming.length > 0 && (
         <>
-          <h3>Sent to you</h3>
-          <ul className="alliance-list">
-            {incoming.map((d) => (
-              <li key={d.id} className="army">
-                <span>
-                  <strong>
+          <GroupHead count={incoming.length}>Sent to you</GroupHead>
+          <ul className="dip-list">
+            {incoming.map((d) => {
+              const decline = (
+                <button
+                  type="button"
+                  className="btn grow"
+                  onClick={() => void order({ kind: 'declineDemand', demandId: d.id })}
+                >
+                  Decline
+                </button>
+              )
+              return (
+                <li key={d.id} className="sec">
+                  <span className="b">
                     {senderLine(d.from)} demands {termsLine(d.terms)}
-                  </strong>
+                  </span>
                   <DemandNote note={d.note} />
-                  <span className="muted small">
-                    Lapses in {aboutTime(d.deadline - tick)}.{' '}
+                  <span className="bad">Lapses in {aboutTime(d.deadline - tick)}.</span>
+                  <span className="mu small">
                     {d.from.realmId === TRADE_ORG
                       ? 'If you decline it or let it lapse, its next army comes for your workplaces. Paying in full at any warehouse stops that.'
                       : d.from.city
                         ? 'Paid by a Transfer, the city is at peace with you; declined or let lapse, it turns hostile.'
                         : 'Ignoring it does nothing by itself.'}
                   </span>
-                </span>
-                {d.terms.kind === 'goods' && (
-                  <HandOverGoods
-                    goods={d.terms.goods}
-                    senderId={d.from.realmId}
-                    buildings={buildings}
-                    cities={cities}
-                    carriedWays={carriedWays}
-                    noCaravans={noCaravans}
-                    realmId={realmId}
-                    npcCity={d.from.city ? { id: d.from.realmId, name: d.from.realm } : undefined}
-                    onAccept={(handOver) =>
-                      void order({ kind: 'acceptDemand', demandId: d.id, handOver })
-                    }
-                  />
-                )}
-                <div className="order-buttons">
-                  {d.terms.kind === 'city' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const question = handOverQuestion(d, realmId, cities)
-                        if (question && !window.confirm(question)) return
-                        void order({ kind: 'acceptDemand', demandId: d.id })
-                      }}
-                    >
-                      Accept
-                    </button>
+                  {d.terms.kind === 'goods' ? (
+                    <HandOverGoods
+                      goods={d.terms.goods}
+                      senderId={d.from.realmId}
+                      buildings={buildings}
+                      cities={cities}
+                      carriedWays={carriedWays}
+                      noCaravans={noCaravans}
+                      realmId={realmId}
+                      npcCity={d.from.city ? { id: d.from.realmId, name: d.from.realm } : undefined}
+                      onAccept={(handOver) =>
+                        void order({ kind: 'acceptDemand', demandId: d.id, handOver })
+                      }
+                      decline={decline}
+                    />
+                  ) : (
+                    <div className="fx dip-buttons">
+                      <button
+                        type="button"
+                        className="btn pri grow"
+                        onClick={() => {
+                          const question = handOverQuestion(d, realmId, cities)
+                          if (question && !window.confirm(question)) return
+                          void order({ kind: 'acceptDemand', demandId: d.id })
+                        }}
+                      >
+                        Accept
+                      </button>
+                      {decline}
+                    </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => void order({ kind: 'declineDemand', demandId: d.id })}
-                  >
-                    Decline
-                  </button>
-                </div>
-              </li>
-            ))}
+                </li>
+              )
+            })}
           </ul>
         </>
       )}
       {sent.length > 0 && (
         <>
-          <h3>Sent by you</h3>
-          <ul className="alliance-list">
+          <GroupHead count={sent.length}>Sent by you</GroupHead>
+          <ul className="dip-list">
             {sent.map((d) => (
-              <li key={d.id} className="army">
-                <span>
-                  <strong>{sentLine(d)}</strong>
-                  <DemandNote note={d.note} />
-                  <span className="muted small">{waitLine(d, tick)}</span>
-                </span>
+              <li key={d.id} className="sec">
+                <span className="b">{sentLine(d)}</span>
+                <DemandNote note={d.note} />
+                <span className="mu small">{waitLine(d, tick)}</span>
               </li>
             ))}
           </ul>
         </>
       )}
-      <form className="contract-form demand-form" onSubmit={send} aria-label="New demand">
-        <h3>Send a demand</h3>
-        <label className="contract-field">
-          <span className="contract-label">To</span>
+      <form className="sec dip-form" onSubmit={send} aria-label="New demand">
+        <h3 className="px t16">Send a demand</h3>
+        <label className="fld">
+          <span className="lb">To</span>
           <select
             value={toId}
             onChange={(e) => {
@@ -374,21 +385,18 @@ export function DemandsPanel({
             ))}
           </select>
         </label>
-        <div className="contract-field" role="radiogroup" aria-label="What">
-          <span className="contract-label">What</span>
-          <span className="contract-choice">
-            <label>
-              <input type="radio" checked={wantsCity} onChange={() => setWantsCity(true)} />A city
-            </label>
-            <label>
-              <input type="radio" checked={!wantsCity} onChange={() => setWantsCity(false)} />
-              Goods or Coins
-            </label>
-          </span>
-        </div>
+        <Choice
+          label="What"
+          value={wantsCity}
+          options={[
+            { value: true, label: 'A city' },
+            { value: false, label: 'Goods or Coins' },
+          ]}
+          onChange={setWantsCity}
+        />
         {wantsCity ? (
-          <label className="contract-field">
-            <span className="contract-label">City</span>
+          <label className="fld">
+            <span className="lb">City</span>
             <select value={cityId} onChange={(e) => setCityId(e.target.value)}>
               <option value="">
                 {!toId
@@ -405,12 +413,13 @@ export function DemandsPanel({
             </select>
           </label>
         ) : (
-          <div className="contract-field">
-            <span className="contract-label">Goods</span>
-            <ul className="demand-goods" aria-label="Goods">
+          <div className="fld" role="group" aria-label="Goods">
+            <span className="lb">Goods</span>
+            <ul className="col dip-goods" aria-label="Goods">
               {lines.map((l, i) => (
-                <li key={i}>
+                <li key={i} className="fx">
                   <select
+                    className="grow"
                     aria-label="Good"
                     value={l.good}
                     onChange={(e) => setLine(i, { ...l, good: e.target.value as Good })}
@@ -423,6 +432,7 @@ export function DemandsPanel({
                   </select>
                   <input
                     type="number"
+                    className="mono dip-units"
                     aria-label="Units"
                     min={1}
                     value={l.units}
@@ -431,6 +441,7 @@ export function DemandsPanel({
                   {lines.length > 1 && (
                     <button
                       type="button"
+                      className="btn sq"
                       aria-label="Remove"
                       onClick={() => setLines(lines.filter((_, at) => at !== i))}
                     >
@@ -442,6 +453,7 @@ export function DemandsPanel({
               <li>
                 <button
                   type="button"
+                  className="btn sm"
                   onClick={() => setLines([...lines, { good: 'food', units: 10 }])}
                 >
                   Add a good
@@ -450,8 +462,8 @@ export function DemandsPanel({
             </ul>
           </div>
         )}
-        <label className="contract-field">
-          <span className="contract-label">Note</span>
+        <label className="fld">
+          <span className="lb">Note</span>
           <textarea
             rows={3}
             maxLength={DEMAND_NOTE_MAX_LENGTH}
@@ -460,25 +472,25 @@ export function DemandsPanel({
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
-        <label className="contract-field">
-          <span className="contract-label">Deadline</span>
-          <span>
-            <input
-              type="number"
-              min={1}
-              max={DEMAND_MAX_DAYS}
-              value={days}
-              onChange={(e) => setDays(Number(e.target.value))}
-            />{' '}
-            game days
-          </span>
+        <label className="fx dip-inline">
+          Deadline
+          <input
+            type="number"
+            className="mono dip-units"
+            min={1}
+            max={DEMAND_MAX_DAYS}
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+          />
+          game days
         </label>
         {noteProblem && <p className="error">{noteProblem}</p>}
-        <button type="submit" className="primary" disabled={!ready}>
+        <button type="submit" className="btn pri" disabled={!ready}>
           Send
         </button>
       </form>
-      <p className="muted small">
+      {error && <p className="error dip-error">{error}</p>}
+      <p className="sec mu small dip-foot">
         A demand arrives at once, wherever they are. A realm sends at most {DEMANDS_PER_GAME_DAY} a
         game day. It is only words: what you threaten is yours to carry out, or not. An NPC city
         gives in only once your armed residents near it, by weapon, armour and Combat skill, have
@@ -488,7 +500,6 @@ export function DemandsPanel({
         declines and thinks less of you. The Trade Organization always declines, and being asked
         costs standing.
       </p>
-      {error && <p className="error">{error}</p>}
     </section>
   )
 }
