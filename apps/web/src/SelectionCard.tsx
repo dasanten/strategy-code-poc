@@ -332,7 +332,7 @@ export function PickBanner({
         </button>
       )}
       <button type="button" onClick={onCancel}>
-        Cancel
+        Cancel<kbd aria-hidden="true">Esc</kbd>
       </button>
     </div>
   )

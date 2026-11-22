@@ -932,11 +932,12 @@ export function Wiki() {
           last saw as thin lines, and one emblem per city; middle adds buildings, nodes and
           residents; close shows each figure. Far out territory is filled in its owner’s colour,
           nearer in only its borders are drawn; the Region map button fills it at every zoom. The
-          readout bottom right names the terrain, the tile and the tier under the pointer. Above it
-          the minimap shows the terrain you explored, your cities, your residents and carriages away
+          map dock bottom right holds the minimap, the zoom and Centre buttons, Select, Region map
+          and Legend; its last line names the terrain, the tile and the tier under the pointer. The
+          minimap shows the terrain you explored, your cities, your residents and carriages away
           from them, and the cities you know, with the part on screen as a rectangle; click it to
-          look there. The minimap and the legend fold to buttons, and your browser remembers how you
-          left them.
+          look there. The minimap folds to a button, the legend opens over the dock, and your
+          browser remembers how you left them.
         </p>
         <p>
           The top bar shows the Food, Wood, Stone and Coins held in your storages, for what you pick

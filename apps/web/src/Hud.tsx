@@ -654,12 +654,26 @@ export function useEscapeCloses(open: OpenTab, close: () => void) {
   }, [open, close])
 }
 
-/** A dialog in the middle of the screen, over a dimmed map. */
-export function CentredDialog({ title, children }: { title: string; children: ReactNode }) {
+/**
+ * A dialog in the middle of the screen, over a dimmed map. Its header bar says what kind of news
+ * it is: `bad` (red, with a warning sign) for a loss, `news` (navy) for word from the game.
+ */
+export function CentredDialog({
+  title,
+  tone,
+  children,
+}: {
+  title: string
+  tone?: 'bad' | 'news'
+  children: ReactNode
+}) {
   return (
     <div className="hud-backdrop">
       <div className="hud-dialog pn" role="alertdialog" aria-modal="true" aria-label={title}>
-        <h2 className="hd">{title}</h2>
+        <h2 className={`hd${tone ? ` hd-${tone}` : ''}`}>
+          {tone === 'bad' && <span className="ic s24 i-warn" aria-hidden="true" />}
+          <span className="grow">{title}</span>
+        </h2>
         {children}
       </div>
     </div>
@@ -691,11 +705,12 @@ export function HorseOfferNotice({
   }
   return (
     <aside className="pn notice hud-offer" role="status">
-      <span className="notice-text">
+      <span className="ic s24 i-horse" aria-hidden="true" />
+      <span className="notice-text b">
         {NUMBER_WORDS[horses] ?? horses} horses are waiting for you
         {refused && <span className="hud-offer-refused"> — {refused}</span>}
       </span>
-      <button type="button" disabled={busy} onClick={() => void claim()}>
+      <button type="button" className="btn sm gold" disabled={busy} onClick={() => void claim()}>
         Claim
       </button>
     </aside>
@@ -720,11 +735,11 @@ export function IncomingNotice({
       <span className="notice-text" title={line}>
         {line}
       </span>
-      <button type="button" onClick={onOpen}>
+      <button type="button" className="btn sm" onClick={onOpen}>
         Open
       </button>
-      <button type="button" aria-label="Dismiss" onClick={onDismiss}>
-        ×
+      <button type="button" className="btn sm sq" aria-label="Dismiss" onClick={onDismiss}>
+        <span className="ic s16 i-x" aria-hidden="true" />
       </button>
     </aside>
   )
@@ -816,14 +831,15 @@ export function TraderVisitNotice({
     <aside className="pn notice trader-visit" role="status">
       <span className="notice-text">{traderVisitLine(visit, tick)}</span>
       <span className="notice-actions">
-        <button type="button" onClick={onShow}>
+        <button type="button" className="btn sm" onClick={onShow}>
           Show
         </button>
-        <button type="button" onClick={onTrade}>
+        <button type="button" className="btn sm gold" onClick={onTrade}>
           Trade
         </button>
         <button
           type="button"
+          className="btn sm"
           aria-label={`Dismiss the trader at ${visit.city}`}
           onClick={onDismiss}
         >
@@ -858,7 +874,12 @@ export function GroupReportNotice({
           </span>
         ))}
       </span>
-      <button type="button" aria-label="Dismiss the group order's report" onClick={onDismiss}>
+      <button
+        type="button"
+        className="btn sm"
+        aria-label="Dismiss the group order's report"
+        onClick={onDismiss}
+      >
         OK
       </button>
     </aside>
@@ -882,11 +903,24 @@ export function FirstDayCard({
   const { lines, next, ticked } = firstDayView(card)
   return (
     <aside className="pn notice first-day" aria-label="First day">
-      <div className="notice-text">
-        <strong>First day</strong>{' '}
-        <span className="first-day-count">
-          {ticked} of {lines.length}
+      <div className="hd first-day-head">
+        <span className="grow">
+          First day ·{' '}
+          <span className="first-day-count">
+            {ticked} of {lines.length}
+          </span>
         </span>
+        <button
+          type="button"
+          className="btn sm sq dk first-day-dismiss"
+          aria-label="Don't show again"
+          title="Don't show again"
+          onClick={onDismiss}
+        >
+          <span className="ic s16 i-x" aria-hidden="true" />
+        </button>
+      </div>
+      <div className="notice-text first-day-body">
         <ul>
           {lines.map((l) => (
             <li
@@ -894,9 +928,7 @@ export function FirstDayCard({
               className={l.done ? 'done' : l.line === next ? 'next' : undefined}
               aria-label={l.done ? `${l.label}: done` : undefined}
             >
-              <span className="first-day-tick" aria-hidden="true">
-                {l.done ? '✓' : '○'}
-              </span>{' '}
+              <span className={`cb first-day-tick${l.done ? ' on' : ''}`} aria-hidden="true" />{' '}
               {l.line === 'openWiki' ? (
                 // A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki).
                 <a href={WIKI_PATH} target="_blank" rel="noopener" onClick={onWiki}>
@@ -908,17 +940,8 @@ export function FirstDayCard({
             </li>
           ))}
         </ul>
-        <p className="first-day-tip small">{FIRST_DAY_RALLY_TIP}</p>
+        <p className="first-day-tip small mu">{FIRST_DAY_RALLY_TIP}</p>
       </div>
-      <button
-        type="button"
-        className="first-day-dismiss"
-        aria-label="Don't show again"
-        title="Don't show again"
-        onClick={onDismiss}
-      >
-        ✕
-      </button>
     </aside>
   )
 }

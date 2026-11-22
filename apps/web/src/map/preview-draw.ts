@@ -2,12 +2,9 @@ import type { Graphics } from 'pixi.js'
 import { FOOTPRINT } from '../shared/footprint.js'
 import type { PickPreview } from '../pick-preview.js'
 import { tileToScreen, type Camera, type Size } from './camera.js'
-import { LEADER_COLOR, ROAD_COLOR, WALL_COLOR } from './palette.js'
+import { LEADER_COLOR, REFUSED_COLOR, ROAD_COLOR, WALL_COLOR } from './palette.js'
 import { GLYPH_COLOR } from './tokens.js'
 import { drawWallTiles, wallSides, type WallTile } from './wall-tile.js'
-
-/** What doesn't fit, in a pick's preview: a footprint where it can't go, a line too long. */
-const REFUSED_COLOR = 0xe5484d
 
 /**
  * Draws the preview of a pick under the pointer (`CONTEXT.md`: Picking a target): each way as a
