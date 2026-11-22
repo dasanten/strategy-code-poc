@@ -947,17 +947,17 @@ button.card-list-row:hover {
 }
 
 /* Order buttons in a drawer row are smaller than the inspector's touch targets. */
-.hud-drawer .order-buttons {
+.side-panel .order-buttons {
   gap: 4px;
   margin-top: 6px;
 }
-.hud-drawer .order-buttons button {
+.side-panel .order-buttons button {
   min-height: 0;
   min-width: 0;
   padding: 4px 9px;
   font-size: 12px;
 }
-.hud-drawer .order-buttons select {
+.side-panel .order-buttons select {
   padding: 3px 6px;
   font-size: 12px;
 }

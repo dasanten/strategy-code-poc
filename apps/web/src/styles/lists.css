@@ -17,7 +17,7 @@
   display: flex;
   flex-direction: column;
 }
-.hud-drawer .residents-group h3 {
+.side-panel .residents-group h3 {
   margin: 12px 0 0;
   padding: 0 6px 4px;
   border-bottom: 2px solid var(--ui-line-strong);
@@ -468,7 +468,7 @@ button.residents-row.selected:hover {
 /* The Contracts form (`CONTEXT.md`: Mercenary contract): one field a line, its label on the left,
    the residents as a list with their Doing, and the offer as it will read under them. */
 .contract-form,
-.hud-drawer form.contract-form {
+.side-panel form.contract-form {
   display: grid;
   gap: 8px;
   margin: 8px 0;
