@@ -16,6 +16,7 @@ import { ActionRows, useInSheet, useSheetPeek } from './SelectionCard.js'
  */
 export function CommandBar({
   rel,
+  icon = 'i-person',
   title,
   badge,
   lines,
@@ -28,6 +29,8 @@ export function CommandBar({
   children,
 }: {
   rel: Relationship
+  /** The kit icon in the figure: a resident by default, an army's banner. */
+  icon?: string
   title: string
   /** Leader or Heir. */
   badge?: string
@@ -75,7 +78,7 @@ export function CommandBar({
         <div className="cmd-head">
           <div className="cmd-who">
             <span className="cmd-figure" aria-hidden="true">
-              <span className="ic s32 i-person" />
+              <span className={`ic s32 ${icon}`} />
             </span>
             <div className="cmd-title">
               <div className="name-line">

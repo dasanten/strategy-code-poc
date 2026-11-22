@@ -97,7 +97,7 @@ import {
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
 import { commandsSeen } from './alliance-army.js'
-import { ArmiesPanel, type ArmyPick } from './Armies.js'
+import { ArmiesPanel, ArmyCard, type ArmyPick } from './Armies.js'
 import { ContractsPanel } from './Contracts.js'
 import { demandNoticeLine, demandSides } from './demand-view.js'
 import { DemandsPanel } from './Demands.js'
@@ -506,6 +506,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [orderError, setOrderError] = useState<string | undefined>()
   const [armyPick, setArmyPick] = useState<ArmyPick>()
   const [armyError, setArmyError] = useState<string | undefined>()
+  // The army whose card is in the command bar, opened from the Armies tab (`CONTEXT.md`: Army).
+  const [openArmyId, setOpenArmyId] = useState<string>()
   // The param of the picked resident's script whose value the map is waiting for (`CONTEXT.md`:
   // Script parameter).
   const [paramPick, setParamPick] = useState<ScriptParam>()
@@ -922,6 +924,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     (mode: ControlMode) => {
       if (mode === 'realm') {
         setSelectedIds([])
+        setOpenArmyId(undefined)
         setStarting(undefined)
         cancelPick()
       }
@@ -950,7 +953,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }, [controlMode, switchControlMode])
   // Picking a resident, a group or an army some other way than a map click (the Residents list,
   // a saved group's key, the Armies drawer, a notice) switches to unit control mode.
-  const pickedArmy = armyPick !== undefined
+  const openArmy = world?.armies.find((a) => a.id === openArmyId)
+  const pickedArmy = armyPick !== undefined || openArmy !== undefined
+  // One card in the command bar at a time: a resident or group picked closes the army's.
+  useEffect(() => {
+    if (selectedIds.length > 0) setOpenArmyId(undefined)
+  }, [selectedIds.length])
   useEffect(() => {
     const next = modeAfterPick(controlMode, { residents: selectedIds.length, army: pickedArmy })
     if (next !== controlMode) setControlMode(next)
@@ -968,6 +976,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const besideTile = barBesideTile(phone, tileOpen)
   // The realm order's Build menu or who-list, which Escape closes as it does a card.
   const realmCard = realmOrder !== undefined && !realmPicking
+  const armyOpen = openArmy !== undefined
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing =
@@ -977,7 +986,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         pick: picked,
         panel: formOpen || (shownCard && panelOpen()),
         tile: shownCard && tileOpen,
-        card: shownCard && (anySelected || realmCard),
+        card: shownCard && (anySelected || realmCard || armyOpen),
       })
       // With nothing else open, the drawer's own Escape closes it.
       if (!step) return
@@ -992,10 +1001,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setSelectedIds([])
       setPicking(false)
       setRealmOrder(undefined)
+      setOpenArmyId(undefined)
     }
     window.addEventListener('keydown', onKey, { capture: true })
     return () => window.removeEventListener('keydown', onKey, { capture: true })
-  }, [anySelected, realmCard, picked, formOpen, tileOpen, shownCard, cancelPick])
+  }, [anySelected, realmCard, armyOpen, picked, formOpen, tileOpen, shownCard, cancelPick])
   useLayoutEffect(() => {
     if (!toShow) return
     const covered = mapCovered()
@@ -2508,6 +2518,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       />
       {world && controlMode === 'realm' && (
         <RealmBar
+          phone={phone}
           open={realmBarOpen}
           onOpen={(order) => {
             setSelectedTile(undefined)
@@ -2630,20 +2641,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               armies={world.armies}
               own={own}
               inSight={world.residents}
-              carriages={world.carriages}
-              realmId={world.home.realmId}
-              picking={armyPick}
-              onPick={(pick) => {
-                setArmyPick(pick)
-                setPicking(false)
+              openId={openArmy?.id}
+              onOpen={(id) => {
+                // The army's card takes the command bar: a resident or group picked lets go.
+                if (id) setSelectedIds([])
+                cancelPick()
                 setArmyError(undefined)
+                setOpenArmyId(id)
               }}
-              pickError={armyError}
-              scripts={scripts}
               sendOrder={sendOrder}
-              scriptMemory={(id) =>
-                scriptDebug(id, world.armies.find((a) => a.id === id)?.script?.scriptId ?? 0)
-              }
             />,
           )}
         {world &&
@@ -3612,6 +3618,41 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           />
         </CardSheet>
       )}
+      {world && openArmy && besideTile.shows && (
+        // The army opened in the Armies tab, its card in the command bar as a resident's is.
+        <CardSheet
+          phone={phone}
+          pinnedPeek={armyPick !== undefined}
+          bar
+          keysOff={!besideTile.keys}
+          hidden={hideCard}
+        >
+          <ArmyCard
+            key={openArmy.id}
+            army={openArmy}
+            own={own}
+            inSight={world.residents}
+            carriages={world.carriages}
+            realmId={world.home.realmId}
+            picking={armyPick}
+            onPick={(p) => {
+              setArmyPick(p)
+              setPicking(false)
+              setArmyError(undefined)
+            }}
+            pickError={armyError}
+            scripts={scripts}
+            sendOrder={sendOrder}
+            scriptMemory={
+              openArmy.script && scriptDebug(openArmy.id, openArmy.script.scriptId ?? 0)
+            }
+            onClose={() => {
+              setOpenArmyId(undefined)
+              setArmyPick(undefined)
+            }}
+          />
+        </CardSheet>
+      )}
       {world && realmOrder?.step === 'menu' && !selectedTile && (
         <CardSheet phone={phone} dock={dock} pinnedPeek={false} hidden={hideCard}>
           <SelectionCard
@@ -3696,6 +3737,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               realmOrder.step === 'vehicle'
                 ? vehicleSuggests(realmOrder.order)
                 : WHO_SUGGESTS[who.order.kind]
+            }
+            // Shift on Confirm arms Build, a line and Walk to again (`confirmRealmOrder`, `confirmPlace`).
+            armable={
+              realmOrder.step === 'who' ||
+              realmOrder.step === 'lineWho' ||
+              (realmOrder.step === 'place' && realmOrder.order.kind === 'walkTo')
             }
             most={realmOrder.step === 'vehicle' ? vehicleMost(realmOrder.order) : undefined}
             mostNote={
