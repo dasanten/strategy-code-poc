@@ -410,35 +410,76 @@ function ControlSwitch({
   )
 }
 
+/** The kit icon beside a realm bar order, where the artboard (`Game-Realm`) draws one. */
+const REALM_BAR_ICONS: Partial<Record<RealmBarOrder, string>> = {
+  build: 'i-hammer',
+  walkTo: 'i-walk',
+  explore: 'i-eye',
+  gather: 'i-pick',
+  runScript: 'i-code',
+}
+
+/** The gap, in pixels, between the realm bar and what stops above it. */
+const REALM_BAR_GAP = 8
+
 /**
- * The realm bar over the map in realm control mode (`CONTEXT.md`: Realm order): where the orders
- * that begin with a kind or a place start, beside a line on what the mode is for.
+ * The realm bar in realm control mode (`CONTEXT.md`: Realm order, Screen; ADR 0044): it takes the
+ * command bar's place along the bottom, left of the map dock, and is where the orders that begin
+ * with a kind or a place start, under a heading and a line on what the mode is for. On a desktop
+ * its height, with the gap above it, goes to the screen as `--command-h`, so the sidebar and the
+ * dock stop above it as they do above the command bar. On a phone it sits above the map buttons.
  */
 export function RealmBar({
   open,
   onOpen,
+  phone = false,
 }: {
   /** The realm bar's order being given, if one is. */
   open: RealmBarOrder | undefined
   /** Starts the order, or with it open already, drops it. */
   onOpen: (order: RealmBarOrder) => void
+  phone?: boolean
 }) {
+  const ref = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const bar = ref.current
+    const screen = bar?.parentElement
+    if (!bar || !screen || phone) return
+    const observer = new ResizeObserver(() => {
+      const tall = bar.offsetHeight
+      screen.style.setProperty('--command-h', `${tall > 0 ? tall + REALM_BAR_GAP : 0}px`)
+    })
+    observer.observe(bar)
+    return () => {
+      observer.disconnect()
+      screen.style.removeProperty('--command-h')
+    }
+  }, [phone])
   return (
-    <div className="hud-realm-bar bar" role="toolbar" aria-label="Realm orders">
-      {REALM_BAR_ORDERS.map(({ id, label, title }) => (
-        <button
-          key={id}
-          type="button"
-          className={open === id ? 'on' : undefined}
-          aria-pressed={open === id}
-          title={title}
-          onClick={() => onOpen(id)}
-        >
-          {label}
-        </button>
-      ))}
-      <span className="hud-realm-bar-hint">{REALM_BAR_HINT}</span>
-    </div>
+    <section ref={ref} className="realm-bar pn" aria-label="Realm bar">
+      <div className="realm-bar-head">
+        <span className="px t18">Realm orders</span>
+        <span className="realm-bar-hint">{REALM_BAR_HINT}</span>
+      </div>
+      <div className="realm-bar-orders" role="toolbar" aria-label="Realm orders">
+        {REALM_BAR_ORDERS.map(({ id, label, title }) => {
+          const icon = REALM_BAR_ICONS[id]
+          return (
+            <button
+              key={id}
+              type="button"
+              className={open === id ? 'btn lg on' : 'btn lg'}
+              aria-pressed={open === id}
+              title={title}
+              onClick={() => onOpen(id)}
+            >
+              {icon && <span className={`ic ${icon}`} aria-hidden="true" />}
+              {label}
+            </button>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 

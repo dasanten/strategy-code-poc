@@ -59,8 +59,7 @@ button.people-row.sel:hover:not(:disabled) {
   overflow-wrap: anywhere;
 }
 /* A second line under a name or Doing: the script they run, where a horse is, an army's order. */
-.people-row .under,
-.army-card .under {
+.people-row .under {
   display: block;
   font-weight: 400;
   font-size: 12px;
@@ -231,31 +230,15 @@ button.people-row.sel:hover:not(:disabled) {
   width: 32px;
 }
 
-/* Armies: a row each; the open one marked, with its tabs on paper under it (the army's card),
-   then Form an army. */
+/* Armies: a row each, the open one marked (its card is in the command bar, `ArmyCard`), then
+   Form an army. An army's Members and Supply lists. */
 .army-list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.army-card-body {
-  background: var(--paper);
-  border-bottom: 2px solid var(--ink);
-}
-.army-facts {
-  padding-bottom: 6px;
-}
-.army-card .tabs {
-  background: transparent;
-}
-.army-card .tabs .tab {
-  flex: none;
-}
-.army-tab {
-  background: var(--parch);
-}
-.army-buttons {
-  gap: 4px;
+.army-row {
+  width: 100%;
 }
 .army-facts-list {
   list-style: none;
@@ -264,9 +247,6 @@ button.people-row.sel:hover:not(:disabled) {
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-.army-tab p {
-  margin: 0;
 }
 .side-panel[data-tab='armies'] .army-form {
   flex-direction: column;
