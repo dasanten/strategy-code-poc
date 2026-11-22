@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { AdminPlaces } from '@csp/shared-types'
 import { jumpCount, jumpList, jumpMark, type JumpEntry } from './admin-jump.js'
 import { relationshipClass } from './theme.js'
+import { Icon } from './Icon.js'
 
 /**
  * The admin map's jump list (`CONTEXT.md`: admin map): the whole world's places by name, grouped,
@@ -81,7 +82,7 @@ function JumpRow({
       {'rel' in mark ? (
         <span className={`dot ${relationshipClass(mark.rel)}`} aria-hidden="true" />
       ) : (
-        <span className={`ic s16 i-${mark.icon}`} aria-hidden="true" />
+        <Icon name={mark.icon} size={16} />
       )}
       <span className="grow admin-jump-text">
         <span className="name">{e.name}</span>

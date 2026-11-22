@@ -1,6 +1,7 @@
 import type { DeliveryView, RealmEvent } from '@csp/shared-types'
 import { describeDelivery, describeEvent, logDays, type EventPlace } from './realm-log.js'
 import { PanelHead } from './drawer-head.js'
+import { Icon } from './Icon.js'
 
 /**
  * What happened in the Player's realm, newest first under a heading for each game day: hunger,
@@ -31,7 +32,7 @@ export function RealmLog({
           <ul className="col realm-log-deliveries" aria-label="Open deliveries">
             {deliveries.map((d) => (
               <li key={d.id} className="fx">
-                <span className="ic s16 i-cart" aria-hidden="true" />
+                <Icon name="cart" size={16} />
                 <span className="grow">{describeDelivery(d)}</span>
               </li>
             ))}

@@ -1,49 +1,13 @@
 import { THEME } from './theme.js'
-
-/** The icons the kit draws, with what each stands for (`.ic.i-<name>`). */
-const ICONS: [string, string][] = [
-  ['food', 'Food'],
-  ['wood', 'Wood'],
-  ['stone', 'Stone'],
-  ['ironore', 'Iron ore'],
-  ['iron', 'Iron'],
-  ['goldore', 'Gold ore'],
-  ['coins', 'Coins'],
-  ['spear', 'Spear'],
-  ['sword', 'Sword'],
-  ['shield', 'Shield'],
-  ['armour', 'Armour'],
-  ['person', 'Resident'],
-  ['crown', 'Leader'],
-  ['horse', 'Horse'],
-  ['cart', 'Carriage'],
-  ['banner', 'Army'],
-  ['city', 'City'],
-  ['scroll', 'Contracts'],
-  ['ally', 'Alliance'],
-  ['medal', 'Standing'],
-  ['code', 'Scripts'],
-  ['book', 'Log, Wiki'],
-  ['key', 'Admin'],
-  ['clock', 'Clock'],
-  ['eye', 'Sight'],
-  ['map', 'Map'],
-  ['heart', 'Health'],
-  ['warn', 'Warning'],
-  ['walk', 'Walk'],
-  ['pick', 'Work'],
-  ['hammer', 'Build'],
-  ['box', 'Storage'],
-  ['plus', 'Add'],
-  ['x', 'Close'],
-  ['check', 'Done'],
-  ['loop', 'Loop'],
-  ['play', 'Run'],
-  ['stop', 'Stop'],
-]
+import type { Good } from '@csp/shared-types'
+import { GoodIcon } from './GoodsGrid.js'
+import { GOOD_LABELS } from './goods-grid.js'
+import { Icon } from './Icon.js'
+import { PIXEL_GOOD } from './map/pixel-art.js'
+import { UI_ICONS, type UiIconName } from './ui-icons.js'
 
 /** The relationship colours (ADR 0008, 0044), each with its token's class. */
-const RELATIONSHIPS: [string, string, string, string][] = [
+const RELATIONSHIPS: [string, string, string, UiIconName][] = [
   ['', 'Yours', 'gold', 'person'],
   ['al', 'Alliance', 'sky', 'person'],
   ['ot', 'Another realm', 'red', 'person'],
@@ -121,7 +85,7 @@ export function Kit() {
               Small
             </button>
             <button type="button" className="btn sq" aria-label="Icon button">
-              <span className="ic i-gear" aria-hidden="true" />
+              <Icon name="settings" />
             </button>
             <button type="button" className="btn lg">
               Phone · 44 px
@@ -227,10 +191,18 @@ export function Kit() {
       <section className="pn kit-wide">
         <h2 className="hd">Icons</h2>
         <div className="sec kit-icons">
-          {ICONS.map(([name, label]) => (
+          {(Object.keys(UI_ICONS) as UiIconName[]).map((name) => (
             <span key={name} className="col kit-icon">
-              <span className={`ic s32 i-${name}`} aria-hidden="true" />
-              {label}
+              <Icon name={name} size={32} />
+              {name}
+            </span>
+          ))}
+        </div>
+        <div className="sec kit-icons">
+          {(Object.keys(PIXEL_GOOD) as Good[]).map((good) => (
+            <span key={good} className="col kit-icon">
+              <GoodIcon good={good} />
+              {GOOD_LABELS[good]}
             </span>
           ))}
         </div>
@@ -242,7 +214,7 @@ export function Kit() {
           {RELATIONSHIPS.map(([kind, label, colour, icon]) => (
             <div key={label} className="fx">
               <span className={`tk ${kind}`}>
-                <span className={`ic i-${icon}`} aria-hidden="true" />
+                <Icon name={icon} />
               </span>
               <span className="grow b">{label}</span>
               <span className="mono mu">{colour}</span>

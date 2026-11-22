@@ -30,6 +30,7 @@ import {
   workshopSteps,
   type WorkshopStep,
 } from './script-workshop-view.js'
+import { Icon } from './Icon.js'
 
 /** How a default script stands against the game's default (`CONTEXT.md`: Default script). */
 const DEFAULT_STATUS: Record<ReturnType<typeof defaultStatus>, string> = {
@@ -344,7 +345,7 @@ export function ScriptLibrary({
         <button type="button" className="btn sm dk" onClick={onClose}>
           « Back to the map<kbd className="k">Esc</kbd>
         </button>
-        <span className="ic s24 i-code" aria-hidden="true" />
+        <Icon name="script" size={24} />
         <h1 className="px t18 workshop-title">Script workshop</h1>
         <span className="grow" />
         <HelpLinks />
@@ -375,7 +376,7 @@ export function ScriptLibrary({
               aria-current={!script || undefined}
               onClick={startNew}
             >
-              <span className="ic s16 i-plus" aria-hidden="true" />
+              <Icon name="add" size={16} />
               New script
             </button>
           </div>

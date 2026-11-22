@@ -153,6 +153,7 @@ import type { PickPreview } from './pick-preview.js'
 import { inBox, pickKey, pickables, toggled, type MapPick, type Point } from './map/selection.js'
 import { LONG_PRESS_MS, TAP_SLOP, longPresses, pressKind } from './map/gestures.js'
 import { controlPickAt, type ControlMode } from './control-mode.js'
+import { Icon } from './Icon.js'
 
 /** No residents selected. */
 const NONE: readonly string[] = []
@@ -1436,7 +1437,7 @@ export function MapView({
               title="Centre on my residents"
               onClick={() => controlsRef.current?.centre()}
             >
-              <span className="ic s16 i-crown" aria-hidden="true" />
+              <Icon name="crown" size={16} />
             </button>
           )}
           {onSelectMany && (

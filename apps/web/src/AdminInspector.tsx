@@ -4,6 +4,7 @@ import { api, ApiFailure } from './api.js'
 import { ADMIN_MAP_REFRESH_MS } from './admin-map.js'
 import { inspectorCard } from './admin-inspector.js'
 import { relationshipClass, type Relationship } from './theme.js'
+import { Icon } from './Icon.js'
 
 /** The card's mark in the theme's colour for the kind of Organization holding it. */
 const ORG_TONE: Record<NonNullable<AdminInspection['org']>['is'], Relationship> = {
@@ -67,7 +68,7 @@ export function AdminInspector({
           aria-label="Close the inspector"
           onClick={onClose}
         >
-          <span className="ic s16 i-x" aria-hidden="true" />
+          <Icon name="close" size={16} />
         </button>
       </div>
       {(card || error) && (

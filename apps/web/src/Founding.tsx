@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { REALM_NAME_MAX_LENGTH, RESIDENT_NAME_MAX_LENGTH } from '@csp/balance'
 import { foundingProblem } from './shared/names.js'
 import { EntryScreen } from './Login.js'
+import { Icon } from './Icon.js'
 
 /**
  * The naming screen of a Player without a realm (first login, or after a Leader death): they name
@@ -37,7 +38,7 @@ export function Founding({
   return (
     <EntryScreen label="Found your realm">
       <h2 className="hd">
-        <span className="ic s24 i-crown" aria-hidden="true" />
+        <Icon name="crown" size={24} />
         <span className="grow">Found your realm</span>
       </h2>
       <form onSubmit={submit} className="login-form">
@@ -93,7 +94,7 @@ export function RealmEnded() {
         aria-label="Your realm has ended"
       >
         <h2 className="hd">
-          <span className="ic s24 i-warn" aria-hidden="true" />
+          <Icon name="warning" size={24} />
           <span className="grow">Your realm has ended</span>
         </h2>
         <p>

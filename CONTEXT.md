@@ -2146,9 +2146,10 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   order, list and form stays what it was.
 - **Pixel frontier:** the look of the whole UI (ADR 0044): panels, buttons and type drawn like
   Daniel's pixel art, in its palette, with hard edges and no rounded corners or blur. One look for
-  every Player; the Art style picks only how the map and the goods icons are drawn. A UI icon
-  (a sidebar tab, an order, a mark) comes from the `ui` sheet of `art/pixel`, and one not drawn
-  yet shows a placeholder drawn in code.
+  every Player; the Art style picks only how the map is drawn. A UI icon (a sidebar tab, an order,
+  a mark) comes from the `ui` sheet of `art/pixel`, and one not drawn yet shows a placeholder
+  drawn in code. A good's icon in the UI comes from the pixel goods sheet whatever the Art style;
+  a good not drawn yet keeps its line icon.
 - **Resident card:** what the UI shows for a picked resident (and, laid out the same, a group or
   an army): a header that always shows (name, Doing, hunger and health, what they carry) and one
   open tab under it: Orders, Queue, Stats or Script. Orders are grouped by kind (Move, Work &
@@ -2157,8 +2158,7 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   becomes possible is added at the end of its group, and the rows are sorted afresh only when
   something else is picked (ADR 0019). A group card has the same rows, with the group's own
   reasons.
-- **Art style:** how the map and the goods icons are drawn, picked by the Player in the map's
-  legend and remembered per browser (ADR 0043): **Tokens** (line art only), **Painted** (painted
+- **Art style:** how the map is drawn, picked by the Player in the map's legend and remembered per browser (ADR 0043): **Tokens** (line art only), **Painted** (painted
   sprites where there are some, tokens otherwise) or **Pixel** (Daniel's pixel art, and the
   Painted look for whatever has none yet; the default since ADR 0044, for whoever hasn't picked
   one). It changes nothing in the world. In Pixel,

@@ -21,6 +21,7 @@ import { PanelHead } from './drawer-head.js'
 import { CommandBar } from './CommandBar.js'
 import { CardTabs } from './SelectionCard.js'
 import { relationshipClass } from './theme.js'
+import { Icon } from './Icon.js'
 
 /** An army order that needs a tile, picked on the map. */
 export type ArmyPick = { armyId: string; kind: 'armyWalkTo' | 'armyGuard' }
@@ -105,7 +106,7 @@ export function ArmiesPanel({
                   title={open ? `Close ${a.name}` : `Open ${a.name}`}
                   onClick={() => onOpen(open ? undefined : a.id)}
                 >
-                  <span className="ic i-banner" aria-hidden="true" />
+                  <Icon name="banner" />
                   <span className="grow">
                     <span className="b">{a.name}</span>
                     <span className="under">{armyDoing(a, names)}</span>
@@ -242,7 +243,7 @@ export function ArmyCard({
   return (
     <CommandBar
       rel="own"
-      icon="i-banner"
+      icon="banner"
       title={a.name}
       lines={[<strong key="doing">{armyDoing(a, names)}</strong>]}
       head={

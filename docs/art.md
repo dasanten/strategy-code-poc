@@ -179,6 +179,7 @@ the **Pixel** art style (`CONTEXT.md`: Art style); whatever isn't drawn yet keep
 | `units.aseprite`     | Horse, carriage (alone and hitched), caravan, banner, vessels, siege machines    |
 | `goods.aseprite`     | One icon per good                                                                |
 | `resident.aseprite`  | One figure; a layer each for the body, the Leader's crown and each piece of gear |
+| `ui.aseprite`        | The UI icons (ADR 0044), one tile each (below)                                   |
 
 Each sheet has a locked `guide` layer (never exported), an `art` layer, and optionally a `tint`
 layer. Each asset is a **named slice** (Slice tool, Shift+C); the name is what the code asks for.
@@ -201,6 +202,25 @@ layer. Each asset is a **named slice** (Slice tool, Shift+C); the name is what t
 - **Gear on the resident:** a layer named after the good (`sword`, `shield`, `armour`, `spear`,
   `bow`, `crossbow`), and `steel-…` for a steel one that should look different. Steel without a
   layer of its own shows the iron layer; gear with no layer at all keeps its small mark.
+- **UI icons** are 16×16, drawn for a dark bar and for parchment alike (a dark outline helps),
+  and shown at 16, 20, 24, 32 and 48 px, so whole pixels only.
+
+### The `ui` sheet
+
+One slice per UI icon, named for what it means. The game draws each from its slice once something
+is drawn in it, and until then a placeholder (`apps/web/src/assets/ui/sprites.svg`).
+
+| Row               | Slices                                                                                               |
+| ----------------- | ---------------------------------------------------------------------------------------------------- |
+| Sidebar tabs      | `residents` `horses` `armies` `diplomacy` `cities` `waypoints` `scripts` `realm-log`                 |
+| Diplomacy's tabs  | `contracts` `demands` `direct-offers` `alliance` `standing`                                          |
+| Orders and steps  | `walk` `gather` `build` `goods` `script`                                                             |
+| Actions and marks | `close` `add` `check` `warning` `loop` `run` `stop` `clock` `find` `settings` `sight` `map` `health` |
+| Things            | `crown` `banner` `city` `key` `book`                                                                 |
+
+The resident, a horse, a carriage, a caravan and a sword in the UI come from the resident, units
+and goods sheets, and a good's icon from the goods sheet, whatever the map's Art style; a good not
+drawn yet keeps its line icon.
 
 ### Exporting
 
@@ -217,4 +237,5 @@ of half-finished sheets is fine.
 
 Draw it in a new slice, and if the code doesn't know the name yet, add it to
 `apps/web/src/map/pixel-art.ts`. A different look by state (as the open gate or the hitched
-carriage) is a slice of its own that the code picks.
+carriage) is a slice of its own that the code picks. A new UI icon goes in `UI_ICONS` in
+`apps/web/src/ui-icons.ts`, with a placeholder cell if it has one.

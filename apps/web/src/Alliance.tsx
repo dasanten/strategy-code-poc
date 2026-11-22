@@ -12,6 +12,7 @@ import type {
 import { GroupHead } from './diplomacy-parts.js'
 import { PanelHead } from './drawer-head.js'
 import { relationshipClass } from './theme.js'
+import { Icon } from './Icon.js'
 
 /**
  * The Player's alliance (`CONTEXT.md`: Alliance, Alliance leader): found one or answer
@@ -273,10 +274,7 @@ function AllianceArmy({
         <ul className="col dip-members">
           {army.map((p) => (
             <li key={p.id} className="fx wrap">
-              <span
-                className={`ic s16 ${p.is === 'resident' ? 'i-sword' : 'i-cart'}`}
-                aria-hidden="true"
-              />
+              <Icon name={p.is === 'resident' ? 'sword' : 'cart'} size={16} />
               <span className="grow">{nameOf(p)}</span>
               <span className={p.realmId === realmId ? 'chip y' : 'chip bl'}>
                 {p.realmId === realmId ? 'yours' : `realm of ${p.realm}`}

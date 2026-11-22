@@ -26,7 +26,7 @@
              .rw (row) with .sel .grp; .tb (table) with .n cells; .dot; .sw (swatch)
    code      .code with .c .kw .s .n .e .ln
    map       .tk (token) with .al .ot .np .tr .sel; .cnt (count); .tag (name tag)
-   icons     .ic with .s16 .s24 .s32 .s48 and .i-<name>
+   icons     .ic with .s16 .s24 .s32 .s48, drawn by the Icon component (Icon.tsx)
    owner     .rel-own .rel-alliance .rel-other-realm .rel-npc-city .rel-trade-org set
              --rel (mark) and --rel-text (words) for what is inside */
 
@@ -677,20 +677,21 @@ label > select {
   white-space: nowrap;
 }
 
-/* ---------- Icons: 16 px cells, scaled by --s ----------
-   Placeholders on one sheet (10 x 4 cells) until the ui sheet is drawn; goods, units and the
-   resident come from Daniel's pixel sheets (`assets/pixel`). */
+/* ---------- Icons: the Icon component (`Icon.tsx`) puts a sheet's 16 px cell in an svg ----------
+   Sized by --s: 20 px unless .s16 .s24 .s32 .s48; the art scales pixel for pixel. */
 .ic {
   --s: 20px;
-  --c: 0;
-  --r: 0;
   display: inline-block;
   flex: none;
   width: var(--s);
   height: var(--s);
-  background: url('../assets/ui/sprites.svg') calc(var(--s) * -1 * var(--c))
-    calc(var(--s) * -1 * var(--r)) / calc(var(--s) * 10) calc(var(--s) * 4) no-repeat;
   image-rendering: pixelated;
+}
+.ic > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 .ic.s16 {
   --s: 16px;
@@ -703,241 +704,6 @@ label > select {
 }
 .ic.s48 {
   --s: 48px;
-}
-.i-crown {
-  --r: 1;
-  --c: 2;
-}
-.i-banner {
-  --r: 1;
-  --c: 5;
-}
-.i-city {
-  --r: 1;
-  --c: 6;
-}
-.i-scroll {
-  --r: 1;
-  --c: 7;
-}
-.i-ally {
-  --r: 1;
-  --c: 8;
-}
-.i-medal {
-  --r: 1;
-  --c: 9;
-}
-.i-code {
-  --r: 2;
-}
-.i-book {
-  --r: 2;
-  --c: 1;
-}
-.i-key {
-  --r: 2;
-  --c: 2;
-}
-.i-find {
-  --r: 2;
-  --c: 3;
-}
-.i-clock {
-  --r: 2;
-  --c: 4;
-}
-.i-gear {
-  --r: 2;
-  --c: 5;
-}
-.i-eye {
-  --r: 2;
-  --c: 6;
-}
-.i-map {
-  --r: 2;
-  --c: 7;
-}
-.i-heart {
-  --r: 2;
-  --c: 8;
-}
-.i-warn {
-  --r: 2;
-  --c: 9;
-}
-.i-walk {
-  --r: 3;
-}
-.i-pick {
-  --r: 3;
-  --c: 1;
-}
-.i-hammer {
-  --r: 3;
-  --c: 2;
-}
-.i-box {
-  --r: 3;
-  --c: 3;
-}
-.i-plus {
-  --r: 3;
-  --c: 4;
-}
-.i-x {
-  --r: 3;
-  --c: 5;
-}
-.i-check {
-  --r: 3;
-  --c: 6;
-}
-.i-loop {
-  --r: 3;
-  --c: 7;
-}
-.i-play {
-  --r: 3;
-  --c: 8;
-}
-.i-stop {
-  --r: 3;
-  --c: 9;
-}
-/* Goods (`goods.png`, 19 x 7 cells), units (`units.png`, 13 x 6) and the resident (`resident.png`). */
-.i-food,
-.i-wood,
-.i-stone,
-.i-ironore,
-.i-iron,
-.i-goldore,
-.i-coal,
-.i-steel,
-.i-coins,
-.i-spear,
-.i-sword,
-.i-shield,
-.i-armour,
-.i-steelsword,
-.i-steelshield,
-.i-steelarmour,
-.i-bow,
-.i-crossbow,
-.i-arrows {
-  background-image: url('../assets/pixel/goods.png');
-  background-size: calc(var(--s) * 19) calc(var(--s) * 7);
-}
-.i-food {
-  --c: 1;
-  --r: 1;
-}
-.i-wood {
-  --c: 3;
-  --r: 1;
-}
-.i-stone {
-  --c: 5;
-  --r: 1;
-}
-.i-ironore {
-  --c: 7;
-  --r: 1;
-}
-.i-iron {
-  --c: 9;
-  --r: 1;
-}
-.i-goldore {
-  --c: 11;
-  --r: 1;
-}
-.i-coal {
-  --c: 13;
-  --r: 1;
-}
-.i-steel {
-  --c: 15;
-  --r: 1;
-}
-.i-coins {
-  --c: 17;
-  --r: 1;
-}
-.i-spear {
-  --c: 1;
-  --r: 3;
-}
-.i-sword {
-  --c: 3;
-  --r: 3;
-}
-.i-shield {
-  --c: 5;
-  --r: 3;
-}
-.i-armour {
-  --c: 7;
-  --r: 3;
-}
-.i-steelsword {
-  --c: 9;
-  --r: 3;
-}
-.i-steelshield {
-  --c: 11;
-  --r: 3;
-}
-.i-steelarmour {
-  --c: 13;
-  --r: 3;
-}
-.i-bow {
-  --c: 1;
-  --r: 5;
-}
-.i-crossbow {
-  --c: 3;
-  --r: 5;
-}
-.i-arrows {
-  --c: 5;
-  --r: 5;
-}
-.i-horse,
-.i-cart,
-.i-caravan,
-.i-boat,
-.i-ship {
-  background-image: url('../assets/pixel/units.png');
-  background-size: calc(var(--s) * 13) calc(var(--s) * 6);
-}
-.i-horse {
-  --c: 1;
-  --r: 1;
-}
-.i-cart {
-  --c: 3;
-  --r: 1;
-}
-.i-caravan {
-  --c: 5;
-  --r: 1;
-}
-.i-boat {
-  --c: 9;
-  --r: 1;
-}
-.i-ship {
-  --c: 11;
-  --r: 1;
-}
-.i-person {
-  --c: 0;
-  --r: 0;
-  background-image: url('../assets/pixel/resident.png');
-  background-size: calc(var(--s) * 7) var(--s);
 }
 
 /* ---------- Owner: what is inside takes the relationship's colours (`relationshipClass`) ---------- */

@@ -254,6 +254,8 @@ import {
   type ActionId,
   type CardAction,
 } from './selection-view.js'
+import { Icon } from './Icon.js'
+import type { UiIconName } from './ui-icons.js'
 
 export { GOOD_LABELS }
 
@@ -825,7 +827,7 @@ export function QueueBlock({
         data-depth={depth}
       >
         <div className="queue-bracket-head" {...rowProps(id)}>
-          <span className="ic s16 i-loop queue-step-icon" aria-hidden="true" />
+          <Icon name="loop" size={16} className="queue-step-icon" />
           <RepeatCount
             repeat={block.repeat}
             steps={stepCount(block.items)}
@@ -853,7 +855,7 @@ export function QueueBlock({
               aria-label="Remove the block and its steps"
               onClick={() => edit(removeItem(q.items, id))}
             >
-              <span className="ic s16 i-x" aria-hidden="true" />
+              <Icon name="close" size={16} />
             </button>
           </span>
         </div>
@@ -916,7 +918,7 @@ export function QueueBlock({
               aria-label="Remove the block and its steps"
               onClick={() => edit(removeItem(q.items, id))}
             >
-              <span className="ic s16 i-x" aria-hidden="true" />
+              <Icon name="close" size={16} />
             </button>
           </span>
         </div>
@@ -947,7 +949,7 @@ export function QueueBlock({
         {...rowProps(id)}
       >
         <div className="queue-step-head">
-          <span className={`ic s16 queue-step-icon ${STEP_ICONS[step.group]}`} aria-hidden="true" />
+          <Icon name={STEP_ICONS[step.group]} size={16} className="queue-step-icon" />
           <span
             className="small queue-step-label"
             title={step.gone ? `${step.gone}: it will be skipped` : step.label}
@@ -965,7 +967,7 @@ export function QueueBlock({
               aria-label="Remove"
               onClick={() => edit(removeItem(q.items, id))}
             >
-              <span className="ic s16 i-x" aria-hidden="true" />
+              <Icon name="close" size={16} />
             </button>
           </span>
         </div>
@@ -1280,13 +1282,13 @@ export function GivePlan({
   )
 }
 
-/** A step's icon (the kit's `.i-…` class) by the kind of order it is, as the Orders tab groups them. */
-const STEP_ICONS: Record<StepGroup, string> = {
-  move: 'i-walk',
-  work: 'i-hammer',
-  goods: 'i-box',
-  scripts: 'i-code',
-  flow: 'i-clock',
+/** A step's UI icon by the kind of order it is, as the Orders tab groups them. */
+const STEP_ICONS: Record<StepGroup, UiIconName> = {
+  move: 'walk',
+  work: 'build',
+  goods: 'goods',
+  scripts: 'script',
+  flow: 'clock',
 }
 
 /**
@@ -3996,7 +3998,7 @@ function WorkBlock({
             )
           })}
           <div className="fx work-recipe">
-            <span className="ic s16 i-hammer" aria-hidden="true" />
+            <Icon name="build" size={16} />
             <span className="grow">
               <strong>Mend</strong>{' '}
               <span className="muted small">· worn gear here, for a share of its recipe</span>
