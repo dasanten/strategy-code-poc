@@ -4,33 +4,36 @@ import type { Building } from '@csp/shared-types'
 import { centreBeside, tileToScreen } from './map/camera.js'
 import {
   DIPLOMACY_TABS,
-  DRAWERS,
-  DRAWER_WIDTH,
-  NO_DRAWER,
+  FOLDED,
+  SIDEBAR_GROUPS,
+  SIDE_TABS,
+  SIDE_WIDTH,
   MIN_OPEN_MAP,
-  drawerWidth,
+  foldOrUnfold,
   goodsLabel,
   goodsOldText,
   goodsPickCities,
   goodsPickOf,
-  RAIL_GROUPS,
-  railGroups,
-  rememberGoodsPick,
-  rememberedDrawerWidth,
-  rememberedGoodsPick,
   isWide,
   keyGoods,
   openDiplomacy,
-  showsTab,
-  withOpen,
+  rememberGoodsPick,
+  rememberedGoodsPick,
+  rememberedSideWidth,
+  rememberedSidebar,
   showBeside,
-  toggleDrawer,
-  type OpenDrawer,
+  showsTab,
+  sideWidth,
+  sidebarGroups,
+  sidebarToKeep,
+  toggleTab,
+  withOpen,
+  type OpenTab,
 } from './hud-view.js'
 
-describe('drawers', () => {
-  it('has a drawer for every tool on the rail, once each', () => {
-    const labels = DRAWERS.map((d) => d.label)
+describe('the sidebar', () => {
+  it('has a tab for every drawer the tool rail had, once each', () => {
+    const labels = SIDE_TABS.map((t) => t.label)
     for (const tool of [
       'Residents',
       'Horses',
@@ -42,24 +45,22 @@ describe('drawers', () => {
       'Realm log',
     ])
       expect(labels).toContain(tool)
-    expect(new Set(DRAWERS.map((d) => d.id)).size).toBe(DRAWERS.length)
+    expect(new Set(SIDE_TABS.map((t) => t.id)).size).toBe(SIDE_TABS.length)
   })
 
-  it('puts every drawer in exactly one group, in rail order', () => {
-    const groups = railGroups()
-    expect(groups.map((g) => g.id)).toEqual(RAIL_GROUPS.map((g) => g.id))
-    expect(groups.flatMap((g) => g.drawers.map((d) => d.id))).toEqual(DRAWERS.map((d) => d.id))
-    expect(Object.fromEntries(groups.map((g) => [g.label, g.drawers.map((d) => d.label)]))).toEqual(
-      {
-        People: ['Residents', 'Horses', 'Armies'],
-        Diplomacy: ['Diplomacy'],
-        Realm: ['Cities', 'Waypoints', 'Scripts', 'Realm log'],
-      },
-    )
+  it('puts every tab in exactly one group, in the tool rail order', () => {
+    const groups = sidebarGroups()
+    expect(groups.map((g) => g.id)).toEqual(SIDEBAR_GROUPS.map((g) => g.id))
+    expect(groups.flatMap((g) => g.tabs.map((t) => t.id))).toEqual(SIDE_TABS.map((t) => t.id))
+    expect(Object.fromEntries(groups.map((g) => [g.label, g.tabs.map((t) => t.label)]))).toEqual({
+      People: ['Residents', 'Horses', 'Armies'],
+      Diplomacy: ['Diplomacy'],
+      Realm: ['Cities', 'Waypoints', 'Scripts', 'Realm log'],
+    })
   })
 
-  it('has one Diplomacy drawer, with a tab each for its five parts', () => {
-    expect(DRAWERS.filter((d) => d.group === 'diplomacy').map((d) => d.id)).toEqual(['diplomacy'])
+  it('has one Diplomacy tab, with a tab of its own for each of its five parts', () => {
+    expect(SIDE_TABS.filter((t) => t.group === 'diplomacy').map((t) => t.id)).toEqual(['diplomacy'])
     expect(DIPLOMACY_TABS.map((t) => t.label)).toEqual([
       'Contracts',
       'Demands',
@@ -69,53 +70,91 @@ describe('drawers', () => {
     ])
   })
 
-  it('starts the Diplomacy drawer on its first tab', () => {
-    expect(withOpen(NO_DRAWER, 'diplomacy')).toEqual({ open: 'diplomacy', tab: 'contracts' })
+  it('starts folded, and the Diplomacy tab on its first tab', () => {
+    expect(FOLDED.open).toBeUndefined()
+    expect(withOpen(FOLDED, 'diplomacy')).toMatchObject({ open: 'diplomacy', tab: 'contracts' })
   })
 
   it("lands a notice's Open on its tab, whatever was open before", () => {
-    const demands = openDiplomacy('demands')
-    expect(demands).toEqual({ open: 'diplomacy', tab: 'demands' })
+    const demands = openDiplomacy(withOpen(FOLDED, 'cities'), 'demands')
+    expect(demands).toMatchObject({ open: 'diplomacy', tab: 'demands' })
     expect(showsTab(demands, 'demands')).toBe(true)
     expect(showsTab(demands, 'directOffers')).toBe(false)
-    const offers = openDiplomacy('directOffers')
+    const offers = openDiplomacy(FOLDED, 'directOffers')
     expect(showsTab(offers, 'directOffers')).toBe(true)
     expect(showsTab(offers, 'demands')).toBe(false)
   })
 
-  it('remembers the Diplomacy tab while the drawer is closed or another is open', () => {
-    let drawers = openDiplomacy('standing')
-    drawers = withOpen(drawers, undefined)
-    expect(showsTab(drawers, 'standing')).toBe(false)
-    drawers = withOpen(drawers, toggleDrawer(drawers.open, 'residents'))
-    drawers = withOpen(drawers, toggleDrawer(drawers.open, 'diplomacy'))
-    expect(drawers).toEqual({ open: 'diplomacy', tab: 'standing' })
-    expect(showsTab(drawers, 'standing')).toBe(true)
+  it('remembers the Diplomacy tab while folded or another tab is open', () => {
+    let sidebar = openDiplomacy(FOLDED, 'standing')
+    sidebar = withOpen(sidebar, undefined)
+    expect(showsTab(sidebar, 'standing')).toBe(false)
+    sidebar = withOpen(sidebar, toggleTab(sidebar.open, 'residents'))
+    sidebar = withOpen(sidebar, toggleTab(sidebar.open, 'diplomacy'))
+    expect(sidebar).toMatchObject({ open: 'diplomacy', tab: 'standing' })
+    expect(showsTab(sidebar, 'standing')).toBe(true)
   })
 
-  it('opens the clicked drawer when none is open', () => {
-    expect(toggleDrawer(undefined, 'armies')).toBe('armies')
+  it('opens the clicked tab while folded', () => {
+    expect(toggleTab(undefined, 'armies')).toBe('armies')
   })
 
-  it('closes the open drawer when its button is clicked again', () => {
-    expect(toggleDrawer('armies', 'armies')).toBeUndefined()
+  it("folds when the open tab's button is clicked again", () => {
+    expect(toggleTab('armies', 'armies')).toBeUndefined()
   })
 
-  it('keeps one drawer open at a time: another button swaps it', () => {
-    let open: OpenDrawer = undefined
-    open = toggleDrawer(open, 'residents')
-    open = toggleDrawer(open, 'realmLog')
+  it('keeps one tab open at a time: another button swaps it', () => {
+    let open: OpenTab = undefined
+    open = toggleTab(open, 'residents')
+    open = toggleTab(open, 'realmLog')
     expect(open).toBe('realmLog')
-    open = toggleDrawer(open, 'residents')
+    open = toggleTab(open, 'residents')
     expect(open).toBe('residents')
   })
 
-  it('makes only the Scripts drawer wide', () => {
-    expect(DRAWERS.filter((d) => isWide(d.id)).map((d) => d.id)).toEqual(['scripts'])
+  it('folds to its strip with the fold button, and unfolds to the tab open last', () => {
+    const open = withOpen(FOLDED, 'waypoints')
+    const folded = foldOrUnfold(open)
+    expect(folded.open).toBeUndefined()
+    expect(foldOrUnfold(folded).open).toBe('waypoints')
+    // Escape or the open tab's button fold it as well; it still unfolds to that tab.
+    expect(foldOrUnfold(withOpen(withOpen(FOLDED, 'cities'), undefined)).open).toBe('cities')
+    // Never opened: it unfolds to the first tab.
+    expect(foldOrUnfold(FOLDED).open).toBe('residents')
   })
 
-  it('centres a resident picked in the drawer in the map left free beside the drawer and card', () => {
-    // The Residents drawer covers 428 px on the left, the card 372 px on the right, of 1280.
+  it('opens wide only for Scripts', () => {
+    expect(SIDE_TABS.filter((t) => isWide(t.id)).map((t) => t.id)).toEqual(['scripts'])
+  })
+
+  describe('across a reload', () => {
+    it('comes back open on the tab it was open on', () => {
+      const kept = sidebarToKeep(withOpen(FOLDED, 'realmLog'))
+      expect(rememberedSidebar(kept)).toMatchObject({ open: 'realmLog', last: 'realmLog' })
+    })
+
+    it('comes back folded, unfolding to the tab open last', () => {
+      const kept = sidebarToKeep(withOpen(withOpen(FOLDED, 'horses'), undefined))
+      const sidebar = rememberedSidebar(kept)
+      expect(sidebar.open).toBeUndefined()
+      expect(foldOrUnfold(sidebar).open).toBe('horses')
+    })
+
+    it('starts folded on a phone, where a tab covers the map', () => {
+      const kept = sidebarToKeep(withOpen(FOLDED, 'cities'))
+      expect(rememberedSidebar(kept, true)).toMatchObject({ open: undefined, last: 'cities' })
+    })
+
+    it('starts folded with nothing kept, or nonsense', () => {
+      expect(rememberedSidebar(null)).toEqual(FOLDED)
+      expect(rememberedSidebar('{')).toEqual(FOLDED)
+      expect(rememberedSidebar('"residents"')).toEqual(FOLDED)
+      expect(rememberedSidebar('{"open":"gone","last":"gone"}')).toEqual(FOLDED)
+    })
+  })
+
+  it('centres a resident picked in the sidebar in the map left free beside it and the card', () => {
+    // The Residents tab covers 428 px on the left, the card 372 px on the right, of 1280.
     const view = { width: 1280, height: 800 }
     const cover = showBeside(view.width, 428, 372)
     expect(cover.closeDrawer).toBe(false)
@@ -126,22 +165,26 @@ describe('drawers', () => {
     expect(sy).toBe(400)
   })
 
-  it('shows a place between the open drawer and the card', () => {
+  it('shows a place between the open sidebar and the card', () => {
     expect(showBeside(1280, 0, 0)).toEqual({ left: 0, right: 0, closeDrawer: false })
     expect(showBeside(1280, 428, 0)).toEqual({ left: 428, right: 0, closeDrawer: false })
     expect(showBeside(1024, 428, 372)).toEqual({ left: 428, right: 372, closeDrawer: false })
     const room = 1024 - 428 - MIN_OPEN_MAP
     expect(showBeside(1024, 428, room)).toEqual({ left: 428, right: room, closeDrawer: false })
+    // Folded, the strip alone covers the map's left edge.
+    expect(showBeside(1280, 56, 372, 56)).toEqual({ left: 56, right: 372, closeDrawer: false })
   })
 
-  it('closes a drawer that leaves too little map, and uses the whole screen if need be', () => {
-    // Drawer and card leave 100 px: without the drawer there is room beside the card.
+  it('folds a sidebar that leaves too little map, and uses the whole screen if need be', () => {
+    // Sidebar and card leave 100 px: folded to the strip there is room beside the card.
     expect(showBeside(900, 428, 372)).toEqual({ left: 0, right: 372, closeDrawer: true })
-    // A phone: the drawer covers the map, and the card nearly all of it.
+    expect(showBeside(900, 428, 372, 56)).toEqual({ left: 56, right: 372, closeDrawer: true })
+    // A phone: the tab covers the map, and the card nearly all of it.
     expect(showBeside(375, 375, 0)).toEqual({ left: 0, right: 0, closeDrawer: true })
     expect(showBeside(375, 375, 351)).toEqual({ left: 0, right: 0, closeDrawer: true })
-    // No drawer open and a card that leaves too little: the whole screen.
+    // Folded already and a card that leaves too little: the whole screen.
     expect(showBeside(375, 0, 351)).toEqual({ left: 0, right: 0, closeDrawer: false })
+    expect(showBeside(500, 56, 351, 56)).toEqual({ left: 0, right: 0, closeDrawer: false })
   })
 })
 
@@ -339,23 +382,23 @@ describe('goods in the top bar', () => {
   })
 })
 
-describe('drawer width', () => {
+describe('sidebar width', () => {
   it('keeps a dragged width within the limits', () => {
-    expect(drawerWidth(DRAWER_WIDTH.min - 100)).toBe(DRAWER_WIDTH.min)
-    expect(drawerWidth(DRAWER_WIDTH.max + 100)).toBe(DRAWER_WIDTH.max)
-    expect(drawerWidth(450.6)).toBe(451)
-    expect(drawerWidth(Number.NaN)).toBe(DRAWER_WIDTH.initial)
+    expect(sideWidth(SIDE_WIDTH.min - 100)).toBe(SIDE_WIDTH.min)
+    expect(sideWidth(SIDE_WIDTH.max + 100)).toBe(SIDE_WIDTH.max)
+    expect(sideWidth(450.6)).toBe(451)
+    expect(sideWidth(Number.NaN)).toBe(SIDE_WIDTH.initial)
   })
 
   it('starts at the initial width the limits allow', () => {
-    expect(DRAWER_WIDTH.initial).toBeGreaterThanOrEqual(DRAWER_WIDTH.min)
-    expect(DRAWER_WIDTH.initial).toBeLessThanOrEqual(DRAWER_WIDTH.max)
+    expect(SIDE_WIDTH.initial).toBeGreaterThanOrEqual(SIDE_WIDTH.min)
+    expect(SIDE_WIDTH.initial).toBeLessThanOrEqual(SIDE_WIDTH.max)
   })
 
   it('falls back to the initial width without a remembered one', () => {
-    expect(rememberedDrawerWidth(null)).toBe(DRAWER_WIDTH.initial)
-    expect(rememberedDrawerWidth('wide')).toBe(DRAWER_WIDTH.initial)
-    expect(rememberedDrawerWidth('500')).toBe(500)
-    expect(rememberedDrawerWidth('9999')).toBe(DRAWER_WIDTH.max)
+    expect(rememberedSideWidth(null)).toBe(SIDE_WIDTH.initial)
+    expect(rememberedSideWidth('wide')).toBe(SIDE_WIDTH.initial)
+    expect(rememberedSideWidth('500')).toBe(500)
+    expect(rememberedSideWidth('9999')).toBe(SIDE_WIDTH.max)
   })
 })
