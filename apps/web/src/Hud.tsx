@@ -28,6 +28,7 @@ import {
   type KeyGood,
   type OpenTab,
 } from './hud-view.js'
+import { dockCovers } from './dock-view.js'
 import { groupSentLine, type Skipped } from './group-orders.js'
 import {
   FIRST_DAY_RALLY_TIP,
@@ -622,21 +623,22 @@ export function DiplomacyTabs({
 
 /**
  * How many pixels of the map the sidebar covers from the left (its strip alone while folded) and
- * the selection card from the right, 0 for each that isn't showing; and how many the strip alone
+ * the cards in the dock from the right, 0 for each that isn't showing; and how many the strip alone
  * covers, all the sidebar leaves when folded. The map fills the window, so screen edges measure it.
  */
 export function mapCovered(): { left: number; right: number; strip: number } {
   // A bottom sheet and the command bar (`.game-command`) cover the bottom of the map, not its right
-  // side; a hidden card none of it. Only a tile card or realm order card covers the right.
-  const card = document
-    .querySelector('.game-selection:not(.sheet):not([hidden])')
-    ?.getBoundingClientRect()
+  // side; a hidden card none of it. Only the cards in the dock (`Dock`: a tile card, the who-list,
+  // a realm order card) cover the right; the empty dock lets the map through.
+  const docked = [...document.querySelectorAll('.game-dock > :not([hidden])')].map(
+    (el) => el.getBoundingClientRect().left,
+  )
   // A folded sidebar on a phone isn't drawn, and measures 0.
   const side = document.querySelector('.side')?.getBoundingClientRect()
   const strip = document.querySelector('.side-strip')?.getBoundingClientRect()
   return {
     left: side?.right ?? 0,
-    right: card ? window.innerWidth - card.left : 0,
+    right: dockCovers(docked, window.innerWidth),
     strip: strip && strip.width > 0 ? strip.right : 0,
   }
 }
@@ -794,7 +796,7 @@ export function NoticeLane({ phone, children }: { phone: boolean; children: Reac
     if (!lane || !w) return
     w.disconnect()
     w.observe(lane)
-    for (const el of document.querySelectorAll('.side, .game-selection')) w.observe(el)
+    for (const el of document.querySelectorAll('.side, .game-dock > *')) w.observe(el)
   })
   return (
     <div
