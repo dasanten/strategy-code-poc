@@ -44,18 +44,25 @@
   height: 26px;
   padding: 0;
   border: 0;
+  border-bottom: 2px solid var(--ink);
   box-shadow: none;
-  background: var(--ui-panel);
+  /* The artboard's (`Phone-Card`): a clay strip with an ink grip. */
+  background: var(--clay);
   cursor: ns-resize;
   touch-action: none;
 }
+.sheet-handle:hover:not(:disabled) {
+  background: var(--clay);
+}
 .sheet-handle:disabled {
   cursor: default;
+  border-style: solid;
+  background: var(--clay);
 }
 .sheet-handle span {
-  width: 40px;
-  height: 4px;
-  background: var(--ui-line-strong);
+  width: 48px;
+  height: 6px;
+  background: var(--ink);
 }
 .game-selection.sheet .sel-card {
   flex: 1 1 auto;
@@ -906,10 +913,10 @@ button.card-list-row:hover {
 .who-actions {
   margin-top: 8px;
 }
-/* On a phone above the map buttons and the minimap button, clear of the notices up top: no
-   heading, the hint small, the orders in as few rows as fit. */
+/* On a phone above the map's buttons (and the minimap, when open), which `RealmBar` measures into
+   `--map-dock-h`: no heading, the hint small, the orders a finger's size in as few rows as fit. */
 .game.phone .realm-bar {
-  bottom: calc(var(--sheet-h, 0px) + 12px + 44px + 6px + 36px + 8px);
+  bottom: calc(var(--sheet-h, 0px) + 8px + var(--map-dock-h, 58px));
   right: 8px;
   gap: 4px;
   padding: 6px 8px;
@@ -924,9 +931,9 @@ button.card-list-row:hover {
   gap: 4px;
 }
 .game.phone .realm-bar-orders .btn.lg {
-  height: 36px;
-  padding: 0 8px;
-  font-size: 13px;
+  height: 44px;
+  padding: 0 10px;
+  font-size: 14px;
 }
 
 /* ---------- The command bar (`CONTEXT.md`: Screen; `CommandBar.tsx`, ADR 0044) ----------
@@ -1150,6 +1157,35 @@ button.card-list-row:hover {
 }
 .game-selection.sheet .cmd-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* A finger's size in the sheet (artboard `Phone-Card`): the tabs 44 px (the open one 48), ✕,
+   each order and its Customise, a tile card's rows and fields. */
+.game-selection.sheet .sel-tabs [role='tab'] {
+  height: 44px;
+  font-size: 14px;
+}
+.game-selection.sheet .sel-tabs [aria-selected='true'] {
+  height: 48px;
+}
+.game-selection.sheet :is(.cmd-close, .sel-close, .opanel-head .btn.sq) {
+  width: 44px;
+  height: 44px;
+}
+.game-selection.sheet .cmd-order > :is(button, .customise) {
+  min-height: 44px;
+}
+.game-selection.sheet .sel-card :is(button, select, input:not([type='checkbox'], [type='radio'])),
+.game-selection.sheet .cmd-status :is(button, select) {
+  min-height: 44px;
+}
+/* At 16px a phone doesn't zoom the page when the field takes focus. */
+.game-selection.sheet :is(select, input:not([type='checkbox'], [type='radio']), textarea) {
+  font-size: 16px;
+}
+/* The who-list's rows, ticked with a finger. */
+.game-selection.sheet .who-row label {
+  min-height: 44px;
+  box-sizing: border-box;
 }
 
 /* Order panels: shell, goods, gear, move, people (T119.8)
@@ -1386,7 +1422,23 @@ button.card-list-row:hover {
 .game-selection.sheet .opanel-body button,
 .game-selection.sheet .opanel-body select,
 .game-selection.sheet .opanel-body input:not([type='checkbox']) {
-  min-height: 40px;
+  min-height: 44px;
+}
+/* The Build menu in the sheet: each group across the sheet, its kinds in even columns, so no
+   group is squeezed beside another into a column of one. */
+.game-selection.sheet .build-group {
+  flex: 1 1 100%;
+}
+.game-selection.sheet .build-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+}
+.game-selection.sheet .build-grid .build-kind.btn {
+  width: auto;
+}
+/* A confirm row in the sheet (`PanelFoot`, also on a tile card): a finger's size. */
+.game-selection.sheet .opanel-confirm > button {
+  min-height: 44px;
 }
 /* Dock: tile cards (T119.5) ----------
    The dock on the right (`Dock`, ADR 0044; artboard Card-Tile): tile cards, the who-list and
@@ -1397,6 +1449,16 @@ button.card-list-row:hover {
    through to the map. On a phone there is no dock: the card is the bottom sheet (`.sheet`). */
 .game {
   --card-dock-w: 340px;
+}
+/* A tablet (768 px) keeps the desktop layout: the dock and the command bar's header narrower,
+   so the sidebar at its usual width, the dock and the bar's tabs don't overlap. */
+@media (max-width: 999px) {
+  .game:not(.phone) {
+    --card-dock-w: 300px;
+  }
+  .game:not(.phone) .cmd-head {
+    width: 220px;
+  }
 }
 .game-dock {
   position: absolute;
@@ -1910,7 +1972,7 @@ button.card-list-row:hover {
   border-top: 2px solid var(--tan);
 }
 .game-selection.sheet .queue-planner button {
-  min-height: 36px;
+  min-height: 44px;
 }
 .game-selection.sheet .queue-insert button {
   min-height: 0;

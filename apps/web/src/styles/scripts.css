@@ -152,7 +152,7 @@
   border-top: 2px solid var(--tan);
 }
 .game-selection.sheet .script-tab button {
-  min-height: 36px;
+  min-height: 44px;
 }
 
 /* The form before a script starts: the rows scroll between its title and Start and Cancel. */
@@ -263,7 +263,7 @@
 .game.phone .start-param .buttons button,
 .game.phone .start-param input,
 .game.phone .start-param select {
-  min-height: 40px;
+  min-height: 44px;
 }
 .game.phone .start-param-why {
   width: 28px;
@@ -292,7 +292,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  height: var(--top-h, 44px);
+  /* The top bar's height on a desktop; not `--top-h`, which grows when the top bar wraps. */
+  height: 44px;
   box-sizing: border-box;
   padding: 0 10px;
   border-width: 0 0 2px;
@@ -483,9 +484,31 @@
   flex: none;
 }
 .game.phone .workshop-bar {
-  gap: 8px;
-  padding: 0 6px;
+  height: var(--top-h);
+  gap: 6px;
+  padding: 0 4px;
   overflow-x: auto;
+}
+/* Back to the map and the help links, a finger's size in the 48 px bar (`--top-h`). */
+.game.phone .workshop-bar .btn {
+  flex: none;
+  height: 44px;
+  padding: 0 10px;
+  font-size: 14px;
+}
+.game.phone .workshop-steps .tab {
+  height: 44px;
+  font-size: 14px;
+}
+.game.phone .workshop-steps .tab[aria-selected='true'] {
+  height: 48px;
+}
+/* The library's rows, History's buttons, Save: all a finger's size. */
+.game.phone .workshop-body :is(button:not(.cm-editor *), select, .in) {
+  min-height: 44px;
+}
+.game.phone .workshop-foot {
+  flex-wrap: wrap;
 }
 .game.phone .workshop-bar .k,
 .game.phone .workshop-bar .ic,

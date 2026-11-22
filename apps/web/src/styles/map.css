@@ -254,15 +254,32 @@
 .game.phone .notice .ic.s24 {
   display: none;
 }
-/* The pick banner: what to pick, then the hint after it. */
+/* Its buttons a finger's size (artboards `Phone-Map`, `Phone-Card`); no keys on a touch screen. */
+.game.phone .notice :is(button, .btn) {
+  height: 44px;
+  min-width: 44px;
+  font-size: 14px;
+}
+.game.phone .notice kbd {
+  display: none;
+}
+/* The pick banner: what to pick over the hint, as the artboard's two lines, its buttons after;
+   with more buttons than fit beside the words (a wall's Wood | Stone, Waypoints) they go below. */
+.game.phone .notice.pick-banner {
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  padding: 4px 4px 4px 8px;
+}
 .game.phone .pick-banner-text {
+  flex: 1 1 150px;
+}
+.game.phone .pick-banner-text > * {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .game.phone .pick-banner-text strong {
   font-size: 15px;
-}
-.game.phone .pick-banner-text .small::before {
-  content: ' — ';
 }
 /* The first-day card: how far along, then only the first line still to do, then ✕. Its header bar
    gives way to the line (`display: contents`), so its words take the panel's ink. */
@@ -295,6 +312,14 @@
 }
 .game.phone .first-day li:not(.next) {
   display: none;
+}
+/* The Rally tip is a second line: the Wiki and the full card on a wider screen have it. */
+.game.phone .first-day-tip {
+  display: none;
+}
+/* Its ✕ stays the header bar's dark button, on the panel's paper. */
+.game.phone .first-day-dismiss {
+  width: 44px;
 }
 /* But a trader's stop says where it is, which is what the notice is for: its buttons go below. */
 .game.phone .notice.trader-visit {
@@ -374,21 +399,37 @@
   padding: 10px 12px;
 }
 
-/* ---------- On a phone ----------
-   The dock gives up its panel: the map's buttons sit in a row bottom left above the card's sheet
-   (`--sheet-h`), zoom is pinch only; the minimap and the readout sit bottom right; the legend
-   opens above the row. */
+/* A dialog's and the tile menu's controls a finger's size on a phone; fields at 16px, so a phone
+   doesn't zoom in on them. */
+@media (max-width: 640px) {
+  .hud-dialog-actions :is(button, .btn) {
+    min-height: 44px;
+  }
+}
+.game.phone .tile-menu :is(button, select, input:not([type='checkbox'], [type='radio'])) {
+  min-height: 44px;
+}
+.game.phone .tile-menu :is(select, input:not([type='checkbox'], [type='radio'])) {
+  font-size: 16px;
+}
+
+/* ---------- On a phone (artboard `Phone-Map`) ----------
+   The dock gives up its panel: above the card's sheet (`--sheet-h`) the map's buttons sit in a
+   row, Centre, Select, Region and Legend bottom left and Minimap at the right end; zoom is pinch
+   only. The readout is one line above the row, the minimap (open) above that at the right. The
+   legend opens above it all, no higher than the room left under the top bar. */
 .game.phone .map-dock {
-  left: 12px;
-  right: 12px;
-  bottom: calc(var(--sheet-h, 0px) + 12px);
+  left: 8px;
+  right: 8px;
+  bottom: calc(var(--sheet-h, 0px) + 8px);
   width: auto;
   padding: 0;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas:
-    '. . minimap'
-    'buttons more readout';
+    'minimap minimap'
+    'readout readout'
+    'buttons more';
   align-items: end;
   gap: 6px;
   background: none;
@@ -408,12 +449,22 @@
 .game.phone .map-dock .btn {
   height: 44px;
   min-width: 44px;
+  padding: 0 10px;
+  font-size: 14px;
+}
+.game.phone .map-dock .btn.sq {
+  width: 44px;
+  padding: 0;
 }
 .game.phone .map-dock .btn.grow {
   flex: none;
 }
 .game.phone .map-dock .zoom {
   display: none;
+}
+/* Minimap at the right end of the row, as the artboard's. */
+.game.phone .minimap-button {
+  margin-left: auto;
 }
 .game.phone .minimap {
   grid-area: minimap;
@@ -422,27 +473,33 @@
   background: var(--parch);
   border: 2px solid var(--ink);
 }
-.game.phone .minimap .btn {
-  height: 24px;
-  min-width: 24px;
-}
+/* One line: what is under the finger, the zoom, or that the map is loading. */
 .game.phone .map-readout {
   grid-area: readout;
-  justify-self: end;
+  justify-self: start;
   max-width: 100%;
+  box-sizing: border-box;
   padding: 4px 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
   background: var(--parch);
   border: 2px solid var(--ink);
   color: var(--ui-text);
 }
+.game.phone .map-readout:empty {
+  display: none;
+}
 .game.phone .map-legend-panel {
   left: 0;
-  right: auto;
+  right: 0;
+  width: auto;
+  max-width: none;
   bottom: calc(100% + 6px);
-  max-height: 45vh;
-}
-@media (max-width: 640px) {
-  .map-legend-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  /* 100% is the map dock's height, under which the panel opens. */
+  max-height: min(
+    40vh,
+    calc(100vh - var(--top-h) - var(--lane-h, 0px) - var(--sheet-h, 0px) - 100% - 24px)
+  );
 }

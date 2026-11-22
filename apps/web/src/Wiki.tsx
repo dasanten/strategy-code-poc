@@ -1015,10 +1015,10 @@ export function Wiki() {
           On a phone the command bar is a sheet at the bottom of the screen. Drag its handle to show
           just its header, half the screen or all of it; a tap on the handle goes one step up. While
           an order waits for a target the card drops to its header. The menu button at the top left
-          opens the sidebar’s tabs, your goods, the wiki and Log out. The map’s buttons (Centre,
-          Select, Region map) sit in one row at the bottom left, just above the card; zoom by
-          pinching. The Residents and Horses tabs show each one in two lines: name and age, then
-          what they are doing (or where the horse is) with their meters.
+          opens the sidebar’s tabs, your goods, your Leader, heir and Zeal, the wiki and Log out.
+          The map’s buttons (Centre, Select, Region map, Legend and Minimap) sit in one row just
+          above the card; zoom by pinching. The Residents and Horses tabs show each one in two
+          lines: name and age, then what they are doing (or where the horse is) with their meters.
         </p>
         <p>
           Terrain you have explored loads as you look at it. Until it is here it shows grey, and the

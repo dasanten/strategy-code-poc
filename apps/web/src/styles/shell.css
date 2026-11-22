@@ -116,6 +116,26 @@
     text-overflow: ellipsis;
   }
 }
+/* Off a phone the bar is as tall as its content, at least 44 px, and `TopBar` measures it into
+   `--top-h`. On a tablet (768 px) one row has no room: the goods, Leader, Zeal, heir, Wiki and
+   Log out go to a second row (a third, if they need it), and all under the bar moves down. */
+.game:not(.phone) .hud-top {
+  height: auto;
+  min-height: 44px;
+}
+/* Off a phone the bar wraps wherever it no longer fits (a long realm name, a narrow window); its
+   height is measured into --top-h. Below 1000 px it always splits into two rows. */
+.game:not(.phone) .hud-top {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+@media (max-width: 999px) {
+  .game:not(.phone) .hud-top > .grow {
+    flex-basis: 100%;
+  }
+}
 /* The Player's Zeal (`CONTEXT.md`: Zeal): the word, a small kit meter and how full. */
 .hud-zeal {
   display: inline-flex;
@@ -273,16 +293,23 @@
   }
 }
 
+/* The clock's short form is for a phone (`formatGameTimeShort`). */
+.hud-clock-short {
+  display: none;
+}
+
 /* ---------- Phones (ADR 0012): narrow or touch screens (`PHONE_QUERY`) ---------- */
-/* The strip folds into the menu button and the top bar keeps only the realm, clock and status. */
+/* The strip folds into the menu button and the top bar keeps only the Unit | Realm switch, the
+   realm, the clock and the status; 48 px tall as the artboard (`Phone-Map`), so its buttons are a
+   finger's size. Goods, Leader, heir, Zeal, Wiki and Log out are in the menu. */
 .game.phone {
   --rail-w: 0px;
-  --top-h: 44px;
+  --top-h: 48px;
 }
 
 .game.phone .hud-top {
-  gap: 10px;
-  padding-left: 54px;
+  gap: 8px;
+  padding: 0 8px 0 52px;
   overflow: hidden;
 }
 /* The realm's name gives way first: it ends in an ellipsis while the clock stays whole. */
@@ -292,16 +319,32 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  font-size: 16px;
 }
 .game.phone .hud-top .hud-clock,
 .game.phone .hud-top .hud-status {
   flex: none;
   white-space: nowrap;
 }
+.game.phone .hud-top .hud-clock {
+  font-size: 12px;
+}
+.game.phone .hud-clock-long {
+  display: none;
+}
+.game.phone .hud-clock-short {
+  display: inline;
+}
+.game.phone .hud-control .btn {
+  height: 44px;
+  padding: 0 8px;
+  font-size: 13px;
+}
 
 .game.phone .hud-top .hud-goods,
 .game.phone .hud-top .hud-leader,
 .game.phone .hud-top .hud-heir,
+.game.phone .hud-top .hud-zeal,
 .game.phone .hud-top .hud-wiki,
 .game.phone .hud-top .hud-logout,
 .game.phone .hud-top .hud-muted,
@@ -324,24 +367,45 @@
 .game.phone .side.full .side-panel {
   width: 100%;
 }
+/* The open tab's ✕ and every control in it at a finger's size. */
+.game.phone .side-head .btn.sq {
+  width: 44px;
+  height: 44px;
+}
+.game.phone .side-body :is(button, select, input:not([type='checkbox'], [type='radio'])) {
+  min-height: 44px;
+}
+.game.phone .side-body .btn.sq {
+  min-width: 44px;
+}
+/* At 16px a phone doesn't zoom the page when the field takes focus. */
+.game.phone .side-body :is(select, input:not([type='checkbox'], [type='radio']), textarea) {
+  font-size: 16px;
+}
+/* The menu button at the top bar's left end, as the artboard's: a dark square button. */
 .hud-menu-button {
   position: absolute;
-  top: 4px;
-  left: 6px;
+  top: 0;
+  left: 0;
   z-index: 6;
-  width: 40px;
-  height: 36px;
+  width: 46px;
+  height: 46px;
   padding: 0;
   display: grid;
   place-items: center;
   border: 0;
-  background: transparent;
-  box-shadow: none;
+  border-right: 2px solid var(--ink);
+  background: var(--slate);
+  box-shadow:
+    inset -2px -2px 0 var(--night),
+    inset 2px 2px 0 var(--steel);
   color: var(--ui-bar-text);
 }
 .hud-menu-button:hover:not(:disabled),
 .hud-menu-button[aria-expanded='true'] {
-  background: var(--slate);
+  background: var(--gold);
+  color: var(--ink);
+  box-shadow: inset 2px 2px 0 var(--orange);
 }
 .hud-menu-button svg {
   fill: none;
@@ -351,80 +415,101 @@
 }
 .hud-menu-backdrop {
   position: absolute;
-  inset: 0;
+  inset: var(--top-h) 0 0;
   z-index: 5;
+  background: rgba(24, 20, 37, 0.6);
 }
+/* The menu (artboard `Phone-Menu`): the goods on paper, the Leader, heir and Zeal, a row a tab
+   under its group, then Wiki and Log out at the foot. */
 .hud-menu {
   position: absolute;
   top: var(--top-h);
   left: 0;
+  bottom: 0;
   z-index: 6;
-  width: min(280px, 100vw);
-  max-height: calc(100% - var(--top-h));
+  width: min(320px, 100vw);
   box-sizing: border-box;
   overflow: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 8px;
-  border-width: 0 2px 2px 0;
+  border-width: 0 2px 0 0;
 }
 .hud-menu-heading {
   margin: 0;
-  padding: 8px 10px 2px;
+  padding: 10px 12px 4px;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--ui-muted);
 }
-.hud-menu-heading:not(:first-child) {
-  margin-top: 6px;
-  border-top: 2px solid var(--ui-line);
-}
 .hud-menu > button {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 44px;
-  padding: 0 10px;
-  border: 2px solid transparent;
+  min-height: 52px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid var(--tan);
   background: transparent;
   box-shadow: none;
+  font-size: 15px;
   text-align: left;
 }
 .hud-menu > button.on {
   background: var(--gold);
   color: var(--ink);
-  border-color: var(--ink);
+  box-shadow: inset 4px 0 0 var(--ink);
 }
 .hud-menu-goods {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
-  padding: 10px 10px 4px;
-  border-top: 2px solid var(--ui-line);
-  margin-top: 6px;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px;
+  background: var(--paper);
+  border-bottom: 2px solid var(--ink);
 }
+/* A field at 16px, so a phone doesn't zoom in on it, and tall enough to show its words. */
 .hud-menu-goods .hud-goods-pick {
   flex: 1 0 100%;
   max-width: none;
-  padding: 8px;
-  font-size: 14px;
+  height: 44px;
+  padding: 0 8px;
+  font-size: 16px;
 }
-.hud-menu .hud-leader,
-.hud-menu .hud-heir {
-  padding: 6px 10px;
+.hud-menu-realm {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--tan);
+}
+.hud-menu-realm .btn {
+  height: 44px;
 }
 .hud-menu-links {
+  flex: none;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px 2px;
+  gap: 6px;
+  margin-top: auto;
+  padding: 10px;
+  background: var(--paper);
+  border-top: 2px solid var(--ink);
 }
-.hud-menu-links .hud-account {
-  margin-left: auto;
-  color: var(--ui-muted);
+.hud-menu-links .btn {
+  flex: 1 1 0;
+}
+.hud-menu > .hud-account {
+  flex: none;
+  padding: 0 10px 10px;
+  background: var(--paper);
+  font-size: 12px;
 }
 
 /* ---------- Sidebar tab contents: uppercase headings, quiet rows ---------- */

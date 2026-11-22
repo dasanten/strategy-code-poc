@@ -72,6 +72,17 @@
   .login-title h1 {
     font-size: 40px;
   }
+  /* Log in | Sign up a finger's size; fields at 16px, so a phone doesn't zoom in on them. */
+  .login-panel .tabs .tab {
+    height: 44px;
+    font-size: 15px;
+  }
+  .login-panel .tabs .tab[aria-selected='true'] {
+    height: 48px;
+  }
+  .login-form .in {
+    font-size: 16px;
+  }
 }
 
 /* Realm ended: the dialog's header bar in blood red. */
