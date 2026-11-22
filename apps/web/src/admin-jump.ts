@@ -1,6 +1,7 @@
 import type { AdminPlace, AdminPlaces } from '@csp/shared-types'
 import { CLOSE_SCALE } from './map/camera.js'
 import { ADMIN_LINK_SCALE } from './admin-map.js'
+import type { Relationship } from './theme.js'
 
 /*
  * The admin map's jump list (`CONTEXT.md`: admin map): the places of the whole world by name,
@@ -40,6 +41,39 @@ export function jumpScale(kind: JumpKind): number {
     ? ADMIN_JUMP_FIGURE_SCALE
     : ADMIN_LINK_SCALE
 }
+
+/**
+ * The mark before an entry on the jump list: a place is a square in the colour of whose it is (a
+ * realm red as on the admin map's inspector, an NPC city, the Trade Organization); a figure or a
+ * realm's city is its UI icon.
+ */
+export type JumpMark =
+  { rel: Relationship } | { icon: 'crown' | 'city' | 'caravan' | 'cart' | 'banner' }
+
+export function jumpMark(kind: JumpKind): JumpMark {
+  switch (kind) {
+    case 'realm':
+      return { rel: 'otherRealm' }
+    case 'npcCity':
+      return { rel: 'npcCity' }
+    case 'hq':
+    case 'post':
+      return { rel: 'tradeOrg' }
+    case 'leader':
+      return { icon: 'crown' }
+    case 'city':
+      return { icon: 'city' }
+    case 'caravan':
+      return { icon: 'caravan' }
+    case 'trader':
+      return { icon: 'cart' }
+    case 'army':
+      return { icon: 'banner' }
+  }
+}
+
+/** How many places a group lists, not counting what is listed under a realm. */
+export const jumpCount = (group: JumpGroup) => group.entries.filter((e) => !e.nested).length
 
 const byName = <T extends { name: string }>(list: readonly T[]) =>
   [...list].sort((a, b) => a.name.localeCompare(b.name))
