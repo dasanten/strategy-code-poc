@@ -3752,7 +3752,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         />
       )}
       {status === 'updated' && (
-        <CentredDialog title="The game was updated">
+        <CentredDialog title="The game was updated" tone="news">
           <p>A new version of the game is out. Reload the page to play on.</p>
           <div className="hud-dialog-actions">
             <button type="button" className="primary" onClick={() => window.location.reload()}>
@@ -3762,7 +3762,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CentredDialog>
       )}
       {takeover && (
-        <CentredDialog title="Your heir has taken over">
+        <CentredDialog title="Your heir has taken over" tone="bad">
           <p>
             Your Leader has died. {takeover.heir} is your Leader now and leads your realm on from{' '}
             {takeover.city}, under its name, with its standing, contracts and alliance.
