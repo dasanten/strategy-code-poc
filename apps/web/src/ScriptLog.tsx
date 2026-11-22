@@ -22,12 +22,12 @@ export function ScriptLog({
   useEffect(() => watch(id), [id, watch])
   if (!lines) return null
   return (
-    <div className="sel-order-group script-log">
-      <h3>Script log</h3>
+    <section className="sec script-log" aria-label="Script log">
+      <h3 className="px t16">Script log</h3>
       {lines.length === 0 ? (
         <p className="muted small">Empty: lines a script gives log() show here.</p>
       ) : (
-        <ul className="memory-tree" aria-label="Script log">
+        <ul className="mono script-log-lines" aria-label="Script log">
           {lines.toReversed().map((l, i) => (
             <li key={lines.length - i}>
               <time className="muted">{formatGameTime(l.tick)}</time> {l.text}
@@ -35,6 +35,6 @@ export function ScriptLog({
           ))}
         </ul>
       )}
-    </div>
+    </section>
   )
 }

@@ -71,8 +71,8 @@ function ParamName({ param }: { param: ScriptParam }) {
   const { purpose } = paramNote(param.description)
   return (
     <>
-      <span className="small">
-        <strong>{param.name}</strong> <span className="muted">({param.type})</span>
+      <span className="script-param-name">
+        <strong className="mono">{param.name}</strong> <span className="chip">{param.type}</span>
       </span>
       {purpose && <span className="muted small param-purpose">{purpose}</span>}
     </>
@@ -132,7 +132,8 @@ export function ScriptParamFields({
   const pickingType = params.find((p) => p.name === picking)?.type
   const foodHint = foodParamsHint(params.filter((p) => p.type === 'number').map((p) => p.name))
   return (
-    <div className="script-params" aria-label="Script parameters">
+    <div className="script-params sec" aria-label="Script parameters">
+      <h3 className="px t16">Params</h3>
       {params.map((p) => {
         const value = values[p.name]
         const uses = effectiveParam(p, value, {
@@ -155,7 +156,7 @@ export function ScriptParamFields({
           const n = typeof value === 'number' ? value : undefined
           const from = workplace?.[p.name]
           return (
-            <div key={p.name} className="goods-row">
+            <div key={p.name} className="script-param">
               <ParamName param={p} />
               {shown}
               <span className="buttons">
@@ -176,6 +177,7 @@ export function ScriptParamFields({
                 />
                 <button
                   type="button"
+                  className="btn sm"
                   title={clearTitle}
                   onClick={() => onClear(p.name)}
                   disabled={n === undefined}
@@ -188,13 +190,18 @@ export function ScriptParamFields({
         }
         const id = typeof value === 'string' ? value : undefined
         const pick = pickedOnMap(p.type) && (
-          <button type="button" aria-pressed={picking === p.name} onClick={() => onPick(p)}>
+          <button
+            type="button"
+            className="btn sm"
+            aria-pressed={picking === p.name}
+            onClick={() => onPick(p)}
+          >
             {picking === p.name ? 'Cancel' : 'Pick'}
           </button>
         )
         if (p.type === 'choice' || p.type === 'waypoint') {
           return (
-            <div key={p.name} className="goods-row">
+            <div key={p.name} className="script-param">
               <ParamName param={p} />
               {/* The list shows the value the script uses: the one picked, else its unset entry. */}
               <span className="buttons">
@@ -210,13 +217,14 @@ export function ScriptParamFields({
           )
         }
         return (
-          <div key={p.name} className="goods-row">
+          <div key={p.name} className="script-param">
             <ParamName param={p} />
             {shown}
             <span className="buttons">
               {pick}
               <button
                 type="button"
+                className="btn sm"
                 title={clearTitle}
                 onClick={() => onClear(p.name)}
                 disabled={id === undefined}

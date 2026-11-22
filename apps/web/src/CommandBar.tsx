@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { orderColumns } from './command-bar-view.js'
 import type { CardAction, OrderGroup } from './selection-view.js'
 import type { Relationship } from './theme.js'
@@ -13,6 +13,9 @@ import { ActionRows, useInSheet, useSheetPeek } from './SelectionCard.js'
  *
  * In pick mode (`collapsed`) the bar shrinks to its header: the room the rest took stays, drawn
  * dead, so a click there gives no order by accident (`CONTEXT.md`: Picking a target).
+ *
+ * A tab with more to show (`tall`: the Queue tab) grows the bar upward while it is open, with a
+ * button back to bar height and up again. On a phone the sheet is as tall as it is pulled.
  */
 export function CommandBar({
   rel,
@@ -25,6 +28,7 @@ export function CommandBar({
   panel,
   onClose,
   collapsed = false,
+  tall = false,
   children,
 }: {
   rel: Relationship
@@ -43,12 +47,17 @@ export function CommandBar({
   panel?: { title: string; body: ReactNode; onClose: () => void }
   onClose: () => void
   collapsed?: boolean
+  /** The open tab grows the bar upward (the Queue tab's planner). */
+  tall?: boolean
   /** The open tab's content. */
   children: ReactNode
 }) {
   const peek = useSheetPeek()
   const phone = useInSheet()
   const shrunk = collapsed && !peek
+  // Back to bar height: kept while the card is open, from one tall tab to the next.
+  const [low, setLow] = useState(false)
+  const grown = tall && !low && !phone && !shrunk
   const relClass = `rel-${rel.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`
   return (
     <>
@@ -69,7 +78,7 @@ export function CommandBar({
         </section>
       )}
       <section
-        className={`cmd-bar pn ${relClass}${shrunk ? ' cmd-shrunk' : ''}`}
+        className={`cmd-bar pn ${relClass}${shrunk ? ' cmd-shrunk' : ''}${grown ? ' cmd-tall' : ''}`}
         aria-label="Selection"
       >
         <div className="cmd-head">
@@ -105,6 +114,16 @@ export function CommandBar({
           !peek && (
             <div className="cmd-main">
               {tabs}
+              {tall && !phone && (
+                <button
+                  type="button"
+                  className="btn sm cmd-grow"
+                  title={grown ? 'Back to bar height' : 'Grow the bar upward again'}
+                  onClick={() => setLow(!low)}
+                >
+                  {grown ? '▾ Bar height' : '▴ Taller'}
+                </button>
+              )}
               <div className="cmd-body">{children}</div>
               {status && <div className="cmd-status">{status}</div>}
             </div>

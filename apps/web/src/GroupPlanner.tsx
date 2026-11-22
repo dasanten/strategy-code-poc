@@ -38,56 +38,60 @@ export function GroupPlanner({
   /** The Player's realm, whose saved queues Save and Load keep (`CONTEXT.md`: Saved queue). */
   realm: string
 }) {
-  if (!plan)
+  const give = (
+    <GivePlan
+      plan={plan ?? EMPTY_PLAN}
+      give="Give to all"
+      note="Give to all makes each one’s queue a copy of the plan, ending what they do. One who can’t do a step skips it when its turn comes."
+      onGive={onGive}
+      onDiscard={() => onPlan(undefined)}
+    />
+  )
+  if (plan && plan.items.length > 0)
     return (
-      <>
-        <p className="muted small">
-          Each of them has a queue of their own, edited on their card. Add step adds a step to the
-          end of each one’s queue; plan a queue to give them all the same one.
-        </p>
-        <div className="order-buttons">
-          <button type="button" onClick={() => onPlan(EMPTY_PLAN)}>
-            Plan a queue for all
-          </button>
-        </div>
-        {addStep}
-      </>
-    )
-  return (
-    <>
-      {plan.items.length > 0 ? (
-        <QueueBlock
-          title="Plan"
-          queue={plan}
-          scripts={scripts}
-          buildings={buildings}
-          lastSeen={lastSeen}
-          waypoints={waypoints}
-          onEdit={(items, loop) => onPlan(editPlan(plan, items, loop))}
-          realm={realm}
-          palette={addStep}
-        />
-      ) : (
-        <>
-          <p className="muted small">
-            Nothing planned yet. Plan steps with Add step, paste copied ones or load a saved queue.
-          </p>
-          <PasteSteps onPaste={(items) => onPlan(editPlan(plan, items))} />
-          <SavedQueueTools
-            realm={realm}
-            steps={[]}
-            onLoad={(items) => onPlan(editPlan(plan, items))}
-          />
-          {addStep}
-        </>
-      )}
-      <GivePlan
-        plan={plan}
-        give="Give to all"
-        note="Give to all makes each one’s queue a copy of the plan, ending what they do. One who can’t do a step skips it when its turn comes."
-        onGive={onGive}
-        onDiscard={() => onPlan(undefined)}
+      <QueueBlock
+        title="Plan"
+        queue={plan}
+        scripts={scripts}
+        buildings={buildings}
+        lastSeen={lastSeen}
+        waypoints={waypoints}
+        onEdit={(items, loop) => onPlan(editPlan(plan, items, loop))}
+        realm={realm}
+        palette={addStep}
+        foot={give}
       />
-    </>
+    )
+  // No plan open, or one with nothing in it yet: the planner's two columns all the same.
+  return (
+    <section className="queue-planner" aria-label="Plan">
+      <div className="queue-list">
+        <div className="queue-tools">
+          <span className="px t16">Plan</span>
+          <span className="grow" />
+          {plan ? (
+            <>
+              <PasteSteps onPaste={(items) => onPlan(editPlan(plan, items))} />
+              <SavedQueueTools
+                realm={realm}
+                steps={[]}
+                onLoad={(items) => onPlan(editPlan(plan, items))}
+              />
+            </>
+          ) : (
+            <button type="button" className="btn sm" onClick={() => onPlan(EMPTY_PLAN)}>
+              Plan a queue for all
+            </button>
+          )}
+        </div>
+        <p className="muted small">
+          {plan
+            ? 'Nothing planned yet. Plan steps with Add step, paste copied ones or load a saved queue.'
+            : 'Each of them has a queue of their own, edited on their card. Add step adds a step to the end of each one’s queue; plan a queue to give them all the same one.'}
+        </p>
+        {plan && give}
+      </div>
+      <div className="queue-palette">{addStep}</div>
+    </section>
   )
 }
