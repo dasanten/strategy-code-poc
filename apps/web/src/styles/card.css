@@ -1984,3 +1984,189 @@ button.card-list-row:hover {
   width: 100%;
 }
 /* End of realm control mode and the army card (T119.7) */
+
+/* Order panels: work and build (T119.9)
+   ---------------------------------------------------------------------------------------------
+   The panels of Work, Gather, Teach, Build, Tear down and Breed horses in the order panel shell
+   (artboards Card-Panels and Card-New-Orders), the Build menu wherever it opens (an order's
+   panel, the realm's Build card in the dock, the planner's Add step), the realm orders on a
+   building's or vehicle's card and a siege machine's orders as a grid two to a row, Work settings
+   on a workplace's card, and the form before a script starts. Atoms keep the kit's look; these
+   rules only place them. */
+
+/* The Build menu: each group under its label, its kinds as buttons with the kind's pixel sprite
+   (`BuildingIcon`) over its short name; what's tapped opens below on paper, as its own section. */
+.build-groups {
+  gap: 8px 12px;
+}
+.build-group h4.lb {
+  margin: 0;
+}
+.build-grid {
+  flex-wrap: wrap;
+}
+.build-grid .build-kind.btn {
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 2px;
+  width: 60px;
+  height: auto;
+  min-height: 58px;
+  padding: 4px 2px 3px;
+  font-weight: 400;
+  font-size: 11px;
+  line-height: 1.15;
+}
+.build-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+}
+.build-icon svg,
+.build-icon img {
+  display: block;
+  width: 32px;
+  height: 32px;
+}
+/* Line art is drawn smaller in its box, as it was beside its name. */
+.build-icon:not(.build-icon-pixel, .build-icon-painted) svg {
+  width: 24px;
+  height: 24px;
+}
+/* Pixel art (`CONTEXT.md`: Art style) stays crisp at any size. */
+.build-icon-pixel svg,
+.build-icon-pixel image,
+.build-icon-painted img {
+  image-rendering: pixelated;
+}
+.build-detail {
+  gap: 8px;
+  margin-top: 4px;
+  padding: 10px;
+  border: 2px solid var(--tan);
+  background: var(--paper);
+}
+.build-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.build-detail-head .build-icon,
+.build-detail-head .build-icon svg,
+.build-detail-head .build-icon img {
+  width: 40px;
+  height: 40px;
+}
+.build-detail h4.px {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ui-text);
+}
+.build-detail .build-why {
+  color: var(--ui-warn-text);
+}
+/* Built of: the label, then Wood | Stone as one pair of buttons. */
+.build-material {
+  align-items: center;
+  gap: 0;
+}
+.build-material .lb {
+  margin-right: 8px;
+}
+.build-material .btn + .btn {
+  margin-left: -2px;
+}
+.build-detail .opanel-confirm {
+  background: var(--paper);
+}
+.build-detail .order-buttons button {
+  display: inline-flex;
+  flex: none;
+}
+.build-detail .order-buttons button:first-of-type {
+  flex: 1 1 auto;
+}
+
+/* A construction site's materials: icon, name, delivered against needed. */
+.site-material-row {
+  gap: 6px;
+  font-size: 12px;
+}
+
+/* Work at a smithy: a row per recipe (icon, name and inputs, Make, Customise), then Mend. */
+.work-recipes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.work-recipe {
+  gap: 6px;
+  min-height: 28px;
+}
+.work-recipe > .good-icon,
+.work-recipe > .ic {
+  flex: none;
+}
+
+/* Teach: the subject's picker takes the room, Teach beside it. */
+.subject-pick {
+  align-items: center;
+}
+.subject-pick select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Breed horses for a group or from a stable's card: one block per stable. */
+.group-breed {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.group-breed + .group-breed {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 2px solid var(--tan);
+}
+
+/* The realm orders on a building's or vehicle's card, and a siege machine's orders, two to a row
+   as the command bar's (`ActionRows` with `grid`); a panel opens across both columns. */
+.realm-orders .cmd-grid,
+.sel-body > .cmd-grid {
+  margin-top: 2px;
+}
+.sel-body > .cmd-grid + * {
+  padding-top: 10px;
+  border-top: 2px solid var(--tan);
+}
+.realm-orders .sel-panel-under .inspector-block {
+  padding: 8px 0 0;
+}
+
+/* Work settings on a workplace's card: a quiet toggle, then the work script and its params. */
+.work-settings-toggle {
+  align-self: stretch;
+  padding: 2px 0;
+}
+.work-settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.work-settings-body .fld select {
+  width: 100%;
+}
+
+/* The form before a script starts (Customise; artboard Card-Panels "Start Work"): each param by
+   its script name, Cancel and Start side by side. */
+.start-param-label strong {
+  font-family: var(--font-mono);
+}
+.start-params .hud-dialog-actions > button {
+  flex: 1 1 0;
+}

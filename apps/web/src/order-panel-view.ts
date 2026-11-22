@@ -10,12 +10,34 @@ export type PanelSize = 'sm' | 'md' | 'lg'
 export const PANEL_WIDTHS: Record<PanelSize, number> = { sm: 340, md: 420, lg: 560 }
 
 /** The orders whose panel is a short form, and those that list a lot side by side. */
-const SMALL = new Set(['rename', 'makeLeader', 'board', 'feed', 'equip', 'script', 'pair', 'fetch'])
+const SMALL = new Set([
+  'rename',
+  'makeLeader',
+  'board',
+  'feed',
+  'equip',
+  'script',
+  'pair',
+  'fetch',
+  'gather',
+  'teach',
+])
 const LARGE = new Set(['goods', 'build'])
 
 /** How wide the panel of this order (a resident's or a group's action id) opens. */
 export function panelSize(order: string): PanelSize {
   return LARGE.has(order) ? 'lg' : SMALL.has(order) ? 'sm' : 'md'
+}
+
+/**
+ * The kit's colour for an order's button (artboard Card-New-Orders), if it has one: the Leader's
+ * Rally the crew gold, a siege machine's blow at a wall or gate (Ram, Throw Stone at…) danger red.
+ * Every other order keeps the plain button.
+ */
+export function orderTone(order: string): 'gold' | 'dng' | undefined {
+  if (order === 'rally') return 'gold'
+  if (order === 'ram' || order === 'throw') return 'dng'
+  return undefined
 }
 
 /** An order's label as its panel's title: "Feed…" opens the panel "Feed". */

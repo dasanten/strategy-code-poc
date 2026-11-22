@@ -74,6 +74,8 @@ export function VehicleOrders({
         open={open}
         onAction={act}
         label="Realm orders"
+        // Two to a row, as the command bar's orders (artboard Card-New-Orders).
+        grid={{ wide: true }}
         panel={
           open === 'haul' && (
             <HaulBlock

@@ -102,6 +102,8 @@ export function BuildingOrders({
         open={open}
         onAction={act}
         label="Realm orders"
+        // Two to a row, as the command bar's orders (artboard Card-New-Orders).
+        grid={{ wide: true }}
         panel={panel}
         beside={(a) => {
           const task = TASKS[a.id]
@@ -112,6 +114,7 @@ export function BuildingOrders({
                 of={a.label}
                 disabled={a.disabled}
                 give={() => give(a.id)}
+                small
               />
             )
           )

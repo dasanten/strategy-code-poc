@@ -315,7 +315,7 @@ export function SubjectPicker({
 }) {
   const [subject, setSubject] = useState<TrainingSubject>(picked ?? 'strength')
   return (
-    <div className="order-buttons">
+    <div className="order-buttons subject-pick">
       <select
         aria-label="Subject to teach"
         value={subject}
@@ -2009,9 +2009,6 @@ export function GroupCard({
       )}
       {shown === 'teach' && (
         <section className="inspector-block" aria-label="Teach">
-          <div className="panel-head">
-            <h3>Teach</h3>
-          </div>
           <SubjectPicker action="Teach" onPick={(subject) => onOrder({ kind: 'teach', subject })} />
           <p className="muted small">
             The first of them on each training ground teaches it there; one teacher per ground.
@@ -2020,9 +2017,6 @@ export function GroupCard({
       )}
       {shown === 'breed' && (
         <section className="inspector-block" aria-label="Breed horses">
-          <div className="panel-head">
-            <h3>Breed horses</h3>
-          </div>
           {stables.length === 0 && (
             <p className="muted small">None of them stands in a finished stable.</p>
           )}
@@ -2058,14 +2052,8 @@ export function GroupCard({
   // Build's tile picked: its menu opens where an order's panel does (`CommandBar`).
   const buildPanel = tab === 'orders' && buildAt && !picking && (
     <section className="inspector-block" aria-label="Build" ref={buildBlock}>
-      <div className="panel-head">
-        <h3>Build</h3>
-        <span className="small muted">
-          at {buildAt.x}, {buildAt.y}
-        </span>
-      </div>
       {buildAt.site ? (
-        <div className="order-buttons">
+        <PanelFoot>
           <button
             type="button"
             className="primary"
@@ -2092,7 +2080,7 @@ export function GroupCard({
               })
             }
           />
-        </div>
+        </PanelFoot>
       ) : (
         <BuildMenu
           // Another tile starts with nothing tapped.
@@ -2877,6 +2865,29 @@ export function ResidentCard({
           onWork={onWork}
         />
       )}
+      {shown === 'gather' && (
+        // Gather's own form picks the good (`CONTEXT.md`: Gather): the panel says what it does and
+        // opens that form.
+        <section className="inspector-block" aria-label="Gather">
+          <p className="small">
+            Wood or Food from a Forest tile, Stone from a Hills tile, by hand: they walk to the
+            nearest tile that gives it and isn’t picked over, and gather until their hands are full.
+          </p>
+          <p className="muted small">The form picks the good and where the load goes.</p>
+          <PanelFoot>
+            <button
+              type="button"
+              className="primary"
+              onClick={() => {
+                setPanel(undefined)
+                onGather()
+              }}
+            >
+              Gather…
+            </button>
+          </PanelFoot>
+        </section>
+      )}
       {shown === 'build' && (
         <>
           {[building, carriageSite, road].map(
@@ -3358,6 +3369,20 @@ export function ResidentCard({
     rename: 'free, at once',
     walls: 'break or climb',
     attack: weapon ? `fights with a ${GOOD_LABELS[weapon].toLowerCase()}` : 'unarmed',
+    work: building && !building.site && MAX_WORKERS[building.kind] !== undefined && (
+      <span className="mono">
+        {workers} / {MAX_WORKERS[building.kind]} workers
+      </span>
+    ),
+    teach: shown === 'teach' && building && (
+      <span className="mono">
+        {traineesOf(building, residents, mapSize).length} / {TRAINING_GROUND_MAX_TRAINEES} trainees
+      </span>
+    ),
+    breed:
+      shown === 'breed' &&
+      building &&
+      `${horsesIn(horses, building).filter((h) => h.realmId === realmId).length} of yours here`,
   }
   const panelSpec: OrderPanelSpec | undefined =
     tab === 'orders' && shown && openPanel
@@ -3869,16 +3894,16 @@ function SiteBlock({
       />
       {materials.length === 0 && <p className="muted small">Needs no materials.</p>}
       {materials.map(([good, units]) => (
-        <div className="goods-row" key={good}>
-          <span>{GOOD_LABELS[good]}</span>
+        <div className="fx site-material-row" key={good}>
+          <GoodIcon good={good} />
+          <span className="grow">{GOOD_LABELS[good]}</span>
           <span className="mono">
             {site.site!.delivered[good] ?? 0} / {units}
           </span>
-          <span />
         </div>
       ))}
-      <div className="order-buttons">
-        <button type="button" disabled={!adult || joined} onClick={help}>
+      <PanelFoot>
+        <button type="button" className="primary" disabled={!adult || joined} onClick={help}>
           {joined ? 'Building…' : 'Help build'}
         </button>
         <CustomiseButton
@@ -3887,7 +3912,7 @@ function SiteBlock({
           disabled={!adult || joined}
           give={help}
         />
-      </div>
+      </PanelFoot>
       <p className="muted small">
         It becomes a {stone ? 'stone ' : ''}
         {name.toLowerCase()} once its materials are delivered and the work is done: about{' '}
@@ -3939,59 +3964,61 @@ function WorkBlock({
   const blocked = !canWork(resident, tick) || (!working && workers >= max)
   return (
     <section className="inspector-block" aria-label="Work">
-      <div className="panel-head">
-        <h3>{BUILDING_NAMES[building.kind]}</h3>
-        <span className="mono small">
-          {workers} / {max} workers
-        </span>
-      </div>
       <p className="small">{holding(holders, realmId)}</p>
       {recipes.length > 1 ? (
         // A smithy: each worker says what they make (`CONTEXT.md`: Smithy), or mends (Mending).
-        [
-          ...recipes.map((r) => {
+        <div className="work-recipes">
+          {recipes.map((r) => {
             const made = recipeGood(r)
             const making = working && !o.mends && o.makes === made
             return (
-              <div key={made} className="goods-row">
-                <span>{GOOD_LABELS[made]}</span>
-                <span className="muted small">{stockText(r.input)}</span>
-                <span className="buttons">
-                  <button type="button" disabled={blocked || making} onClick={() => onWork(made)}>
-                    {making ? 'Making…' : working ? 'Make instead' : 'Make'}
-                  </button>
-                  <CustomiseButton
-                    order={taskStart('work', building.id)}
-                    of={`Make ${GOOD_LABELS[made].toLowerCase()}`}
-                    disabled={blocked || making}
-                    give={() => onWork(made)}
-                  />
+              <div key={made} className="fx work-recipe">
+                <GoodIcon good={made} />
+                <span className="grow">
+                  <strong>{GOOD_LABELS[made]}</strong>{' '}
+                  <span className="muted small">· {stockText(r.input)}</span>
                 </span>
+                <button
+                  type="button"
+                  className="btn sm"
+                  disabled={blocked || making}
+                  onClick={() => onWork(made)}
+                >
+                  {making ? 'Making…' : working ? 'Make instead' : 'Make'}
+                </button>
+                <CustomiseButton
+                  order={taskStart('work', building.id)}
+                  of={`Make ${GOOD_LABELS[made].toLowerCase()}`}
+                  disabled={blocked || making}
+                  give={() => onWork(made)}
+                />
               </div>
             )
-          }),
-          <div key="mend" className="goods-row">
-            <span>Mend</span>
-            <span className="muted small">worn gear here, for a share of its recipe</span>
-            <span className="buttons">
-              <button
-                type="button"
-                disabled={blocked || (working && !!o.mends)}
-                onClick={() => onWork(MEND)}
-              >
-                {working && o.mends ? 'Mending…' : working ? 'Mend instead' : 'Mend'}
-              </button>
-              <CustomiseButton
-                order={taskStart('work', building.id)}
-                of="Mend"
-                disabled={blocked || (working && !!o.mends)}
-                give={() => onWork(MEND)}
-              />
+          })}
+          <div className="fx work-recipe">
+            <span className="ic s16 i-hammer" aria-hidden="true" />
+            <span className="grow">
+              <strong>Mend</strong>{' '}
+              <span className="muted small">· worn gear here, for a share of its recipe</span>
             </span>
-          </div>,
-        ]
+            <button
+              type="button"
+              className="btn sm"
+              disabled={blocked || (working && !!o.mends)}
+              onClick={() => onWork(MEND)}
+            >
+              {working && o.mends ? 'Mending…' : working ? 'Mend instead' : 'Mend'}
+            </button>
+            <CustomiseButton
+              order={taskStart('work', building.id)}
+              of="Mend"
+              disabled={blocked || (working && !!o.mends)}
+              give={() => onWork(MEND)}
+            />
+          </div>
+        </div>
       ) : (
-        <div className="order-buttons">
+        <PanelFoot>
           <button
             type="button"
             className="primary"
@@ -4006,7 +4033,7 @@ function WorkBlock({
             disabled={blocked || working}
             give={() => onWork()}
           />
-        </div>
+        </PanelFoot>
       )}
       <p className="muted small">
         {recipes.length > 1 ? (
@@ -4062,9 +4089,10 @@ function TearDownBlock({
   const joined = o?.kind === 'tearDown' && o.buildingId === building.id
   return (
     <section className="inspector-block" aria-label="Tear down">
+      {/* The panel's header says Tear down; each section names what it tears down, as up to
+          three can stand on one tile (a building, a carriage site, a road). */}
       <div className="panel-head">
-        <h3>Tear down</h3>
-        <span className="small muted">{what}</span>
+        <h3>{capitalised(what)}</h3>
       </div>
       {building.teardown !== undefined && (
         <Meter
@@ -4086,9 +4114,10 @@ function TearDownBlock({
           : leaves.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')}{' '}
         on the tile.
       </p>
-      <div className="order-buttons">
+      <PanelFoot>
         <button
           type="button"
+          className="btn dng"
           disabled={!canWork(resident, tick) || joined}
           onClick={() => onTearDown(building.id)}
         >
@@ -4100,7 +4129,7 @@ function TearDownBlock({
           disabled={!canWork(resident, tick) || joined}
           give={() => onTearDown(building.id)}
         />
-      </div>
+      </PanelFoot>
     </section>
   )
 }
@@ -4127,16 +4156,9 @@ function TeachBlock({
   const other = teacher && teacher.id !== resident.id ? teacher : undefined
   const o = resident.order
   const teaching = o?.kind === 'teach' && o.buildingId === ground.id ? o.subject : undefined
-  const trainees = traineesOf(ground, residents, mapSize).length
   const otherTeaches = other?.order?.kind === 'teach' ? other.order.subject : undefined
   return (
     <section className="inspector-block" aria-label="Teach">
-      <div className="panel-head">
-        <h3>Teach</h3>
-        <span className="mono small">
-          {trainees} / {TRAINING_GROUND_MAX_TRAINEES} trainees
-        </span>
-      </div>
       <p className="small">
         {otherTeaches
           ? `${other!.name} teaches ${subjectLabel(otherTeaches)} here: one teacher per ground.`
@@ -4241,10 +4263,6 @@ function BreedBlock({
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id].slice(-2)))
   return (
     <section className="inspector-block" aria-label="Breed horses">
-      <div className="panel-head">
-        <h3>Breed horses</h3>
-        <span className="small muted">{own.length} of yours here</span>
-      </div>
       {breeding && (
         <Meter
           label="Foal"
@@ -4282,9 +4300,10 @@ function BreedBlock({
           onToggle={() => toggle(h.id)}
         />
       ))}
-      <div className="order-buttons">
+      <PanelFoot>
         <button
           type="button"
+          className="primary"
           disabled={!!breeding || !pair || problem !== undefined}
           title={problem}
           onClick={() => pair && onBreed(stable.id, pair)}
@@ -4297,7 +4316,7 @@ function BreedBlock({
           disabled={!!breeding || !pair || problem !== undefined}
           give={() => pair && onBreed(stable.id, pair)}
         />
-      </div>
+      </PanelFoot>
       {!breeding && pair && problem && <p className="muted small">{problem}</p>}
     </section>
   )
@@ -4324,8 +4343,8 @@ export function GroupBreed({
   const toggle = (id: string) =>
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id].slice(-2)))
   return (
-    <div aria-label={`Stable at ${stable.x}, ${stable.y}`}>
-      <span className="small muted">
+    <div className="group-breed" aria-label={`Stable at ${stable.x}, ${stable.y}`}>
+      <span className="lb">
         Stable at {stable.x}, {stable.y} · {horses.length} of yours
       </span>
       {horses.map((h) => (
@@ -4337,9 +4356,10 @@ export function GroupBreed({
           onToggle={() => toggle(h.id)}
         />
       ))}
-      <div className="order-buttons">
+      <PanelFoot>
         <button
           type="button"
+          className="primary"
           disabled={!pair}
           onClick={() => {
             if (!pair) return
@@ -4359,7 +4379,7 @@ export function GroupBreed({
             onBreed(pair)
           }}
         />
-      </div>
+      </PanelFoot>
     </div>
   )
 }
