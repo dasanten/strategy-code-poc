@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ScriptParam, ScriptSummary, Waypoint, WorkplaceSettings } from '@csp/shared-types'
 import { ScriptParamFields } from './ScriptParams.js'
 import { workScriptOf, workScripts, workSettingsParams } from './work-settings-view.js'
+import { Icon } from './Icon.js'
 
 /** Where the browser remembers whether the Player left Work settings open. */
 const OPEN_KEY = 'csp.workSettingsOpen'
@@ -69,25 +70,25 @@ export function WorkSettings({
     <div className="sel-info work-settings">
       <button
         type="button"
-        className="sel-info-toggle"
+        className="sel-info-toggle work-settings-toggle"
         aria-expanded={open}
         onClick={() => {
           setOpen(!open)
           remember(!open)
         }}
       >
-        <span aria-hidden="true">⚙</span> Work settings
+        <Icon name="settings" size={16} />
+        <span className="grow">Work settings</span>
         <span className="sel-more" aria-hidden="true">
           {open ? '▾' : '▸'}
         </span>
       </button>
       {open && (
-        <div aria-label="Work settings">
-          <label className="goods-row">
-            <span className="small">
-              <strong>Work script</strong>
-            </span>
+        <div className="work-settings-body" aria-label="Work settings">
+          <label className="fld">
+            <span className="lb">Work script</span>
             <select
+              className="in"
               aria-label="Work script"
               value={script?.id ?? ''}
               disabled={choices.length === 0}
@@ -116,9 +117,9 @@ export function WorkSettings({
               onClear={onClear}
             />
           ) : (
-            script && <p className="muted small">{script.name} takes no settings here.</p>
+            script && <p className="mu small">{script.name} takes no settings here.</p>
           )}
-          <p className="muted small">Only your realm sees these.</p>
+          <p className="mu small">Only your realm sees these.</p>
         </div>
       )}
     </div>

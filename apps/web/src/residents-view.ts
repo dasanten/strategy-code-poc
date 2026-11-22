@@ -2,7 +2,7 @@ import { MAX_HUNGER, PAIRING_WAIT_TICKS, TICKS_PER_GAME_DAY } from '@csp/balance
 import { ageInYears } from './shared/stats.js'
 import type { City, Diplomacy, Good, Resident, Stock } from '@csp/shared-types'
 
-/** One heading of the Residents drawer and the residents under it. */
+/** One heading of the Residents tab and the residents under it. */
 export interface ResidentGroup<R> {
   /** A city's id, or `hired`, `army` or `homeless`. */
   key: string
@@ -11,7 +11,7 @@ export interface ResidentGroup<R> {
 }
 
 /**
- * The residents the Player commands, grouped for the Residents drawer: by the city they live in
+ * The residents the Player commands, grouped for the Residents tab: by the city they live in
  * (`CONTEXT.md`: Resident), the home city first and the Player's other cities by name, then the
  * mercenaries they hired (`CONTEXT.md`: Mercenary contract), what was handed over to their
  * alliance army (`CONTEXT.md`: Alliance army) and the homeless. Empty groups are left out. The
@@ -64,7 +64,7 @@ export function groupResidents<R extends Pick<Resident, 'id' | 'cityId'>>(
   return groups.filter((g) => g.residents.length > 0)
 }
 
-/** A resident's row in the Residents drawer on a phone (`residentLines`). */
+/** A resident's row in the Residents tab on a phone (`residentLines`). */
 export interface ResidentLines {
   /** First line: their name, the Leader mark after it, and their age. */
   name: string
@@ -84,7 +84,7 @@ export function yearsLine(years: number): string {
 }
 
 /**
- * A resident's row in the Residents drawer on a phone (ADR 0012): two lines in place of the
+ * A resident's row in the Residents tab on a phone (ADR 0012): two lines in place of the
  * table's columns, "Edda · Leader · 34 years" and their Doing line (`doingLine`) with the hunger
  * meter at its end.
  */
@@ -280,7 +280,7 @@ export function busyAndIdle(residents: readonly Pick<Resident, 'order' | 'script
   return { busy: residents.length - idle, idle }
 }
 
-/** The Residents drawer's head: "8 residents · 7 busy · 1 idle". */
+/** The Residents tab's head: "8 residents · 7 busy · 1 idle". */
 export function residentsCount(residents: readonly Pick<Resident, 'order' | 'script'>[]): string {
   if (residents.length === 0) return 'No residents'
   const { busy, idle } = busyAndIdle(residents)

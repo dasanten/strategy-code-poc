@@ -1,8 +1,26 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { MIN_PASSWORD_LENGTH } from './shared/api.js'
 import type { Account } from '@csp/shared-types'
 import { api, ApiFailure } from './api.js'
 import { WIKI_PATH } from './wiki-view.js'
+
+/**
+ * The game's title over the dimmed board, above the panel of the screens outside the game (log
+ * in, sign up, founding; artboard `Entry`).
+ */
+export function EntryScreen({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <main className="login">
+      <div className="login-title">
+        <h1 className="px">Code Strategy</h1>
+        <p className="px t18">One world. It keeps running while you sleep.</p>
+      </div>
+      <section className="login-panel pn" aria-label={label}>
+        {children}
+      </section>
+    </main>
+  )
+}
 
 /** Log in, or sign up with an invite code (ADR 0005). */
 export function Login({ onLoggedIn }: { onLoggedIn: (account: Account) => void }) {
@@ -32,29 +50,42 @@ export function Login({ onLoggedIn }: { onLoggedIn: (account: Account) => void }
 
   const signup = mode === 'signup'
   return (
-    <main className="login">
+    <EntryScreen label={signup ? 'Sign up' : 'Log in'}>
+      <div className="tabs" role="tablist">
+        <button
+          type="button"
+          className="tab"
+          role="tab"
+          aria-selected={!signup}
+          onClick={() => setMode('login')}
+        >
+          Log in
+        </button>
+        <button
+          type="button"
+          className="tab"
+          role="tab"
+          aria-selected={signup}
+          onClick={() => setMode('signup')}
+        >
+          Sign up
+        </button>
+      </div>
       <form onSubmit={submit} className="login-form">
-        <h1>Code Strategy</h1>
-        <div className="tabs" role="tablist">
-          <button type="button" role="tab" aria-selected={!signup} onClick={() => setMode('login')}>
-            Log in
-          </button>
-          <button type="button" role="tab" aria-selected={signup} onClick={() => setMode('signup')}>
-            Sign up
-          </button>
-        </div>
-        <label>
-          Name
+        <label className="fld">
+          <span className="lb">Name</span>
           <input
+            className="in lg"
             value={name}
             onChange={(e) => setName(e.target.value)}
             autoComplete="username"
             required
           />
         </label>
-        <label>
-          Password
+        <label className="fld">
+          <span className="lb">Password</span>
           <input
+            className="in lg"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -62,25 +93,31 @@ export function Login({ onLoggedIn }: { onLoggedIn: (account: Account) => void }
             minLength={signup ? MIN_PASSWORD_LENGTH : undefined}
             required
           />
+          {signup && <span className="mu">At least {MIN_PASSWORD_LENGTH} characters.</span>}
         </label>
         {signup && (
-          <label>
-            Invite code
-            <input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} required />
+          <label className="fld">
+            <span className="lb">Invite code</span>
+            <input
+              className="in lg mono"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              required
+            />
           </label>
         )}
         {error && (
-          <p className="error" role="alert">
+          <p className="login-error well bad" role="alert">
             {error}
           </p>
         )}
-        <button type="submit" className="primary" disabled={busy}>
+        <button type="submit" className="btn pri lg" disabled={busy}>
           {signup ? 'Create account' : 'Log in'}
         </button>
-        <a className="login-wiki" href={WIKI_PATH}>
-          The game's rules and numbers: Wiki
-        </a>
+        <p className="login-wiki">
+          The game's rules and numbers: <a href={WIKI_PATH}>Wiki</a>
+        </p>
       </form>
-    </main>
+    </EntryScreen>
   )
 }

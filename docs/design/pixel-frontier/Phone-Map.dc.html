@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone, map with the card at peek</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui map" style="width: 390px; height: 844px; position: relative; overflow: hidden; font-size: 14px; background-size: 1440px 900px; background-position: -560px -160px">
+<div class="tag" style="left: 180px; top: 112px">Ashford</div>
+<div class="tk sel" style="left: 142px; top: 332px"><span class="ic i-person" aria-hidden="true"></span></div>
+<div class="tk" style="left: 240px; top: 260px"><span class="ic i-crown" aria-hidden="true"></span></div>
+<div class="tk" style="left: 220px; top: 436px"><span class="ic i-person" aria-hidden="true"></span><span class="cnt">4</span></div>
+<!-- preview after the first tap -->
+<div class="way" style="left: 156px; top: 262px; width: 4px; height: 70px; border-left-width: 4px"></div>
+<div style="position: absolute; left: 140px; top: 226px; width: 36px; height: 36px; border: 4px solid var(--gold); background: rgba(254,174,52,.3)"></div>
+
+<header class="bar fx" style="position: absolute; left: 0; top: 0; right: 0; height: 48px; padding: 0 2px 0 0; gap: 8px; border-width: 0 0 2px">
+<a class="btn lg sq dk" aria-label="Menu" href="Phone-Menu.dc.html" style="border-width: 0 2px 0 0">≡</a>
+<span class="px t16 grow" style="color: var(--gold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">Realm of Ashford</span>
+<span class="mono" style="font-size: 12px">Y2 · D131 · 14:21</span>
+<span class="chip g">live</span>
+<button class="btn lg sq dk" aria-label="Find" style="border-width: 0 0 0 2px"><span class="ic i-find" aria-hidden="true"></span></button>
+</header>
+
+<!-- one-line notices; the pick banner replaces them -->
+<div class="pn fx" role="status" style="position: absolute; left: 0; right: 0; top: 48px; padding: 6px 8px; background: var(--sun); box-shadow: none; border-width: 0 0 2px">
+<span class="grow"><span class="b">Tap where Bram walks to</span><br>7 tiles · about 1 min (1 game hour)</span>
+<button class="btn lg pri">Confirm</button><button class="btn lg">Cancel</button>
+</div>
+
+<div class="fx" style="position: absolute; left: 8px; bottom: 116px; gap: 6px">
+<button class="btn lg sq" aria-label="Centre on my residents"><span class="ic i-crown" aria-hidden="true"></span></button>
+<button class="btn lg on" aria-pressed="true">Select</button>
+<button class="btn lg" aria-pressed="false">Region</button>
+<button class="btn lg">Legend</button>
+</div>
+<button class="btn lg" style="position: absolute; right: 8px; bottom: 116px">Minimap</button>
+
+<!-- bottom sheet at peek: header only; pinned here while picking -->
+<section class="pn" aria-label="Bram" style="position: absolute; left: 0; right: 0; bottom: 0; height: 108px; border-width: 2px 0 0">
+<button aria-label="Card height: header only. Drag or tap to change it." style="display: block; width: 100%; height: 22px; background: var(--clay); border: 0; border-bottom: 2px solid var(--ink); padding: 0"><span style="display: block; width: 48px; height: 6px; margin: 0 auto; background: var(--ink)"></span></button>
+<div class="fx" style="padding: 8px 10px; gap: 10px">
+<div style="width: 48px; height: 48px; background: var(--ink); border: 4px solid var(--own); display: grid; place-items: center; flex: none"><span class="ic s32 i-person" aria-hidden="true"></span></div>
+<div class="grow" style="min-width: 0"><div class="px t18">Bram</div><div class="b" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Building a house: fetching 10 wood</div><div class="fx" style="gap: 6px; margin-top: 4px"><span class="mt hp grow"><i style="width: 92%"></i></span><span class="mt fd grow"><i style="width: 62%"></i></span></div></div>
+<button class="btn lg sq" aria-label="Close the card"><span class="ic i-x" aria-hidden="true"></span></button>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

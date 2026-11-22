@@ -1,0 +1,773 @@
+/* ---------- The pixel kit (ADR 0044: Pixel frontier) ----------
+   Ported from `docs/design/pixel-frontier/ui.css`; the `/kit` page (`Kit.tsx`) shows every atom
+   as the `System` artboard does. Hard 2 px edges, no rounded corners, no blur, no translucent
+   panels. Colours and fonts come from `theme.ts` as custom properties (`applyTheme`): the EDG32
+   palette as `--ink`, `--night`, `--slate`, `--steel`, `--fog`, `--mist`, `--bark`, `--wood`,
+   `--clay`, `--tan`, `--parch`, `--paper`, `--gold`, `--sun`, `--orange`, `--red`, `--blood`,
+   `--grass`, `--leaf`, `--pine`, `--navy`, `--sky`, `--cyan`; the HUD's roles as `--ui-*`; the
+   relationship colours as `--rel-own`, `--rel-alliance`, `--rel-other-realm`, `--rel-npc-city`,
+   `--rel-trade-org`, and as text on parchment `--text-rel-*`; fonts as `--font-ui` (IBM Plex
+   Sans), `--font-mono` (IBM Plex Mono) and `--font-pixel` (Pixelify Sans).
+
+   Atoms, each defined only here (later stylesheets place them, never restyle them):
+   text      .px (pixel face) .mono .lb (section label) .mu / .muted .ok .bad .b .small
+             .t16 .t18 .t22 .t28
+   surfaces  .pn (panel) .hd (wood header bar) .bar (dark bar) .well .sec (section)
+   layout    .grow .fx .col .wrap .spacer
+   buttons   .btn, with .pri .gold .dng .dk (on dark bars) .on (pressed) .off (greyed)
+             .why (greyed with its reason in <small>) .sm .lg (phone, 44 px) .sq .fill;
+             plain <button> elements take the .btn look, button.primary is .btn.pri,
+             [aria-pressed=true] is .on and :disabled is .off
+   orders    .og .og2 (order grid) .k (key cap; also <kbd>)
+   fields    .in (also <input>, <select>, <textarea>) .fld (label over field) .cb (checkbox)
+   tabs      .tabs .tab, .tab.on or [aria-selected=true]
+   data      .mt (meter) with .hp .fd .bl, or .ok .mid .low on its fill (also .meter);
+             .chip with .g .r .y .bl .d (also .chips); .badge (relationship chip);
+             .rw (row) with .sel .grp; .tb (table) with .n cells; .dot; .sw (swatch)
+   code      .code with .c .kw .s .n .e .ln
+   map       .tk (token) with .al .ot .np .tr .sel; .cnt (count); .tag (name tag)
+   icons     .ic with .s16 .s24 .s32 .s48, drawn by the Icon component (Icon.tsx)
+   owner     .rel-own .rel-alliance .rel-other-realm .rel-npc-city .rel-trade-org set
+             --rel (mark) and --rel-text (words) for what is inside */
+
+:root {
+  color-scheme: light;
+  font-family: var(--font-ui);
+  background: var(--ui-panel);
+  color: var(--ui-text);
+}
+body {
+  margin: 0;
+}
+
+/* ---------- Text ---------- */
+.px {
+  font-family: var(--font-pixel);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.lb {
+  font: 600 11px/1.2 var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+.mu,
+.muted {
+  color: var(--ui-muted);
+}
+.ok {
+  color: var(--ui-live);
+  font-weight: 600;
+}
+.bad {
+  color: var(--ui-bad);
+  font-weight: 600;
+}
+.b {
+  font-weight: 600;
+}
+.small {
+  font-size: 0.75rem;
+}
+.t16 {
+  font-size: 16px;
+}
+.t18 {
+  font-size: 18px;
+}
+.t22 {
+  font-size: 22px;
+}
+.t28 {
+  font-size: 28px;
+}
+.accent {
+  color: var(--text-rel-own);
+}
+.right {
+  text-align: right;
+}
+.error {
+  color: var(--ui-bad);
+  margin: 0;
+}
+
+/* ---------- Surfaces ---------- */
+.pn {
+  background: var(--parch);
+  color: var(--ui-text);
+  border: 2px solid var(--ink);
+  box-shadow:
+    inset 0 0 0 2px var(--paper),
+    4px 4px 0 var(--ink);
+}
+.hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  background: var(--wood);
+  color: var(--parch);
+  border-bottom: 2px solid var(--ink);
+  box-shadow: inset 0 2px 0 #8d5247;
+  font: 600 16px/1.2 var(--font-pixel);
+  letter-spacing: 0.02em;
+  --ui-text: var(--ui-bar-text);
+  --ui-muted: var(--ui-bar-muted);
+}
+/* A dark bar (top bar, sidebar strip, realm bar): words in parchment, plain buttons on dark. */
+.bar {
+  --ui-text: var(--ui-bar-text);
+  --ui-muted: var(--ui-bar-muted);
+  --ui-line: var(--slate);
+  --ui-line-strong: var(--steel);
+  --ui-raised-hover: var(--slate);
+  --ui-live: var(--grass);
+  --ui-bad: var(--orange);
+  --ui-warn-text: var(--gold);
+  --text-rel-own: var(--gold);
+  background: var(--bark);
+  color: var(--ui-bar-text);
+  border: 2px solid var(--ink);
+  box-shadow: inset 0 2px 0 #5a3a40;
+}
+.well {
+  background: var(--paper);
+  border: 2px solid var(--tan);
+}
+.sec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+.sec + .sec {
+  border-top: 2px solid var(--tan);
+}
+
+/* ---------- Layout ---------- */
+.grow {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.spacer {
+  flex: 1;
+}
+.fx {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wrap {
+  flex-wrap: wrap;
+}
+
+/* ---------- Buttons ---------- */
+button,
+.btn {
+  font: inherit;
+  font-weight: 600;
+  color: var(--bark);
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  box-shadow:
+    inset -2px -2px 0 var(--tan),
+    inset 2px 2px 0 #fffaf0;
+  padding: 4px 10px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  font: 600 13px/1 var(--font-ui);
+  white-space: nowrap;
+}
+button:hover:not(:disabled),
+.btn:hover:not(:disabled, .off) {
+  background-color: #fffaf0;
+}
+.btn.pri,
+button.primary,
+.btn.pri:hover:not(:disabled),
+button.primary:hover:not(:disabled) {
+  background: var(--pine);
+  color: #fff;
+  box-shadow:
+    inset -2px -2px 0 #193c3e,
+    inset 2px 2px 0 var(--leaf);
+}
+.btn.gold,
+.btn.gold:hover:not(:disabled) {
+  background: var(--gold);
+  color: var(--ink);
+  box-shadow:
+    inset -2px -2px 0 var(--orange),
+    inset 2px 2px 0 var(--sun);
+}
+.btn.dng,
+.btn.dng:hover:not(:disabled) {
+  background: var(--blood);
+  color: #fff;
+  box-shadow:
+    inset -2px -2px 0 #6e1a24,
+    inset 2px 2px 0 var(--red);
+}
+/* Plain buttons on a dark bar or a header bar are .dk too, with as little weight as a plain button
+   so that a placed button (`.side-strip .btn.on`) still wins. */
+.btn.dk,
+:where(.bar, .hd) button,
+.btn.dk:hover:not(:disabled),
+:where(.bar, .hd) button:hover:not(:disabled) {
+  background: var(--slate);
+  color: #fff;
+  box-shadow:
+    inset -2px -2px 0 var(--night),
+    inset 2px 2px 0 var(--steel);
+}
+.btn.pri:hover:not(:disabled),
+button.primary:hover:not(:disabled),
+.btn.gold:hover:not(:disabled),
+.btn.dng:hover:not(:disabled),
+.btn.dk:hover:not(:disabled),
+:where(.bar, .hd) button:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.btn.on,
+button[aria-pressed='true'],
+.btn.on:hover:not(:disabled),
+button[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--gold);
+  color: var(--ink);
+  box-shadow: inset 2px 2px 0 var(--orange);
+}
+/* As strong as .btn.pri (0,2,0) and later, so a greyed primary, gold or danger button greys out. */
+.btn.off,
+:is(button, .btn):disabled {
+  background: transparent;
+  color: var(--ui-muted);
+  border-style: dashed;
+  box-shadow: none;
+  cursor: default;
+}
+.btn.sm {
+  height: 24px;
+  padding: 0 7px;
+  font-size: 12px;
+}
+.btn.lg {
+  height: 44px;
+  padding: 0 16px;
+  font-size: 15px;
+}
+.btn.sq {
+  width: 30px;
+  padding: 0;
+}
+.btn.sm.sq {
+  width: 24px;
+}
+.btn.lg.sq {
+  width: 44px;
+}
+.btn.fill {
+  width: 100%;
+  justify-content: flex-start;
+}
+.btn.why {
+  height: auto;
+  min-height: 24px;
+  padding: 3px 7px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  white-space: normal;
+  text-align: left;
+}
+.btn.why small {
+  font: 400 11px/1.2 var(--font-ui);
+}
+
+/* ---------- Orders: a grid of buttons, each with its key ---------- */
+.og {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+.og2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.k,
+kbd {
+  display: inline-block;
+  margin-left: auto;
+  padding: 2px 3px;
+  border: 1px solid currentColor;
+  border-radius: 0;
+  font: 500 10px/1 var(--font-mono);
+}
+
+/* ---------- Fields ---------- */
+input,
+select,
+textarea,
+.in {
+  font: inherit;
+  color: var(--bark);
+  background: #fffaf0;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  box-shadow: inset 2px 2px 0 var(--tan);
+  padding: 4px 8px;
+  min-width: 0;
+}
+.in {
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  font: 13px/1 var(--font-ui);
+}
+.in.lg {
+  height: 44px;
+  font-size: 15px;
+}
+input[type='checkbox'],
+.cb {
+  appearance: none;
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  vertical-align: middle;
+  background: #fffaf0;
+  border: 2px solid var(--ink);
+  box-shadow: none;
+  cursor: pointer;
+}
+input[type='checkbox']:checked,
+.cb.on {
+  background: var(--pine);
+  box-shadow: inset 0 0 0 2px #fffaf0;
+}
+input[type='radio'],
+input[type='range'],
+progress {
+  accent-color: var(--pine);
+}
+input[type='radio'] {
+  box-shadow: none;
+}
+:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 1px;
+}
+.bar :focus-visible {
+  outline-color: var(--sun);
+}
+label,
+.fld {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ui-muted);
+}
+label > input,
+label > select {
+  color: var(--bark);
+}
+
+/* ---------- Tabs ---------- */
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 6px 6px 0;
+  background: var(--clay);
+  border-bottom: 2px solid var(--ink);
+}
+.tab,
+.tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  background: var(--tan);
+  color: var(--bark);
+  border: 2px solid var(--ink);
+  border-bottom: 0;
+  box-shadow: none;
+  font: 600 13px/1 var(--font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* Today's tabs share their row evenly (log in, the card's tabs). */
+.tabs button {
+  flex: 1;
+}
+.tab:hover:not(:disabled),
+.tabs button:hover:not(:disabled) {
+  background: var(--paper);
+}
+.tab.on,
+.tabs [aria-selected='true'],
+.tabs [aria-selected='true']:hover:not(:disabled) {
+  height: 32px;
+  margin-bottom: -2px;
+  background: var(--parch);
+  color: var(--bark);
+}
+
+/* ---------- Meters ---------- */
+.mt,
+.meter {
+  display: flex;
+  min-width: 40px;
+  height: 10px;
+  box-sizing: border-box;
+  background: var(--bark);
+  border: 2px solid var(--ink);
+  overflow: hidden;
+}
+.mt > i,
+.mt > span,
+.meter > span {
+  display: block;
+  height: 100%;
+  background: var(--grass);
+}
+.mt.hp > *,
+.meter .low,
+.mt .low {
+  background: var(--red);
+}
+.mt.fd > *,
+.meter .mid,
+.mt .mid {
+  background: var(--gold);
+}
+.mt.bl > * {
+  background: var(--sky);
+}
+.meter .ok,
+.mt .ok {
+  background: var(--grass);
+}
+.meter.big {
+  height: 12px;
+}
+
+/* ---------- Chips, badges ---------- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.chip,
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+  box-sizing: border-box;
+  padding: 0 6px;
+  background: var(--paper);
+  color: var(--bark);
+  border: 2px solid var(--ink);
+  font: 600 11px/1 var(--font-ui);
+  white-space: nowrap;
+}
+.chip.g {
+  background: var(--pine);
+  color: #fff;
+}
+.chip.r {
+  background: var(--blood);
+  color: #fff;
+}
+.chip.y {
+  background: var(--gold);
+  color: var(--ink);
+}
+.chip.bl {
+  background: var(--navy);
+  color: #fff;
+}
+.chip.d {
+  background: var(--slate);
+  color: #fff;
+}
+/* A badge names whose a thing is: the owner's square, then the words. */
+.badge {
+  color: var(--rel-text, var(--text-rel-own));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--rel, var(--rel-own));
+  border: 1px solid var(--ink);
+}
+
+/* ---------- Rows and tables ---------- */
+.rw {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  border-bottom: 2px solid var(--tan);
+}
+.rw.sel {
+  background: var(--sun);
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+.rw.grp {
+  min-height: 26px;
+  padding: 3px 10px;
+  background: var(--tan);
+  border-bottom: 2px solid var(--clay);
+}
+.tb {
+  width: 100%;
+  border-collapse: collapse;
+}
+.tb th {
+  padding: 5px 8px;
+  text-align: left;
+  font: 600 11px/1.2 var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bark);
+  background: var(--tan);
+  border-bottom: 2px solid var(--clay);
+  white-space: nowrap;
+}
+.tb td {
+  padding: 6px 8px;
+  border-bottom: 2px solid var(--tan);
+  vertical-align: middle;
+}
+.tb .n {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+.dot {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  background: var(--rel, var(--rel-own));
+  border: 2px solid var(--ink);
+}
+.sw {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  box-sizing: border-box;
+  border: 2px solid var(--ink);
+}
+
+/* ---------- Code ---------- */
+.code {
+  font: 13px/1.6 var(--font-mono);
+  background: var(--ui-code);
+  color: var(--mist);
+  border: 2px solid var(--ink);
+  white-space: pre;
+  overflow: auto;
+}
+.code .c {
+  color: var(--fog);
+}
+.code .kw {
+  color: var(--gold);
+}
+.code .s {
+  color: var(--grass);
+}
+.code .n {
+  color: var(--cyan);
+}
+.code .e {
+  background: var(--blood);
+  color: #fff;
+}
+.code .ln {
+  display: inline-block;
+  width: 34px;
+  margin-right: 12px;
+  text-align: right;
+  color: var(--fog);
+}
+
+/* ---------- Map tokens: a square, its ring in the relationship colour ---------- */
+.tk {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  background: var(--ink);
+  border: 3px solid var(--rel-own);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.tk.al {
+  border-color: var(--rel-alliance);
+}
+.tk.ot {
+  border-color: var(--rel-other-realm);
+}
+.tk.np {
+  border-color: var(--rel-npc-city);
+}
+.tk.tr {
+  border-color: var(--rel-trade-org);
+}
+.tk.sel {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.cnt {
+  height: 16px;
+  min-width: 16px;
+  box-sizing: border-box;
+  padding: 0 3px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  font: 600 10px/12px var(--font-mono);
+  text-align: center;
+}
+.tag {
+  padding: 1px 6px;
+  background: var(--ink);
+  color: #fff;
+  border: 2px solid var(--rel, var(--rel-own));
+  font: 600 13px/1.3 var(--font-pixel);
+  white-space: nowrap;
+}
+
+/* ---------- Icons: the Icon component (`Icon.tsx`) puts a sheet's 16 px cell in an svg ----------
+   Sized by --s: 20 px unless .s16 .s24 .s32 .s48; the art scales pixel for pixel. */
+.ic {
+  --s: 20px;
+  display: inline-block;
+  flex: none;
+  width: var(--s);
+  height: var(--s);
+  image-rendering: pixelated;
+}
+.ic > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.ic.s16 {
+  --s: 16px;
+}
+.ic.s24 {
+  --s: 24px;
+}
+.ic.s32 {
+  --s: 32px;
+}
+.ic.s48 {
+  --s: 48px;
+}
+
+/* ---------- Owner: what is inside takes the relationship's colours (`relationshipClass`) ---------- */
+.rel-own {
+  --rel: var(--rel-own);
+  --rel-text: var(--text-rel-own);
+}
+.rel-alliance {
+  --rel: var(--rel-alliance);
+  --rel-text: var(--text-rel-alliance);
+}
+.rel-other-realm {
+  --rel: var(--rel-other-realm);
+  --rel-text: var(--text-rel-other-realm);
+}
+.rel-npc-city {
+  --rel: var(--rel-npc-city);
+  --rel-text: var(--text-rel-npc-city);
+}
+.rel-trade-org {
+  --rel: var(--rel-trade-org);
+  --rel-text: var(--text-rel-trade-org);
+}
+
+.clock {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* ---------- The kit's own page (`/kit`, `Kit.tsx`): the atoms laid out as the System artboard ---------- */
+.kit-page {
+  box-sizing: border-box;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+  gap: 20px;
+  align-items: start;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.kit-page h2 {
+  margin: 0;
+}
+.kit-wide {
+  grid-column: 1 / -1;
+}
+.kit-swatch,
+.kit-icon {
+  gap: 2px;
+  align-items: center;
+  text-align: center;
+  font-size: 11px;
+}
+.kit-icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 10px 6px;
+}
+.kit-label {
+  width: 60px;
+}
+.kit-bar {
+  padding: 6px 10px;
+}

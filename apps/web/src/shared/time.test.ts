@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { GAME_DAYS_PER_YEAR, TICKS_PER_GAME_HOUR, formatGameTime, gameTime } from './time.js'
+import {
+  GAME_DAYS_PER_YEAR,
+  TICKS_PER_GAME_HOUR,
+  formatGameTime,
+  formatGameTimeShort,
+  gameTime,
+} from './time.js'
 import { TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR } from '@csp/balance'
 describe('game time', () => {
   it('runs 1 game minute per real second, 1 game day per 24 real minutes, 420 game days a year', () => {
@@ -35,5 +41,11 @@ describe('game time', () => {
     expect(formatGameTime(2 * TICKS_PER_GAME_DAY + 14 * TICKS_PER_GAME_HOUR + 50)).toBe(
       'Year 1 · Day 3 · 14:50',
     )
+  })
+
+  it('formats short for a phone', () => {
+    expect(formatGameTimeShort(0)).toBe('Y1 · D1 · 00:00')
+    const tick = TICKS_PER_GAME_YEAR + 130 * TICKS_PER_GAME_DAY + 14 * TICKS_PER_GAME_HOUR + 21
+    expect(formatGameTimeShort(tick)).toBe('Y2 · D131 · 14:21')
   })
 })

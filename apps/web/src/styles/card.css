@@ -1,0 +1,2138 @@
+/* The selection card: tile cards, the who-list and realm order cards, actions as rows with keys.
+   On a desktop they sit in the dock on the right (`.game-dock`, "Dock: tile cards" at the end);
+   this places one top right only until the dock has mounted. A resident's or a group's card is
+   the command bar along the bottom (`.game-command`). */
+.game-selection {
+  position: absolute;
+  /* Below the notice lane while it is a band across the screen (`NoticeLane`). */
+  top: calc(var(--top-h) + var(--lane-h, 0px) + 12px);
+  right: 12px;
+  z-index: 1;
+  width: min(360px, calc(100vw - var(--strip-w) - 24px));
+  max-height: calc(100% - var(--top-h) - var(--lane-h, 0px) - 24px);
+  overflow: auto;
+}
+/* Hidden behind the script workshop or the full Residents list (`cardHidden`). */
+.game-selection[hidden] {
+  display: none;
+}
+
+/* On a phone the card is a bottom sheet (ADR 0012, `CardSheet`): peek shows just its header,
+   half and full fixed heights; a drag sets the height inline until it settles. */
+.game-selection.sheet {
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-height: calc(100% - var(--top-h) - var(--lane-h, 0px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.game-selection.sheet-half {
+  height: 50%;
+}
+.game-selection.sheet-full {
+  height: calc(100% - var(--top-h) - var(--lane-h, 0px));
+}
+.sheet-handle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  box-shadow: none;
+  /* The artboard's (`Phone-Card`): a clay strip with an ink grip. */
+  background: var(--clay);
+  cursor: ns-resize;
+  touch-action: none;
+}
+.sheet-handle:hover:not(:disabled) {
+  background: var(--clay);
+}
+.sheet-handle:disabled {
+  cursor: default;
+  border-style: solid;
+  background: var(--clay);
+}
+.sheet-handle span {
+  width: 48px;
+  height: 6px;
+  background: var(--ink);
+}
+.game-selection.sheet .sel-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border-top: 0;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+/* Shrunk while the map waits for a target: the room the card took stays, lightly drawn, and
+   swallows clicks so none lands on the map by accident (`CONTEXT.md`: Picking a target). */
+.inspector.sel-card.sel-shrunk {
+  background: transparent;
+  box-shadow: none;
+  border-style: dashed;
+}
+.sel-dead {
+  flex: 1 1 auto;
+  background: repeating-linear-gradient(135deg, transparent 0 10px, var(--tan) 10px 12px);
+}
+.sel-line {
+  font-size: 0.8rem;
+  color: var(--ui-muted);
+}
+.sel-line strong {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+.sel-facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* A name in a line that picks that resident, such as a carriage's passenger. */
+.sel-facts button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* What the Player only remembers (`CONTEXT.md`: Last seen): greyed, apart from what is there now. */
+.sel-past,
+.last-seen {
+  color: var(--ui-muted);
+  font-style: italic;
+}
+.sel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* A row, with its Customise button beside it when it has one. */
+.sel-action {
+  display: flex;
+  gap: 2px;
+  align-items: stretch;
+}
+.sel-action > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.sel-actions .sel-action > button.customise {
+  display: block;
+  flex: none;
+  font-size: 0.75rem;
+}
+.sel-actions button {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  text-align: left;
+  height: auto;
+  line-height: 1.3;
+  white-space: normal;
+}
+.sel-actions kbd {
+  display: grid;
+  place-items: center;
+  height: 20px;
+  margin: 0;
+  box-sizing: border-box;
+  color: var(--ui-muted);
+}
+.sel-reason {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--ui-muted);
+}
+.sel-more {
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+}
+.sel-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 10px;
+}
+/* The resident card's tabs (ADR 0012): one open at a time under the header. */
+.sel-tabs button {
+  padding: 4px 6px;
+  font-size: 0.8rem;
+}
+/* The ⓘ on a building's card: a quiet toggle that opens what the building is for. */
+.sel-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sel-info-toggle {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  align-self: flex-start;
+  padding: 2px 6px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--ui-muted);
+  font-size: 0.8rem;
+}
+.sel-info-toggle:hover {
+  color: var(--ui-text);
+}
+/* A group card's list: one row per selected resident, each picking just them. */
+.sel-group button {
+  width: 100%;
+  padding: 3px 6px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--ui-muted);
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sel-group button:hover {
+  background: var(--ui-raised);
+}
+.sel-group strong {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+
+/* Who and what a tile holds (`CardList`): its horses or workers as rows, meters on the right as
+   the resident card has them, a row the Player can open is a button; its goods as the goods grid. */
+.card-list {
+  display: grid;
+  gap: 2px;
+}
+.card-list .panel-head h3 {
+  margin: 0;
+}
+.card-list-row {
+  display: grid;
+  gap: 8px;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--ui-text);
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: left;
+}
+button.card-list-row {
+  background: var(--ui-raised);
+  cursor: pointer;
+}
+button.card-list-row:hover {
+  background: var(--ui-raised-hover);
+}
+.card-list-row.heading {
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+.card-list-name {
+  display: grid;
+  min-width: 0;
+}
+.card-list-name small {
+  font-size: 0.72rem;
+}
+.card-list-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.card-food .meter {
+  margin-bottom: 4px;
+}
+/* An order's panel, open right under the row that opened it. */
+.sel-panel-under {
+  margin: 2px 0 8px;
+  scroll-margin: 12px;
+}
+.sel-actions button[aria-expanded='true'] {
+  border-left-width: 3px;
+}
+/* Run script's button keeps its label on one line beside the picker. */
+.run-script .order-buttons button {
+  white-space: nowrap;
+}
+/* The goods grid (`CONTEXT.md`: Goods on cards): icon and amount per good, the name on hover or
+   long-press; a resident's own food apart at the end. */
+.goods-grid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.goods-cell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.good-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+/* Pixel art (CONTEXT.md: Art style) stays crisp at any size. */
+.good-icon-pixel image {
+  image-rendering: pixelated;
+}
+.goods-own {
+  margin-left: 6px;
+  background: none;
+  box-shadow: none;
+  border-style: dashed;
+}
+.goods-own.warn {
+  color: var(--ui-warn-text);
+  border-color: var(--blood);
+}
+.goods-own-tag {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ui-muted);
+}
+.goods-name {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 2px 6px;
+  background: var(--ink);
+  color: var(--parch);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.goods-cell.named .goods-name {
+  display: block;
+}
+@media (hover: hover) {
+  .goods-cell:hover .goods-name {
+    display: block;
+  }
+}
+/* The resident card's header line: what they carry, then its weight against what they can. */
+.carried-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 2px;
+}
+/* A carriage on the tile card (`CarriageView`): its load bar and goods, then labelled rows. */
+.card-carriage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.card-carriage .panel-head h3 {
+  margin: 0;
+}
+.card-load .vital-head {
+  margin-bottom: 4px;
+}
+.card-rows {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 10px;
+  margin: 0;
+  font-size: 0.8rem;
+}
+.card-rows dt {
+  color: var(--ui-muted);
+}
+.card-rows dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.card-rows dd small {
+  display: block;
+  font-size: 0.72rem;
+}
+.card-rows button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* A construction site on the tile card (`SiteView`): its work meter, then a row per material with
+   its icon and name, what was delivered against what it needs, and a small bar. */
+.card-site {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.card-site .panel-head h3 {
+  margin: 0;
+}
+.card-work .meter {
+  margin-bottom: 4px;
+}
+.site-materials {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+.site-materials li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto 56px;
+  gap: 8px;
+  align-items: center;
+}
+.site-material-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The Build menu (`CONTEXT.md`: Build menu): an icon and short name per kind under group headings,
+   the groups side by side where they fit; what's tapped opens below, so the icons stay put. */
+.build-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.build-group h4,
+.build-detail h4 {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+.build-grid {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.build-grid .build-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 52px;
+  padding: 5px 2px 4px;
+  border: 2px solid var(--ink);
+  font-size: 0.68rem;
+  font-weight: 400;
+  line-height: 1.15;
+}
+.build-grid .build-kind.dimmed .build-icon,
+.build-grid .build-kind.dimmed .build-name {
+  opacity: 0.4;
+}
+.build-icon svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+.build-name {
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.build-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 2px solid var(--ui-line);
+  /* `scrollIntoView` leaves it clear of the sheet's edge. */
+  scroll-margin-bottom: 8px;
+}
+.build-detail h4 {
+  font-size: 0.85rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ui-text);
+}
+.build-detail p {
+  margin: 0;
+}
+.build-why {
+  color: var(--ui-warn-text);
+}
+.build-cost {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.build-detail .order-buttons button {
+  display: block;
+  flex: 1;
+  text-align: center;
+}
+.build-detail .order-buttons button.customise {
+  flex: none;
+}
+
+/* A resident's three equipment slots (`CONTEXT.md`: Equipment), one per line. */
+.equipment-slots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+/* The Creative section on a building's or carriage's card, for admins on a creative server
+   (`CONTEXT.md`: Creative mode): dashed like the Creative bar, a testing tool, never play. */
+.card-creative {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 2px dashed var(--ui-line);
+}
+.card-creative h3 {
+  margin: 0;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.card-creative-goods {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.card-creative-goods input {
+  width: 5em;
+}
+.card-creative > button {
+  align-self: flex-start;
+}
+.card-creative-error {
+  color: var(--ui-warn-text);
+}
+.card-creative-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.card-creative-field input {
+  width: 5.5em;
+}
+.card-creative-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+.card-creative-add summary {
+  cursor: pointer;
+}
+
+/* Order buttons in a sidebar row are smaller than the inspector's touch targets. */
+.side-panel .order-buttons {
+  gap: 4px;
+  margin-top: 6px;
+}
+.side-panel .order-buttons button {
+  min-height: 0;
+  min-width: 0;
+  padding: 4px 9px;
+  font-size: 12px;
+}
+.side-panel .order-buttons select {
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.inspector h3 {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+
+.inspector {
+  box-sizing: border-box;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.inspector p {
+  margin: 0;
+}
+.name-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.name-line h2 {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-size: 1.6rem;
+}
+.vitals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.vital-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  margin-bottom: 6px;
+}
+.inspector-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.horse-pick {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  color: inherit;
+}
+.horse-pick input {
+  flex: none;
+  margin: 2px 0 0;
+}
+
+.order-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.order-buttons button {
+  min-height: 44px;
+  min-width: 96px;
+}
+.goods-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.goods-row .buttons {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  display: flex;
+  gap: 6px;
+}
+.goods-row .amount {
+  width: 4.5em;
+  min-height: 36px;
+}
+.goods-row button {
+  min-height: 36px;
+  min-width: 64px;
+}
+/* A good's icon beside its name: the wiki's goods table, trade prices (`CONTEXT.md`: Goods on
+   cards). */
+.good-label {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.good-label .good-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+/* The realm bar (`RealmBar`; `CONTEXT.md`: Realm order, Screen; artboard Game-Realm): in realm
+   control mode it takes the command bar's place along the bottom, left of the map dock, a heading
+   and the hint over a row of big order buttons. `RealmBar` measures it into `--command-h`. */
+.realm-bar {
+  position: absolute;
+  left: 8px;
+  right: calc(var(--dock-w, 236px) + 16px);
+  bottom: 8px;
+  z-index: 3;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  font-family: var(--font-ui);
+}
+.realm-bar-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.realm-bar-head .px {
+  flex: 1 1 auto;
+}
+.realm-bar-hint {
+  color: var(--ui-muted);
+  white-space: normal;
+}
+.realm-bar-orders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.realm-bar-orders .btn {
+  flex: none;
+}
+/* The who-list (`CONTEXT.md`: Who-list): one row a resident, nearest first, can't-take greyed. */
+.who-choice {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 4px 0 6px;
+}
+.who-search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.who-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.who-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.who-shown {
+  margin: 0 0 4px;
+}
+/* Now / After under a ticked busy resident's row, in line with their name. */
+.who-when {
+  display: flex;
+  gap: 4px;
+  padding: 0 2px 5px 28px;
+  border-bottom: 2px solid var(--ui-line);
+}
+.who-row:has(.who-when) label {
+  border-bottom: none;
+}
+.who-when button {
+  padding: 2px 10px;
+  font-size: 12px;
+}
+.who-more {
+  width: 100%;
+  margin-top: 4px;
+}
+.who-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.who-row label {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: 'tick name way' 'tick doing doing';
+  column-gap: 8px;
+  align-items: baseline;
+  padding: 5px 2px;
+  border-bottom: 2px solid var(--ui-line);
+  cursor: pointer;
+}
+.who-row input {
+  grid-area: tick;
+  align-self: center;
+}
+.who-name {
+  grid-area: name;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.who-way {
+  grid-area: way;
+  white-space: nowrap;
+}
+.who-doing {
+  grid-area: doing;
+  color: var(--ui-muted);
+  min-width: 0;
+}
+.who-cant label {
+  opacity: 0.5;
+  cursor: default;
+}
+.who-actions {
+  margin-top: 8px;
+}
+/* On a phone above the map's buttons (and the minimap, when open), which `RealmBar` measures into
+   `--map-dock-h`: no heading, the hint small, the orders a finger's size in as few rows as fit. */
+.game.phone .realm-bar {
+  bottom: calc(var(--sheet-h, 0px) + 8px + var(--map-dock-h, 58px));
+  right: 8px;
+  gap: 4px;
+  padding: 6px 8px;
+}
+.game.phone .realm-bar-head .px {
+  display: none;
+}
+.game.phone .realm-bar-hint {
+  font-size: 12px;
+}
+.game.phone .realm-bar-orders {
+  gap: 4px;
+}
+.game.phone .realm-bar-orders .btn.lg {
+  height: 44px;
+  padding: 0 10px;
+  font-size: 14px;
+}
+
+/* ---------- The command bar (`CONTEXT.md`: Screen; `CommandBar.tsx`, ADR 0044) ----------
+   A resident's or a group's card along the bottom: header on the left (`.cmd-head`), tabs, the
+   open tab (`.cmd-body`) and the status line (`.cmd-status`) beside it (`.cmd-main`). Its right
+   end is left free for the map dock (`--dock-w`, set in map.css). `CardSheet` measures it
+   into `--command-h` on `.game`, so the sidebar stops above it. A panel an order opens
+   (`.cmd-panel`) sits above it. On a phone it is the bottom sheet instead (`.game-selection`). */
+.game-command {
+  position: absolute;
+  left: 8px;
+  right: calc(var(--dock-w, 236px) + 16px);
+  bottom: 8px;
+  z-index: 3;
+}
+.game-command[hidden] {
+  display: none;
+}
+.cmd-bar {
+  display: flex;
+  height: min(264px, 38vh);
+  min-height: 180px;
+  box-sizing: border-box;
+  font-family: var(--font-ui);
+}
+.cmd-head {
+  flex: none;
+  width: 280px;
+  box-sizing: border-box;
+  padding: 10px;
+  border-right: 2px solid var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+}
+.cmd-who {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+/* The figure in its relationship colour (`.rel-*` on the bar sets `--rel`). */
+.cmd-figure {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  box-sizing: border-box;
+  background: var(--ink);
+  border: 4px solid var(--rel, var(--rel-own));
+}
+.cmd-title {
+  flex: 1;
+  min-width: 0;
+}
+.cmd-title .name-line {
+  gap: 6px;
+}
+.cmd-title .name-line h2 {
+  font-size: 22px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.cmd-head .sel-line {
+  font-size: 12px;
+}
+.cmd-close {
+  flex: none;
+}
+/* Health and Hunger one line each: label, meter, value. */
+.cmd-head .vitals {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+.cmd-head .vital {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+.cmd-head .vital-head {
+  display: contents;
+  font-size: 12px;
+}
+.cmd-head .vital-head .mono {
+  order: 2;
+}
+.cmd-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cmd-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cmd-status {
+  flex: none;
+  padding: 4px 10px;
+  border-top: 2px solid var(--tan);
+}
+.cmd-status p {
+  margin: 0;
+}
+/* Pick mode: only the header shows; the room the rest took stays dead (`.sel-dead`). */
+.cmd-bar.cmd-shrunk {
+  background: transparent;
+  box-shadow: none;
+  border-style: dashed;
+}
+.cmd-bar.cmd-shrunk .cmd-head {
+  background: var(--parch);
+}
+
+/* The Orders tab (`OrderGrid`): kinds side by side in columns (`orderColumns`), a wide column
+   two buttons to a row; the grid scrolls inside the bar when they don't fit. */
+.cmd-orders {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.cmd-col {
+  flex: 1 1 0;
+  min-width: 112px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cmd-col.wide {
+  flex-grow: 2;
+  min-width: 228px;
+}
+.cmd-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* A kind's heading, as the kit's label (`.lb`). */
+.cmd-group h3 {
+  margin: 0;
+  font: 600 11px/1.2 var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+/* An order and the Customise beside it, when it has one. */
+.cmd-order {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+.cmd-order > button:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: auto;
+  min-height: 24px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+  white-space: normal;
+  line-height: 1.2;
+}
+/* The key cap after the label, though first in the button for screen readers. */
+.cmd-order kbd {
+  order: 1;
+}
+.cmd-order .sel-more {
+  order: 2;
+  font-size: 10px;
+}
+.cmd-order .sel-reason {
+  display: block;
+  font: 400 11px/1.2 var(--font-ui);
+}
+.cmd-order > .customise {
+  flex: none;
+}
+/* An order's panel under its order, on a phone. */
+.cmd-grid > .sel-panel-under {
+  grid-column: 1 / -1;
+}
+
+/* The panel an order opens (`.opanel`, `.cmd-panel` above the bar) is styled under "Order
+   panels" at the end of this file. */
+
+/* On a phone the bar is the bottom sheet: header over the tabs, kinds stacked, two to a row. */
+.game-selection.sheet .cmd-bar {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  flex-direction: column;
+  overflow: auto;
+  border-top: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.game-selection.sheet .cmd-head {
+  width: auto;
+  border-right: 0;
+  overflow: visible;
+}
+.game-selection.sheet .cmd-body {
+  overflow: visible;
+}
+.game-selection.sheet .cmd-orders {
+  flex-direction: column;
+  align-items: stretch;
+}
+.game-selection.sheet .cmd-col {
+  min-width: 0;
+}
+.game-selection.sheet .cmd-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* A finger's size in the sheet (artboard `Phone-Card`): the tabs 44 px (the open one 48), ✕,
+   each order and its Customise, a tile card's rows and fields. */
+.game-selection.sheet .sel-tabs [role='tab'] {
+  height: 44px;
+  font-size: 14px;
+}
+.game-selection.sheet .sel-tabs [aria-selected='true'] {
+  height: 48px;
+}
+.game-selection.sheet :is(.cmd-close, .sel-close, .opanel-head .btn.sq) {
+  width: 44px;
+  height: 44px;
+}
+.game-selection.sheet .cmd-order > :is(button, .customise) {
+  min-height: 44px;
+}
+.game-selection.sheet .sel-card :is(button, select, input:not([type='checkbox'], [type='radio'])),
+.game-selection.sheet .cmd-status :is(button, select) {
+  min-height: 44px;
+}
+/* At 16px a phone doesn't zoom the page when the field takes focus. */
+.game-selection.sheet :is(select, input:not([type='checkbox'], [type='radio']), textarea) {
+  font-size: 16px;
+}
+/* The who-list's rows, ticked with a finger. */
+.game-selection.sheet .who-row label {
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+/* Order panels: shell, goods, gear, move, people (T119.8)
+   ---------------------------------------------------------------------------------------------
+   The shell (`OrderPanel` in CommandBar.tsx; ADR 0044, `CONTEXT.md`: Screen): a kit panel with a
+   wood header bar (title, note, the order's key, ✕), a body that scrolls inside itself and an
+   optional footer. On a desktop it opens above the command bar (`.cmd-panel`), placed by
+   `CommandBar` over the order that opened it (inline `left`); on a phone under its order in the
+   sheet (`.opanel-inline`). Widths by size (`panelSize`, `PANEL_WIDTHS`). The sections inside are
+   `.inspector-block`s, drawn as the kit's `.sec`; `PanelFoot` is a section's confirm row. */
+.opanel {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  max-width: 100%;
+  font-family: var(--font-ui);
+}
+.opanel.cmd-panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 1;
+  max-height: calc(100vh - var(--top-h, 44px) - var(--command-h, 0px) - 24px);
+}
+.opanel-sm {
+  width: 340px;
+}
+.opanel-md {
+  width: 420px;
+}
+.opanel-lg {
+  width: 560px;
+}
+.opanel.opanel-inline {
+  width: auto;
+}
+.opanel-head {
+  flex: none;
+}
+.opanel-title {
+  overflow-wrap: anywhere;
+}
+.opanel-note {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 12px/1.2 var(--font-ui);
+}
+.opanel-note .chip {
+  font-size: 11px;
+}
+.opanel-key {
+  flex: none;
+  margin: 0;
+}
+.opanel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.opanel-inline .opanel-body {
+  overflow: visible;
+}
+.opanel-foot {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 2px solid var(--tan);
+}
+.opanel-body > .sel-panel {
+  padding: 0;
+  gap: 0;
+}
+/* Each section as the kit's `.sec`, a tan rule between them. */
+.opanel-body .inspector-block {
+  padding: 10px;
+  gap: 8px;
+}
+.opanel-body .inspector-block + .inspector-block {
+  border-top: 2px solid var(--tan);
+}
+.opanel-body p {
+  margin: 0;
+}
+/* A section's heading as the kit's label (`.lb`), its note or button beside it. */
+.opanel-body .panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.opanel-body .panel-head h3 {
+  flex: 1 1 auto;
+  margin: 0;
+  font: 600 11px/1.2 var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+/* Buttons at the kit's size in a panel; the old touch-target minimums are the sheet's below. */
+.opanel-body .order-buttons {
+  align-items: center;
+  gap: 6px;
+}
+.opanel-body .order-buttons button {
+  min-height: 0;
+  min-width: 0;
+}
+.opanel-body select {
+  max-width: 100%;
+}
+.opanel-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* A section's confirm row (`PanelFoot`): the main button takes the room, kept in view as the
+   section scrolls by. */
+.opanel-confirm {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: 0 -10px;
+  padding: 4px 10px;
+  background: var(--parch);
+}
+.opanel-confirm > button:first-of-type {
+  flex: 1 1 auto;
+}
+.opanel-units {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.opanel .amount {
+  width: 56px;
+  min-height: 0;
+}
+/* Choices that each give the order at once: Board at …, the gear to put on. */
+.opanel-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.opanel-choices button {
+  gap: 4px;
+}
+.opanel .horse-pick {
+  padding: 2px 0;
+}
+.opanel .run-script {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.opanel .run-script select {
+  flex: 1 1 160px;
+}
+
+/* Goods: Equipped, then each inventory as a goods grid (`GoodsPick`), the good tapped on a line
+   of its own with an amount and what to do with it. */
+.opanel .equipment-slots {
+  gap: 4px;
+}
+.opanel .equipment-slots li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.equipment-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.goods-spot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.goods-spot + .goods-spot {
+  margin-top: 4px;
+}
+.goods-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.goods-pick-cell {
+  gap: 3px;
+}
+.goods-pick-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+}
+
+/* Haul route: the goods each way as toggles, the Food kept, then the other stop. */
+.haul-goods {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.haul-goods-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.haul-goods-grid button {
+  gap: 4px;
+}
+.haul-keep {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.haul-on-route {
+  align-self: flex-start;
+}
+
+/* On a phone the panel opens under its order in the sheet; its buttons keep a finger's size. */
+.game-selection.sheet .opanel-inline {
+  margin: 2px 0 8px;
+}
+.game-selection.sheet .opanel-body button,
+.game-selection.sheet .opanel-body select,
+.game-selection.sheet .opanel-body input:not([type='checkbox']) {
+  min-height: 44px;
+}
+/* The Build menu in the sheet: each group across the sheet, its kinds in even columns, so no
+   group is squeezed beside another into a column of one. */
+.game-selection.sheet .build-group {
+  flex: 1 1 100%;
+}
+.game-selection.sheet .build-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+}
+.game-selection.sheet .build-grid .build-kind.btn {
+  width: auto;
+}
+/* A confirm row in the sheet (`PanelFoot`, also on a tile card): a finger's size. */
+.game-selection.sheet .opanel-confirm > button {
+  min-height: 44px;
+}
+/* Dock: tile cards (T119.5) ----------
+   The dock on the right (`Dock`, ADR 0044; artboard Card-Tile): tile cards, the who-list and
+   realm order cards (`CardSheet` with `dock`), so a tile and a resident's command bar are open
+   together. It runs from under the top bar (and the notice band) down to above the map dock
+   (`--map-dock-h`, measured by `Dock`) and the command bar (`--command-h`), `--card-dock-w` wide;
+   its cards stack at the top, each scrolling once it runs out of room. Empty, it lets clicks
+   through to the map. On a phone there is no dock: the card is the bottom sheet (`.sheet`). */
+.game {
+  --card-dock-w: 340px;
+}
+/* A tablet (768 px) keeps the desktop layout: the dock and the command bar's header narrower,
+   so the sidebar at its usual width, the dock and the bar's tabs don't overlap. */
+@media (max-width: 999px) {
+  .game:not(.phone) {
+    --card-dock-w: 300px;
+  }
+  .game:not(.phone) .cmd-head {
+    width: 220px;
+  }
+}
+.game-dock {
+  position: absolute;
+  top: calc(var(--top-h) + var(--lane-h, 0px) + 8px);
+  right: 8px;
+  bottom: calc(max(var(--command-h, 0px), var(--map-dock-h, 0px)) + 8px);
+  z-index: 1;
+  width: min(var(--card-dock-w), calc(100vw - var(--strip-w) - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.game-dock > * {
+  pointer-events: auto;
+}
+.game-dock > .game-selection {
+  position: static;
+  flex: 0 1 auto;
+  width: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+}
+
+/* A card in the dock (`SelectionCard`): a wood header bar with the owner's square (`.dot`), the
+   icon of what it is, the title and close, then one section of facts, blocks and orders. */
+.inspector.sel-card {
+  gap: 0;
+  padding: 0;
+  font-family: var(--font-ui);
+}
+/* The header stays in view while a long card scrolls in the dock or the sheet. */
+.game-selection .sel-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.sel-title {
+  margin: 0;
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+.sel-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+.sel-icon svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.sel-body {
+  flex: 1 1 auto;
+  gap: 10px;
+  font-size: 13px;
+}
+/* The first line says whose it is ("Yours", "NPC city", "Last seen …"), as the artboard's bold
+   first line. */
+.sel-body > .sel-line:first-child {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+/* The card's blocks (a site, a list, a carriage, goods, the orders) apart from each other as the
+   artboard's sections are, by a tan rule. */
+.sel-body > :is(.inspector-block, .card-site, .card-list, .card-carriage, .sel-actions) + * {
+  padding-top: 10px;
+  border-top: 2px solid var(--tan);
+}
+
+/* Queue, Stats and Script tabs (T119.10) ----------
+   The Queue and Stats tabs of the command bar (`CONTEXT.md`: Queue, Planner blocks; artboards
+   `Card-Queue-Blocks` and `Card-Stats-Script`); the Script tab's rules are in scripts.css under
+   the same heading. Each tab fills the bar's body edge to edge, in columns that scroll inside
+   it; in the phone's sheet they stack and the sheet scrolls. */
+
+/* The Queue tab grows the bar upward (`CommandBar`'s `tall`), its button at the tabs' end. */
+.cmd-bar.cmd-tall {
+  height: min(520px, calc(100vh - var(--top-h, 44px) - 24px));
+}
+.cmd-main {
+  position: relative;
+}
+.cmd-grow {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+}
+/* The tab strip leaves room for the button, so it never covers the last tab. */
+.cmd-main:has(> .cmd-grow) > .tabs {
+  padding-right: 118px;
+}
+
+/* The planner (`QueueBlock`): the toolbar, the steps in their brackets and the foot on the left,
+   the Add step palette and its ask beside them. */
+.queue-planner {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: -8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.queue-list {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.queue-list > p {
+  margin: 8px 10px;
+}
+.queue-planner .order-buttons button {
+  min-height: 0;
+  min-width: 0;
+}
+/* The toolbar: title and draft mark, the tools, the count; Saved…'s form opens on a row below. */
+.queue-tools {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 2px solid var(--tan);
+}
+.queue-tools .saved-queues,
+.queue-tools .saved-queues > .order-buttons,
+.queue-tools > .order-buttons {
+  display: contents;
+}
+.queue-tools .saved-queues > :not(.order-buttons) {
+  flex-basis: 100%;
+}
+.queue-help {
+  flex: none;
+  margin: 6px 8px 0;
+  padding: 6px 8px;
+}
+/* How many steps the plan becomes after repeats, warned when over what a queue holds. */
+.queue-unrolled-over {
+  color: var(--ui-warn-text);
+  font-weight: 600;
+}
+/* Saved…: the name to save under, and the list to load from. */
+.saved-queues-save,
+.saved-queues-list,
+.saved-queues-none {
+  margin: 0;
+  padding: 6px 8px;
+}
+.saved-queues-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.saved-queues-save input {
+  flex: 1 1 10em;
+  min-width: 0;
+  height: 24px;
+}
+.saved-queues-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.saved-queues-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+.saved-queues-list .buttons {
+  display: flex;
+  gap: 4px;
+}
+/* Brackets (`CONTEXT.md`: Planner blocks): Loop the outermost, scrolling under its head; each
+   repeat and If block a head row with its steps indented under it, a rule down their left. */
+.queue-bracket {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.queue-loop-bracket {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.queue-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.queue-loop-bracket > .queue-steps {
+  margin-left: 12px;
+  border-left: 2px dashed var(--tan);
+}
+.queue-loop-bracket.on > .queue-steps {
+  border-left: 2px solid var(--ui-live);
+}
+.queue-steps .queue-steps {
+  margin-left: 18px;
+  border-left: 2px solid var(--clay);
+}
+.queue-steps:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+/* A block's head as the kit's group row: tan, an If on sun; the words in full colour there. */
+.queue-bracket-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-height: 30px;
+  box-sizing: border-box;
+  padding: 3px 8px;
+  background: var(--tan);
+  border-bottom: 2px solid var(--clay);
+  color: var(--ui-text);
+}
+.queue-bracket-head .muted {
+  color: var(--ui-text);
+}
+.queue-loop-bracket > .queue-bracket-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.queue-repeat-bracket > .queue-bracket-head,
+.queue-if-bracket > .queue-bracket-head:not(.queue-else-head) {
+  cursor: grab;
+}
+.queue-if-bracket > .queue-bracket-head:not(.queue-else-head) {
+  background: var(--sun);
+}
+.queue-if-bracket > .queue-bracket-head > .queue-step-label {
+  flex: 1 1 14em;
+  white-space: normal;
+}
+.queue-bracket-head .buttons,
+.queue-step-head .buttons {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.queue-bracket-head:focus-visible,
+.queue-step:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+/* A step: a row with its icon, number and label, its duration, remove; the current one marked
+   down its left edge, a picked one on sun. */
+.queue-step {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 32px;
+  box-sizing: border-box;
+  padding: 3px 8px;
+  border-bottom: 2px solid var(--tan);
+  cursor: grab;
+}
+.queue-step.current {
+  background: var(--paper);
+  box-shadow: inset 4px 0 0 var(--ui-live);
+}
+.queue-step.picked,
+.queue-bracket.picked > .queue-bracket-head {
+  background: var(--sun);
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+.queue-step-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.queue-step-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A step whose place is gone from the map, as a saved queue's loaded after a tear-down. */
+.queue-step-gone {
+  color: var(--ui-warn-text);
+  font-weight: 600;
+}
+.queue-step-chip {
+  flex: none;
+}
+/* Repeat's how and count, a duration being typed, Loop's switch: one line of small fields. */
+.queue-step-minutes,
+.queue-loop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.queue-step-minutes select,
+.queue-step-minutes input {
+  height: 24px;
+}
+.queue-block-count {
+  width: 4em;
+}
+/* The part of an If being run, in a running queue. */
+.queue-branch {
+  margin-left: 4px;
+}
+/* An insert point between two items: "+" to add the next step there, faint until hovered; the
+   one set, and Move here while steps are picked, a full-width bar in the list. */
+.queue-insert {
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  height: 0;
+  position: relative;
+  z-index: 1;
+}
+.queue-insert button {
+  position: absolute;
+  top: -10px;
+  height: 18px;
+  min-height: 0;
+  padding: 0 6px;
+  font-size: 11px;
+  opacity: 0.4;
+}
+.queue-insert button:hover,
+.queue-insert button:focus-visible,
+.queue-insert.set button,
+.queue-insert.move button {
+  opacity: 1;
+}
+.queue-insert.set,
+.queue-insert.move {
+  height: auto;
+  padding: 3px 8px;
+}
+.queue-insert.set button,
+.queue-insert.move button {
+  position: static;
+  width: 100%;
+}
+/* Under the steps: what giving does or why it waits, then Discard and Start (or Edit as draft). */
+.queue-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-top: 2px solid var(--tan);
+}
+.queue-foot p {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+}
+/* Add step beside the steps: its palette, then what the step being planned asks for. */
+.queue-palette {
+  min-width: 0;
+  min-height: 0;
+  max-width: 440px;
+  overflow: auto;
+  border-left: 2px solid var(--ink);
+}
+.add-step {
+  display: flex;
+  flex-direction: column;
+}
+.add-step.open {
+  width: 420px;
+  max-width: 100%;
+}
+.add-step p {
+  margin: 0;
+}
+.step-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.step-palette-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.step-palette-group h4 {
+  margin: 0;
+}
+.step-palette-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.step-palette-item {
+  display: inline-flex;
+  gap: 2px;
+}
+.add-step-ask {
+  background: var(--paper);
+}
+.add-step-ask .order-buttons {
+  gap: 4px;
+}
+/* The condition editor of an If, a Repeat until or a Wait until: its fields on a line, what it
+   reads as in a well, then its button. */
+.condition-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.condition-editor .order-buttons {
+  align-items: center;
+}
+.condition-preview {
+  margin: 0;
+  padding: 6px 8px;
+}
+
+/* The Stats tab: facts and family, the four stats, skills; side by side, each scrolling. */
+.stats-tab {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: -8px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.3fr) minmax(0, 1fr);
+}
+.stats-tab > .sec {
+  min-height: 0;
+  overflow: auto;
+}
+.stats-tab > .sec + .sec {
+  border-top: 0;
+  border-left: 2px solid var(--tan);
+}
+.stats-tab h3 {
+  margin: 0;
+}
+/* A stat: its name, base + trained + room to the cap as one bar, the numbers. */
+.stat {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) 92px;
+  gap: 8px;
+  align-items: center;
+}
+.stat .mono {
+  text-align: right;
+  font-size: 12px;
+}
+.stat-bar > .stat-base {
+  background: var(--clay);
+}
+.stat-bar > .stat-trained {
+  background: var(--gold);
+}
+.stat-bar > .stat-room {
+  background: var(--steel);
+}
+.stat-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.stat-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.stat-legend .stat-base {
+  --rel: var(--clay);
+}
+.stat-legend .stat-trained {
+  --rel: var(--gold);
+}
+.stat-legend .stat-room {
+  --rel: var(--steel);
+}
+
+/* In the phone's sheet: the planner's palette under the steps, the stats stacked, the sheet
+   scrolling them all at a finger's size. */
+.game-selection.sheet :is(.queue-planner, .stats-tab) {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.game-selection.sheet :is(.queue-loop-bracket, .queue-palette, .stats-tab > .sec) {
+  overflow: visible;
+}
+.game-selection.sheet .queue-palette {
+  max-width: none;
+  border-left: 0;
+  border-top: 2px solid var(--ink);
+}
+.game-selection.sheet .add-step.open {
+  width: auto;
+}
+.game-selection.sheet .stats-tab > .sec + .sec {
+  border-left: 0;
+  border-top: 2px solid var(--tan);
+}
+.game-selection.sheet .queue-planner button {
+  min-height: 44px;
+}
+.game-selection.sheet .queue-insert button {
+  min-height: 0;
+  height: 28px;
+}
+.game-selection.sheet .queue-insert:not(.set, .move) button {
+  top: -14px;
+}
+/* Realm control mode and the army card (T119.7) ----------
+   The who-list (`WhoList`; artboard Game-Realm) in the dock: rows ruled as the kit's (`.rw`),
+   Now | After as one switch, the can't rows saying why in red, and Cancel and Confirm in a footer
+   that stays in view while the card scrolls. In the dock the whole card scrolls, not the list. */
+.who-row label {
+  padding: 6px 2px;
+  border-bottom-color: var(--tan);
+}
+.who-when {
+  gap: 0;
+  border-bottom-color: var(--tan);
+}
+.who-cant label {
+  opacity: 0.7;
+}
+.who-cant .who-doing {
+  color: var(--ui-bad);
+}
+.who-more {
+  width: auto;
+  margin: 8px 0 0;
+}
+.game-dock .who-list {
+  max-height: none;
+  overflow: visible;
+}
+.who-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px -10px -10px;
+  padding: 8px 10px;
+  border-top: 2px solid var(--ink);
+  background: var(--paper);
+}
+.who-again {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The Orders block on a building's, carriage's or vessel's card in realm control mode
+   (`BuildingOrders`, `VehicleOrders`), headed as the card's other blocks are; a tile's realm
+   orders (`RealmTileOrders`) two to a row. */
+.realm-orders .panel-head h3 {
+  margin: 0;
+}
+.realm-tile-orders .order-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.realm-tile-orders .order-buttons button {
+  min-width: 0;
+}
+
+/* An army's card in the command bar (`ArmyCard`): members and wagons under its name, the target
+   picker over Attack and Follow, Members and Supply as plain lists. */
+.cmd-head .army-facts {
+  color: var(--ui-text);
+}
+.army-orders .cmd-group > select {
+  width: 100%;
+}
+/* End of realm control mode and the army card (T119.7) */
+
+/* Order panels: work and build (T119.9)
+   ---------------------------------------------------------------------------------------------
+   The panels of Work, Gather, Teach, Build, Tear down and Breed horses in the order panel shell
+   (artboards Card-Panels and Card-New-Orders), the Build menu wherever it opens (an order's
+   panel, the realm's Build card in the dock, the planner's Add step), the realm orders on a
+   building's or vehicle's card and a siege machine's orders as a grid two to a row, Work settings
+   on a workplace's card, and the form before a script starts. Atoms keep the kit's look; these
+   rules only place them. */
+
+/* The Build menu: each group under its label, its kinds as buttons with the kind's pixel sprite
+   (`BuildingIcon`) over its short name; what's tapped opens below on paper, as its own section. */
+.build-groups {
+  gap: 8px 12px;
+}
+.build-group h4.lb {
+  margin: 0;
+}
+.build-grid {
+  flex-wrap: wrap;
+}
+.build-grid .build-kind.btn {
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 2px;
+  width: 60px;
+  height: auto;
+  min-height: 58px;
+  padding: 4px 2px 3px;
+  font-weight: 400;
+  font-size: 11px;
+  line-height: 1.15;
+}
+.build-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+}
+.build-icon svg,
+.build-icon img {
+  display: block;
+  width: 32px;
+  height: 32px;
+}
+/* Line art is drawn smaller in its box, as it was beside its name. */
+.build-icon:not(.build-icon-pixel, .build-icon-painted) svg {
+  width: 24px;
+  height: 24px;
+}
+/* Pixel art (`CONTEXT.md`: Art style) stays crisp at any size. */
+.build-icon-pixel svg,
+.build-icon-pixel image,
+.build-icon-painted img {
+  image-rendering: pixelated;
+}
+.build-detail {
+  gap: 8px;
+  margin-top: 4px;
+  padding: 10px;
+  border: 2px solid var(--tan);
+  background: var(--paper);
+}
+.build-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.build-detail-head .build-icon,
+.build-detail-head .build-icon svg,
+.build-detail-head .build-icon img {
+  width: 40px;
+  height: 40px;
+}
+.build-detail h4.px {
+  margin: 0;
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ui-text);
+}
+.build-detail .build-why {
+  color: var(--ui-warn-text);
+}
+/* Built of: the label, then Wood | Stone as one pair of buttons. */
+.build-material {
+  align-items: center;
+  gap: 0;
+}
+.build-material .lb {
+  margin-right: 8px;
+}
+.build-material .btn + .btn {
+  margin-left: -2px;
+}
+.build-detail .opanel-confirm {
+  background: var(--paper);
+}
+.build-detail .order-buttons button {
+  display: inline-flex;
+  flex: none;
+}
+.build-detail .order-buttons button:first-of-type {
+  flex: 1 1 auto;
+}
+
+/* A construction site's materials: icon, name, delivered against needed. */
+.site-material-row {
+  gap: 6px;
+  font-size: 12px;
+}
+
+/* Work at a smithy: a row per recipe (icon, name and inputs, Make, Customise), then Mend. */
+.work-recipes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.work-recipe {
+  gap: 6px;
+  min-height: 28px;
+}
+.work-recipe > .good-icon,
+.work-recipe > .ic {
+  flex: none;
+}
+
+/* Teach: the subject's picker takes the room, Teach beside it. */
+.subject-pick {
+  align-items: center;
+}
+.subject-pick select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Breed horses for a group or from a stable's card: one block per stable. */
+.group-breed {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.group-breed + .group-breed {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 2px solid var(--tan);
+}
+
+/* The realm orders on a building's or vehicle's card, and a siege machine's orders, two to a row
+   as the command bar's (`ActionRows` with `grid`); a panel opens across both columns. */
+.realm-orders .cmd-grid,
+.sel-body > .cmd-grid {
+  margin-top: 2px;
+}
+.sel-body > .cmd-grid + * {
+  padding-top: 10px;
+  border-top: 2px solid var(--tan);
+}
+.realm-orders .sel-panel-under .inspector-block {
+  padding: 8px 0 0;
+}
+
+/* Work settings on a workplace's card: a quiet toggle, then the work script and its params. */
+.work-settings-toggle {
+  align-self: stretch;
+  padding: 2px 0;
+}
+.work-settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.work-settings-body .fld select {
+  width: 100%;
+}
+
+/* The form before a script starts (Customise; artboard Card-Panels "Start Work"): each param by
+   its script name, Cancel and Start side by side. */
+.start-param-label strong {
+  font-family: var(--font-mono);
+}
+.start-params .hud-dialog-actions > button {
+  flex: 1 1 0;
+}

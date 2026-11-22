@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sidebar, Cities with trade</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<aside class="ui pn col" style="width: 420px; height: 1240px; gap: 0">
+<div class="hd"><span class="ic i-city" aria-hidden="true"></span><span class="grow">Cities in sight</span><span class="mono" style="font-size: 12px">4 in sight</span></div>
+
+<!-- own city -->
+<button class="rw" aria-expanded="true" style="width: 100%; background: var(--paper); border-width: 0 0 2px; text-align: left"><span class="dot"></span><span class="grow"><span class="b">Ashford</span> · Your city<br><span class="bad">Occupied by the realm of Mire, 2 game days left</span></span><span>▾</span></button>
+<div class="sec"><span>8 residents in sight · 1 town hall, 5 houses, 1 storage, 28 walls, 1 gate, 1 farm, 1 stable</span>
+<div class="fx"><span class="grow">Gate at 2190, 1786: <span class="b">open</span></span><button class="btn sm">Close</button><button class="btn sm">Show on map</button></div></div>
+
+<!-- trading post, open -->
+<button class="rw sel" aria-expanded="true" style="width: 100%; border-width: 0 0 2px; text-align: left"><span class="dot" style="background: var(--trade)"></span><span class="grow"><span class="b">Saltmarket</span> · Trading post</span><span>▾</span></button>
+<div class="sec"><span class="fx"><span class="grow">3 residents in sight · 1 town hall, 1 warehouse</span><a href="Wiki.dc.html" style="color: var(--navy)">How to trade</a></span>
+<span class="px t16">Warehouse at 1904, 2210</span>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<table class="tb"><thead><tr><th>You can buy</th><th class="n">Units</th><th class="n">Coins</th></tr></thead><tbody><tr><td>Iron</td><td class="n">120</td><td class="n">11</td></tr><tr><td>Sword</td><td class="n">8</td><td class="n">46</td></tr><tr><td>Shield</td><td class="n">5</td><td class="n">38</td></tr></tbody></table>
+<table class="tb"><thead><tr><th>You can sell</th><th class="n">Coins</th></tr></thead><tbody><tr><td>Food</td><td class="n">2</td></tr><tr><td>Stone</td><td class="n">3</td></tr><tr><td>Iron ore</td><td class="n">5</td></tr></tbody></table>
+</div></div>
+<div class="sec" style="background: var(--paper)"><span class="px t16">Trading</span>
+<div class="fx"><label class="fld grow"><span class="lb">Trader</span><select class="in"><option>Ana</option></select></label><label class="fld grow"><span class="lb">With</span><select class="in"><option>their hands</option><option>carriage 9</option></select></label></div>
+<span>Carries 24 coins and 6 Stone; room for 14 kg more (4 Iron)</span>
+<div class="fx"><label class="fld grow"><span class="lb">Good</span><select class="in"><option>Iron</option></select></label><label class="fld" style="width: 90px"><span class="lb">Units</span><input class="in mono" value="4"></label></div>
+<span class="b">Delivery</span><span class="mu">A caravan brings what you buy to your city's storage, or fetches what you sell from it, for a fee.</span>
+<select class="in" aria-label="City"><option>none, carry it here</option><option>to or from Ashford</option></select>
+<button class="btn pri" style="height: auto; padding: 8px 10px; white-space: normal">Buy 2 Iron for 22 coins: your coins run out</button>
+<button class="btn off" disabled style="height: auto; padding: 8px 10px; white-space: normal">Can't sell Iron: nothing of it to sell</button>
+<span class="mu">With delivery the buttons read "Buy 4 Iron for 44 coins + 6 fee, delivered to Ashford" and "Sell 20 Stone from Ashford, picked up for about 54 coins after a 6 fee".</span></div>
+<div class="sec"><span class="b">Buying off an admin directive</span><div class="fx"><select class="in grow" aria-label="Payer"><option>Ana · their hands</option></select></div><button class="btn off" disabled style="height: auto; padding: 8px 10px; white-space: normal">Buying off the directive (farming new Players) takes 500 coins</button></div>
+
+<!-- nobody there: send a trader -->
+<div class="sec" style="background: var(--paper)"><span class="px t16">Sending a trader</span><span>Nobody of yours is at the warehouse at 1904, 2210 to trade.</span>
+<div class="fx"><select class="in grow" aria-label="Send"><option>Ana, 42 tiles away, 24 coins and 6 Stone</option><option>carriage 9, driven by Tobin, 120 tiles away</option></select><button class="btn pri">Send</button></div><span class="mu">Then: "Ana is on the way, about 6 min (5 game hours)."</span></div>
+
+<!-- NPC city -->
+<button class="rw" aria-expanded="true" style="width: 100%; background: var(--paper); border-width: 2px 0; text-align: left"><span class="dot" style="background: var(--npc)"></span><span class="grow"><span class="b">Dunmoor</span> · NPC city</span><span>▾</span></button>
+<div class="sec"><span class="bad">It holds you in low standing: it won't trade with you or hire out to you, and its gates are shut to your residents.</span>
+<span class="fx"><span class="grow"><span class="b">Price: 1,400 coins</span><br><span class="mu">To buy it, bring residents carrying the coins to its town hall at 2410, 1520. Your residents at its town hall carry 900 coins.</span></span><button class="btn sm off" disabled>Buy for 1,400 coins</button></span>
+<span class="mu">Storage prices list its surplus and what it is short of: "It has nothing to spare.", "It takes nothing else."</span>
+<a class="btn sm" href="Side-Contracts.dc.html">Hire its residents in Contracts</a></div>
+
+<!-- another realm -->
+<button class="rw" aria-expanded="true" style="width: 100%; background: var(--paper); border-width: 2px 0; text-align: left"><span class="dot" style="background: var(--ally)"></span><span class="grow"><span class="b">Harrowgate</span> · City of the realm of Harrow</span><span>▾</span></button>
+<div class="sec"><span class="b">Transfer</span><span class="mu">A caravan fetches goods or coins from one of your cities and brings them to this city, for a fee.</span>
+<div class="fx"><label class="fld grow"><span class="lb">From</span><select class="in"><option>Ashford</option></select></label><label class="fld grow"><span class="lb">Good</span><select class="in"><option>Food</option></select></label><label class="fld" style="width: 70px"><span class="lb">Units</span><input class="in mono" value="60"></label></div>
+<button class="btn pri" style="height: auto; padding: 8px 10px; white-space: normal">Send 60 Food from Ashford for a 14-coin fee</button><span class="mu">to Harrowgate, by Trade Org caravan</span></div>
+
+<div class="hd" style="background: var(--slate); border-top: 2px solid var(--ink)"><span class="grow">Last seen</span><span class="mono" style="font-size: 12px">2</span></div>
+<div class="rw" style="opacity: .8"><span class="dot" style="background: var(--other)"></span><span class="grow"><span class="b">Mirefield</span> · City of the realm of Mire<br><span class="mu">Last seen: day 118, 09:40 (13 days ago) · 4 houses, 1 storage · read only</span></span><span>▸</span></div>
+<div class="rw" style="opacity: .8"><span class="dot" style="background: var(--trade)"></span><span class="grow"><span class="b">Trade Org HQ</span> · Trade Org HQ<br><span class="mu">Last seen: year 1, day 402, 17:05</span></span><span>▸</span></div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":420,"height":1240}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

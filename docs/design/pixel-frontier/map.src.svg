@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 450" width="1440" height="900" shape-rendering="crispEdges">
+<defs>
+<image id="bs" href="data:image/png;base64,@@BUILDINGS@@" width="496" height="336" style="image-rendering:pixelated"/>
+<image id="ts" href="data:image/png;base64,@@TILES@@" width="336" height="144" style="image-rendering:pixelated"/>
+<pattern id="g" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#63c74d"/><path fill="#3e8948" d="M3 4h1v2h-1zM4 5h1v1h-1zM11 10h1v2h-1zM12 11h1v1h-1z"/><path fill="#8fde5d" d="M8 2h1v1h-1zM2 12h1v1h-1z"/></pattern>
+<pattern id="f" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#3e8948"/><path fill="#265c42" d="M4 2h8v2h2v6h-2v2h-8v-2h-2v-6h2z"/><path fill="#63c74d" d="M5 4h3v2h-3z"/><path fill="#733e39" d="M7 12h2v3h-2z"/></pattern>
+<pattern id="h" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#e8b796"/><path fill="#b86f50" d="M2 10h2v-2h2v-2h4v2h2v2h2v1h-3v-2h-2v-2h-2v2h-2v2h-3z"/></pattern>
+<pattern id="m" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#8b9bb4"/><path fill="#5a6988" d="M7 2h2v2h2v3h2v3h2v3h-14v-3h2v-3h2v-3h2z"/><path fill="#fff" d="M7 2h2v2h1v1h-4v-1h1z"/></pattern>
+<pattern id="w" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#0099db"/><path fill="#2ce8f5" d="M2 5h4v1h-4zM9 11h4v1h-4z"/></pattern>
+<pattern id="s" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#124e89"/><path fill="#0099db" d="M2 5h4v1h-4zM9 11h4v1h-4z"/></pattern>
+<!-- Daniel's pieces: wood wall and road, straight, turned for the vertical runs -->
+<pattern id="wh" width="16" height="16" patternUnits="userSpaceOnUse"><svg width="16" height="16" viewBox="48 16 16 16"><use href="#ts"/></svg></pattern>
+<pattern id="wv" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(90)"><svg width="16" height="16" viewBox="48 16 16 16"><use href="#ts"/></svg></pattern>
+<pattern id="rh" width="16" height="16" patternUnits="userSpaceOnUse"><svg width="16" height="16" viewBox="48 80 16 16"><use href="#ts"/></svg></pattern>
+<pattern id="rv" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(90)"><svg width="16" height="16" viewBox="48 80 16 16"><use href="#ts"/></svg></pattern>
+<svg id="corner" width="16" height="16" viewBox="80 16 16 16"><use href="#ts"/></svg>
+<svg id="house" width="32" height="32" viewBox="16 16 32 32"><use href="#bs"/></svg>
+<svg id="store" width="32" height="32" viewBox="64 16 32 32"><use href="#bs"/></svg>
+<svg id="mine" width="32" height="32" viewBox="112 16 32 32"><use href="#bs"/></svg>
+<svg id="lumber" width="32" height="32" viewBox="208 16 32 32"><use href="#bs"/></svg>
+<svg id="smelter" width="32" height="32" viewBox="256 16 32 32"><use href="#bs"/></svg>
+<!-- not drawn yet in art/pixel: placeholders -->
+<g id="hall"><path fill="#c0cbdc" d="M6 18h36v26h-36z"/><path fill="#124e89" d="M4 10h40v8h-40z"/><path fill="#c0cbdc" d="M20 2h8v8h-8z"/><path stroke="none" fill="#0099db" d="M5 11h38v3h-38z"/><path stroke="none" fill="#feae34" d="M22 4h4v3h-4z"/><path stroke="none" fill="#3e2731" d="M20 30h8v14h-8zM10 24h4v6h-4zM34 24h4v6h-4z"/></g>
+<g id="farm"><path fill="#e4a672" d="M2 2h60v60h-60z"/><path stroke="none" fill="#fee761" d="M6 8h52v4h-52zM6 20h52v4h-52zM6 32h52v4h-52zM6 44h52v4h-52z"/><path stroke="none" fill="#63c74d" d="M6 14h52v2h-52zM6 26h52v2h-52zM6 38h52v2h-52zM6 50h52v6h-52z"/></g>
+<g id="stable"><path fill="#b86f50" d="M4 16h40v28h-40z"/><path fill="#e4a672" d="M2 8h44v8h-44z"/><path stroke="none" fill="#3e2731" d="M8 26h8v18h-8zM20 26h8v18h-8zM32 26h8v18h-8z"/></g>
+<g id="work"><path fill="#b86f50" d="M4 14h24v14h-24z"/><path fill="#5a6988" d="M2 8h28v6h-28z"/><path stroke="none" fill="#181425" d="M12 18h8v10h-8z"/></g>
+</defs>
+<rect width="720" height="450" fill="url(#g)"/>
+<g transform="scale(16)">
+<path fill="url(#f)" d="M0 0h17v3h-2v3h-3v2h-4v3h-3v5h-5z"/>
+<path fill="url(#f)" d="M33 9h6v2h3v5h-2v3h-5v-2h-3v-5h1z"/>
+<path fill="url(#h)" d="M24 0h12v3h-2v3h-5v-2h-3v-2h-2z"/>
+<path fill="url(#h)" d="M33 22h12v6h-15v-3h3z"/>
+<path fill="url(#m)" d="M36 0h9v9h-3v-2h-3v-3h-3z"/>
+<path fill="url(#w)" d="M14 17h5v1h2v4h-2v2h-5v-2h-2v-4h2z"/>
+<path fill="url(#s)" d="M0 22h6v2h3v2h4v2h-13z"/>
+<path fill="#fee761" opacity=".18" d="M19 8h12v11h-12z"/>
+</g>
+<!-- roads -->
+<rect x="480" y="208" width="32" height="16" fill="url(#rh)"/>
+<rect x="496" y="96" width="16" height="112" fill="url(#rv)"/>
+<rect x="496" y="224" width="16" height="96" fill="url(#rv)"/>
+<svg x="496" y="208" width="16" height="16" viewBox="144 80 16 16"><use href="#ts"/></svg>
+<!-- wall ring with a gate on the east side -->
+<rect x="336" y="144" width="128" height="16" fill="url(#wh)"/>
+<rect x="336" y="272" width="128" height="16" fill="url(#wh)"/>
+<rect x="320" y="160" width="16" height="112" fill="url(#wv)"/>
+<rect x="464" y="160" width="16" height="48" fill="url(#wv)"/>
+<rect x="464" y="224" width="16" height="48" fill="url(#wv)"/>
+<use href="#corner" x="320" y="144"/>
+<use href="#corner" transform="translate(464 144) rotate(90 8 8)"/>
+<use href="#corner" transform="translate(464 272) rotate(180 8 8)"/>
+<use href="#corner" transform="translate(320 272) rotate(270 8 8)"/>
+<svg x="464" y="208" width="16" height="16" viewBox="272 16 16 16"><use href="#ts"/></svg>
+<!-- resource nodes -->
+<svg x="560" y="176" width="16" height="16" viewBox="16 112 16 16"><use href="#ts"/></svg>
+<svg x="472" y="32" width="16" height="16" viewBox="48 112 16 16"><use href="#ts"/></svg>
+<svg x="656" y="64" width="16" height="16" viewBox="80 112 16 16"><use href="#ts"/></svg>
+<svg x="600" y="16" width="16" height="16" viewBox="112 112 16 16"><use href="#ts"/></svg>
+<svg x="272" y="304" width="16" height="16" viewBox="176 112 16 16"><use href="#ts"/></svg>
+<!-- buildings -->
+<use href="#house" x="336" y="160"/><use href="#house" x="336" y="200"/><use href="#house" x="336" y="240"/><use href="#house" x="432" y="232"/><use href="#house" x="384" y="160"/>
+<use href="#store" x="432" y="168"/>
+<use href="#lumber" x="544" y="192"/><use href="#mine" x="632" y="32"/><use href="#smelter" x="272" y="192"/>
+<g stroke="#181425" stroke-width="2" paint-order="stroke" stroke-linejoin="miter">
+<use href="#hall" x="384" y="196"/>
+<use href="#farm" x="368" y="304"/>
+<use href="#stable" x="448" y="320"/>
+<use href="#work" x="488" y="48"/>
+</g>
+<g transform="scale(16)"><path fill="#181425" d="M42 11h3v12h-2v-4h-1z"/><path fill="#181425" opacity=".45" d="M40 10h2v9h1v5h-2v-4h-1z"/></g>
+</svg>

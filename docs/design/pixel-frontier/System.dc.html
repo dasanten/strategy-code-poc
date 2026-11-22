@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pixel kit: colours, type, controls, icons</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui" style="width: 1440px; height: 1000px; box-sizing: border-box; padding: 24px; background: var(--parch); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-content: start">
+
+<section class="pn" style="grid-column: 1 / -1"><div class="hd"><span class="grow">Pixel frontier</span><span style="font-size: 12px">hard 2 px edges · no rounded corners · no blur · EDG32 colours, as in art/pixel</span></div>
+<div class="sec" style="flex-direction: row; flex-wrap: wrap; gap: 6px">
+<span class="col" style="gap: 2px"><span class="sw" style="background: #181425"></span><span class="mono" style="font-size: 11px">ink</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #262b44"></span><span class="mono" style="font-size: 11px">night</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #3a4466"></span><span class="mono" style="font-size: 11px">slate</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #5a6988"></span><span class="mono" style="font-size: 11px">steel</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #8b9bb4"></span><span class="mono" style="font-size: 11px">fog</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #c0cbdc"></span><span class="mono" style="font-size: 11px">mist</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #3e2731"></span><span class="mono" style="font-size: 11px">bark</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #733e39"></span><span class="mono" style="font-size: 11px">wood</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #b86f50"></span><span class="mono" style="font-size: 11px">clay</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #e4a672"></span><span class="mono" style="font-size: 11px">tan</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #ead4aa"></span><span class="mono" style="font-size: 11px">parch</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #f6e9c9"></span><span class="mono" style="font-size: 11px">paper</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #feae34"></span><span class="mono" style="font-size: 11px">gold</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #fee761"></span><span class="mono" style="font-size: 11px">sun</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #f77622"></span><span class="mono" style="font-size: 11px">orange</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #e43b44"></span><span class="mono" style="font-size: 11px">red</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #a22633"></span><span class="mono" style="font-size: 11px">blood</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #63c74d"></span><span class="mono" style="font-size: 11px">grass</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #3e8948"></span><span class="mono" style="font-size: 11px">leaf</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #265c42"></span><span class="mono" style="font-size: 11px">pine</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #124e89"></span><span class="mono" style="font-size: 11px">navy</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #0099db"></span><span class="mono" style="font-size: 11px">sky</span></span>
+<span class="col" style="gap: 2px"><span class="sw" style="background: #2ce8f5"></span><span class="mono" style="font-size: 11px">cyan</span></span>
+</div></section>
+
+<section class="pn"><div class="hd">Type</div>
+<div class="sec"><span class="px" style="font-size: 40px; line-height: 1">Realm of Ashford</span><span class="mu">Pixelify Sans 600 · names, panel titles, big numbers</span>
+<span class="t18 b">Building a house: fetching 10 wood</span><span>IBM Plex Sans 13 / 1.4 · everything a Player reads or presses. Long Doing lines wrap, never cut off.</span>
+<span class="mono t16">12 / 30 kg · 2231, 1712 · 14:20</span><span class="mu">IBM Plex Mono · amounts, tiles, clocks, hotkeys and scripts</span>
+<span class="lb">Section label</span></div></section>
+
+<section class="pn"><div class="hd">Controls</div>
+<div class="sec"><div class="fx wrap"><button class="btn">Order<span class="k">W</span></button><button class="btn pri">Confirm</button><button class="btn gold">Claim</button><button class="btn dng">Attack</button><button class="btn dk">On dark bars</button></div>
+<div class="fx wrap"><button class="btn on">Pressed</button><button class="btn off why" disabled>Mount horse<small>no free horse here</small></button><button class="btn sm">Small</button><button class="btn sq" aria-label="Icon button"><span class="ic i-gear" aria-hidden="true"></span></button><button class="btn lg">Phone · 44 px</button></div>
+<div class="fx wrap"><input class="in" value="Text field" aria-label="Text field"><select class="in" aria-label="Select"><option>Pick a city…</option></select><label class="fx"><span class="cb on"></span>Loop</label></div>
+<div class="tabs" role="tablist" style="border: 2px solid var(--ink)"><button class="tab on" role="tab" aria-selected="true">Orders</button><button class="tab" role="tab">Queue</button><button class="tab" role="tab">Stats</button><button class="tab" role="tab">Script</button></div>
+<span class="mu">A greyed order keeps its slot and says why. Every order shows its key.</span></div></section>
+
+<section class="pn"><div class="hd">Meters, chips, rows</div>
+<div class="sec"><div class="fx"><span class="lb" style="width: 60px">Health</span><span class="mt hp grow"><i style="width: 92%"></i></span><span class="mono">46 / 50</span></div>
+<div class="fx"><span class="lb" style="width: 60px">Hunger</span><span class="mt fd grow"><i style="width: 62%"></i></span><span class="mono">62% fed</span></div>
+<div class="fx"><span class="lb" style="width: 60px">Work</span><span class="mt grow"><i style="width: 38%"></i></span><span class="mono">about 14 min</span></div>
+<div class="fx"><span class="lb" style="width: 60px">Foal</span><span class="mt bl grow"><i style="width: 55%"></i></span><span class="mono">1 h</span></div>
+<div class="fx wrap" style="gap: 4px"><span class="chip">neutral</span><span class="chip y">Leader</span><span class="chip g">live</span><span class="chip r">offline</span><span class="chip bl">ally</span><span class="chip d">last seen</span></div>
+<div class="well"><div class="rw grp"><span class="lb grow">Group heading</span><span class="mono">8</span></div><div class="rw"><span class="grow">A row</span></div><div class="rw sel"><span class="grow b">The picked row</span></div></div></div></section>
+
+<section class="pn" style="grid-column: span 2"><div class="hd"><span class="grow">Icons</span><span style="font-size: 12px">16 px sprites on one sheet · placeholders until the art/pixel sheets are drawn</span></div>
+<div class="sec" style="display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 10px 6px; justify-items: center; text-align: center; font-size: 11px">
+<span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-food" aria-hidden="true"></span>Food</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-wood" aria-hidden="true"></span>Wood</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-stone" aria-hidden="true"></span>Stone</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-ironore" aria-hidden="true"></span>Iron ore</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-iron" aria-hidden="true"></span>Iron</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-goldore" aria-hidden="true"></span>Gold ore</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-coins" aria-hidden="true"></span>Coins</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-spear" aria-hidden="true"></span>Spear</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-sword" aria-hidden="true"></span>Sword</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-shield" aria-hidden="true"></span>Shield</span>
+<span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-armour" aria-hidden="true"></span>Armour</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-person" aria-hidden="true"></span>Resident</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-crown" aria-hidden="true"></span>Leader</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-horse" aria-hidden="true"></span>Horse</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-cart" aria-hidden="true"></span>Carriage</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-banner" aria-hidden="true"></span>Army</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-city" aria-hidden="true"></span>City</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-scroll" aria-hidden="true"></span>Contracts</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-ally" aria-hidden="true"></span>Alliance</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-medal" aria-hidden="true"></span>Standing</span>
+<span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-code" aria-hidden="true"></span>Scripts</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-book" aria-hidden="true"></span>Log, Wiki</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-key" aria-hidden="true"></span>Admin</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-find" aria-hidden="true"></span>Find</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-clock" aria-hidden="true"></span>Clock</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-gear" aria-hidden="true"></span>Settings</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-eye" aria-hidden="true"></span>Sight</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-map" aria-hidden="true"></span>Map</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-heart" aria-hidden="true"></span>Health</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-warn" aria-hidden="true"></span>Warning</span>
+<span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-walk" aria-hidden="true"></span>Walk</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-pick" aria-hidden="true"></span>Work</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-hammer" aria-hidden="true"></span>Build</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-box" aria-hidden="true"></span>Storage</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-plus" aria-hidden="true"></span>Add</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-x" aria-hidden="true"></span>Close</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-check" aria-hidden="true"></span>Done</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-loop" aria-hidden="true"></span>Loop</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-play" aria-hidden="true"></span>Run</span><span class="col" style="gap: 2px; align-items: center"><span class="ic s32 i-stop" aria-hidden="true"></span>Stop</span>
+</div></section>
+
+<section class="pn"><div class="hd">Relationship colours</div>
+<div class="sec">
+<div class="fx" style="height: 34px"><span class="tk" style="position: static"><span class="ic i-person" aria-hidden="true"></span></span><span class="grow b">Yours</span><span class="mono mu">gold</span></div>
+<div class="fx" style="height: 34px"><span class="tk al" style="position: static"><span class="ic i-person" aria-hidden="true"></span></span><span class="grow b">Alliance</span><span class="mono mu">sky</span></div>
+<div class="fx" style="height: 34px"><span class="tk ot" style="position: static"><span class="ic i-person" aria-hidden="true"></span></span><span class="grow b">Another realm</span><span class="mono mu">red</span></div>
+<div class="fx" style="height: 34px"><span class="tk np" style="position: static"><span class="ic i-person" aria-hidden="true"></span></span><span class="grow b">NPC city</span><span class="mono mu">fog</span></div>
+<div class="fx" style="height: 34px"><span class="tk tr" style="position: static"><span class="ic i-cart" aria-hidden="true"></span></span><span class="grow b">Trade Organization</span><span class="mono mu">cyan</span></div>
+<span class="mu">Still no enemy colour: there is no war state, only standing. Every card title carries the same square.</span></div></section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

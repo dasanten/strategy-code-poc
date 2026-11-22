@@ -8,23 +8,24 @@ import {
 } from 'react'
 import type { Good } from '@csp/shared-types'
 import { GOOD_ART, GOOD_FILES, GOOD_LABELS, goodsAmount, type GoodsItem } from './goods-grid.js'
-import { artStyle, onArtStyle } from './map/art-style.js'
+import { drawnSlices, onDrawnSlices } from './drawn-slices.js'
 import { LONG_PRESS_MS, longPresses } from './map/gestures.js'
-import { PIXEL_FILES, PIXEL_GOOD, pixelSlice } from './map/pixel-art.js'
+import { PIXEL_FILES, PIXEL_GOOD, pixelArt, pixelSlice } from './map/pixel-art.js'
 import { PIXEL_SLICES } from './map/pixel-slices.js'
 
 /** How long (in ms) a good's name stays after the long-press that showed it lets go. */
 const NAME_STAYS_MS = 1500
 
 /**
- * A good's icon (`GOOD_ART`), in the colour of the text around it; in the Pixel art style
- * (`CONTEXT.md`: Art style) its pixel art, where the good has some.
+ * A good's icon: its slice of the pixel goods sheet wherever Daniel has drawn it, whatever the
+ * map's Art style (`CONTEXT.md`: Pixel frontier); else its line art (`GOOD_ART`) in the colour of
+ * the text around it.
  */
 export function GoodIcon({ good }: { good: Good }) {
-  const style = useSyncExternalStore(onArtStyle, artStyle, artStyle)
-  const slice = style === 'pixel' ? PIXEL_GOOD[good] : undefined
+  const drawn = useSyncExternalStore(onDrawnSlices, drawnSlices, drawnSlices)
+  const slice = PIXEL_GOOD[good]
   const rect = slice === undefined ? undefined : pixelSlice('goods', slice)
-  if (rect) {
+  if (rect && slice !== undefined && drawn?.has(pixelArt('goods', slice))) {
     // The goods sheet, with only this good's slice in view.
     const [width, height] = PIXEL_SLICES.goods.size
     return (
@@ -91,7 +92,7 @@ export function GoodsGrid({
   const cell = (key: string, good: Good, amount: number, name: string, own = false) => (
     <li
       key={key}
-      className={`goods-cell${own ? ' goods-own' : ''}${own && amount <= 0 ? ' warn' : ''}${named === key ? ' named' : ''}`}
+      className={`goods-cell chip${own ? ' goods-own' : ''}${own && amount <= 0 ? ' warn' : ''}${named === key ? ' named' : ''}`}
       aria-label={`${name}: ${goodsAmount(amount)}`}
       {...press(key)}
     >

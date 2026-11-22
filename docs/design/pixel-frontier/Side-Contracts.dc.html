@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sidebar, Contracts</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<aside class="ui pn col" style="width: 360px; height: 860px; gap: 0">
+<div class="hd"><span class="ic i-scroll" aria-hidden="true"></span><span class="grow">Mercenaries</span><span class="mono" style="font-size: 12px">3 contracts</span></div>
+
+<div class="sec"><span class="fx"><span class="b grow">Hired from The Trade Organization</span><span class="chip y">offered to you</span></span>
+<span>4 soldiers · 14 days at 12 Coins a week, paid into the warehouse at 1904, 2210</span>
+<div class="fx" style="gap: 4px"><button class="btn sm pri grow">Accept</button><button class="btn sm grow">Decline</button></div></div>
+
+<div class="sec"><span class="fx"><span class="b grow">Hired from Dunmoor</span><span class="chip g">running</span></span>
+<span>Odric, Wen · 21 days at 8 Coins a week, paid into the storage at 2410, 1522</span>
+<div class="fx"><span class="mt grow"><i style="width: 33%; background: var(--gold)"></i></span><span class="mono">1 of 3 weeks paid</span></div>
+<span class="bad">Next week due by day 133, 08:00</span>
+<button class="btn sm gold">Ana pays a week</button></div>
+
+<div class="sec"><span class="fx"><span class="b grow">Rented to the realm of Harrow</span><span class="chip">waiting for them to accept</span></span>
+<span>Tam · 7 days at 10 Coins a week, paid into Ashford storage</span>
+<button class="btn sm">Withdraw</button></div>
+
+<div class="sec" style="background: var(--paper)"><span class="px t16">New contract</span>
+<div class="fx" role="radiogroup" aria-label="What" style="gap: 4px"><button class="btn sm grow" role="radio" aria-checked="false">Rent out mine</button><button class="btn sm grow on" role="radio" aria-checked="true">Hire theirs</button></div>
+<label class="fld"><span class="lb">From</span><select class="in"><option>Dunmoor (NPC city)</option><option>The Trade Organization</option><option>The realm of Harrow</option></select></label>
+<div class="fx"><label class="fld grow"><span class="lb">Residents</span><input class="in mono" value="2"></label><label class="fld grow"><span class="lb">For · game days</span><input class="in mono" value="14"></label><label class="fld grow"><span class="lb">Coins a week</span><input class="in mono" value="9"></label></div>
+<span class="mu">It can spare 3, at least 8 Coins a week each. Hiring from a realm lists its residents in sight with age, city and what they do.</span>
+<label class="fld"><span class="lb">Paid into</span><select class="in"><option>Dunmoor storage at 2410, 1522</option></select></label>
+<div class="well" style="padding: 6px 8px">Hire 2 residents from Dunmoor for 14 days at 9 coins a week, paid into Dunmoor storage</div>
+<button class="btn pri">Ask</button></div>
+
+<span class="grow"></span>
+<div class="sec"><span class="mu">Each week is paid in advance; a week left unpaid breaks the contract and the mercenaries walk home.</span></div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":360,"height":860}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

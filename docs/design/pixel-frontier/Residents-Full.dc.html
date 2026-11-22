@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Full Residents list</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui map" style="width: 1440px; height: 900px; position: relative; overflow: hidden">
+<section class="pn col" aria-label="All residents" style="position: absolute; left: 8px; top: 8px; right: 8px; bottom: 8px; gap: 0">
+<div class="hd"><span class="ic i-person" aria-hidden="true"></span><span class="grow">Residents</span><span class="mono" style="font-size: 12px">5 of 12 shown</span><button class="btn sm dk">Close full list</button></div>
+<div class="fx wrap" style="padding: 8px 10px; gap: 8px; border-bottom: 2px solid var(--tan); align-items: flex-end">
+<label class="fld"><span class="lb">Search</span><input class="in" placeholder="Name" style="width: 160px"></label>
+<label class="fld"><span class="lb">Weapons</span><select class="in"><option>Anyone</option><option>Has weapons</option><option>No weapons</option><option>Spear</option><option>Sword</option><option>Steel sword</option><option>Bow</option><option>Crossbow</option></select></label>
+<label class="fld"><span class="lb">Doing</span><select class="in"><option>Anyone</option><option>Idle</option><option>Busy</option></select></label>
+<label class="fld"><span class="lb">Age</span><select class="in"><option>Grown up</option><option>Anyone</option><option>Children</option></select></label>
+<label class="fld"><span class="lb">City</span><select class="in"><option>All</option><option>Ashford</option><option>Stonewick</option></select></label>
+<label class="fld"><span class="lb">Skill</span><select class="in"><option>Anyone</option><option>Mining</option><option>Farming</option></select></label>
+<button class="btn">Clear filters</button>
+<span class="grow"></span>
+<button class="btn pri" title="Pick those ticked as a group, or everyone listed when none of them is">Pick these (2)</button>
+</div>
+<div class="grow" style="overflow: hidden">
+<table class="tb"><thead><tr><th></th><th>Name ▲</th><th class="n">Age</th><th>City</th><th class="n">Str</th><th class="n">End</th><th class="n">Agi</th><th class="n">Int</th><th>Skills</th><th>Gear</th><th>Carrying</th><th>Hunger</th><th>Health</th><th>Doing</th></tr></thead>
+<tbody>
+<tr><td><span class="cb on" role="checkbox" aria-checked="true" aria-label="Tick Ana"></span></td><td class="b">Ana <span class="chip bl">Heir</span></td><td class="n">19</td><td>Ashford</td><td class="n">9.0</td><td class="n">11.2</td><td class="n">13.0</td><td class="n">8.4</td><td>Combat 3.2 · Driving 1.0</td><td><span class="fx" style="gap: 2px"><span class="ic s16 i-sword" role="img" aria-label="Sword"></span><span class="ic s16 i-shield" role="img" aria-label="Shield"></span></span></td><td><span class="fx" style="gap: 4px"><span class="ic s16 i-food" aria-hidden="true"></span><span class="mono">8 · 4 / 26 kg</span></span></td><td><span class="mt fd"><i style="width: 45%"></i></span></td><td><span class="mt hp"><i style="width: 100%"></i></span></td><td>Walking to 2204, 1810 · about 3 min</td></tr>
+<tr><td><span class="cb on" role="checkbox" aria-checked="true" aria-label="Tick Bram"></span></td><td class="b">Bram</td><td class="n">24</td><td>Ashford</td><td class="n">12.3</td><td class="n">8.8</td><td class="n">12.0</td><td class="n">10.5</td><td>Construction 41.2 · Mining 18.0</td><td>–</td><td><span class="fx" style="gap: 4px"><span class="ic s16 i-wood" aria-hidden="true"></span><span class="mono">4 · 12 / 30 kg</span></span></td><td><span class="mt fd"><i style="width: 62%"></i></span></td><td><span class="mt hp"><i style="width: 92%"></i></span></td><td>Building a house: fetching 10 wood from the storage</td></tr>
+<tr><td><span class="cb" role="checkbox" aria-checked="false" aria-label="Tick Edda"></span></td><td class="b">Edda <span class="chip y">Leader</span></td><td class="n">31</td><td>Ashford</td><td class="n">10.0</td><td class="n">10.0</td><td class="n">9.5</td><td class="n">14.1</td><td>Farming 22.4</td><td><span class="ic s16 i-spear" role="img" aria-label="Spear"></span></td><td><span class="mono">6 / 28 kg</span></td><td><span class="mt fd"><i style="width: 88%"></i></span></td><td><span class="mt hp"><i style="width: 100%"></i></span></td><td>Rallying the crew<br><span class="mu">Working the farm</span></td></tr>
+<tr><td><span class="cb" role="checkbox" aria-checked="false" aria-label="Tick Hale"></span></td><td class="b">Hale</td><td class="n">36</td><td>Stonewick</td><td class="n">14.6</td><td class="n">12.0</td><td class="n">7.2</td><td class="n">6.0</td><td>Mining 55.0</td><td>–</td><td><span class="fx" style="gap: 4px"><span class="ic s16 i-stone" aria-hidden="true"></span><span class="mono">20 · 20 / 32 kg</span></span></td><td><span class="mt fd"><i style="width: 54%"></i></span></td><td><span class="mt hp"><i style="width: 90%"></i></span></td><td>Working the quarry: carrying 20 stone to the storage</td></tr>
+<tr><td><span class="cb" role="checkbox" aria-checked="false" aria-label="Tick Tobin"></span></td><td class="b">Tobin</td><td class="n">42</td><td>Ashford</td><td class="n">11.0</td><td class="n">9.0</td><td class="n">8.0</td><td class="n">9.9</td><td>Driving 31.5</td><td>–</td><td><span class="mono">0 / 34 kg</span></td><td><span class="mt fd"><i style="width: 71%"></i></span></td><td><span class="mt hp"><i style="width: 100%"></i></span></td><td>Hauling: loading wood at the lumber camp<br><span class="mu">Mine run</span></td></tr>
+</tbody></table>
+</div>
+<div class="fx mu" style="padding: 6px 10px; border-top: 2px solid var(--tan)">Tap a heading to sort; again to reverse. Ticks last while the list is open; search, filters and sort are remembered. With nothing left: "No resident fits this." On a phone: Sort by, a direction button, Filters (n) and one compact card per resident.</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

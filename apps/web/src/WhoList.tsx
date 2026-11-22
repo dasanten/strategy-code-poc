@@ -66,9 +66,12 @@ export function WhoList({
   tick,
   most,
   mostNote,
+  armable = false,
   onConfirm,
   onClose,
 }: {
+  /** Whether Confirm with Shift held keeps the order armed for the next place, which it says. */
+  armable?: boolean
   /** What is to be done: "Build a house". */
   title: string
   /** Where it is to be done (`whoWhere`): "at 4, 5", "from 4, 5 to 9, 5". */
@@ -78,7 +81,7 @@ export function WhoList({
   suggest: number
   /** A resident's Doing line. */
   doing: (id: string) => string
-  /** The realm's residents under their cities, as the Residents drawer has them, to filter. */
+  /** The realm's residents under their cities, as the Residents tab has them, to filter. */
   groups: readonly ResidentGroup<Resident>[]
   tick: number
   /**
@@ -237,6 +240,7 @@ export function WhoList({
                 <div className="who-when" role="group" aria-label={`When ${row.name} does it`}>
                   <button
                     type="button"
+                    className="btn sm"
                     aria-pressed={rowWhen === 'now'}
                     title="Drop what they are doing and go"
                     onClick={() => setWhen({ ...when, [row.id]: 'now' })}
@@ -248,6 +252,7 @@ export function WhoList({
                   ) : (
                     <button
                       type="button"
+                      className="btn sm"
                       aria-pressed={rowWhen === 'after'}
                       title="Add it to the end of their queue"
                       onClick={() => setWhen({ ...when, [row.id]: 'after' })}
@@ -267,24 +272,31 @@ export function WhoList({
         )}
         {shown.length > limit && (
           <li>
-            <button type="button" className="who-more" onClick={() => setLimit(limit + WHO_PAGE)}>
+            <button
+              type="button"
+              className="btn sm who-more"
+              onClick={() => setLimit(limit + WHO_PAGE)}
+            >
               Show more ({shown.length - limit} more)
             </button>
           </li>
         )}
       </ul>
-      <div className="order-buttons who-actions">
+      <div className="who-actions">
+        <span className="who-again small muted">
+          {armable && 'Shift keeps the order armed for the next place.'}
+        </span>
+        <button type="button" className="btn" onClick={onClose}>
+          Cancel
+        </button>
         <button
           type="button"
-          className="primary"
+          className="btn pri"
           disabled={ticked.length === 0 || tooMany}
-          title="With Shift held, pick the next place for another"
+          title={armable ? 'With Shift held, pick the next place for another' : undefined}
           onClick={(e) => send(e.shiftKey)}
         >
           Confirm{ticked.length > 0 ? ` (${ticked.length})` : ''}
-        </button>
-        <button type="button" onClick={onClose}>
-          Cancel
         </button>
       </div>
     </SelectionCard>

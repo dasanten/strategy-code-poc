@@ -1,0 +1,20 @@
+/* The web app's stylesheets, one per area (ADR 0044). The order is the cascade: the kit first,
+   then the areas; a later file may place the kit's atoms but never restyle them.
+   kit      tokens, fonts, atoms and plain controls (buttons, fields, tabs, meters, chips, rows)
+   shell    the game screen's frame: top bar, sidebar, the phone menu, Creative bar
+   map      the map and its chrome: buttons, legend, minimap, notices, tile menu, dialogs
+   entry    log in and founding
+   admin    the admin panel, its map, inspector and Tick health
+   lists    sidebar lists: residents, horses, armies, diplomacy, cities, waypoints, realm log
+   wiki     the Wiki page
+   card     the selection card, its tabs, orders, panels, queue planner, goods grid; realm bar
+   scripts  the script library and editor, the form before a script starts, the Script tab */
+@import './kit.css';
+@import './shell.css';
+@import './map.css';
+@import './entry.css';
+@import './admin.css';
+@import './lists.css';
+@import './wiki.css';
+@import './card.css';
+@import './scripts.css';

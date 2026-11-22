@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sidebar, Alliance</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<aside class="ui pn col" style="width: 360px; height: 860px; gap: 0">
+<div class="hd"><span class="ic i-ally" aria-hidden="true"></span><span class="grow">Northern Pact</span><span class="mono" style="font-size: 12px">3 members</span></div>
+
+<div class="sec"><span class="lb">Members</span>
+<div class="fx"><span class="dot"></span><span class="b grow">Your realm</span><span class="chip y">leader</span></div>
+<div class="fx"><span class="dot" style="background: var(--ally)"></span><span class="grow">Realm of Harrow</span><button class="btn sm">Remove</button></div>
+<div class="fx"><span class="dot" style="background: var(--ally)"></span><span class="grow">Dunmoor (NPC city)</span><span class="chip r">leaves day 133, 10:00</span></div>
+<div class="fx"><span class="dot" style="background: var(--npc)"></span><span class="grow">Realm of Fenn</span><span class="chip">invited</span><button class="btn sm">Withdraw</button></div></div>
+
+<div class="sec"><label class="fld"><span class="lb">Invite a realm or NPC city in sight</span><span class="fx"><select class="in grow"><option>Choose whom</option><option>Realm of Mire</option><option>Oakhollow (NPC city)</option></select><button class="btn pri">Invite</button></span></label></div>
+
+<div class="sec"><span class="px t16">Alliance army</span>
+<span class="mu">Soldiers and carriages handed over take orders only from you: pick them as residents.</span>
+<div class="fx"><span class="ic s16 i-sword" aria-hidden="true"></span><span class="grow">Hale</span><span class="chip y">yours</span><button class="btn sm">Recall</button></div>
+<div class="fx"><span class="ic s16 i-sword" aria-hidden="true"></span><span class="grow">Odric</span><span class="chip bl">realm of Harrow</span></div>
+<div class="fx"><span class="ic s16 i-cart" aria-hidden="true"></span><span class="grow">Carriage 14</span><span class="chip y">yours</span><span class="chip">back day 131, 15:20</span></div>
+<div class="fx"><span class="ic s16 i-sword" aria-hidden="true"></span><span class="grow mu">a soldier out of sight</span><span class="chip bl">realm of Harrow</span></div>
+<span class="fx"><select class="in grow" aria-label="Hand over"><option>Choose a soldier or carriage</option><option>Tam</option><option>Carriage 9</option></select><button class="btn">Hand over</button></span></div>
+
+<div class="sec"><button class="btn dng">Leave the alliance</button><span class="mu">Leaving, or being removed, takes effect after a delay.</span></div>
+
+<div class="sec" style="background: var(--paper)"><span class="lb">When in no alliance</span>
+<div class="fx"><span class="grow">Northern Pact (led by the realm of Harrow) invites you</span><button class="btn sm pri">Join</button><button class="btn sm">Decline</button></div>
+<label class="fld"><span class="b">Found an alliance</span><span class="fx"><input class="in grow" placeholder="Its name"><button class="btn pri">Found</button></span></label></div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":360,"height":860}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

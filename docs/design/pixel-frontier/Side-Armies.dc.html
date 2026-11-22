@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sidebar, Armies</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<aside class="ui pn col" style="width: 360px; height: 860px; gap: 0">
+<div class="hd"><span class="ic i-banner" aria-hidden="true"></span><span class="grow">Armies</span><span class="mono" style="font-size: 12px">2</span></div>
+
+<div class="rw sel"><span class="ic i-banner" aria-hidden="true"></span><span class="grow"><span class="b">North Guard</span><br>Guarding 2301, 1688</span><button class="btn sm sq" aria-label="Close North Guard"><span class="ic s16 i-x" aria-hidden="true"></span></button></div>
+<div style="background: var(--paper); border-bottom: 2px solid var(--ink)">
+<div class="sec" style="padding-bottom: 6px"><span>6 members · 1 supply wagon</span></div>
+<div class="tabs" role="tablist" style="background: transparent"><button class="tab on" role="tab" aria-selected="true">Orders</button><button class="tab" role="tab">Members</button><button class="tab" role="tab">Supply</button><button class="tab" role="tab">Script</button></div>
+<div class="sec" style="background: var(--parch)"><span class="lb">Move</span>
+<div class="fx" style="gap: 4px"><button class="btn sm grow">Walk to…</button><button class="btn sm grow on">Guard…</button><button class="btn sm grow">Stop</button></div>
+<span class="lb">A resident in sight</span>
+<select class="in" aria-label="Resident in sight"><option>Pick a resident…</option><option>Garrick · realm of Mire</option><option>Ana · yours</option></select>
+<div class="fx" style="gap: 4px"><button class="btn sm dng grow">Attack</button><button class="btn sm grow">Follow</button></div>
+<span class="lb">Army</span>
+<button class="btn sm">Disband</button></div>
+<div class="sec" style="background: var(--parch)"><span class="lb">Members tab</span><span>Hale, Odric, Wen, Tam, Isolde, Someone out of sight</span>
+<span class="lb">Supply tab</span><span>Tobin · haul route · 84 Food to take</span><span class="mu">Empty: "No supply wagon. A carriage driven after the army, or a haul route with the army as its second stop, feeds it on the way."</span>
+<span class="lb">Script tab</span><div class="fx"><select class="in grow" aria-label="Script for North Guard to run"><option>Hold the pass · v3</option></select><button class="btn sm pri">Run script</button></div><span class="mu">Its Memory shows below, as on a resident.</span></div>
+</div>
+
+<div class="rw"><span class="ic i-banner" aria-hidden="true"></span><span class="grow"><span class="b">Road wardens</span><br>Idle</span><span class="mono mu">3</span></div>
+
+<div class="sec"><span class="px t16">Form an army</span>
+<label class="fx"><span class="cb on"></span><span class="grow">Bram</span></label>
+<label class="fx"><span class="cb on"></span><span class="grow">Ana</span></label>
+<label class="fx"><span class="cb"></span><span class="grow">Hale <span class="mu">· North Guard</span></span></label>
+<div class="fx"><input class="in grow" placeholder="Its name" aria-label="Its name"><button class="btn pri">Form</button></div>
+<span class="mu">A resident given an order of their own leaves their army.</span></div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":360,"height":860}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

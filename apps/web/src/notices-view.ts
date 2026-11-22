@@ -2,7 +2,7 @@ import { RALLY_PACE } from '@csp/balance'
 import { FIRST_DAY_LINES } from './shared/first-day.js'
 import { aboutTime } from './shared/estimates.js'
 import type { FirstDay, FirstDayLine, TraderVisit } from '@csp/shared-types'
-import { isWide, type OpenDrawer } from './hud-view.js'
+import { isScreen, type OpenTab } from './hud-view.js'
 
 /**
  * The notices that share the lane under the top bar (`CONTEXT.md`: Notices), besides the pick
@@ -40,36 +40,36 @@ export function traderVisitLine(v: TraderVisit, tick: number): string {
 }
 
 /**
- * Whether the selection card is hidden: the wide Scripts drawer and the full Residents list
- * (`fullList`) leave no room for it. It stays as it was, and closing them brings it back.
+ * Whether the selection card is hidden: the script workshop covers it and the full Residents list
+ * (`fullList`) leaves no room for it. It stays as it was, and closing them brings it back.
  */
-export function cardHidden(open: OpenDrawer, fullList = false): boolean {
-  return open !== undefined && (isWide(open) || fullList)
+export function cardHidden(open: OpenTab, fullList = false): boolean {
+  return open !== undefined && (isScreen(open) || fullList)
 }
 
-/** The least width, in pixels, the lane needs over the map between the drawer and the card. */
+/** The least width, in pixels, the lane needs over the map between the sidebar and the dock. */
 export const MIN_LANE_WIDTH = 320
 
-/** The gap, in pixels, between the lane and the drawer, the card or the screen's edge. */
+/** The gap, in pixels, between the lane and the sidebar, the dock or the screen's edge. */
 export const LANE_GAP = 12
 
 /**
- * Where the lane goes, in pixels from the screen's left and right edges, while the tool rail
- * takes `rail` pixels on the left, the open drawer covers the map up to `covered.left` and the
+ * Where the lane goes, in pixels from the screen's left and right edges, while the sidebar's
+ * strip takes `strip` pixels on the left, the open sidebar tab covers the map up to `covered.left` and the
  * card from `covered.right`: centred over the map between them. When that leaves less than
- * `MIN_LANE_WIDTH`, and always on a phone (where drawers take the whole screen), the lane is a
- * band across the screen under the top bar instead, and the drawer and card move down below it.
+ * `MIN_LANE_WIDTH`, and always on a phone (where sidebar tabs take the whole screen), the lane is a
+ * band across the screen under the top bar instead, and the sidebar and dock move down below it.
  */
 export function laneSpot(
   screenWidth: number,
-  rail: number,
+  strip: number,
   covered: { left: number; right: number },
   phone: boolean,
 ): { left: number; right: number; band: boolean } {
-  const left = Math.max(rail, covered.left) + LANE_GAP
+  const left = Math.max(strip, covered.left) + LANE_GAP
   const right = covered.right + LANE_GAP
   if (!phone && screenWidth - left - right >= MIN_LANE_WIDTH) return { left, right, band: false }
-  return { left: rail + LANE_GAP, right: LANE_GAP, band: true }
+  return { left: strip + LANE_GAP, right: LANE_GAP, band: true }
 }
 
 /**

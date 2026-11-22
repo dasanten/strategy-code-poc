@@ -26,7 +26,7 @@ describe('camera', () => {
   it('centres a tile in the part of the screen left uncovered', () => {
     const cam = centreBeside(100, 200, { left: 0, right: 0 }, 10, size)
     expect(tileToScreen(cam, view, size, 100.5, 200.5)).toEqual([400, 300])
-    // A drawer covers 400 px on the left: the tile shows in the middle of the 400 px beside it.
+    // The sidebar covers 400 px on the left: the tile shows in the middle of the 400 px beside it.
     const beside = centreBeside(100, 200, { left: 400, right: 0 }, 10, size)
     expect(beside.scale).toBe(10)
     expect(tileToScreen(beside, view, size, 100.5, 200.5)).toEqual([600, 300])

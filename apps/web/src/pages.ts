@@ -21,6 +21,15 @@ function adminSubpath(pathname: string): string | undefined {
 export const isWikiPath = (pathname: string) => pathname.replace(/\/+$/, '') === WIKI_PATH
 
 /**
+ * The pixel kit's page (ADR 0044): every atom of the UI as the design's `System` artboard shows
+ * them, for whoever builds or reviews a screen. Like the Wiki it needs no account.
+ */
+export const KIT_PATH = '/kit'
+
+/** Whether a path is the pixel kit's page. */
+export const isKitPath = (pathname: string) => pathname.replace(/\/+$/, '') === KIT_PATH
+
+/**
  * Which page to show for a path. The Wiki is for everyone, logged in or not. The admin panel is
  * its own page: the game screen shows no admin features, and the panel never opens the admin's
  * realm.

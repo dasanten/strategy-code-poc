@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Build menu, gear, vessels, siege and other newer panels</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui" style="width: 1440px; height: 1180px; box-sizing: border-box; padding: 20px; background: var(--steel); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start">
+
+<div class="col" style="gap: 16px">
+<section class="pn"><div class="hd"><span class="ic i-hammer" aria-hidden="true"></span><span class="grow">Build</span><span style="font-size: 12px">at 2172, 1820</span><span class="k" style="margin: 0">B</span></div>
+<div class="sec" style="gap: 6px">
+<span class="lb">Resources</span><div class="fx wrap" style="gap: 4px"><button class="btn sm">Lumber camp</button><button class="btn sm off" disabled title="Not here: no stone node">Quarry</button><button class="btn sm off" disabled>Mine</button></div>
+<span class="lb">Food and animals</span><div class="fx wrap" style="gap: 4px"><button class="btn sm">Farm</button><button class="btn sm">Stable</button></div>
+<span class="lb">Industry</span><div class="fx wrap" style="gap: 4px"><button class="btn sm">Smelter</button><button class="btn sm">Mint</button><button class="btn sm">Smithy</button></div>
+<span class="lb">City</span><div class="fx wrap" style="gap: 4px"><button class="btn sm">Town hall</button><button class="btn sm">House</button><button class="btn sm">Storage</button><button class="btn sm">Training ground</button></div>
+<span class="lb">Defence</span><div class="fx wrap" style="gap: 4px"><button class="btn sm">Wall</button><button class="btn sm">Gate</button><button class="btn sm on">Tower</button></div>
+<span class="lb">Transport</span><div class="fx wrap" style="gap: 4px"><button class="btn sm">Road</button><button class="btn sm">Carriage</button><button class="btn sm off" disabled title="Not here: not on a shore">Haven</button><button class="btn sm off" disabled>Boat</button><button class="btn sm off" disabled>Ship</button></div>
+<span class="lb">Siege</span><div class="fx wrap" style="gap: 4px"><button class="btn sm">Ram</button><button class="btn sm">Catapult</button></div>
+</div>
+<div class="sec" style="background: var(--paper)"><span class="px t16">Tower</span>
+<span class="mu">Bowmen on it shoot further, from high ground.</span>
+<div class="fx" role="radiogroup" aria-label="Built of" style="gap: 0"><span class="lb" style="margin-right: 8px">Built of</span><button class="btn sm" role="radio" aria-checked="false">Wood</button><button class="btn sm on" role="radio" aria-checked="true">Stone</button></div>
+<div class="fx wrap" style="gap: 4px"><span class="chip"><span class="ic s16 i-stone" aria-hidden="true"></span>[N] Stone</span><span class="chip"><span class="ic s16 i-wood" aria-hidden="true"></span>[N] Wood</span></div>
+<span>about [N] game days of work</span>
+<div class="fx"><button class="btn pri grow">Build tower</button><button class="btn">Customise</button></div>
+<span class="mu">In the planner the button reads "Add: build tower". Every icon in the grid is the building's pixel sprite.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Orders</span><span style="font-size: 12px">then who does it</span></div>
+<div class="sec"><span class="mu">On a building's card in Realm control mode.</span>
+<div class="og og2"><button class="btn sm fill">Work here<span class="k">E</span></button><button class="btn sm fill">Tear down<span class="k">T</span></button><button class="btn sm fill">Feed the stable<span class="k">F</span></button><button class="btn sm fill">Breed horses<span class="k">F</span></button><button class="btn sm fill">Teach<span class="k">Y</span></button><button class="btn sm fill">Train<span class="k">I</span></button><button class="btn sm fill off why" disabled>Build this site<small>finished already</small></button><button class="btn sm fill">Customise</button></div>
+<span class="mu">On a tile: Walk here…, Build here…, Store here…, Fetch from here…. On a carriage or vessel: Haul with this carriage (H), Drive this to (D), Row this to (D), Board (K, "2 seats left"), Board as crew (C).</span></div></section>
+</div>
+
+<div class="col" style="gap: 16px">
+<section class="pn"><div class="hd"><span class="grow">Goods</span><span class="mono" style="font-size: 12px">18 / 30 kg</span><span class="k" style="margin: 0">G</span></div>
+<div class="sec"><span class="lb">Equipped</span>
+<div class="fx"><span class="ic i-sword" aria-hidden="true"></span><span class="grow"><span class="b">Weapon</span> · Sword (worn)</span><select class="in" style="height: 24px" aria-label="Swap weapon"><option>Swap for…</option><option>Spear</option></select><button class="btn sm">Take off</button></div>
+<div class="fx"><span class="ic i-shield" aria-hidden="true"></span><span class="grow"><span class="b">Shield</span> · Shield (good)</span><button class="btn sm">Take off</button></div>
+<div class="fx"><span class="ic i-armour" aria-hidden="true"></span><span class="grow"><span class="b">Armour</span> · none</span><select class="in" style="height: 24px" aria-label="Put on armour"><option>Put on…</option><option>Steel armour</option></select></div>
+<span class="mu">Swapping or taking off takes [N] ticks, and they strike no blows meanwhile. What comes off stays carried.</span></div>
+<div class="sec"><span class="lb">Carried</span>
+<div class="fx wrap" style="gap: 4px"><span class="chip y"><span class="ic s16 i-food" aria-hidden="true"></span>8 own</span><span class="chip"><span class="ic s16 i-wood" aria-hidden="true"></span>4</span><span class="chip"><span class="ic s16 i-steelarmour" aria-hidden="true"></span>1</span><span class="chip"><span class="ic s16 i-arrows" aria-hidden="true"></span>20</span></div>
+<span class="mu">Every inventory is a grid of icon and amount; the name shows on hover or long-press. New here spots: In the haven, In the boat, Carried by Wen, Down. A docked ship adds Load ship and Unload.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Feed</span><span style="font-size: 12px">8 Food in hand</span><span class="k" style="margin: 0">O</span></div>
+<div class="sec"><select class="in" aria-label="Whom"><option>Wen (Down)</option><option>Pip (horse, Down)</option></select>
+<div class="fx"><label class="fx">Units<input class="in mono" style="width: 56px; height: 24px" value="3"></label><button class="btn pri grow">Feed Wen</button></div>
+<span class="mu">Someone Down from hunger takes no orders until fed.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Hitch horse</span><span style="font-size: 12px">2 free here</span><span class="k" style="margin: 0">J</span></div>
+<div class="sec"><label class="fx"><span class="cb on"></span><span class="grow"><span class="b">Bramble</span> · 12/8/10 · 5 years · fed, healthy</span></label><label class="fx"><span class="cb"></span><span class="grow"><span class="b">Pip</span> · 9/9/12 · 3 years · hungry</span></label><button class="btn pri">Hitch</button></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Board ship</span><span class="k" style="margin: 0">K</span></div>
+<div class="sec"><div class="fx"><button class="btn grow pri">As crew</button><button class="btn grow">As passenger</button></div><span class="mu">A child can't crew. Board the ship as crew to sail it.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Leader and heir</span><span class="k" style="margin: 0">L</span></div>
+<div class="sec"><span class="lb">Make Leader</span><span>Hand your realm to Ana? Edda stays on as an ordinary resident.</span><button class="btn gold">Make Ana Leader</button>
+<span class="lb">Heir</span><span>Ana is your realm’s heir.</span><div class="fx"><button class="btn grow">Clear heir</button><button class="btn grow off" disabled>Name Ana heir</button></div></div></section>
+</div>
+
+<div class="col" style="gap: 16px">
+<section class="pn"><div class="hd">Orders added since</div>
+<div class="sec"><span class="lb">Move</span>
+<div class="og og2"><button class="btn sm fill">Explore<span class="k">Z</span></button><button class="btn sm fill">Hitch horse…<span class="k">J</span></button><button class="btn sm fill">Row boat to<span class="k">D</span></button><button class="btn sm fill">Sail ship to<span class="k">D</span></button><button class="btn sm fill">Board ship…<span class="k">K</span></button><button class="btn sm fill">Board boat<span class="k">K</span></button></div>
+<span class="lb">Theft</span>
+<div class="og og2"><button class="btn sm fill dng">Drive off (theft)<span class="k">D</span></button><button class="btn sm fill dng">Row off (theft)<span class="k">D</span></button><button class="btn sm fill dng">Drive with their horse (theft)</button><button class="btn sm fill dng">Mount their horse (theft)<span class="k">M</span></button></div>
+<span class="lb">Work &amp; build</span>
+<div class="og og2"><button class="btn sm fill">Gather…<span class="k">U</span></button><button class="btn sm fill gold">Rally the crew<span class="k">Y</span></button><button class="btn sm fill">Mend</button><button class="btn sm fill">Repair the wall<span class="k">R</span></button></div>
+<span class="lb">Goods</span>
+<div class="og og2"><button class="btn sm fill">Feed…<span class="k">O</span></button><button class="btn sm fill">Equip… (group)<span class="k">N</span></button></div>
+<span class="mu">Rows with a script that has params carry a Customise button, which opens Start &lt;script&gt; first. While someone is Down every row greys with "Down: takes no orders".</span></div></section>
+
+<section class="pn"><div class="hd"><span class="ic i-gear" aria-hidden="true"></span><span class="grow">Work settings</span><span style="font-size: 12px">Ashford quarry</span></div>
+<div class="sec"><label class="fld"><span class="lb">Work script</span><select class="in"><option>Work (default)</option><option>Mine run</option></select></label>
+<div class="fx"><span class="mono b grow">storage</span><button class="btn sm">Pick</button><button class="btn sm">Clear</button></div>
+<div class="fx"><span class="mono b grow">crewFood</span><input class="in mono" style="width: 56px; height: 24px" value="12"></div>
+<span class="mu">Only your realm sees these. A worker's own value shows ", their own" with a Workplace’s button to go back.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Script tab additions</span></div>
+<div class="sec"><label class="fld"><span class="lb">Alarm script</span><select class="in"><option>Alarm (default)</option><option>None</option><option>Hold the pass</option></select></label><span class="mu">What they run when an alarm reaches them at home. Choice and waypoint params are selects; a waypoint param also has Pick.</span></div></section>
+
+<section class="pn"><div class="hd" style="background: var(--night)"><span class="px" style="color: var(--cyan)">Creative</span></div>
+<div class="sec"><span class="mu">On cards, admins on a CREATIVE server only.</span>
+<div class="fx wrap" style="gap: 4px"><button class="btn sm">Heal</button><button class="btn sm">Grow up</button><button class="btn sm dng">Kill</button><button class="btn sm">Move</button><button class="btn sm">Finish now</button></div>
+<div class="fx" style="gap: 4px"><select class="in grow" aria-label="Good"><option>Wood</option></select><input class="in mono" style="width: 56px" value="50" aria-label="Units"><button class="btn sm">Give</button><button class="btn sm">Take</button></div>
+<span class="mu">Tile card: Joins a city, Add Resident (age, stats, skills), Add horse (age, Speed, Strength, Endurance).</span></div></section>
+</div>
+
+<div class="col" style="gap: 16px">
+<section class="pn"><div class="hd"><span class="ic i-ship" aria-hidden="true"></span><span class="grow">Ship (yours)</span></div>
+<div class="sec"><div class="fx"><span class="lb">Load</span><span class="mt grow"><i style="width: 40%; background: var(--clay)"></i></span><span class="mono">[N] / [N] kg</span></div>
+<div class="fx wrap" style="gap: 4px"><span class="chip"><span class="ic s16 i-iron" aria-hidden="true"></span>60</span><span class="chip"><span class="ic s16 i-food" aria-hidden="true"></span>40</span></div>
+<table class="tb"><tbody><tr><td class="lb">Crew</td><td>Tobin, Hale · needs 1 more crew to sail</td></tr><tr><td class="lb">Passengers</td><td>Odo · [N] kg of it people</td></tr><tr><td class="lb">Route</td><td>Ashford haven → Saltmarket haven<br><span class="mu">Leg 1 of 2 · about 6 min</span></td></tr><tr><td class="lb">Food on board</td><td>for 4 game days</td></tr></tbody></table>
+<div class="og og2"><button class="btn sm fill">Board<span class="k">K</span></button><button class="btn sm fill">Board as crew<span class="k">C</span></button></div></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Ram</span><span class="chip r">Damaged: 20%</span></div>
+<div class="sec"><span>Crew 2 of 4: needs 2 more to be pushed</span>
+<div class="og og2"><button class="btn sm fill">Crew the ram<span class="k">K</span></button><button class="btn sm fill">Push the ram to…<span class="k">D</span></button><button class="btn sm fill dng">Ram the gate<span class="k">R</span></button><button class="btn sm fill">Tear down the ram<span class="k">T</span></button></div>
+<span class="mu">A catapult has Throw Stone at… (R). Sites read Ram site, Catapult site, Boat site, Ship site.</span></div></section>
+
+<section class="pn"><div class="hd"><span class="grow">Tile card lines added</span></div>
+<div class="sec"><span>Heartland of Ashmere · pass</span><span>Vein: thinning</span><span>Of stone · condition 80%</span><span>The crew is rallied · Zeal lasts about 4 min</span><span>A wandering trader buys and sells here</span><span>On the way: Ana, to fetch 10 Wood · about 1 min</span><span>Made a game day: Hale 6, Odric 5 · Total 11</span>
+<button class="btn sm fill">Add waypoint…<span class="k">J</span></button></div></section>
+
+<section class="pn" role="dialog" aria-label="Add waypoint here"><div class="hd"><span class="grow">Add waypoint here</span><span class="mono" style="font-size: 12px">(2172, 1820)</span></div>
+<div class="sec"><span class="mu">Right-click or long-press a tile. Only you see it.</span><label class="fld"><span class="lb">Waypoint name</span><input class="in" value="North pass"></label><div class="fx"><button class="btn grow">Cancel</button><button class="btn pri grow">Add waypoint</button></div></div></section>
+
+<section class="pn" role="alertdialog" aria-label="The game was updated"><div class="hd" style="background: var(--navy)"><span class="grow">The game was updated</span></div>
+<div class="sec"><span>A new version of the game is out. Reload the page to play on.</span><button class="btn pri">Reload</button></div></section>
+
+<section class="pn" role="alertdialog" aria-label="Your heir has taken over"><div class="hd" style="background: var(--blood)"><span class="grow">Your heir has taken over</span></div>
+<div class="sec"><span>Ana leads your realm from Ashford now. Your other cities are self-managed.</span><button class="btn pri">Play on</button></div></section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

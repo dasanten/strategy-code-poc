@@ -130,7 +130,7 @@ import {
   type ResidentGroup,
   type ResidentLines,
 } from './residents-view.js'
-import { GOOD_LABELS, carriedItems } from './goods-grid.js'
+import { GOOD_LABELS, carriedItems, goodsAmount } from './goods-grid.js'
 import {
   equipmentLine,
   equipmentSlots,
@@ -139,7 +139,7 @@ import {
   swapChoices,
   type SlotView,
 } from './equipment-view.js'
-import { GoodsGrid } from './GoodsGrid.js'
+import { GoodIcon, GoodsGrid } from './GoodsGrid.js'
 import { BuildMenu } from './BuildMenu.js'
 import { workSpan } from './build-menu-view.js'
 import { doingLine, interruptedLine, scriptLine } from './doing-view.js'
@@ -158,12 +158,11 @@ import {
   type StepGroup,
 } from './queue-view.js'
 import { copy, paste, pickStep, useClipboardEmpty } from './planner-clipboard.js'
+import { toolbarCount } from './command-tabs-view.js'
 import {
   followInsert,
   InsertPointContext,
   PlannerFlowContext,
-  PLAN_STEP_ICONS,
-  REPEAT_ICON,
   STEP_KIND_TYPE,
 } from './step-palette-view.js'
 import { canMoveTo, insertPoints, moveItems } from './queue-brackets-view.js'
@@ -232,18 +231,19 @@ import {
 } from './script-run-view.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
-import { PanelHead } from './drawer-head.js'
+import { PanelHead } from './panel-head.js'
 import { labelled } from './name-labels.js'
 import {
-  ActionRows,
   CardTabs,
   FeedBlock,
-  SelectionCard,
   useActionKeys,
+  useInSheet,
   useEscapeClosesPanel,
   useKeptRows,
 } from './SelectionCard.js'
 import { rallyProblem } from './zeal.js'
+import { CommandBar, OrderGrid, PanelFoot, type OrderPanelSpec } from './CommandBar.js'
+import { panelSize, panelTitle } from './order-panel-view.js'
 import { HorsePick } from './HorsePick.js'
 import {
   orderGroupOf,
@@ -254,6 +254,8 @@ import {
   type ActionId,
   type CardAction,
 } from './selection-view.js'
+import { Icon } from './Icon.js'
+import type { UiIconName } from './ui-icons.js'
 
 export { GOOD_LABELS }
 
@@ -315,7 +317,7 @@ export function SubjectPicker({
 }) {
   const [subject, setSubject] = useState<TrainingSubject>(picked ?? 'strength')
   return (
-    <div className="order-buttons">
+    <div className="order-buttons subject-pick">
       <select
         aria-label="Subject to teach"
         value={subject}
@@ -424,12 +426,13 @@ function TaskScript({
   const script = scripts.find((s) => s.id === scriptId)
   const note = !script?.task ? '' : script.followsDefault ? 'the game’s default' : 'edited by you'
   return (
-    <div className="task-script goods-row">
-      <span className="small">
+    <div className="task-script">
+      <span className="grow">
         Runs <strong>{script?.name ?? 'a script'}</strong>
+        {script && script.activeVersion !== null && ` · version ${script.activeVersion}`}
+        {note && <span className="muted small"> · {note}</span>}
       </span>
-      <span className="muted small">{note}</span>
-      <button type="button" onClick={() => onEdit(scriptId)} disabled={!script}>
+      <button type="button" className="btn sm" onClick={() => onEdit(scriptId)} disabled={!script}>
         Edit
       </button>
     </div>
@@ -468,10 +471,16 @@ export function QueueBlock({
   palette,
   rounds,
   branches,
+  mark,
+  foot,
 }: {
   queue: Pick<QueuePlan, 'items' | 'loop' | 'nextStepId'>
-  /** The Add step palette, right under the steps (`CONTEXT.md`: Planner blocks). */
+  /** The Add step palette, beside the steps (`CONTEXT.md`: Planner blocks). */
   palette?: ReactNode
+  /** Said after the title at the head of the toolbar: a draft's "not started". */
+  mark?: ReactNode
+  /** Under the steps: Start queue and Discard draft, Give to all, or Edit as draft. */
+  foot?: ReactNode
   /** The id of the step being done, in a running queue. */
   currentId?: number
   /** The round each block around the current step is on, by block id, in a running queue. */
@@ -592,107 +601,122 @@ export function QueueBlock({
   }
   let n = 0
   return (
-    <section className="inspector-block" aria-label={title}>
-      <div className="order-buttons queue-tools">
-        <button type="button" disabled={picked.length === 0} onClick={copyPicked}>
-          Copy
-        </button>
-        <button type="button" disabled={clipboardEmpty} onClick={pasteSteps}>
-          Paste
-        </button>
-        <button
-          type="button"
-          disabled={!wrapped}
-          title="Wrap the picked steps, in a row, in a repeat block"
-          onClick={repeat}
-        >
-          Repeat
-        </button>
-        <button
-          type="button"
-          disabled={q.items.length === 0}
-          title={
-            running
-              ? 'Remove every step but the current one and turn loop off: the queue ends after it'
-              : 'Remove every step'
-          }
-          onClick={clear}
-        >
-          Clear
-        </button>
-        {realm && (
-          <SavedQueueTools
-            realm={realm}
-            steps={q.items}
-            onLoad={(loaded) => add(undefined, loaded)}
-            oneButton
-          />
-        )}
-        <button
-          type="button"
-          aria-label="How the planner works"
-          aria-expanded={help}
-          onClick={() => setHelp(!help)}
-        >
-          ?
-        </button>
-        {picked.length > 0 && <span className="small muted">{picked.length} picked</span>}
-      </div>
-      {help && (
-        <p className="muted small">
-          Tap a step to pick it (Shift for a range), then Copy; Paste puts the copies after the
-          picked step. Drag a step or block to move it, into or out of a bracket, or pick it and tap
-          Move here; focus it and press Alt+↑ or Alt+↓. Drag a step kind from Add step to put it
-          where you drop it. Loop is the outer bracket, its switch in its head. Working, hauling,
-          teaching and training never end on their own, so they need a duration unless they are
-          last: tap the duration to set it. Repeat wraps the picked steps in a block done so many
-          times in a row, or forever; a round in which none of its steps could start ends it, and a
-          running queue shows the round it is on. If (in Add step’s Flow) puts the picked steps
-          under a condition, checked once when its turn comes; Else moves other picked steps into
-          its Else part, run when the condition doesn’t hold. A queue holds up to {QUEUE_MAX_STEPS}{' '}
-          steps and blocks as written, nested up to {QUEUE_MAX_DEPTH} deep. Saved… keeps the steps
-          in this browser under a name, and loads a saved queue’s steps at the end. Clear empties a
-          draft; on a running queue it keeps only the current step and turns loop off, so the queue
-          ends after it.
-        </p>
-      )}
-      {hasBlocks(q.items) && (
-        <p className={`small ${over ? 'queue-unrolled-over' : 'muted'}`}>
-          {over ? `Too long: ${over}.` : `${written} of ${QUEUE_MAX_STEPS} steps and blocks.`}
-        </p>
-      )}
-      <div className={`queue-bracket queue-loop-bracket${q.loop ? ' on' : ''}`}>
-        <div className="queue-bracket-head">
-          <label className="small queue-loop">
-            <input
-              type="checkbox"
-              checked={q.loop}
-              onChange={(e) => edit(q.items, e.target.checked)}
-            />{' '}
-            <span aria-hidden="true">⟲</span> Loop
-          </label>
-          <span className="small muted">
-            {q.loop ? 'from the top again after the last step' : 'ends after the last step'}
-          </span>
+    <section className="queue-planner" aria-label={title}>
+      <div className="queue-list">
+        <div className="queue-tools">
+          <span className="px t16">{title}</span>
+          {mark}
+          <span className="grow" />
+          <button
+            type="button"
+            className="btn sm"
+            disabled={picked.length === 0}
+            onClick={copyPicked}
+          >
+            Copy
+          </button>
+          <button type="button" className="btn sm" disabled={clipboardEmpty} onClick={pasteSteps}>
+            Paste
+          </button>
+          <button
+            type="button"
+            className="btn sm"
+            disabled={!wrapped}
+            title="Wrap the picked steps, in a row, in a repeat block"
+            onClick={repeat}
+          >
+            Repeat
+          </button>
+          <button
+            type="button"
+            className="btn sm"
+            disabled={q.items.length === 0}
+            title={
+              running
+                ? 'Remove every step but the current one and turn loop off: the queue ends after it'
+                : 'Remove every step'
+            }
+            onClick={clear}
+          >
+            Clear
+          </button>
+          {realm && (
+            <SavedQueueTools
+              realm={realm}
+              steps={q.items}
+              onLoad={(loaded) => add(undefined, loaded)}
+              oneButton
+            />
+          )}
+          <button
+            type="button"
+            className="btn sm sq"
+            aria-label="How the planner works"
+            aria-expanded={help}
+            onClick={() => setHelp(!help)}
+          >
+            ?
+          </button>
+          {(picked.length > 0 || hasBlocks(q.items)) && (
+            <span className={`small ${over ? 'queue-unrolled-over' : 'muted'}`}>
+              {toolbarCount(picked.length, hasBlocks(q.items) ? { written, over } : undefined)}
+            </span>
+          )}
         </div>
-        <ol className="queue-steps" tabIndex={-1} onKeyDown={onKey}>
-          {renderItems(q.items, 0)}
-          {(picked.length > 0 || dragging) && point(undefined)}
-        </ol>
+        {help && (
+          <p className="well small queue-help">
+            Tap a step to pick it (Shift for a range), then Copy; Paste puts the copies after the
+            picked step. Drag a step or block to move it, into or out of a bracket, or pick it and
+            tap Move here; focus it and press Alt+↑ or Alt+↓. Drag a step kind from Add step to put
+            it where you drop it. Loop is the outer bracket, its switch in its head. Working,
+            hauling, teaching and training never end on their own, so they need a duration unless
+            they are last: tap the duration to set it. Repeat wraps the picked steps in a block done
+            so many times in a row, or forever; a round in which none of its steps could start ends
+            it, and a running queue shows the round it is on. If (in Add step’s Flow) puts the
+            picked steps under a condition, checked once when its turn comes; Else moves other
+            picked steps into its Else part, run when the condition doesn’t hold. A queue holds up
+            to {QUEUE_MAX_STEPS} steps and blocks as written, nested up to {QUEUE_MAX_DEPTH} deep.
+            Saved… keeps the steps in this browser under a name, and loads a saved queue’s steps at
+            the end. Clear empties a draft; on a running queue it keeps only the current step and
+            turns loop off, so the queue ends after it.
+          </p>
+        )}
+        <div className={`queue-bracket queue-loop-bracket${q.loop ? ' on' : ''}`}>
+          <div className="queue-bracket-head">
+            <label className="small queue-loop">
+              <input
+                type="checkbox"
+                checked={q.loop}
+                onChange={(e) => edit(q.items, e.target.checked)}
+              />{' '}
+              <span aria-hidden="true">⟲</span> Loop
+            </label>
+            <span className="small muted">
+              {q.loop ? 'from the top again after the last step' : 'ends after the last step'}
+            </span>
+          </div>
+          <ol className="queue-steps" tabIndex={-1} onKeyDown={onKey}>
+            {renderItems(q.items, 0)}
+            {(picked.length > 0 || dragging) && point(undefined)}
+          </ol>
+        </div>
+        {foot}
       </div>
       {palette && (
-        <PlannerFlowContext.Provider
-          value={{
-            ...(wrapped ? { repeat } : {}),
-            ...(wrapped && kept?.start
-              ? { wrapIf: () => kept.start?.('if', undefined, { wrap: picked }) }
-              : {}),
-            ifDone,
-            ...(insertAt === undefined ? {} : { after: insertAt }),
-          }}
-        >
-          {palette}
-        </PlannerFlowContext.Provider>
+        <div className="queue-palette">
+          <PlannerFlowContext.Provider
+            value={{
+              ...(wrapped ? { repeat } : {}),
+              ...(wrapped && kept?.start
+                ? { wrapIf: () => kept.start?.('if', undefined, { wrap: picked }) }
+                : {}),
+              ifDone,
+              ...(insertAt === undefined ? {} : { after: insertAt }),
+            }}
+          >
+            {palette}
+          </PlannerFlowContext.Provider>
+        </div>
       )}
     </section>
   )
@@ -745,6 +769,7 @@ export function QueueBlock({
       >
         <button
           type="button"
+          className="btn sm"
           aria-label={
             moving
               ? `Move the picked steps ${after === undefined ? 'to the end' : 'here'}`
@@ -802,9 +827,7 @@ export function QueueBlock({
         data-depth={depth}
       >
         <div className="queue-bracket-head" {...rowProps(id)}>
-          <span className="queue-step-icon" aria-hidden="true">
-            {REPEAT_ICON}
-          </span>
+          <Icon name="loop" size={16} className="queue-step-icon" />
           <RepeatCount
             repeat={block.repeat}
             steps={stepCount(block.items)}
@@ -823,15 +846,16 @@ export function QueueBlock({
               : {})}
           />
           <span className="buttons">
-            <button type="button" onClick={() => edit(unwrap(q.items, id))}>
+            <button type="button" className="btn sm" onClick={() => edit(unwrap(q.items, id))}>
               Unwrap
             </button>
             <button
               type="button"
+              className="btn sm sq"
               aria-label="Remove the block and its steps"
               onClick={() => edit(removeItem(q.items, id))}
             >
-              ✕
+              <Icon name="close" size={16} />
             </button>
           </span>
         </div>
@@ -848,24 +872,22 @@ export function QueueBlock({
     const isPicked = picked.includes(id)
     const taken = branches?.get(id)
     const toElse = intoElse(q.items, picked, id)
-    const runs = <span className="queue-branch small"> · running</span>
+    const runs = <span className="chip g queue-branch">running</span>
     return (
       <li
         className={`queue-bracket queue-if-bracket${isPicked ? ' picked' : ''}`}
         data-depth={depth}
       >
         <div className="queue-bracket-head" {...rowProps(id)}>
-          <span className="queue-step-icon" aria-hidden="true">
-            {PLAN_STEP_ICONS.if}
-          </span>
           <span className="small queue-step-label">
-            If {conditionLabel(block.if, names)}
+            <strong>If</strong> {conditionLabel(block.if, names)}
             {taken === 'then' && runs}
           </span>
           <span className="buttons">
             {kept?.start && (
               <button
                 type="button"
+                className="btn sm"
                 title="Change the condition"
                 onClick={() =>
                   kept.start?.('if', undefined, { blockId: id, condition: draftOf(block.if) })
@@ -876,6 +898,7 @@ export function QueueBlock({
             )}
             <button
               type="button"
+              className="btn sm"
               disabled={!toElse}
               title={
                 toElse
@@ -886,15 +909,16 @@ export function QueueBlock({
             >
               Else
             </button>
-            <button type="button" onClick={() => edit(unwrap(q.items, id))}>
+            <button type="button" className="btn sm" onClick={() => edit(unwrap(q.items, id))}>
               Unwrap
             </button>
             <button
               type="button"
+              className="btn sm sq"
               aria-label="Remove the block and its steps"
               onClick={() => edit(removeItem(q.items, id))}
             >
-              ✕
+              <Icon name="close" size={16} />
             </button>
           </span>
         </div>
@@ -902,7 +926,8 @@ export function QueueBlock({
         {block.else && (
           <>
             <div className="queue-bracket-head queue-else-head small">
-              Else{taken === 'else' && runs}
+              <strong>Else</strong>
+              {taken === 'else' && runs}
             </div>
             <ol className="queue-steps">{renderItems(block.else, depth + 1)}</ol>
           </>
@@ -924,9 +949,7 @@ export function QueueBlock({
         {...rowProps(id)}
       >
         <div className="queue-step-head">
-          <span className="queue-step-icon" aria-hidden="true">
-            {STEP_ICONS[step.group]}
-          </span>
+          <Icon name={STEP_ICONS[step.group]} size={16} className="queue-step-icon" />
           <span
             className="small queue-step-label"
             title={step.gone ? `${step.gone}: it will be skipped` : step.label}
@@ -938,8 +961,13 @@ export function QueueBlock({
             <DurationChip row={step} onSet={(minutes) => edit(timeItem(q.items, id, minutes))} />
           )}
           <span className="buttons">
-            <button type="button" aria-label="Remove" onClick={() => edit(removeItem(q.items, id))}>
-              ✕
+            <button
+              type="button"
+              className="btn sm sq"
+              aria-label="Remove"
+              onClick={() => edit(removeItem(q.items, id))}
+            >
+              <Icon name="close" size={16} />
             </button>
           </span>
         </div>
@@ -1007,7 +1035,7 @@ function RepeatCount({
   return (
     <span className="small queue-step-minutes">
       <label>
-        Repeat{' '}
+        <strong>Repeat</strong>{' '}
         <select aria-label="How it repeats" value={mode} onChange={(e) => pick(e.target.value)}>
           <option value="times">×</option>
           <option value="forever">forever</option>
@@ -1034,7 +1062,12 @@ function RepeatCount({
         <>
           <span className="queue-step-label">{conditionLabel(until, names)}</span>{' '}
           {onUntil && (
-            <button type="button" title="Change the condition" onClick={() => onUntil(until)}>
+            <button
+              type="button"
+              className="btn sm"
+              title="Change the condition"
+              onClick={() => onUntil(until)}
+            >
               Change
             </button>
           )}
@@ -1099,6 +1132,7 @@ export function SavedQueueTools({
         {oneButton && (
           <button
             type="button"
+            className="btn sm"
             title="Save these steps under a name, or load saved ones"
             aria-expanded={open === 'both'}
             onClick={() => toggle('both')}
@@ -1107,18 +1141,28 @@ export function SavedQueueTools({
           </button>
         )}
         {!oneButton && steps.length > 0 && (
-          <button type="button" aria-expanded={open === 'save'} onClick={() => toggle('save')}>
+          <button
+            type="button"
+            className="btn sm"
+            aria-expanded={open === 'save'}
+            onClick={() => toggle('save')}
+          >
             Save…
           </button>
         )}
         {!oneButton && (
-          <button type="button" aria-expanded={open === 'load'} onClick={() => toggle('load')}>
+          <button
+            type="button"
+            className="btn sm"
+            aria-expanded={open === 'load'}
+            onClick={() => toggle('load')}
+          >
             Load…
           </button>
         )}
       </div>
       {(open === 'save' || (open === 'both' && steps.length > 0)) && (
-        <form className="saved-queues-save" onSubmit={onSave}>
+        <form className="saved-queues-save well" onSubmit={onSave}>
           <input
             aria-label="Name to save the queue under"
             placeholder="Name, such as Mine run"
@@ -1127,7 +1171,7 @@ export function SavedQueueTools({
             autoFocus
             onChange={(e) => setName(e.target.value)}
           />
-          <button type="submit" disabled={!name.trim()}>
+          <button type="submit" className="btn sm" disabled={!name.trim()}>
             {taken ? 'Overwrite' : 'Save'}
           </button>
           {taken && (
@@ -1137,9 +1181,9 @@ export function SavedQueueTools({
       )}
       {(open === 'load' || open === 'both') &&
         (saved.length === 0 ? (
-          <p className="muted small">No queues saved in this browser yet.</p>
+          <p className="muted small saved-queues-none">No queues saved in this browser yet.</p>
         ) : (
-          <ul className="saved-queues-list">
+          <ul className="saved-queues-list well">
             {saved.map((s) => (
               <li key={s.name}>
                 <span className="small">
@@ -1152,6 +1196,7 @@ export function SavedQueueTools({
                 <span className="buttons">
                   <button
                     type="button"
+                    className="btn sm"
                     onClick={() => {
                       onLoad(loadQueue(queues, s.name))
                       setOpen(undefined)
@@ -1161,6 +1206,7 @@ export function SavedQueueTools({
                   </button>
                   <button
                     type="button"
+                    className="btn sm"
                     aria-label={`Delete ${s.name}`}
                     onClick={() => keep(removeQueue(queues, s.name))}
                   >
@@ -1184,7 +1230,7 @@ export function PasteSteps({ onPaste }: { onPaste: (steps: PlanItem[]) => void }
   if (empty) return null
   return (
     <div className="order-buttons">
-      <button type="button" onClick={() => onPaste(paste())}>
+      <button type="button" className="btn sm" onClick={() => onPaste(paste())}>
         Paste
       </button>
     </div>
@@ -1217,29 +1263,32 @@ export function GivePlan({
 }) {
   const problem = planProblem(plan.items)
   return (
-    <>
-      <div className="order-buttons">
-        <button type="button" className="primary" disabled={problem !== undefined} onClick={onGive}>
-          {give}
-        </button>
-        <button type="button" onClick={onDiscard}>
-          {discard}
-        </button>
-      </div>
+    <div className="queue-foot">
       <p className={`small ${problem && plan.items.length > 0 ? 'queue-unrolled-over' : 'muted'}`}>
         {problem && plan.items.length > 0 ? `Can’t give it yet: ${problem}.` : note}
       </p>
-    </>
+      <button type="button" className="btn sm" onClick={onDiscard}>
+        {discard}
+      </button>
+      <button
+        type="button"
+        className="btn sm pri"
+        disabled={problem !== undefined}
+        onClick={onGive}
+      >
+        {give}
+      </button>
+    </div>
   )
 }
 
-/** A step's icon by the kind of order it is, as the Orders tab groups them. */
-const STEP_ICONS: Record<StepGroup, string> = {
-  move: '➜',
-  work: '⚒',
-  goods: '▣',
-  scripts: '{}',
-  flow: '⏳',
+/** A step's UI icon by the kind of order it is, as the Orders tab groups them. */
+const STEP_ICONS: Record<StepGroup, UiIconName> = {
+  move: 'walk',
+  work: 'build',
+  goods: 'goods',
+  scripts: 'script',
+  flow: 'clock',
 }
 
 /**
@@ -1267,7 +1316,7 @@ function DurationChip({
     return (
       <button
         type="button"
-        className={`small queue-step-chip${row.minutes === undefined ? ' needed' : ''}`}
+        className={`btn sm queue-step-chip${row.minutes === undefined ? ' dng needed' : ''}`}
         title="Duration in game minutes"
         onClick={() => setEditing(true)}
       >
@@ -1429,8 +1478,10 @@ export function orderDoing(
 /**
  * The Player's residents, one row each under the city they live in (see `groupResidents`); click
  * a row to inspect that resident and show them on the map. Picking one elsewhere, such as on the
- * map, scrolls their row into view. On a phone each row is two lines instead of the table's
- * columns (`residentLines`). `onOpenFull` opens the full list in its place (`ResidentsFullList`).
+ * map, scrolls their row into view. Each row is two lines (`residentLines`), on a phone as on a
+ * desktop: name with the Leader or Heir mark, age and what they carry; then Doing, with the script
+ * they run under it, and the hunger meter. `onOpenFull` opens the full list in its place
+ * (`ResidentsFullList`).
  */
 export function ResidentsList({
   groups,
@@ -1446,7 +1497,6 @@ export function ResidentsList({
   selectedId,
   onSelect,
   onOpenFull,
-  phone = false,
 }: {
   groups: ResidentGroup<Resident>[]
   leaderId: string
@@ -1468,7 +1518,7 @@ export function ResidentsList({
   selectedId: string | undefined
   onSelect: (id: string) => void
   onOpenFull: () => void
-  /** Rows of two lines each, for a phone's narrow screen. */
+  /** A phone's narrow screen: the rows are the same two lines there. */
   phone?: boolean
 }) {
   const tableRef = useRef<HTMLDivElement>(null)
@@ -1482,109 +1532,70 @@ export function ResidentsList({
   return (
     <section className="residents" aria-label="Residents">
       <PanelHead title="Residents">{residentsCount(groups.flatMap((g) => g.residents))}</PanelHead>
-      <div className="residents-full-tools">
-        <button type="button" onClick={onOpenFull}>
+      <div className="residents-tools fx">
+        <span className="grow" />
+        <button type="button" className="btn sm" onClick={onOpenFull}>
           Open full list
         </button>
       </div>
-      <div className="residents-scroll">
-        <div className={`residents-table${phone ? ' lines' : ''}`} ref={tableRef}>
-          {!phone && (
-            <div className="residents-row heading" aria-hidden="true">
-              <span>Name</span>
-              <span>Age</span>
-              <span>Doing</span>
-              <span>Hunger</span>
-              <span>Carrying</span>
+      <div className="residents-table" ref={tableRef}>
+        {groups.map((g) => (
+          <div className="residents-group" key={g.key} role="group" aria-label={g.label}>
+            <div className="rw grp">
+              <span className="lb grow">{g.label}</span>
+              <span className="mono">{g.residents.length}</span>
             </div>
-          )}
-          {groups.map((g) => (
-            <div className="residents-group" key={g.key} role="group" aria-label={g.label}>
-              <h3>
-                {g.label} <span>· {g.residents.length}</span>
-              </h3>
-              {g.residents.map((r) => {
-                if (phone) {
-                  return (
-                    <ResidentLinesRow
-                      key={r.id}
-                      lines={residentLines(r, {
-                        leaderId,
-                        heirId,
-                        tick,
-                        doing: doingLine(r, {
-                          scripts,
-                          buildings,
-                          residents: inSight,
-                          horses,
-                          cities,
-                          arrives: arrivesIn?.(r),
-                        }),
-                      })}
-                      id={r.id}
-                      selected={r.id === selectedId}
-                      onSelect={onSelect}
-                    />
-                  )
-                }
-                const under =
+            {g.residents.map((r) => (
+              <ResidentLinesRow
+                key={r.id}
+                id={r.id}
+                lines={residentLines(r, {
+                  leaderId,
+                  heirId,
+                  tick,
+                  doing: doingLine(r, {
+                    scripts,
+                    buildings,
+                    residents: inSight,
+                    horses,
+                    cities,
+                    arrives: arrivesIn?.(r),
+                  }),
+                })}
+                under={
                   interruptedLine(r, { scripts, buildings, residents: inSight, horses }) ??
                   scriptLine(r, scripts)
-                return (
-                  <button
-                    type="button"
-                    key={r.id}
-                    data-resident={r.id}
-                    className={`residents-row${r.id === selectedId ? ' selected' : ''}`}
-                    aria-pressed={r.id === selectedId}
-                    onClick={() => onSelect(r.id)}
-                  >
-                    <span className="name">
-                      {r.name}
-                      {r.id === leaderId && <small className="leader-mark">Leader</small>}
-                      {r.id === heirId && <small className="leader-mark">Heir</small>}
-                    </span>
-                    <span className="mono">{Math.floor(ageInYears(r, tick))}</span>
-                    <span className="doing">
-                      {doingLine(r, {
-                        scripts,
-                        buildings,
-                        residents: inSight,
-                        horses,
-                        cities,
-                        arrives: arrivesIn?.(r),
-                      })}
-                      {under && <small className="muted">{under}</small>}
-                    </span>
-                    <span className="meter" aria-label={`Hunger ${pct(r.hunger / MAX_HUNGER)} fed`}>
-                      <span
-                        className={meterClass(r.hunger / MAX_HUNGER)}
-                        style={{ width: pct(r.hunger / MAX_HUNGER) }}
-                      />
-                    </span>
-                    <span className="mono">
-                      {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          ))}
-        </div>
+                }
+                carrying={carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
+                selected={r.id === selectedId}
+                onSelect={onSelect}
+              />
+            ))}
+          </div>
+        ))}
       </div>
     </section>
   )
 }
 
-/** A resident's row on a phone: name, Leader mark and age, then Doing with the hunger meter. */
+/**
+ * A resident's row in the Residents tab: name, Leader or Heir mark, age and what they carry; then
+ * Doing, with the script they run under it, and the hunger meter.
+ */
 function ResidentLinesRow({
   id,
   lines,
+  under,
+  carrying,
   selected,
   onSelect,
 }: {
   id: string
   lines: ResidentLines
+  /** The script they run or the order waiting behind a defence script, under Doing. */
+  under: string | undefined
+  /** "12 / 30 kg" (`carryLine`). */
+  carrying: string
   selected: boolean
   onSelect: (id: string) => void
 }) {
@@ -1592,22 +1603,27 @@ function ResidentLinesRow({
     <button
       type="button"
       data-resident={id}
-      className={`residents-row lines${selected ? ' selected' : ''}`}
+      className={`rw people-row${selected ? ' sel' : ''}`}
       aria-pressed={selected}
       onClick={() => onSelect(id)}
     >
-      <span className="line">
-        <span className="name">
+      <span className="fx">
+        <span className="b grow">
           {lines.name}
-          {lines.leader && <span className="leader-mark"> · Leader</span>}
-          {lines.heir && <span className="leader-mark"> · Heir</span>}
+          {lines.leader && <span className="chip y">Leader</span>}
+          {lines.heir && <span className="chip bl">Heir</span>}
         </span>
-        <span className="mono">{lines.age}</span>
+        <span className="mono mu">
+          {lines.age} · {carrying}
+        </span>
       </span>
-      <span className="line">
-        <span className="doing">{lines.doing}</span>
-        <span className="meter" aria-label={`Hunger ${pct(lines.fed)} fed`}>
-          <span className={meterClass(lines.fed)} style={{ width: pct(lines.fed) }} />
+      <span className="fx">
+        <span className="grow doing">
+          {lines.doing}
+          {under && <span className="mu under">{under}</span>}
+        </span>
+        <span className="mt" aria-label={`Hunger ${pct(lines.fed)} fed`}>
+          <i className={meterClass(lines.fed)} style={{ width: pct(lines.fed) }} />
         </span>
       </span>
     </button>
@@ -1799,10 +1815,15 @@ export function GroupCard({
   useEffect(() => {
     buildBlock.current?.scrollIntoView({ block: 'nearest' })
   }, [buildAt?.x, buildAt?.y, picking])
-  useEscapeClosesPanel(tab === 'orders' && (shown !== undefined || (!!buildAt && !picking)), () => {
+  const closePanel = () => {
     setPanel(undefined)
     if (buildAt) onPicking(false)
-  })
+  }
+  useEscapeClosesPanel(
+    tab === 'orders' && (shown !== undefined || (!!buildAt && !picking)),
+    closePanel,
+  )
+  const phone = useInSheet()
   const act = (a: CardAction<GroupButton>) => {
     if (tab !== 'orders' && a.id !== 'script') showTab('orders')
     // With one carriage or boat to board they board that; with several, or a ship (as crew or as
@@ -1828,12 +1849,12 @@ export function GroupCard({
     (b) => b.kind === 'stable' && !b.site && residents.some((r) => isAt(r, b)),
   )
   const { busy, idle } = busyAndIdle(residents)
-  // The open order's panel, right under the row that opened it (`ActionRows`).
+  // The open order's panel, above the command bar or on a phone under its order (`CommandBar`).
   const openPanel = shown && (
     <>
       {shown === 'board' && (
         <section className="inspector-block" aria-label="Board carriage">
-          <div className="order-buttons">
+          <div className="opanel-choices">
             {carriages.map(({ carriage, seats }) => (
               <button
                 type="button"
@@ -1873,15 +1894,19 @@ export function GroupCard({
       )}
       {shown === 'feed' && (
         <section className="inspector-block" aria-label="Feed">
-          <div className="order-buttons">
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={feedUnits}
-              aria-label="Units of Food each"
-              onChange={(e) => setFeedUnits(Number(e.target.value))}
-            />
+          <PanelFoot>
+            <label className="opanel-units">
+              Units each
+              <input
+                className="amount mono"
+                type="number"
+                min={1}
+                step={1}
+                value={feedUnits}
+                aria-label="Units of Food each"
+                onChange={(e) => setFeedUnits(Number(e.target.value))}
+              />
+            </label>
             <button
               type="button"
               className="primary"
@@ -1893,7 +1918,10 @@ export function GroupCard({
             >
               Feed
             </button>
-          </div>
+          </PanelFoot>
+          {(!Number.isInteger(feedUnits) || feedUnits < 1) && (
+            <span className="muted small">Units: a whole number, 1 or more.</span>
+          )}
           <p className="muted small">
             Each with Food in hand next to someone Down or a horse that isn’t full feeds them, one
             for each: someone Down eats a unit at once and wakes at low health, a horse eats until
@@ -1903,7 +1931,7 @@ export function GroupCard({
       )}
       {shown === 'equip' && (
         <section className="inspector-block" aria-label="Equip">
-          <div className="order-buttons">
+          <div className="opanel-choices">
             {groupSwapChoices(residents).map((c) => (
               <button
                 key={c.good}
@@ -1913,6 +1941,7 @@ export function GroupCard({
                   onOrder({ kind: 'equip', good: c.good })
                 }}
               >
+                <GoodIcon good={c.good} />
                 {c.label}
               </button>
             ))}
@@ -1925,7 +1954,8 @@ export function GroupCard({
       )}
       {shown === 'fetch' && (
         <section className="inspector-block" aria-label="Fetch">
-          <div className="order-buttons">
+          <label className="fld">
+            <span className="lb">Good</span>
             <select
               aria-label="Good to fetch"
               value={good}
@@ -1937,7 +1967,13 @@ export function GroupCard({
                 </option>
               ))}
             </select>
-            <button type="button" onClick={() => onOrder({ kind: 'fetch', good })}>
+          </label>
+          <PanelFoot>
+            <button
+              type="button"
+              className="primary"
+              onClick={() => onOrder({ kind: 'fetch', good })}
+            >
               Fetch
             </button>
             <button
@@ -1947,7 +1983,7 @@ export function GroupCard({
             >
               Fetch from…
             </button>
-          </div>
+          </PanelFoot>
           <p className="muted small">
             Each fetches as much as fits from the nearest storage or carriage holding it, or from
             the storage, stable or carriage picked on the map.
@@ -1975,9 +2011,6 @@ export function GroupCard({
       )}
       {shown === 'teach' && (
         <section className="inspector-block" aria-label="Teach">
-          <div className="panel-head">
-            <h3>Teach</h3>
-          </div>
           <SubjectPicker action="Teach" onPick={(subject) => onOrder({ kind: 'teach', subject })} />
           <p className="muted small">
             The first of them on each training ground teaches it there; one teacher per ground.
@@ -1986,9 +2019,6 @@ export function GroupCard({
       )}
       {shown === 'breed' && (
         <section className="inspector-block" aria-label="Breed horses">
-          <div className="panel-head">
-            <h3>Breed horses</h3>
-          </div>
           {stables.length === 0 && (
             <p className="muted small">None of them stands in a finished stable.</p>
           )}
@@ -2009,8 +2039,74 @@ export function GroupCard({
       )}
     </>
   )
+  const shownRow = rows.find((a) => a.id === shown)
+  // The open order's panel as the shell shows it (`OrderPanel`).
+  const shownSpec: OrderPanelSpec | undefined =
+    shown && openPanel
+      ? {
+          title: panelTitle(shownRow?.label ?? ''),
+          ...(shownRow ? { keyCap: shownRow.key } : {}),
+          size: panelSize(shown),
+          body: openPanel,
+          onClose: closePanel,
+        }
+      : undefined
+  // Build's tile picked: its menu opens where an order's panel does (`CommandBar`).
+  const buildPanel = tab === 'orders' && buildAt && !picking && (
+    <section className="inspector-block" aria-label="Build" ref={buildBlock}>
+      {buildAt.site ? (
+        <PanelFoot>
+          <button
+            type="button"
+            className="primary"
+            onClick={() =>
+              onOrder({
+                kind: 'build',
+                building: buildAt.site!.kind,
+                at: { x: buildAt.site!.x, y: buildAt.site!.y },
+                ...(buildAt.site!.material === 'stone' ? { material: 'stone' as const } : {}),
+              })
+            }
+          >
+            All help build the {BUILDING_NAMES[buildAt.site.kind].toLowerCase()}
+          </button>
+          <CustomiseButton
+            order={taskStart('build')}
+            of="Build"
+            give={() =>
+              onOrder({
+                kind: 'build',
+                building: buildAt.site!.kind,
+                at: { x: buildAt.site!.x, y: buildAt.site!.y },
+                ...(buildAt.site!.material === 'stone' ? { material: 'stone' as const } : {}),
+              })
+            }
+          />
+        </PanelFoot>
+      ) : (
+        <BuildMenu
+          // Another tile starts with nothing tapped.
+          key={`${buildAt.x},${buildAt.y}`}
+          node={buildAt.node}
+          terrain={buildAt.terrain}
+          buildProblem={buildAt.problem}
+          onBuild={(kind, material) =>
+            onOrder({
+              kind: 'build',
+              building: kind,
+              at: { x: buildAt.x, y: buildAt.y },
+              ...(material ? { material } : {}),
+            })
+          }
+        />
+      )}
+      <p className="muted small">
+        Each walks there; the first lays out the site and the others join it.
+      </p>
+    </section>
+  )
   return (
-    <SelectionCard
+    <CommandBar
       rel="own"
       title={card.title}
       lines={[
@@ -2019,95 +2115,63 @@ export function GroupCard({
       ]}
       onClose={onClose}
       collapsed={collapsed}
-    >
-      <CardTabs tabs={GROUP_TABS} labels={TAB_LABELS} tab={tab} onTab={showTab} />
-
-      {tab === 'orders' &&
-        rowGroups(rows, groupButtonGroup).map((g) => (
-          <div className="sel-order-group" key={g.group}>
-            <h3>{g.label}</h3>
-            <ActionRows
-              actions={g.actions}
-              open={shown}
-              onAction={act}
-              label={g.label}
-              keys={false}
-              panel={openPanel || undefined}
-              beside={(a) => {
-                const task = GROUP_ROW_TASKS[a.id]
-                return (
-                  task && (
-                    <CustomiseButton
-                      order={taskStart(task)}
-                      of={a.label}
-                      disabled={a.disabled}
-                      give={() => act(a)}
-                    />
-                  )
-                )
-              }}
-            />
-          </div>
-        ))}
-      {tab === 'orders' && buildAt && !picking && (
-        <section className="inspector-block" aria-label="Build" ref={buildBlock}>
-          <div className="panel-head">
-            <h3>Build</h3>
-            <span className="small muted">
-              at {buildAt.x}, {buildAt.y}
-            </span>
-          </div>
-          {buildAt.site ? (
-            <div className="order-buttons">
-              <button
-                type="button"
-                className="primary"
-                onClick={() =>
-                  onOrder({
-                    kind: 'build',
-                    building: buildAt.site!.kind,
-                    at: { x: buildAt.site!.x, y: buildAt.site!.y },
-                    ...(buildAt.site!.material === 'stone' ? { material: 'stone' as const } : {}),
-                  })
-                }
-              >
-                All help build the {BUILDING_NAMES[buildAt.site.kind].toLowerCase()}
-              </button>
-              <CustomiseButton
-                order={taskStart('build')}
-                of="Build"
-                give={() =>
-                  onOrder({
-                    kind: 'build',
-                    building: buildAt.site!.kind,
-                    at: { x: buildAt.site!.x, y: buildAt.site!.y },
-                    ...(buildAt.site!.material === 'stone' ? { material: 'stone' as const } : {}),
-                  })
-                }
-              />
-            </div>
-          ) : (
-            <BuildMenu
-              // Another tile starts with nothing tapped.
-              key={`${buildAt.x},${buildAt.y}`}
-              node={buildAt.node}
-              terrain={buildAt.terrain}
-              buildProblem={buildAt.problem}
-              onBuild={(kind, material) =>
-                onOrder({
-                  kind: 'build',
-                  building: kind,
-                  at: { x: buildAt.x, y: buildAt.y },
-                  ...(material ? { material } : {}),
-                })
-              }
-            />
-          )}
-          <p className="muted small">
-            Each walks there; the first lays out the site and the others join it.
+      tall={tab === 'queue'}
+      tabs={<CardTabs tabs={GROUP_TABS} labels={TAB_LABELS} tab={tab} onTab={showTab} />}
+      panel={
+        tab === 'orders' && ((shown && openPanel) || buildPanel)
+          ? {
+              ...(buildPanel
+                ? {
+                    title: 'Build',
+                    note: `at ${buildAt!.x}, ${buildAt!.y}`,
+                    size: panelSize('build'),
+                  }
+                : (shownSpec ?? { title: '' })),
+              body: (
+                <>
+                  {shown && openPanel}
+                  {buildPanel}
+                </>
+              ),
+              onClose: closePanel,
+            }
+          : undefined
+      }
+      status={
+        (orderError || picking || tab === 'orders') && (
+          <p className="muted small" role="status">
+            {orderError
+              ? `Order turned down: ${orderError}`
+              : picking
+                ? `${GROUP_PICKING_HINTS[picking]} Tap a tile on the map.`
+                : 'Right-click the map to walk them there. Hold Shift with any order to queue it.'}
           </p>
-        </section>
+        )
+      }
+    >
+      {tab === 'orders' && (
+        <OrderGrid
+          groups={rowGroups(rows, groupButtonGroup)}
+          open={shown}
+          onAction={act}
+          panel={shownSpec}
+          beside={(a) => {
+            const task = GROUP_ROW_TASKS[a.id]
+            return (
+              task && (
+                <CustomiseButton
+                  order={taskStart(task)}
+                  of={a.label}
+                  disabled={a.disabled}
+                  give={() => act(a)}
+                  small
+                />
+              )
+            )
+          }}
+        />
       )}
+      {phone && buildPanel}
       {tab === 'queue' && planner}
       {tab === 'members' && (
         <ul className="sel-facts sel-group" aria-label="Selected residents">
@@ -2130,80 +2194,81 @@ export function GroupCard({
         </ul>
       )}
       {tab === 'script' && (
-        <>
-          <ul className="sel-facts" aria-label="Scripts they run">
-            {scriptsRun(residents.map((r) => scriptName(r, scripts))).map((l) => (
-              <li key={l}>{l}</li>
-            ))}
-          </ul>
-          <section className="inspector-block" aria-label="Run script">
-            <RunScript
-              script={undefined}
-              scripts={scripts}
-              label="Script for all of them to run"
-              customisable
-              onRunScript={(scriptId) => onOrder({ kind: 'runScript', scriptId })}
-            />
-          </section>
-          <DefenceScript
-            picked={groupDefenceScript(residents)}
-            scripts={scripts}
-            label="Defence script for all of them"
-            onPick={(scriptId) => onOrder({ kind: 'setDefenceScript', scriptId })}
-          />
-          <AlarmScript
-            picked={groupAlarmScript(residents)}
-            scripts={scripts}
-            label="Alarm script for all of them"
-            onPick={(scriptId) => onOrder({ kind: 'setAlarmScript', scriptId })}
-          />
-          {numberParams.length > 0 && (
-            <section className="inspector-block" aria-label="Script params">
-              <div className="script-params">
-                {numberParams.map(({ name, scriptIds, default: fallback }) => (
-                  <div key={name} className="goods-row">
-                    <span className="small">
-                      <strong>{name}</strong> <span className="muted">(number)</span>
-                    </span>
-                    <NumberField
-                      name={name}
-                      value={undefined}
-                      fallback={fallback}
-                      onSet={(v) =>
-                        onOrder({ kind: 'setNumber', name, value: v ?? null, scriptIds })
-                      }
-                    />
-                    <span className="buttons">
-                      <button
-                        type="button"
-                        onClick={() => onOrder({ kind: 'setNumber', name, value: null, scriptIds })}
-                      >
-                        Clear
-                      </button>
-                    </span>
-                  </div>
+        <div className="script-tab">
+          <div className="script-col">
+            <section className="sec script-runs" aria-label="Run script">
+              <ul className="sel-facts" aria-label="Scripts they run">
+                {scriptsRun(residents.map((r) => scriptName(r, scripts))).map((l) => (
+                  <li key={l}>{l}</li>
                 ))}
-              </div>
-              <p className="muted small">
-                Sets it for each one running a script with it. Type a number and press Enter.
-              </p>
-              {foodHint && <p className="muted small">{foodHint}</p>}
+              </ul>
+              <RunScript
+                script={undefined}
+                scripts={scripts}
+                label="Script for all of them to run"
+                customisable
+                onRunScript={(scriptId) => onOrder({ kind: 'runScript', scriptId })}
+              />
             </section>
+          </div>
+          <div className="script-col">
+            <DefenceScript
+              picked={groupDefenceScript(residents)}
+              scripts={scripts}
+              label="Defence script for all of them"
+              onPick={(scriptId) => onOrder({ kind: 'setDefenceScript', scriptId })}
+            />
+            <AlarmScript
+              picked={groupAlarmScript(residents)}
+              scripts={scripts}
+              label="Alarm script for all of them"
+              onPick={(scriptId) => onOrder({ kind: 'setAlarmScript', scriptId })}
+            />
+          </div>
+          {numberParams.length > 0 && (
+            <div className="script-col">
+              <section className="sec" aria-label="Script params">
+                <div className="script-params">
+                  <h3 className="px t16">Params</h3>
+                  {numberParams.map(({ name, scriptIds, default: fallback }) => (
+                    <div key={name} className="script-param">
+                      <span className="script-param-name">
+                        <strong className="mono">{name}</strong>{' '}
+                        <span className="chip">number</span>
+                      </span>
+                      <span className="buttons">
+                        <NumberField
+                          name={name}
+                          value={undefined}
+                          fallback={fallback}
+                          onSet={(v) =>
+                            onOrder({ kind: 'setNumber', name, value: v ?? null, scriptIds })
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="btn sm"
+                          onClick={() =>
+                            onOrder({ kind: 'setNumber', name, value: null, scriptIds })
+                          }
+                        >
+                          Clear
+                        </button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="muted small">
+                  Sets it for each one running a script with it. Type a number and press Enter.
+                </p>
+                {foodHint && <p className="muted small">{foodHint}</p>}
+              </section>
+            </div>
           )}
-        </>
-      )}
-
-      {(orderError || picking || tab === 'orders') && (
-        <p className="muted small" role="status">
-          {orderError
-            ? `Order turned down: ${orderError}`
-            : picking
-              ? `${GROUP_PICKING_HINTS[picking]} Tap a tile on the map.`
-              : 'Right-click the map to walk them there. Hold Shift with any order to queue it.'}
-        </p>
+        </div>
       )}
       {creative}
-    </SelectionCard>
+    </CommandBar>
   )
 }
 
@@ -2353,6 +2418,7 @@ export function ResidentCard({
   sections,
   onSections,
   scriptParams,
+  scriptRun,
   scriptMemory,
   scriptLog,
   onStore,
@@ -2590,6 +2656,8 @@ export function ResidentCard({
   onSections: (sections: CardSections<ActionId>) => void
   /** The fields for the params of the script they run (`ScriptParamFields`), if any. */
   scriptParams?: ReactNode
+  /** How the script they run last ran (`ScriptRunInfo`), for the Player running it. */
+  scriptRun?: ReactNode
   /** The memory of the script they run (`ScriptMemoryTree`), for the Player running it. */
   scriptMemory?: ReactNode
   /** Their script log (`ScriptLog`), for the Player owning them, running a script or not. */
@@ -2622,6 +2690,7 @@ export function ResidentCard({
   const child = !canWork(r, tick)
   // Children pick up and put down only Food (`CONTEXT.md`: Child).
   const refused = (good: Good) => !canHandle(r, tick, [good])
+  const childWhy = child ? 'Children handle Food only.' : undefined
   const family = familyLine(r, residents, tick)
   // A queue the game gave under a name (the stable hand's "Farm and feed") goes into the saved
   // queues once (`CONTEXT.md`: Starting city, Saved queue).
@@ -2773,7 +2842,7 @@ export function ResidentCard({
     r.cityId === null
       ? 'Homeless'
       : (cities.find((c) => c.id === r.cityId)?.name ?? 'a city out of sight')
-  // The open order's panel, right under the row that opened it (`ActionRows`).
+  // The open order's panel, above the command bar or on a phone under its order (`CommandBar`).
   const openPanel = shown && (
     <div className="sel-panel">
       {shown === 'haul' && (carriage || boatToRow) && (
@@ -2797,6 +2866,29 @@ export function ResidentCard({
           realmId={realmId}
           onWork={onWork}
         />
+      )}
+      {shown === 'gather' && (
+        // Gather's own form picks the good (`CONTEXT.md`: Gather): the panel says what it does and
+        // opens that form.
+        <section className="inspector-block" aria-label="Gather">
+          <p className="small">
+            Wood or Food from a Forest tile, Stone from a Hills tile, by hand: they walk to the
+            nearest tile that gives it and isn’t picked over, and gather until their hands are full.
+          </p>
+          <p className="muted small">The form picks the good and where the load goes.</p>
+          <PanelFoot>
+            <button
+              type="button"
+              className="primary"
+              onClick={() => {
+                setPanel(undefined)
+                onGather()
+              }}
+            >
+              Gather…
+            </button>
+          </PanelFoot>
+        </section>
       )}
       {shown === 'build' && (
         <>
@@ -2866,9 +2958,10 @@ export function ResidentCard({
             Crew sail the ship and take no room; a passenger rides along and counts against its
             load.
           </p>
-          <div className="order-buttons">
+          <PanelFoot>
             <button
               type="button"
+              className="primary"
               disabled={child}
               title={child ? 'children can’t crew a ship' : undefined}
               onClick={() => onBoard(boatToBoard.id, true)}
@@ -2878,7 +2971,8 @@ export function ResidentCard({
             <button type="button" onClick={() => onBoard(boatToBoard.id, false)}>
               As passenger
             </button>
-          </div>
+          </PanelFoot>
+          {child && <p className="muted small">A child can’t crew a ship.</p>}
         </section>
       )}
       {shown === 'hitch' && toHitch && (
@@ -2914,11 +3008,15 @@ export function ResidentCard({
             <ul className="equipment-slots">
               {equipmentSlots(r.equipped, r.condition).map((s) => {
                 const choices = onEquip ? swapChoices(s.slot, r.carried, r.equipped) : []
+                const worn = r.equipped?.[s.slot]
                 return (
                   <li key={s.slot}>
-                    <span className="muted small">{s.label}</span>{' '}
-                    <span className={s.item ? undefined : 'muted'}>{s.item ?? 'empty'}</span>
-                    {s.condition && <span className="muted small"> ({s.condition})</span>}
+                    <span className="equipment-icon">{worn && <GoodIcon good={worn} />}</span>
+                    <span className="grow">
+                      <strong>{s.label}</strong> ·{' '}
+                      <span className={s.item ? undefined : 'muted'}>{s.item ?? 'empty'}</span>
+                      {s.condition && <span className="muted small"> ({s.condition})</span>}
+                    </span>
                     {choices.length > 0 && (
                       <select
                         aria-label={`Swap into the ${s.label.toLowerCase()} slot`}
@@ -2934,7 +3032,11 @@ export function ResidentCard({
                       </select>
                     )}
                     {onEquip && s.item && (
-                      <button type="button" onClick={() => onEquip(s.slot, null)}>
+                      <button
+                        type="button"
+                        className="btn sm"
+                        onClick={() => onEquip(s.slot, null)}
+                      >
                         Take off
                       </button>
                     )}
@@ -2952,46 +3054,43 @@ export function ResidentCard({
           <section className="inspector-block" aria-label="Carrying">
             <div className="panel-head">
               <h3>Carrying</h3>
-              <span className="mono small">
-                {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
-              </span>
+              {onStore && carried.length > 0 && (
+                <button type="button" className="btn sm" onClick={onStore}>
+                  Store all
+                </button>
+              )}
             </div>
+            {onStore && carried.length > 0 && (
+              <p className="muted small">
+                Store all: at the nearest storage, keeping their own Food.
+              </p>
+            )}
             {carried.length === 0 && (
               <p className="muted small">
                 Nothing. Residents eat only what they carry; at home they take meals from storage.
               </p>
             )}
-            {onStore && carried.length > 0 && (
-              <div className="order-buttons">
-                <button type="button" onClick={onStore}>
-                  Store all
-                </button>
-                <span className="muted small">at the nearest storage, keeping their own Food</span>
-              </div>
-            )}
-            {carried.map(([good, units]) => (
-              <GoodsRow
-                key={good}
-                good={good}
-                units={units}
-                byDefault={putAwayUnits(good, units)}
-                disabled={refused(good)}
-                actions={[
-                  { label: 'Drop', spot: ground },
-                  ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
-                  ...((needed[good] ?? 0) > 0 ? [{ label: 'Deliver', spot: atSite }] : []),
-                  ...((carriageNeeded[good] ?? 0) > 0
-                    ? [{ label: 'Deliver to carriage site', spot: atCarriageSite }]
-                    : []),
-                  ...((roadNeeded[good] ?? 0) > 0
-                    ? [{ label: 'Deliver to road', spot: atRoadSite }]
-                    : []),
-                  ...(carriage ? [{ label: 'Load', spot: onCarriage }] : []),
-                  ...(boat ? [{ label: 'Load into boat', spot: inBoat }] : []),
-                ]}
-                onAct={onDrop}
-              />
-            ))}
+            <GoodsPick
+              label="Carrying"
+              goods={carried}
+              byDefault={putAwayUnits}
+              refused={refused}
+              refusedWhy={childWhy}
+              actions={(good) => [
+                { label: 'Drop', spot: ground },
+                ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
+                ...((needed[good] ?? 0) > 0 ? [{ label: 'Deliver', spot: atSite }] : []),
+                ...((carriageNeeded[good] ?? 0) > 0
+                  ? [{ label: 'Deliver to carriage site', spot: atCarriageSite }]
+                  : []),
+                ...((roadNeeded[good] ?? 0) > 0
+                  ? [{ label: 'Deliver to road', spot: atRoadSite }]
+                  : []),
+                ...(carriage ? [{ label: 'Load', spot: onCarriage }] : []),
+                ...(boat ? [{ label: 'Load into boat', spot: inBoat }] : []),
+              ]}
+              onAct={onDrop}
+            />
           </section>
           {(pile ||
             storage ||
@@ -3012,6 +3111,7 @@ export function ResidentCard({
                 spot={ground}
                 onPickUp={onPickUp}
                 refused={refused}
+                refusedWhy={childWhy}
               />
               {storage && (
                 <TileGoods
@@ -3024,6 +3124,7 @@ export function ResidentCard({
                   spot={inStorage}
                   onPickUp={onPickUp}
                   refused={refused}
+                  refusedWhy={childWhy}
                 />
               )}
               {site && (
@@ -3033,6 +3134,7 @@ export function ResidentCard({
                   spot={atSite}
                   onPickUp={onPickUp}
                   refused={refused}
+                  refusedWhy={childWhy}
                 />
               )}
               {carriageSite && (
@@ -3042,6 +3144,7 @@ export function ResidentCard({
                   spot={atCarriageSite}
                   onPickUp={onPickUp}
                   refused={refused}
+                  refusedWhy={childWhy}
                 />
               )}
               {roadSite && (
@@ -3051,6 +3154,7 @@ export function ResidentCard({
                   spot={atRoadSite}
                   onPickUp={onPickUp}
                   refused={refused}
+                  refusedWhy={childWhy}
                 />
               )}
               {carriage && (
@@ -3060,6 +3164,7 @@ export function ResidentCard({
                   spot={onCarriage}
                   onPickUp={onPickUp}
                   refused={refused}
+                  refusedWhy={childWhy}
                 />
               )}
               {boat?.load && (
@@ -3071,6 +3176,7 @@ export function ResidentCard({
                   spot={inBoat}
                   onPickUp={onPickUp}
                   refused={refused}
+                  refusedWhy={childWhy}
                 />
               )}
               {storage && boat?.kind === 'ship' && storage.id === boat.dockedAt && onLoad && (
@@ -3083,6 +3189,7 @@ export function ResidentCard({
                     label="Load ship"
                     onPickUp={(_, goods) => onLoad(boat.id, goods, false)}
                     refused={refused}
+                    refusedWhy={childWhy}
                   />
                   <TileGoods
                     title="From the ship into the haven"
@@ -3091,6 +3198,7 @@ export function ResidentCard({
                     label="Unload"
                     onPickUp={(_, goods) => onLoad(boat.id, goods, true)}
                     refused={refused}
+                    refusedWhy={childWhy}
                   />
                 </>
               )}
@@ -3102,6 +3210,7 @@ export function ResidentCard({
                   spot={{ kind: 'resident', residentId: d.id }}
                   onPickUp={onPickUp}
                   refused={refused}
+                  refusedWhy={childWhy}
                 />
               ))}
             </section>
@@ -3113,6 +3222,7 @@ export function ResidentCard({
       )}
       {shown === 'feed' && onFeed && (
         <FeedBlock
+          titled={false}
           targets={toFeedNear}
           food={r.carried.food ?? 0}
           onFeed={(targetId, units) => {
@@ -3141,9 +3251,6 @@ export function ResidentCard({
       )}
       {shown === 'script' && (
         <section className="inspector-block" aria-label="Run script">
-          <div className="panel-head">
-            <h3>Run script</h3>
-          </div>
           <RunScript
             script={r.script}
             scripts={scripts}
@@ -3156,7 +3263,6 @@ export function ResidentCard({
       {shown === 'relocate' && relocate && onRelocate && (
         <RelocateBlock
           resident={r}
-          home={home}
           choices={relocate.choices}
           onRelocate={(cityId) => {
             setPanel(undefined)
@@ -3166,18 +3272,19 @@ export function ResidentCard({
       )}
       {shown === 'makeLeader' && makeLeader && (
         <section className="inspector-block" aria-label="Make Leader">
-          <div className="panel-head">
-            <h3>Make Leader</h3>
-          </div>
+          {makeLeader.heir && (
+            <div className="panel-head">
+              <h3>Make Leader</h3>
+            </div>
+          )}
           <p className="small">
             Hand your realm to {r.name}? {leaderName ?? 'Your Leader'} stays on as an ordinary
             resident.
           </p>
-          {makeLeader.problem && <p className="muted small">{makeLeader.problem}.</p>}
-          <div className="order-buttons">
+          <PanelFoot>
             <button
               type="button"
-              className="primary"
+              className="btn gold"
               disabled={!!makeLeader.problem}
               onClick={() => {
                 setPanel(undefined)
@@ -3189,7 +3296,8 @@ export function ResidentCard({
             <button type="button" onClick={() => setPanel(undefined)}>
               Cancel
             </button>
-          </div>
+          </PanelFoot>
+          {makeLeader.problem && <p className="muted small">{makeLeader.problem}.</p>}
         </section>
       )}
       {shown === 'makeLeader' && makeLeader?.heir && (
@@ -3200,7 +3308,7 @@ export function ResidentCard({
           {makeLeader.heir.named ? (
             <>
               <p className="small">{r.name} is your realm’s heir.</p>
-              <div className="order-buttons">
+              <PanelFoot>
                 <button
                   type="button"
                   onClick={() => {
@@ -3210,7 +3318,7 @@ export function ResidentCard({
                 >
                   Clear heir
                 </button>
-              </div>
+              </PanelFoot>
             </>
           ) : (
             <>
@@ -3218,8 +3326,7 @@ export function ResidentCard({
                 Name {r.name} your realm’s heir, to carry it on
                 {heirName ? ` in place of ${heirName}` : ''}? Free and at once, from anywhere.
               </p>
-              {makeLeader.heir.problem && <p className="muted small">{makeLeader.heir.problem}.</p>}
-              <div className="order-buttons">
+              <PanelFoot>
                 <button
                   type="button"
                   className="primary"
@@ -3231,7 +3338,8 @@ export function ResidentCard({
                 >
                   Name {r.name} heir
                 </button>
-              </div>
+              </PanelFoot>
+              {makeLeader.heir.problem && <p className="muted small">{makeLeader.heir.problem}.</p>}
             </>
           )}
         </section>
@@ -3250,8 +3358,50 @@ export function ResidentCard({
       )}
     </div>
   )
+  const shownRow = rows.find((a) => a.id === shown)
+  const weapon = bestWeapon(r)
+  // What the panel's header says beside its title.
+  const notes: Partial<Record<ActionId, ReactNode>> = {
+    goods: (
+      <span className="mono">{carryLine(stockWeight(r.carried), carryCapacity(r, tick))}</span>
+    ),
+    feed: `${r.carried.food ?? 0} Food in hand`,
+    hitch: toHitch && `${toHitch.horses.length} free here`,
+    relocate: `from ${home}`,
+    rename: 'free, at once',
+    walls: 'break or climb',
+    attack: weapon ? `fights with a ${GOOD_LABELS[weapon].toLowerCase()}` : 'unarmed',
+    work: building && !building.site && MAX_WORKERS[building.kind] !== undefined && (
+      <span className="mono">
+        {workers} / {MAX_WORKERS[building.kind]} workers
+      </span>
+    ),
+    teach: shown === 'teach' && building && (
+      <span className="mono">
+        {traineesOf(building, residents, mapSize).length} / {TRAINING_GROUND_MAX_TRAINEES} trainees
+      </span>
+    ),
+    breed:
+      shown === 'breed' &&
+      building &&
+      `${horsesIn(horses, building).filter((h) => h.realmId === realmId).length} of yours here`,
+  }
+  const panelSpec: OrderPanelSpec | undefined =
+    tab === 'orders' && shown && openPanel
+      ? {
+          title:
+            shown === 'makeLeader' && makeLeader?.heir
+              ? 'Leader and heir'
+              : panelTitle(shownRow?.label ?? ''),
+          note: notes[shown] || undefined,
+          ...(shownRow ? { keyCap: shownRow.key } : {}),
+          size: panelSize(shown),
+          body: openPanel,
+          onClose: () => setPanel(undefined),
+        }
+      : undefined
   return (
-    <SelectionCard
+    <CommandBar
       rel={r.owner === realmId ? 'own' : 'alliance'}
       title={r.name}
       badge={r.id === leaderId ? 'Leader' : makeLeader?.heir?.named ? 'Heir' : undefined}
@@ -3274,206 +3424,245 @@ export function ResidentCard({
               </span>,
             ]
           : []),
-        <div key="carried" className="carried-line">
-          <GoodsGrid label="Carried" {...carriedItems(r.carried)} />
-          <span className="mono">{carryLine(stockWeight(r.carried), carryCapacity(r, tick))}</span>
-        </div>,
-        <span key="equipped" className="muted">
-          {equipmentLine(r.equipped, r.condition)}
-        </span>,
-        ...(ridden ? [ridden] : []),
       ]}
       head={
-        <div className="vitals">
-          <Meter
-            label="Health"
-            value={`${Math.round(r.health)} / ${MAX_HEALTH}`}
-            share={r.health / MAX_HEALTH}
-          />
-          <Meter
-            label="Hunger"
-            value={r.hunger / MAX_HUNGER < 0.25 ? 'hungry' : `${pct(r.hunger / MAX_HUNGER)} fed`}
-            share={r.hunger / MAX_HUNGER}
-          />
-        </div>
+        <>
+          <div className="vitals">
+            <Meter
+              label="Health"
+              value={`${Math.round(r.health)} / ${MAX_HEALTH}`}
+              share={r.health / MAX_HEALTH}
+            />
+            <Meter
+              label="Hunger"
+              value={r.hunger / MAX_HUNGER < 0.25 ? 'hungry' : `${pct(r.hunger / MAX_HUNGER)} fed`}
+              share={r.hunger / MAX_HUNGER}
+            />
+          </div>
+          <div className="carried-line">
+            <GoodsGrid label="Carried" {...carriedItems(r.carried)} />
+            <span className="mono">
+              {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
+            </span>
+          </div>
+          <div className="sel-line muted">{equipmentLine(r.equipped, r.condition)}</div>
+          {ridden && <div className="sel-line">{ridden}</div>}
+        </>
       }
       onClose={onClose}
       collapsed={collapsed}
+      tall={tab === 'queue'}
+      tabs={
+        <div className="tabs sel-tabs" role="tablist" aria-label="Card">
+          {CARD_TABS.map((t) => (
+            <button
+              type="button"
+              className="tab"
+              key={t}
+              role="tab"
+              aria-selected={tab === t}
+              onClick={() => onSections({ ...sections, tab: t })}
+            >
+              {CARD_TAB_LABELS[t]}
+            </button>
+          ))}
+        </div>
+      }
+      panel={panelSpec}
+      status={
+        (orderError || tab === 'orders') && (
+          <p className="muted small" role="status">
+            {orderError
+              ? `Order turned down: ${orderError}`
+              : isDown(r)
+                ? `${DOWN_NO_ORDERS}.`
+                : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
+          </p>
+        )
+      }
     >
-      <div className="tabs sel-tabs" role="tablist" aria-label="Card">
-        {CARD_TABS.map((t) => (
-          <button
-            type="button"
-            key={t}
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => onSections({ ...sections, tab: t })}
-          >
-            {CARD_TAB_LABELS[t]}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'orders' &&
-        rowGroups(rows, orderGroupOf).map((g) => (
-          <div className="sel-order-group" key={g.group}>
-            <h3>{g.label}</h3>
-            <ActionRows
-              actions={g.actions}
-              open={shown}
-              onAction={act}
-              label={g.label}
-              keys={false}
-              panel={openPanel || undefined}
-              beside={(a) => {
-                const task = ROW_TASKS[a.id]
-                return (
-                  task && (
-                    <CustomiseButton
-                      order={taskStart(task)}
-                      of={a.label}
-                      disabled={a.disabled}
-                      give={() => act(a)}
-                    />
-                  )
-                )
-              }}
-            />
-          </div>
-        ))}
+      {tab === 'orders' && (
+        <OrderGrid
+          groups={rowGroups(rows, orderGroupOf)}
+          open={shown}
+          onAction={act}
+          panel={panelSpec}
+          beside={(a) => {
+            const task = ROW_TASKS[a.id]
+            return (
+              task && (
+                <CustomiseButton
+                  order={taskStart(task)}
+                  of={a.label}
+                  disabled={a.disabled}
+                  give={() => act(a)}
+                  small
+                />
+              )
+            )
+          }}
+        />
+      )}
       {tab === 'queue' &&
         (queuePlan && onPlanQueue ? (
-          <>
-            <p className="small queue-draft-mark">
-              {r.queue
-                ? 'Draft, not started: the queue runs on until you start it.'
-                : 'Draft, not started'}
-            </p>
-            <QueueBlock
-              title="Draft"
-              queue={queuePlan}
-              currentId={r.queue?.current}
-              doing={doingLine(r, {
-                scripts,
-                buildings,
-                residents,
-                horses,
-                cities,
-                arrives: arrivesIn?.(r),
-              })}
-              scripts={scripts}
-              buildings={buildings}
-              lastSeen={lastSeen}
-              waypoints={waypoints}
-              cities={cities}
-              onEdit={(items, loop) => onPlanQueue(editPlan(queuePlan, items, loop))}
-              realm={realmId}
-              palette={addStep}
-            />
-            <GivePlan
-              plan={queuePlan}
-              give="Start queue"
-              discard="Discard draft"
-              note="Start queue makes their queue this draft, repeat blocks and all; the step they are on keeps going if it is still in it."
-              onGive={() => onGivePlan?.()}
-              onDiscard={() => onPlanQueue(undefined)}
-            />
-          </>
+          <QueueBlock
+            title="Draft"
+            mark={
+              <>
+                <span className="chip y">Draft, not started</span>
+                {r.queue && (
+                  <span className="small muted">the queue runs on until you start it.</span>
+                )}
+              </>
+            }
+            queue={queuePlan}
+            currentId={r.queue?.current}
+            doing={doingLine(r, {
+              scripts,
+              buildings,
+              residents,
+              horses,
+              cities,
+              arrives: arrivesIn?.(r),
+            })}
+            scripts={scripts}
+            buildings={buildings}
+            lastSeen={lastSeen}
+            waypoints={waypoints}
+            cities={cities}
+            onEdit={(items, loop) => onPlanQueue(editPlan(queuePlan, items, loop))}
+            realm={realmId}
+            palette={addStep}
+            foot={
+              <GivePlan
+                plan={queuePlan}
+                give="Start queue"
+                discard="Discard draft"
+                note="Start queue makes their queue this draft, repeat blocks and all; the step they are on keeps going if it is still in it."
+                onGive={() => onGivePlan?.()}
+                onDiscard={() => onPlanQueue(undefined)}
+              />
+            }
+          />
         ) : r.queue && onEditQueue ? (
-          <>
-            {r.queue.name && (
-              <p className="small queue-name">
-                <strong>{r.queue.name}</strong>
+          <QueueBlock
+            title={r.queue.name ?? 'Queue'}
+            queue={planOf(r.queue)}
+            currentId={r.queue.current}
+            rounds={roundsOf(r.queue)}
+            branches={branchesOf(r.queue)}
+            running
+            doing={doingLine(r, {
+              scripts,
+              buildings,
+              residents,
+              horses,
+              cities,
+              arrives: arrivesIn?.(r),
+            })}
+            scripts={scripts}
+            buildings={buildings}
+            lastSeen={lastSeen}
+            waypoints={waypoints}
+            cities={cities}
+            onEdit={onEditQueue}
+            realm={realmId}
+            palette={addStep}
+            foot={
+              onDraftQueue && (
+                <div className="queue-foot">
+                  <span className="grow" />
+                  <button type="button" className="btn sm" onClick={onDraftQueue}>
+                    Edit as draft
+                  </button>
+                </div>
+              )
+            }
+          />
+        ) : (
+          <section className="queue-planner" aria-label="Queue">
+            <div className="queue-list">
+              <div className="queue-tools">
+                <span className="px t16">Queue</span>
+                <span className="grow" />
+                {onEditQueue && <PasteSteps onPaste={(steps) => onEditQueue(steps)} />}
+                {onEditQueue && (
+                  <SavedQueueTools
+                    realm={realmId}
+                    steps={[]}
+                    onLoad={(steps) => onEditQueue(steps)}
+                  />
+                )}
+              </div>
+              <p className="muted small">
+                Nothing queued. Plan steps with Add step, paste copied ones or load a saved queue:
+                they wait as a draft until you press Start queue. Hold Shift with any order to queue
+                it at once.
               </p>
-            )}
-            <QueueBlock
-              title={r.queue.name ?? 'Queue'}
-              queue={planOf(r.queue)}
-              currentId={r.queue.current}
-              rounds={roundsOf(r.queue)}
-              branches={branchesOf(r.queue)}
-              running
-              doing={doingLine(r, {
-                scripts,
-                buildings,
-                residents,
-                horses,
-                cities,
-                arrives: arrivesIn?.(r),
-              })}
-              scripts={scripts}
-              buildings={buildings}
-              lastSeen={lastSeen}
-              waypoints={waypoints}
-              cities={cities}
-              onEdit={onEditQueue}
-              realm={realmId}
-              palette={addStep}
-            />
-            {onDraftQueue && (
-              <div className="order-buttons">
-                <button type="button" onClick={onDraftQueue}>
-                  Edit as draft
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <p className="muted small">
-              Nothing queued. Plan steps with Add step, paste copied ones or load a saved queue:
-              they wait as a draft until you press Start queue. Hold Shift with any order to queue
-              it at once.
-            </p>
-            {onEditQueue && <PasteSteps onPaste={(steps) => onEditQueue(steps)} />}
-            {onEditQueue && (
-              <SavedQueueTools realm={realmId} steps={[]} onLoad={(steps) => onEditQueue(steps)} />
-            )}
-          </>
+            </div>
+            {addStep && <div className="queue-palette">{addStep}</div>}
+          </section>
         ))}
-      {tab === 'queue' && !(queuePlan && onPlanQueue) && !(r.queue && onEditQueue) && addStep}
-      {tab === 'script' &&
-        (r.script ? (
-          <>
-            <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
+      {tab === 'script' && (
+        <div className="script-tab">
+          <div className="script-col">
+            <section className="sec script-runs" aria-label="Script they run">
+              {r.script ? (
+                <>
+                  <TaskScript
+                    scriptId={r.script.scriptId}
+                    scripts={scripts}
+                    onEdit={onEditScript}
+                  />
+                  {scriptRun}
+                </>
+              ) : (
+                <>
+                  <p className="muted small">Runs no script.</p>
+                  {actions.some((a) => a.id === 'script') && (
+                    <div className="order-buttons">
+                      <button
+                        type="button"
+                        className="btn sm"
+                        onClick={() => onSections({ ...sections, tab: 'orders', panel: 'script' })}
+                      >
+                        Run script…
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
             {defenceScript}
             {alarmScript}
-            {scriptParams}
-            {scriptMemory}
+          </div>
+          {r.script && <div className="script-col">{scriptParams}</div>}
+          <div className="script-col">
+            {r.script && scriptMemory}
             {scriptLog}
-          </>
-        ) : (
-          <>
-            <p className="muted small">Runs no script.</p>
-            {actions.some((a) => a.id === 'script') && (
-              <div className="order-buttons">
-                <button
-                  type="button"
-                  onClick={() => onSections({ ...sections, tab: 'orders', panel: 'script' })}
-                >
-                  Run script…
-                </button>
-              </div>
-            )}
-            {defenceScript}
-            {alarmScript}
-            {scriptLog}
-          </>
-        ))}
+          </div>
+        </div>
+      )}
       {tab === 'stats' && (
-        <>
-          <ul className="sel-facts">
-            <li>
-              {child ? 'Child' : 'Adult'} · {age} years · {home}
-              {r.riding ? ' · on horseback' : ''}
-              {r.aboard ? (isVesselId(r.aboard) ? ' · aboard a boat' : ' · aboard a carriage') : ''}
-            </li>
-            {grown && <li>{capitalised(grown)}</li>}
-            {family && <li>{family}</li>}
-          </ul>
-          <section className="inspector-block" aria-label="Stats">
-            <div className="panel-head">
-              <h3>Stats</h3>
+        <div className="stats-tab">
+          <section className="sec" aria-label="About them">
+            <ul className="sel-facts">
+              <li className="b">
+                {child ? 'Child' : 'Adult'} · {age} years · {home}
+                {r.riding ? ' · on horseback' : ''}
+                {r.aboard
+                  ? isVesselId(r.aboard)
+                    ? ' · aboard a boat'
+                    : ' · aboard a carriage'
+                  : ''}
+              </li>
+              {grown && <li>{capitalised(grown)}</li>}
+              {family && <li>{family}</li>}
+            </ul>
+          </section>
+          <section className="sec" aria-label="Stats">
+            <div className="fx">
+              <h3 className="px t16 grow">Stats</h3>
               <span className="small muted">base + trained (cap)</span>
             </div>
             {STAT_NAMES.map((s) => {
@@ -3482,18 +3671,29 @@ export function ResidentCard({
               return (
                 <div className="stat" key={s}>
                   <span>{STAT_LABELS[s]}</span>
-                  <span className="stat-bar" aria-hidden="true">
-                    <span className="base" style={{ width: pct(base / STAT_SCALE) }} />
-                    <span className="trained" style={{ width: pct(trained / STAT_SCALE) }} />
-                    <span className="cap" style={{ width: pct((cap - trained) / STAT_SCALE) }} />
+                  <span className="mt stat-bar" aria-hidden="true">
+                    <i className="stat-base" style={{ width: pct(base / STAT_SCALE) }} />
+                    <i className="stat-trained" style={{ width: pct(trained / STAT_SCALE) }} />
+                    <i className="stat-room" style={{ width: pct((cap - trained) / STAT_SCALE) }} />
                   </span>
-                  <span className="mono right">{statLine(base, trained, cap)}</span>
+                  <span className="mono">{statLine(base, trained, cap)}</span>
                 </div>
               )
             })}
+            <div className="stat-legend small muted" aria-hidden="true">
+              <span>
+                <span className="dot stat-base" /> base
+              </span>
+              <span>
+                <span className="dot stat-trained" /> trained
+              </span>
+              <span>
+                <span className="dot stat-room" /> room to the cap
+              </span>
+            </div>
           </section>
-          <section className="inspector-block" aria-label="Skills">
-            <h3>Skills</h3>
+          <section className="sec" aria-label="Skills">
+            <h3 className="px t16">Skills</h3>
             <div className="chips">
               {skills.length === 0 && <span className="chip">None yet</span>}
               {skills.map((s) => (
@@ -3504,19 +3704,10 @@ export function ResidentCard({
               ))}
             </div>
           </section>
-        </>
-      )}
-      {(orderError || tab === 'orders') && (
-        <p className="muted small" role="status">
-          {orderError
-            ? `Order turned down: ${orderError}`
-            : isDown(r)
-              ? `${DOWN_NO_ORDERS}.`
-              : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
-        </p>
+        </div>
       )}
       {creative}
-    </SelectionCard>
+    </CommandBar>
   )
 }
 
@@ -3557,46 +3748,55 @@ export function HaulBlock({
   }
   return (
     <section className="inspector-block" aria-label="Haul route">
-      <div className="panel-head">
-        <h3>Haul route</h3>
-        {onRoute && <span className="small muted">on a route</span>}
-      </div>
+      {onRoute && <span className="chip y haul-on-route">on a route</span>}
       {([false, true] as const).map((back) => (
-        <div key={String(back)}>
-          <span className="small muted">{back ? 'Back from there' : 'To the other stop'}</span>
-          <div className="chips">
-            {GOODS.map((g) => (
-              <label className="chip" key={g}>
-                <input
-                  type="checkbox"
-                  checked={(back ? returnGoods : goods).includes(g)}
-                  onChange={() => toggle(g, back)}
-                />{' '}
-                {GOOD_LABELS[g]}
-              </label>
-            ))}
+        <div className="haul-goods" key={String(back)}>
+          <span className="lb">{back ? 'Back from there' : 'To the other stop'}</span>
+          <div
+            className="haul-goods-grid"
+            role="group"
+            aria-label={back ? 'Goods back from there' : 'Goods to the other stop'}
+          >
+            {GOODS.map((g) => {
+              const on = (back ? returnGoods : goods).includes(g)
+              const other = (back ? goods : returnGoods).includes(g)
+              return (
+                <button
+                  type="button"
+                  className="btn sm"
+                  key={g}
+                  aria-pressed={on}
+                  title={other ? `${GOOD_LABELS[g]} goes the other way; tap to swap it` : undefined}
+                  onClick={() => toggle(g, back)}
+                >
+                  <GoodIcon good={g} />
+                  {GOOD_LABELS[g]}
+                </button>
+              )
+            })}
           </div>
         </div>
       ))}
-      <label className="small">
+      <span className="muted small">A good goes one way only.</span>
+      <label className="haul-keep">
         {ship
           ? 'Food kept for the crew'
           : byWater
             ? 'Food kept for the rower'
-            : 'Food kept for the horse'}{' '}
+            : 'Food kept for the horse'}
         <input
+          className="amount mono"
           type="number"
           min={0}
           step={1}
           value={keepFood}
           onChange={(e) => setKeepFood(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-          style={{ width: '4em' }}
         />
       </label>
-      <div className="order-buttons">
+      <PanelFoot>
         <button
           type="button"
-          className={picking ? 'primary' : ''}
+          className="primary"
           aria-pressed={picking}
           disabled={!adult || goods.length === 0}
           onClick={() => onHaulTo({ goods, returnGoods, keepFood })}
@@ -3609,7 +3809,14 @@ export function HaulBlock({
           disabled={!adult || goods.length === 0}
           give={() => onHaulTo({ goods, returnGoods, keepFood })}
         />
-      </div>
+      </PanelFoot>
+      {!adult ? (
+        <span className="muted small">A child can’t drive.</span>
+      ) : (
+        goods.length === 0 && (
+          <span className="muted small">Pick at least one good to take to the other stop.</span>
+        )
+      )}
       {ship ? (
         <p className="muted small">
           The captain moves the picked goods straight from this haven onto the ship, sails it with
@@ -3689,16 +3896,16 @@ function SiteBlock({
       />
       {materials.length === 0 && <p className="muted small">Needs no materials.</p>}
       {materials.map(([good, units]) => (
-        <div className="goods-row" key={good}>
-          <span>{GOOD_LABELS[good]}</span>
+        <div className="fx site-material-row" key={good}>
+          <GoodIcon good={good} />
+          <span className="grow">{GOOD_LABELS[good]}</span>
           <span className="mono">
             {site.site!.delivered[good] ?? 0} / {units}
           </span>
-          <span />
         </div>
       ))}
-      <div className="order-buttons">
-        <button type="button" disabled={!adult || joined} onClick={help}>
+      <PanelFoot>
+        <button type="button" className="primary" disabled={!adult || joined} onClick={help}>
           {joined ? 'Building…' : 'Help build'}
         </button>
         <CustomiseButton
@@ -3707,7 +3914,7 @@ function SiteBlock({
           disabled={!adult || joined}
           give={help}
         />
-      </div>
+      </PanelFoot>
       <p className="muted small">
         It becomes a {stone ? 'stone ' : ''}
         {name.toLowerCase()} once its materials are delivered and the work is done: about{' '}
@@ -3759,59 +3966,61 @@ function WorkBlock({
   const blocked = !canWork(resident, tick) || (!working && workers >= max)
   return (
     <section className="inspector-block" aria-label="Work">
-      <div className="panel-head">
-        <h3>{BUILDING_NAMES[building.kind]}</h3>
-        <span className="mono small">
-          {workers} / {max} workers
-        </span>
-      </div>
       <p className="small">{holding(holders, realmId)}</p>
       {recipes.length > 1 ? (
         // A smithy: each worker says what they make (`CONTEXT.md`: Smithy), or mends (Mending).
-        [
-          ...recipes.map((r) => {
+        <div className="work-recipes">
+          {recipes.map((r) => {
             const made = recipeGood(r)
             const making = working && !o.mends && o.makes === made
             return (
-              <div key={made} className="goods-row">
-                <span>{GOOD_LABELS[made]}</span>
-                <span className="muted small">{stockText(r.input)}</span>
-                <span className="buttons">
-                  <button type="button" disabled={blocked || making} onClick={() => onWork(made)}>
-                    {making ? 'Making…' : working ? 'Make instead' : 'Make'}
-                  </button>
-                  <CustomiseButton
-                    order={taskStart('work', building.id)}
-                    of={`Make ${GOOD_LABELS[made].toLowerCase()}`}
-                    disabled={blocked || making}
-                    give={() => onWork(made)}
-                  />
+              <div key={made} className="fx work-recipe">
+                <GoodIcon good={made} />
+                <span className="grow">
+                  <strong>{GOOD_LABELS[made]}</strong>{' '}
+                  <span className="muted small">· {stockText(r.input)}</span>
                 </span>
+                <button
+                  type="button"
+                  className="btn sm"
+                  disabled={blocked || making}
+                  onClick={() => onWork(made)}
+                >
+                  {making ? 'Making…' : working ? 'Make instead' : 'Make'}
+                </button>
+                <CustomiseButton
+                  order={taskStart('work', building.id)}
+                  of={`Make ${GOOD_LABELS[made].toLowerCase()}`}
+                  disabled={blocked || making}
+                  give={() => onWork(made)}
+                />
               </div>
             )
-          }),
-          <div key="mend" className="goods-row">
-            <span>Mend</span>
-            <span className="muted small">worn gear here, for a share of its recipe</span>
-            <span className="buttons">
-              <button
-                type="button"
-                disabled={blocked || (working && !!o.mends)}
-                onClick={() => onWork(MEND)}
-              >
-                {working && o.mends ? 'Mending…' : working ? 'Mend instead' : 'Mend'}
-              </button>
-              <CustomiseButton
-                order={taskStart('work', building.id)}
-                of="Mend"
-                disabled={blocked || (working && !!o.mends)}
-                give={() => onWork(MEND)}
-              />
+          })}
+          <div className="fx work-recipe">
+            <Icon name="build" size={16} />
+            <span className="grow">
+              <strong>Mend</strong>{' '}
+              <span className="muted small">· worn gear here, for a share of its recipe</span>
             </span>
-          </div>,
-        ]
+            <button
+              type="button"
+              className="btn sm"
+              disabled={blocked || (working && !!o.mends)}
+              onClick={() => onWork(MEND)}
+            >
+              {working && o.mends ? 'Mending…' : working ? 'Mend instead' : 'Mend'}
+            </button>
+            <CustomiseButton
+              order={taskStart('work', building.id)}
+              of="Mend"
+              disabled={blocked || (working && !!o.mends)}
+              give={() => onWork(MEND)}
+            />
+          </div>
+        </div>
       ) : (
-        <div className="order-buttons">
+        <PanelFoot>
           <button
             type="button"
             className="primary"
@@ -3826,7 +4035,7 @@ function WorkBlock({
             disabled={blocked || working}
             give={() => onWork()}
           />
-        </div>
+        </PanelFoot>
       )}
       <p className="muted small">
         {recipes.length > 1 ? (
@@ -3882,9 +4091,10 @@ function TearDownBlock({
   const joined = o?.kind === 'tearDown' && o.buildingId === building.id
   return (
     <section className="inspector-block" aria-label="Tear down">
+      {/* The panel's header says Tear down; each section names what it tears down, as up to
+          three can stand on one tile (a building, a carriage site, a road). */}
       <div className="panel-head">
-        <h3>Tear down</h3>
-        <span className="small muted">{what}</span>
+        <h3>{capitalised(what)}</h3>
       </div>
       {building.teardown !== undefined && (
         <Meter
@@ -3906,9 +4116,10 @@ function TearDownBlock({
           : leaves.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')}{' '}
         on the tile.
       </p>
-      <div className="order-buttons">
+      <PanelFoot>
         <button
           type="button"
+          className="btn dng"
           disabled={!canWork(resident, tick) || joined}
           onClick={() => onTearDown(building.id)}
         >
@@ -3920,7 +4131,7 @@ function TearDownBlock({
           disabled={!canWork(resident, tick) || joined}
           give={() => onTearDown(building.id)}
         />
-      </div>
+      </PanelFoot>
     </section>
   )
 }
@@ -3947,16 +4158,9 @@ function TeachBlock({
   const other = teacher && teacher.id !== resident.id ? teacher : undefined
   const o = resident.order
   const teaching = o?.kind === 'teach' && o.buildingId === ground.id ? o.subject : undefined
-  const trainees = traineesOf(ground, residents, mapSize).length
   const otherTeaches = other?.order?.kind === 'teach' ? other.order.subject : undefined
   return (
     <section className="inspector-block" aria-label="Teach">
-      <div className="panel-head">
-        <h3>Teach</h3>
-        <span className="mono small">
-          {trainees} / {TRAINING_GROUND_MAX_TRAINEES} trainees
-        </span>
-      </div>
       <p className="small">
         {otherTeaches
           ? `${other!.name} teaches ${subjectLabel(otherTeaches)} here: one teacher per ground.`
@@ -3993,10 +4197,6 @@ function HitchBlock({
   const chosen = horses.some((h) => h.id === picked) ? picked : undefined
   return (
     <section className="inspector-block" aria-label="Hitch horse">
-      <div className="panel-head">
-        <h3>Hitch horse</h3>
-        <span className="small muted">{horses.length} free here</span>
-      </div>
       <p className="muted small">
         The horse you pick pulls the carriage at once; one already hitched stands free on the tile.
       </p>
@@ -4009,11 +4209,17 @@ function HitchBlock({
           onToggle={() => setPicked(chosen === h.id ? undefined : h.id)}
         />
       ))}
-      <div className="order-buttons">
-        <button type="button" disabled={!chosen} onClick={() => chosen && onHitch(chosen)}>
+      {!chosen && <span className="muted small">Tick the horse to hitch.</span>}
+      <PanelFoot>
+        <button
+          type="button"
+          className="primary"
+          disabled={!chosen}
+          onClick={() => chosen && onHitch(chosen)}
+        >
           Hitch
         </button>
-      </div>
+      </PanelFoot>
     </section>
   )
 }
@@ -4059,10 +4265,6 @@ function BreedBlock({
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id].slice(-2)))
   return (
     <section className="inspector-block" aria-label="Breed horses">
-      <div className="panel-head">
-        <h3>Breed horses</h3>
-        <span className="small muted">{own.length} of yours here</span>
-      </div>
       {breeding && (
         <Meter
           label="Foal"
@@ -4100,9 +4302,10 @@ function BreedBlock({
           onToggle={() => toggle(h.id)}
         />
       ))}
-      <div className="order-buttons">
+      <PanelFoot>
         <button
           type="button"
+          className="primary"
           disabled={!!breeding || !pair || problem !== undefined}
           title={problem}
           onClick={() => pair && onBreed(stable.id, pair)}
@@ -4115,7 +4318,7 @@ function BreedBlock({
           disabled={!!breeding || !pair || problem !== undefined}
           give={() => pair && onBreed(stable.id, pair)}
         />
-      </div>
+      </PanelFoot>
       {!breeding && pair && problem && <p className="muted small">{problem}</p>}
     </section>
   )
@@ -4142,8 +4345,8 @@ export function GroupBreed({
   const toggle = (id: string) =>
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id].slice(-2)))
   return (
-    <div aria-label={`Stable at ${stable.x}, ${stable.y}`}>
-      <span className="small muted">
+    <div className="group-breed" aria-label={`Stable at ${stable.x}, ${stable.y}`}>
+      <span className="lb">
         Stable at {stable.x}, {stable.y} · {horses.length} of yours
       </span>
       {horses.map((h) => (
@@ -4155,9 +4358,10 @@ export function GroupBreed({
           onToggle={() => toggle(h.id)}
         />
       ))}
-      <div className="order-buttons">
+      <PanelFoot>
         <button
           type="button"
+          className="primary"
           disabled={!pair}
           onClick={() => {
             if (!pair) return
@@ -4177,7 +4381,7 @@ export function GroupBreed({
             onBreed(pair)
           }}
         />
-      </div>
+      </PanelFoot>
     </div>
   )
 }
@@ -4212,10 +4416,7 @@ function PairBlock({
   const expecting = resident.carrying || partner?.carrying
   return (
     <section className="inspector-block" aria-label="Pairing">
-      <div className="panel-head">
-        <h3>Pairing</h3>
-        <span className="small muted">one child per pair; pair again for another</span>
-      </div>
+      <p className="muted small">One child per pair; pair again for another.</p>
       {expecting ? (
         <p className="muted small">{familyLine(resident, residents, tick)}.</p>
       ) : (
@@ -4228,27 +4429,29 @@ function PairBlock({
           </p>
         )
       )}
-      <div className="order-buttons">
-        <select
-          aria-label="Partner"
-          value={partnerId}
-          onChange={(e) => setPartnerId(e.target.value)}
-        >
-          <option value="">Pick a partner…</option>
-          {choices.map((x) => (
-            <option key={x.id} value={x.id}>
-              {x.name}
-            </option>
-          ))}
-        </select>
+      <select aria-label="Partner" value={partnerId} onChange={(e) => setPartnerId(e.target.value)}>
+        <option value="">Pick a partner…</option>
+        {choices.map((x) => (
+          <option key={x.id} value={x.id}>
+            {x.name}
+          </option>
+        ))}
+      </select>
+      <PanelFoot>
         <button
           type="button"
+          className="primary"
           disabled={!partnerId || !!resident.carrying}
           onClick={() => onPair(partnerId)}
         >
           Pair
         </button>
-      </div>
+      </PanelFoot>
+      {resident.carrying ? (
+        <span className="muted small">Not while carrying a child.</span>
+      ) : (
+        !partnerId && <span className="muted small">Pick a partner first.</span>
+      )}
     </section>
   )
 }
@@ -4260,13 +4463,10 @@ function PairBlock({
  */
 function RelocateBlock({
   resident,
-  home,
   choices,
   onRelocate,
 }: {
   resident: Resident
-  /** The city they live in now, or "Homeless". */
-  home: string
   choices: RelocateChoice[]
   onRelocate: (cityId: string) => void
 }) {
@@ -4274,10 +4474,6 @@ function RelocateBlock({
   const going = o?.kind === 'relocate' ? choices.find((c) => c.id === o.cityId) : undefined
   return (
     <section className="inspector-block" aria-label="Relocate">
-      <div className="panel-head">
-        <h3>Relocate</h3>
-        <span className="small muted">from {home}</span>
-      </div>
       {going && <p className="muted small">Relocating to {going.name}.</p>}
       <p className="small">
         {resident.name} walks there and moves in on stepping into its area, if it still has free
@@ -4305,9 +4501,6 @@ function GroupRelocateBlock({
 }) {
   return (
     <section className="inspector-block" aria-label="Relocate">
-      <div className="panel-head">
-        <h3>Relocate</h3>
-      </div>
       {problem ? (
         <p className="muted small">Can’t relocate: {problem}.</p>
       ) : (
@@ -4380,12 +4573,9 @@ function RenameBlock({
   }
   return (
     <section className="inspector-block" aria-label="Rename">
-      <div className="panel-head">
-        <h3>Rename</h3>
-        <span className="small muted">free, at once</span>
-      </div>
-      <form onSubmit={submit}>
-        <div className="order-buttons">
+      <form className="opanel-form" onSubmit={submit}>
+        <label className="fld">
+          <span className="lb">New name</span>
           <input
             value={name}
             maxLength={RESIDENT_NAME_MAX_LENGTH}
@@ -4393,14 +4583,15 @@ function RenameBlock({
             onChange={(e) => setName(e.target.value)}
             required
           />
-        </div>
+        </label>
         {needsRealmName && (
           <>
             <p className="small">
               Your realm has no name yet: name it now. Others will know it by this name, and it
               never changes.
             </p>
-            <div className="order-buttons">
+            <label className="fld">
+              <span className="lb">Realm name</span>
               <input
                 value={realmName}
                 maxLength={REALM_NAME_MAX_LENGTH}
@@ -4409,14 +4600,15 @@ function RenameBlock({
                 onChange={(e) => setRealmName(e.target.value)}
                 required
               />
-            </div>
+            </label>
           </>
         )}
-        <div className="order-buttons">
+        <PanelFoot>
           <button type="submit" className="primary" disabled={!!problem}>
             Rename
           </button>
-        </div>
+        </PanelFoot>
+        {problem && <span className="muted small">Can’t rename yet: {problem}.</span>}
       </form>
     </section>
   )
@@ -4459,10 +4651,6 @@ function WallsBlock({
   const label = (w: Building) => (w.kind === 'gate' ? 'Gate' : 'Wall')
   return (
     <section className="inspector-block" aria-label="Walls">
-      <div className="panel-head">
-        <h3>Walls</h3>
-        <span className="small muted">break or climb</span>
-      </div>
       {breaking && (
         <Meter
           label={`Breaking the ${label(breaking).toLowerCase()} at ${breaking.x}, ${breaking.y}`}
@@ -4470,23 +4658,33 @@ function WallsBlock({
           share={wallStrengthLeft(breaking) / wallStrength(breaking)}
         />
       )}
-      <div className="order-buttons">
-        <select aria-label="Wall" value={wallId} onChange={(e) => setWallId(e.target.value)}>
-          <option value="">Pick a wall or gate…</option>
-          {choices.map(({ w, d }) => (
-            <option key={w.id} value={w.id}>
-              {label(w)} at {w.x}, {w.y} · {Math.round(d)} tiles
-              {w.damage ? ` · ${pct(w.damage / wallStrength(w))} broken` : ''}
-            </option>
-          ))}
-        </select>
-        <button type="button" disabled={!picked} onClick={() => onBreak(wallId)}>
+      <select aria-label="Wall" value={wallId} onChange={(e) => setWallId(e.target.value)}>
+        <option value="">Pick a wall or gate…</option>
+        {choices.map(({ w, d }) => (
+          <option key={w.id} value={w.id}>
+            {label(w)} at {w.x}, {w.y} · {Math.round(d)} tiles
+            {w.damage ? ` · ${pct(w.damage / wallStrength(w))} broken` : ''}
+          </option>
+        ))}
+      </select>
+      <PanelFoot>
+        <button
+          type="button"
+          className="btn dng"
+          disabled={!picked}
+          onClick={() => onBreak(wallId)}
+        >
           Break
         </button>
         <button type="button" disabled={!beside} onClick={() => onClimb(wallId)}>
           Climb
         </button>
-      </div>
+      </PanelFoot>
+      {!picked ? (
+        <span className="muted small">Pick a wall or gate first.</span>
+      ) : (
+        !beside && <span className="muted small">Climb: stand next to it first.</span>
+      )}
       <p className="muted small">
         Climbing takes a while, and a climber can’t dodge or strike back. Stand next to the wall to
         climb it.
@@ -4518,26 +4716,19 @@ function AttackBlock({
   const [targetId, setTargetId] = useState('')
   const o = resident.order
   const target = o?.kind === 'attack' ? others.find((x) => x.id === o.targetId) : undefined
-  const weapon = bestWeapon(resident)
   const choices = others
     .map((x) => ({ x, d: wrapDistance(mapSize, resident, x) }))
     .sort((a, b) => a.d - b.d)
     .slice(0, ATTACK_CHOICES)
   return (
     <section className="inspector-block" aria-label="Attack">
-      <div className="panel-head">
-        <h3>Attack</h3>
-        <span className="small muted">
-          {weapon ? `fights with a ${GOOD_LABELS[weapon].toLowerCase()}` : 'unarmed'}
-        </span>
-      </div>
       {o?.kind === 'attack' && !walls.some((w) => w.id === o.targetId) && (
         <p className="muted small">Attacking {target?.name ?? 'someone out of sight'}.</p>
       )}
       {choices.length === 0 ? (
         <p className="muted small">Nobody of another realm in sight.</p>
       ) : (
-        <div className="order-buttons">
+        <>
           <select
             aria-label="Target"
             value={targetId}
@@ -4550,10 +4741,18 @@ function AttackBlock({
               </option>
             ))}
           </select>
-          <button type="button" disabled={!targetId} onClick={() => onAttack(targetId)}>
-            Attack
-          </button>
-        </div>
+          <PanelFoot>
+            <button
+              type="button"
+              className="btn dng"
+              disabled={!targetId}
+              onClick={() => onAttack(targetId)}
+            >
+              Attack
+            </button>
+          </PanelFoot>
+          {!targetId && <span className="muted small">Pick someone to attack first.</span>}
+        </>
       )}
     </section>
   )
@@ -4566,6 +4765,7 @@ export function TileGoods({
   spot,
   onPickUp,
   refused,
+  refusedWhy,
   label = 'Pick up',
 }: {
   title: string
@@ -4576,55 +4776,90 @@ export function TileGoods({
   label?: string
   /** Whether the resident may not pick up this good, as a child anything but Food. */
   refused: (good: Good) => boolean
+  /** Why a refused good's buttons are greyed, said under them. */
+  refusedWhy?: string
 }) {
   const goods = goodsIn(stock)
   return (
-    <>
-      <div className="small muted">{title}</div>
-      {goods.length === 0 && <p className="muted small">Nothing.</p>}
-      {goods.map(([good, units]) => (
-        <GoodsRow
-          key={good}
-          good={good}
-          units={units}
-          byDefault={units}
-          disabled={refused(good)}
-          actions={[{ label, spot }]}
-          onAct={onPickUp}
-        />
-      ))}
-    </>
+    <div className="goods-spot">
+      <span className="b">{title}</span>
+      {goods.length === 0 && <span className="muted small">Nothing.</span>}
+      <GoodsPick
+        label={title}
+        goods={goods}
+        byDefault={(_, units) => units}
+        refused={refused}
+        refusedWhy={refusedWhy}
+        actions={() => [{ label, spot }]}
+        onAct={onPickUp}
+      />
+    </div>
   )
 }
 
 /**
- * One good with an amount and buttons that act on that many: `byDefault` until the Player types
- * an exact amount, which is honoured as typed (`CONTEXT.md`: Own food).
+ * An inventory in an order's panel as a goods grid (`CONTEXT.md`: Goods on cards): a cell per
+ * good with its icon and amount, its name on hover. The good tapped (the first until one is) gets
+ * a line under the grid with an amount and the buttons that act on that many: `byDefault` until
+ * the Player types an exact amount, which is honoured as typed (`CONTEXT.md`: Own food).
  */
-function GoodsRow({
-  good,
-  units,
+function GoodsPick({
+  label,
+  goods,
   byDefault,
-  disabled,
+  refused,
+  refusedWhy,
   actions,
   onAct,
 }: {
-  good: Good
-  units: number
-  byDefault: number
-  disabled: boolean
-  actions: { label: string; spot: GoodsSpot }[]
+  /** What the inventory is, for screen readers. */
+  label: string
+  goods: readonly (readonly [Good, number])[]
+  byDefault: (good: Good, units: number) => number
+  /** Whether the resident may not handle this good, as a child anything but Food. */
+  refused: (good: Good) => boolean
+  /** Why a refused good's buttons are greyed, said under them. */
+  refusedWhy?: string
+  actions: (good: Good) => { label: string; spot: GoodsSpot }[]
   onAct: (spot: GoodsSpot, goods: Stock) => void
 }) {
+  const [picked, setPicked] = useState<Good>()
   const [typed, setTyped] = useState<number>()
-  const amount = Math.min(typed ?? byDefault, units)
+  // A good picked may have gone since; the first stands in for it.
+  const entry = goods.find(([g]) => g === picked) ?? goods[0]
+  if (!entry) return null
+  const [good, units] = entry
+  const amount = Math.min(typed ?? byDefault(good, units), units)
+  const disabled = refused(good)
   return (
-    <div className="goods-row">
-      <span>{GOOD_LABELS[good]}</span>
-      <span className="mono">{units}</span>
-      <span className="buttons">
+    <div className="goods-pick">
+      <ul className="goods-grid" aria-label={label}>
+        {goods.map(([g, n]) => (
+          <li key={g}>
+            <button
+              type="button"
+              className="btn sm goods-pick-cell"
+              aria-pressed={g === good}
+              aria-label={`${GOOD_LABELS[g]}: ${goodsAmount(n)}`}
+              title={GOOD_LABELS[g]}
+              onClick={() => {
+                setPicked(g)
+                setTyped(undefined)
+              }}
+            >
+              <GoodIcon good={g} />
+              <span className="mono">{goodsAmount(n)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="goods-pick-line well">
+        <GoodIcon good={good} />
+        <span className="grow">
+          <strong>{GOOD_LABELS[good]}</strong> · {goodsAmount(units)}
+        </span>
         <input
-          className="amount"
+          className="amount mono"
           type="number"
           min={0}
           max={units}
@@ -4634,20 +4869,22 @@ function GoodsRow({
           disabled={disabled}
           onChange={(e) => setTyped(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
         />
-        {actions.map(({ label, spot }) => (
+        {actions(good).map(({ label: act, spot }) => (
           <button
-            key={label}
+            key={act}
             type="button"
+            className="btn sm"
             disabled={disabled || amount === 0}
             onClick={() => {
               onAct(spot, { [good]: amount })
               setTyped(undefined)
             }}
           >
-            {label}
+            {act}
           </button>
         ))}
-      </span>
+      </div>
+      {disabled && refusedWhy && <span className="muted small">{refusedWhy}</span>}
     </div>
   )
 }
@@ -4708,11 +4945,9 @@ export function DefenceScript({
   const choices = defenceChoices(scripts, picked)
   const value = picked === undefined ? '' : picked === null ? 'defend' : String(picked)
   return (
-    <section className="inspector-block" aria-label="Defence script">
-      <div className="goods-row">
-        <span className="small">
-          <strong>Defence script</strong>
-        </span>
+    <section className="sec script-pick" aria-label="Defence script">
+      <label className="fld">
+        <span className="lb">Defence script</span>
         <select
           aria-label={label}
           value={value}
@@ -4730,7 +4965,7 @@ export function DefenceScript({
             </option>
           ))}
         </select>
-      </div>
+      </label>
       <p className="muted small">
         What they run when struck. Once it ends, they go on with what they were doing.
       </p>
@@ -4758,11 +4993,9 @@ export function AlarmScript({
   const value = picked === undefined ? '' : picked === null ? 'alarm' : String(picked)
   const pick = (v: string) => onPick(v === 'alarm' ? null : v === 'none' ? 'none' : Number(v))
   return (
-    <section className="inspector-block" aria-label="Alarm script">
-      <div className="goods-row">
-        <span className="small">
-          <strong>Alarm script</strong>
-        </span>
+    <section className="sec script-pick" aria-label="Alarm script">
+      <label className="fld">
+        <span className="lb">Alarm script</span>
         <select aria-label={label} value={value} onChange={(e) => pick(e.target.value)}>
           {picked === undefined && (
             <option value="" disabled>
@@ -4777,7 +5010,7 @@ export function AlarmScript({
             </option>
           ))}
         </select>
-      </div>
+      </label>
       <p className="muted small">
         What they run when an alarm reaches them at home. Alarm (default) is for the armed. Once it
         ends, they go on with what they were doing.

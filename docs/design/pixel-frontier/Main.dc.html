@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Game screen, resident picked</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui map" style="width: 1440px; height: 900px; position: relative; overflow: hidden">
+
+<!-- map overlays -->
+<div class="tag" style="left: 742px; top: 268px">Ashford</div>
+<div class="way" style="left: 716px; top: 346px; width: 160px; height: 150px; border-left-width: 4px; border-top-width: 4px"></div>
+<div style="position: absolute; left: 862px; top: 318px; width: 68px; height: 68px; border: 4px solid var(--gold)"></div>
+<div class="tk sel" style="left: 702px; top: 492px"><span class="ic i-person" aria-hidden="true"></span></div>
+<div class="tk" style="left: 800px; top: 420px"><span class="ic i-crown" aria-hidden="true"></span></div>
+<div class="tk" style="left: 780px; top: 596px"><span class="ic i-person" aria-hidden="true"></span><span class="cnt">4</span></div>
+<div class="tk" style="left: 936px; top: 600px"><span class="ic i-cart" aria-hidden="true"></span></div>
+<div class="tk tr" style="left: 1010px; top: 190px"><span class="ic i-cart" aria-hidden="true"></span></div>
+<div class="tk ot" style="left: 1120px; top: 470px"><span class="ic i-sword" aria-hidden="true"></span><span class="cnt">2</span></div>
+<div class="tk np" style="left: 520px; top: 250px"><span class="ic i-person" aria-hidden="true"></span></div>
+
+<!-- top bar -->
+<header class="bar fx" style="position: absolute; left: 0; top: 0; right: 0; height: 44px; padding: 0 10px; gap: 12px; border-width: 0 0 2px">
+<span class="ic s24 i-crown" aria-hidden="true"></span>
+<span class="px t18" style="color: var(--gold)">Realm of Ashford</span>
+<span style="color: var(--tan)">Home city Ashford</span>
+<span class="fx mono" style="gap: 6px"><span class="ic s16 i-clock" aria-hidden="true"></span>Year 2 · Day 131 · 14:20</span>
+<span class="chip g">live</span>
+<button class="btn sm gold">3 idle</button>
+<button class="btn sm dng">2 hungry</button>
+<span class="grow"></span>
+<span class="fx mono" style="gap: 4px"><span class="ic s16 i-food" role="img" aria-label="Food"></span>412</span>
+<span class="fx mono" style="gap: 4px"><span class="ic s16 i-wood" role="img" aria-label="Wood"></span>96</span>
+<span class="fx mono" style="gap: 4px"><span class="ic s16 i-stone" role="img" aria-label="Stone"></span>40</span>
+<span class="fx mono" style="gap: 4px"><span class="ic s16 i-coins" role="img" aria-label="Coins"></span>73</span>
+<span class="fx" style="gap: 4px"><span class="ic s16 i-crown" role="img" aria-label="Your Leader"></span>Edda</span>
+<button class="btn sm dk"><span class="ic s16 i-find" aria-hidden="true"></span>Find<span class="k">Ctrl K</span></button>
+<a class="btn sm dk" href="Wiki.dc.html">Wiki</a>
+<span style="color: var(--tan)">daniel</span>
+<button class="btn sm dk">Log out</button>
+</header>
+
+<!-- notices lane -->
+<div class="col" style="position: absolute; left: 372px; top: 56px; width: 560px">
+<div class="pn fx" style="padding: 8px 10px"><span class="ic s24 i-horse" aria-hidden="true"></span><span class="grow b">Two horses are waiting for you</span><button class="btn sm gold">Claim</button></div>
+<div class="pn">
+<div class="hd" style="font-size: 14px; min-height: 28px; padding: 4px 10px"><span class="grow">First day · 2 of 4</span><button class="btn sm sq dk" aria-label="Don't show again"><span class="ic s16 i-x" aria-hidden="true"></span></button></div>
+<div class="fx wrap" style="padding: 8px 10px; gap: 6px 16px">
+<span class="fx" style="gap: 6px"><span class="cb"></span>Claim the Horse offer</span>
+<span class="fx mu" style="gap: 6px; text-decoration: line-through"><span class="cb on"></span>Pick a resident</span>
+<span class="fx mu" style="gap: 6px; text-decoration: line-through"><span class="cb on"></span>Give them an order</span>
+<span class="fx" style="gap: 6px"><span class="cb"></span><a href="Wiki.dc.html" style="color: var(--navy)">Open the Wiki</a></span>
+</div>
+</div>
+</div>
+
+<!-- sidebar: tabs replace the rail and drawers -->
+<aside class="pn" style="position: absolute; left: 8px; top: 52px; width: 352px; bottom: 280px; display: flex">
+<nav aria-label="Tools" class="col" style="width: 44px; padding: 4px; gap: 4px; background: var(--clay); border-right: 2px solid var(--ink); align-items: center">
+<button class="btn sq on" aria-label="Residents" aria-pressed="true"><span class="ic i-person" aria-hidden="true"></span></button>
+<a class="btn sq" aria-label="Horses" href="Side-Horses.dc.html"><span class="ic i-horse" aria-hidden="true"></span></a>
+<a class="btn sq" aria-label="Armies" href="Side-Armies.dc.html"><span class="ic i-banner" aria-hidden="true"></span></a>
+<a class="btn sq" aria-label="Contracts" href="Side-Contracts.dc.html"><span class="ic i-scroll" aria-hidden="true"></span></a>
+<a class="btn sq" aria-label="Alliance" href="Side-Alliance.dc.html"><span class="ic i-ally" aria-hidden="true"></span></a>
+<a class="btn sq" aria-label="Standing" href="Side-Standing.dc.html"><span class="ic i-medal" aria-hidden="true"></span></a>
+<a class="btn sq" aria-label="Cities" href="Side-Cities.dc.html"><span class="ic i-city" aria-hidden="true"></span></a>
+<a class="btn sq" aria-label="Scripts" href="Scripts.dc.html"><span class="ic i-code" aria-hidden="true"></span></a>
+<a class="btn sq" aria-label="Realm log, 4 new" href="Side-Log.dc.html" style="position: relative"><span class="ic i-book" aria-hidden="true"></span><span class="cnt" style="right: -6px; top: -6px">4</span></a>
+<span class="grow"></span>
+<button class="btn sq sm" aria-label="Fold the sidebar">«</button>
+</nav>
+<div class="grow col" style="gap: 0">
+<div class="hd"><span class="grow">Residents</span><span class="mono" style="font-size: 11px">12 · 9 busy · 3 idle</span></div>
+<div class="fx wrap" style="padding: 6px 8px; gap: 4px; border-bottom: 2px solid var(--tan)">
+<input class="in grow" style="height: 24px" aria-label="Find a resident" placeholder="Find a resident">
+<button class="btn sm on">All</button><button class="btn sm">Idle</button><button class="btn sm">Hungry</button>
+</div>
+<div style="overflow: hidden">
+<div class="rw grp"><span class="lb grow">Ashford · home</span><span class="mono">8</span></div>
+<div class="rw col" style="align-items: stretch; gap: 3px"><span class="fx"><span class="b grow">Edda <span class="chip y">Leader</span></span><span class="mono mu">31 y · 6/28 kg</span></span><span class="fx"><span class="grow">Working the farm</span><span class="mt fd" style="width: 56px"><i style="width: 88%"></i></span></span></div>
+<div class="rw sel col" style="align-items: stretch; gap: 3px"><span class="fx"><span class="b grow">Bram</span><span class="mono">24 y · 12/30 kg</span></span><span class="fx"><span class="grow">Building a house: fetching 10 wood from the storage</span><span class="mt fd" style="width: 56px"><i style="width: 62%"></i></span></span></div>
+<div class="rw col" style="align-items: stretch; gap: 3px"><span class="fx"><span class="b grow">Ana</span><span class="mono mu">19 y · 4/26 kg</span></span><span class="fx"><span class="grow">Walking to 2204, 1810 · about 3 min</span><span class="mt fd" style="width: 56px"><i style="width: 45%"></i></span></span></div>
+<div class="rw col" style="align-items: stretch; gap: 3px"><span class="fx"><span class="b grow">Tobin</span><span class="mono mu">42 y · 0/34 kg</span></span><span class="fx"><span class="grow">Hauling: loading wood at the lumber camp<br><span class="mu">Mine run</span></span><span class="mt fd" style="width: 56px"><i style="width: 71%"></i></span></span></div>
+<div class="rw col" style="align-items: stretch; gap: 3px"><span class="fx"><span class="b grow">Mara</span><span class="mono mu">27 y · 3/24 kg</span></span><span class="fx"><span class="grow">Carrying a child</span><span class="mt fd" style="width: 56px"><i style="width: 90%"></i></span></span></div>
+<div class="rw col" style="align-items: stretch; gap: 3px"><span class="fx"><span class="b grow">Odo</span><span class="mono mu">8 y · 2/9 kg</span></span><span class="fx"><span class="grow">Idle</span><span class="mt hp" style="width: 56px"><i style="width: 18%"></i></span></span></div>
+<div class="rw grp"><span class="lb grow">Stonewick</span><span class="mono">3</span></div>
+<div class="rw col" style="align-items: stretch; gap: 3px"><span class="fx"><span class="b grow">Hale</span><span class="mono mu">36 y · 20/32 kg</span></span><span class="fx"><span class="grow">Working the quarry: carrying 20 stone to the storage</span><span class="mt fd" style="width: 56px"><i style="width: 54%"></i></span></span></div>
+<div class="rw grp"><span class="lb grow">Hired</span><span class="mono">1</span></div>
+<div class="rw grp"><span class="lb grow">Alliance army</span><span class="mono">2</span></div>
+<div class="rw grp"><span class="lb grow">Homeless</span><span class="mono">1</span></div>
+</div>
+</div>
+</aside>
+
+<!-- command bar: the picked resident's card -->
+<section class="pn" aria-label="Bram" style="position: absolute; left: 8px; right: 8px; bottom: 8px; height: 264px; display: flex">
+<div class="col" style="width: 300px; padding: 10px; border-right: 2px solid var(--ink); gap: 6px">
+<div class="fx" style="align-items: flex-start">
+<div style="width: 64px; height: 64px; background: var(--ink); border: 4px solid var(--own); display: grid; place-items: center; flex: none"><span class="ic s48 i-person" aria-hidden="true"></span></div>
+<div class="grow"><div class="px t22">Bram</div><div class="b">Building a house: fetching 10 wood from the storage</div></div>
+<button class="btn sm sq" aria-label="Close the card"><span class="ic s16 i-x" aria-hidden="true"></span></button>
+</div>
+<div class="fx"><span class="lb" style="width: 52px">Health</span><span class="mt hp grow"><i style="width: 92%"></i></span><span class="mono">46 / 50</span></div>
+<div class="fx"><span class="lb" style="width: 52px">Hunger</span><span class="mt fd grow"><i style="width: 62%"></i></span><span class="mono">62% fed</span></div>
+<div class="fx wrap" style="gap: 4px"><span class="chip"><span class="ic s16 i-wood" aria-hidden="true"></span>4 Wood</span><span class="chip"><span class="ic s16 i-food" aria-hidden="true"></span>2 Food</span><span class="mono mu">12 / 30 kg</span></div>
+<div class="mu">Adult · 24 years · Ashford · arrives in about 2 min (2 game hours)</div>
+</div>
+<div class="grow col" style="gap: 0">
+<div class="tabs" role="tablist"><button class="tab on" role="tab" aria-selected="true">Orders</button><a class="tab" role="tab" href="Card-Queue.dc.html">Queue · 3</a><a class="tab" role="tab" href="Card-Stats-Script.dc.html">Stats</a><a class="tab" role="tab" href="Card-Stats-Script.dc.html">Script</a></div>
+<div class="grow" style="padding: 8px; display: grid; grid-template-columns: 2fr 2fr 1fr 1.2fr; gap: 10px">
+<div class="col" style="gap: 4px"><span class="lb">Move</span><div class="og og2">
+<button class="btn sm fill">Walk to<span class="k">W</span></button><button class="btn sm fill">Stop<span class="k">S</span></button>
+<button class="btn sm fill">Relocate…<span class="k">V</span></button><button class="btn sm fill">Drive carriage to<span class="k">D</span></button>
+<button class="btn sm fill">Board carriage<span class="k">K</span></button><button class="btn sm fill">Haul route…<span class="k">H</span></button>
+<button class="btn sm fill off why" disabled>Mount horse<small>no free horse here</small></button><button class="btn sm fill off why" disabled>Unhitch horse<small>no hitched horse here</small></button>
+</div></div>
+<div class="col" style="gap: 4px"><span class="lb">Work &amp; build</span><div class="og og2">
+<button class="btn sm fill on">Help build the house…<span class="k">B</span></button><button class="btn sm fill">Build line: road<span class="k">R</span></button>
+<button class="btn sm fill">Build line: wall<span class="k">Q</span></button><button class="btn sm fill">Tear down…<span class="k">T</span></button>
+<button class="btn sm fill off why" disabled>Work<small>not on a workplace</small></button><button class="btn sm fill off why" disabled>Feed the stable<small>not in a stable</small></button>
+<button class="btn sm fill off why" disabled>Teach… / Train<small>not on a training ground</small></button><button class="btn sm fill off why" disabled>Breed horses…<small>not in a stable</small></button>
+</div></div>
+<div class="col" style="gap: 4px"><span class="lb">Goods</span><div class="og">
+<button class="btn sm fill">Goods…<span class="k">G</span></button>
+</div><span class="lb" style="margin-top: 4px">Scripts</span><div class="og">
+<button class="btn sm fill">Run script…<span class="k">X</span></button>
+</div></div>
+<div class="col" style="gap: 4px"><span class="lb">Other</span><div class="og">
+<button class="btn sm fill">Pair…<span class="k">P</span></button>
+<button class="btn sm fill">Attack…<span class="k">A</span></button>
+<button class="btn sm fill">Break or climb a wall…<span class="k">C</span></button>
+<button class="btn sm fill">Make Leader…<span class="k">L</span></button>
+<button class="btn sm fill">Rename…<span class="k">N</span></button>
+</div></div>
+</div>
+<div class="fx mu" style="padding: 4px 10px; border-top: 2px solid var(--tan)">Right-click the map to walk there. Hold Shift with any order to queue it.</div>
+</div>
+<div class="col" style="width: 236px; padding: 8px; border-left: 2px solid var(--ink); gap: 6px">
+<div class="fx"><span class="lb grow">Minimap</span><button class="btn sm sq" aria-label="Fold the minimap">–</button></div>
+<div class="map" style="height: 124px; border: 2px solid var(--ink); position: relative"><div style="position: absolute; left: 84px; top: 40px; width: 70px; height: 44px; border: 2px solid #fff"></div><span class="dot" style="position: absolute; left: 112px; top: 56px"></span></div>
+<div class="fx" style="gap: 4px">
+<button class="btn sm sq" aria-label="Zoom in">+</button><button class="btn sm sq" aria-label="Zoom out">−</button>
+<button class="btn sm sq" aria-label="Centre on my residents"><span class="ic s16 i-crown" aria-hidden="true"></span></button>
+<button class="btn sm grow" aria-pressed="false">Select</button><button class="btn sm grow" aria-pressed="false">Region</button>
+</div>
+<div class="fx" style="gap: 4px"><button class="btn sm grow">Legend</button><button class="btn sm grow"><span class="ic s16 i-gear" aria-hidden="true"></span>Settings</button></div>
+<div class="mono mu" style="font-size: 11px">Plains · 2198, 1804 · middle zoom</div>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

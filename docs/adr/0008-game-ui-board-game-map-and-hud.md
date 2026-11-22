@@ -1,6 +1,7 @@
 # Game UI: board-game map, HUD over a full-screen map, SVG asset registry
 
-Status: decided (2026-10-21, with Daniel).
+Status: decided (2026-10-21, with Daniel). Its screen layout and panel style are replaced by
+ADR 0044 (Pixel frontier, a command bar, a sidebar and a dock); the rest stands.
 
 The first UI read like a web dashboard: every map element was a coloured dot or square, and all
 panels were stacked beside a map box. Players could not tell what things were. We redesign it as a

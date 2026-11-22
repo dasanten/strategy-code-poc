@@ -7,9 +7,10 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { formatGameTime } from './shared/time.js'
+import { formatGameTime, formatGameTimeShort } from './shared/time.js'
+import { useMapDockHeight } from './Dock.js'
 import type { FirstDay, TraderVisit } from '@csp/shared-types'
-import { DrawerStatus } from './drawer-head.js'
+import { PanelStatus } from './panel-head.js'
 import { zealShown } from './zeal.js'
 import {
   REALM_BAR_HINT,
@@ -19,20 +20,16 @@ import {
 } from './control-mode.js'
 import {
   DIPLOMACY_TABS,
-  DRAWERS,
-  railGroups,
-  DRAWER_WIDTH,
+  sidebarGroups,
   KEY_GOODS,
-  drawerWidth,
   goodsLabel,
-  isWide,
-  rememberedDrawerWidth,
   type DiplomacyTab,
-  type DrawerId,
+  type SideTabId,
   type GoodsPick,
   type KeyGood,
-  type OpenDrawer,
+  type OpenTab,
 } from './hud-view.js'
+import { dockCovers } from './dock-view.js'
 import { groupSentLine, type Skipped } from './group-orders.js'
 import {
   FIRST_DAY_RALLY_TIP,
@@ -43,129 +40,14 @@ import {
 } from './notices-view.js'
 import type { ConnectionStatus } from './useWorld.js'
 import { WIKI_PATH } from './wiki-view.js'
+import { Icon } from './Icon.js'
+import { GoodIcon } from './GoodsGrid.js'
+import { TAB_ICONS, type UiIconName } from './ui-icons.js'
 
-/** The HUD over the full-screen map (ADR 0008): top bar, tool rail, drawers and dialogs. */
-
-/** Line-art icons, 24×24 in `currentColor`, for the rail and the top bar. */
-const ICONS: Record<DrawerId | DiplomacyTab | KeyGood | 'crown', ReactNode> = {
-  residents: (
-    <>
-      <circle cx="12" cy="6" r="3.2" fill="currentColor" />
-      <path d="M6 22c0-6 2.5-10 6-10s6 4 6 10z" fill="currentColor" />
-    </>
-  ),
-  horses: (
-    <>
-      <path d="M7 22l2-7-4-2 1-4 6-6 1 3c3 1 6 5 6 9v7" />
-      <path d="M12 3l3-1" />
-      <circle cx="10" cy="8" r="0.8" fill="currentColor" />
-    </>
-  ),
-  waypoints: (
-    <>
-      <path d="M12 22s-7-7.5-7-13a7 7 0 0 1 14 0c0 5.5-7 13-7 13z" />
-      <circle cx="12" cy="9" r="2.5" fill="currentColor" />
-    </>
-  ),
-  armies: (
-    <>
-      <path d="M6 22V2" />
-      <path d="M6 3h13l-3 4 3 4H6z" fill="currentColor" />
-    </>
-  ),
-  contracts: (
-    <>
-      <path d="M6 4h12v14a2 2 0 0 1-2 2H6" />
-      <path d="M6 4a2 2 0 0 0 0 4h2M6 20a2 2 0 0 1 0-4h10" />
-      <path d="M10 8h6M10 12h6" />
-    </>
-  ),
-  diplomacy: (
-    <>
-      <path d="M3 5h12v8H8l-3 3v-3H3z" />
-      <path d="M17 9h4v8h-2v3l-3-3h-5v-2" />
-    </>
-  ),
-  demands: (
-    <>
-      <path d="M5 4h14v16H5z" />
-      <path d="M12 7v7" />
-      <circle cx="12" cy="17" r="1" fill="currentColor" />
-    </>
-  ),
-  directOffers: (
-    <>
-      <path d="M3 6h18v12H3z" />
-      <path d="M3 7l9 6 9-6" />
-    </>
-  ),
-  alliance: (
-    <>
-      <path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z" />
-      <path d="M12 6v12M7 11h10" />
-    </>
-  ),
-  standing: (
-    <>
-      <path d="M12 3v18M7 21h10M4 7h16" />
-      <path d="M4 7l-3 7a3 3 0 0 0 6 0zM20 7l-3 7a3 3 0 0 0 6 0z" />
-    </>
-  ),
-  cities: (
-    <>
-      <path d="M3 21V8h3v2h2V8h3v13M13 21V8h3v2h2V8h3v13" />
-      <path d="M10 21v-4a2 2 0 0 1 4 0v4" />
-      <path d="M2 21h20" />
-    </>
-  ),
-  scripts: <path d="M8 6l-6 6 6 6M16 6l6 6-6 6M14 4l-4 16" />,
-  realmLog: (
-    <>
-      <path d="M5 3h11l3 3v15H5z" />
-      <path d="M8 9h8M8 13h8M8 17h5" />
-    </>
-  ),
-  food: (
-    <>
-      <path d="M12 22V8" />
-      <path d="M12 9c-3-1-4-3-4-6 3 0 4 2 4 6zM12 9c3-1 4-3 4-6-3 0-4 2-4 6z" />
-      <path d="M12 15c-3-1-4-3-4-5 3 0 4 2 4 5zM12 15c3-1 4-3 4-5-3 0-4 2-4 5z" />
-    </>
-  ),
-  wood: (
-    <>
-      <ellipse cx="18" cy="12" rx="3" ry="5" />
-      <path d="M18 7H6a3 5 0 0 0 0 10h12" />
-    </>
-  ),
-  stone: (
-    <>
-      <path d="M3 19l3-7 5-2 3 3 2-1 5 7z" />
-      <path d="M11 10l1 4-3 5" />
-    </>
-  ),
-  coal: (
-    <>
-      <path d="M3 19l2-6 5-2 3 3-1 5z" />
-      <path d="M12 19l2-7 5-1 2 8z" />
-      <path d="M8 9l2-4 4-1 2 4-3 2z" />
-    </>
-  ),
-  steel: (
-    <>
-      <path d="M3 19l3-6h12l3 6z" />
-      <path d="M9 16h6" />
-      <path d="M18 3v4M16 5h4" />
-    </>
-  ),
-  coins: (
-    <>
-      <circle cx="12" cy="12" r="8" />
-      <circle cx="12" cy="12" r="4.5" />
-    </>
-  ),
-  crown: <path d="M3 18l1-11 5 5 3-7 3 7 5-5 1 11z" fill="currentColor" />,
-}
+/**
+ * The HUD over the full-screen map (ADR 0044): the top bar, notices and dialogs; the sidebar is in
+ * `Sidebar.tsx`.
+ */
 
 const GOOD_LABELS: Record<KeyGood, string> = {
   food: 'Food',
@@ -184,23 +66,13 @@ const STATUS_LABELS: Record<ConnectionStatus, string> = {
   updated: 'updated',
 }
 
-export function Icon({ name, size = 18 }: { name: keyof typeof ICONS; size?: number }) {
-  return (
-    <svg
-      className="icon"
-      viewBox="0 0 24 24"
-      width={size}
-      height={size}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {ICONS[name]}
-    </svg>
-  )
+/** The kit chip each connection state shows as: live green, on its way gold, else red. */
+const STATUS_CHIPS: Record<ConnectionStatus, string> = {
+  open: 'g',
+  connecting: 'y',
+  closed: 'r',
+  throttled: 'r',
+  updated: 'r',
 }
 
 /** The goods the top bar shows and the picker beside them (`CONTEXT.md`: Goods in the top bar). */
@@ -233,14 +105,14 @@ function Goods({ goods, className }: { goods: GoodsShown; className: string }) {
         ))}
       </select>
       {KEY_GOODS.map((g) => (
-        <span key={g} className="hud-good" title={GOOD_LABELS[g]}>
-          <Icon name={g} size={15} /> {Math.floor(goods.totals[g])}
+        <span key={g} className="hud-good mono" title={GOOD_LABELS[g]}>
+          <GoodIcon good={g} /> {Math.floor(goods.totals[g])}
         </span>
       ))}
       {/* The label above says it for those who can't see this. */}
       {goods.oldText && (
         <span className="hud-goods-old" title={goods.oldText} aria-hidden="true">
-          <span className="hud-goods-old-mark">≈</span>
+          <span className="hud-goods-old-mark mono">≈</span>
           <span className="hud-goods-old-words">{goods.oldText}</span>
         </span>
       )}
@@ -267,7 +139,10 @@ export function TopBar({
   control,
   zeal,
   zealDraining,
+  phone = false,
 }: {
+  /** On a phone the bar's height is fixed (`--top-h`); elsewhere it is measured into it. */
+  phone?: boolean
   /** The realm's name (`CONTEXT.md`: Realm name), once the world has come. */
   realm?: string
   account: string
@@ -290,59 +165,75 @@ export function TopBar({
   /** The Leader rallies the crew: the Zeal doesn't fill and drains while the crew works (`CONTEXT.md`: Zeal). */
   zealDraining?: boolean
 }) {
+  // Off a phone the bar wraps to a second row where one has no room (a tablet): its height goes
+  // to the screen as `--top-h`, so the sidebar, the dock and the notices start below it.
+  const ref = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const bar = ref.current
+    const screen = bar?.parentElement
+    if (!bar || !screen || phone) return
+    const observer = new ResizeObserver(() => {
+      if (bar.offsetHeight > 0) screen.style.setProperty('--top-h', `${bar.offsetHeight}px`)
+    })
+    observer.observe(bar)
+    return () => {
+      observer.disconnect()
+      screen.style.removeProperty('--top-h')
+    }
+  }, [phone])
   return (
-    <header className="hud-top">
+    <header ref={ref} className="hud-top bar">
       {control && <ControlSwitch {...control} />}
-      {realm && <b title="Your realm">{realm}</b>}
+      {realm && (
+        <span className="hud-realm px t18" title="Your realm">
+          {realm}
+        </span>
+      )}
       {cityName && (
         <span className="hud-muted" title="Your home city">
           {realm && '· '}
           {cityName}
         </span>
       )}
-      <span className="hud-sep" />
       {tick !== undefined && (
         <span
-          className="hud-clock"
+          className="hud-clock mono"
           title="1 game day = 24 real minutes; 1 game year = 420 game days = 1 real week"
         >
-          {formatGameTime(tick)}
+          {/* A phone has room only for the short form (`formatGameTimeShort`). */}
+          <span className="hud-clock-long">{formatGameTime(tick)}</span>
+          <span className="hud-clock-short">{formatGameTimeShort(tick)}</span>
         </span>
       )}
-      <span className={`hud-status ${status}`} title={tick !== undefined ? `tick ${tick}` : ''}>
-        ● {STATUS_LABELS[status]}
+      <span
+        className={`hud-status chip ${STATUS_CHIPS[status]}`}
+        title={tick !== undefined ? `tick ${tick}` : ''}
+      >
+        {STATUS_LABELS[status]}
       </span>
-      <span className="hud-grow" />
+      <span className="grow" />
       {goods && <Goods goods={goods} className="hud-goods" />}
       {leader && (
-        <>
-          <span className="hud-sep" />
-          <span className="hud-leader" title="Your Leader">
-            <Icon name="crown" size={15} /> {leader}
-          </span>
-        </>
+        <span className="hud-leader" title="Your Leader">
+          <Icon name="crown" size={16} /> {leader}
+        </span>
       )}
-      {zeal !== undefined && (
-        <>
-          <span className="hud-sep" />
-          <ZealMeter zeal={zeal} draining={zealDraining} />
-        </>
-      )}
-      {heir !== undefined && (
-        <>
-          <span className="hud-sep" />
-          <HeirShown heir={heir} onPickHeir={onPickHeir} />
-        </>
-      )}
-      <span className="hud-sep" />
+      {zeal !== undefined && <ZealMeter zeal={zeal} draining={zealDraining} />}
+      {heir !== undefined && <HeirShown heir={heir} onPickHeir={onPickHeir} />}
       {/* A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki). */}
-      <a className="hud-wiki" href={WIKI_PATH} target="_blank" rel="noopener" onClick={onWiki}>
+      <a
+        className="hud-wiki btn sm dk"
+        href={WIKI_PATH}
+        target="_blank"
+        rel="noopener"
+        onClick={onWiki}
+      >
         Wiki
       </a>
       <span className="hud-muted" title="Your account">
         {account}
       </span>
-      <button type="button" className="hud-logout" onClick={onLogout}>
+      <button type="button" className="hud-logout btn sm dk" onClick={onLogout}>
         Log out
       </button>
     </header>
@@ -354,8 +245,9 @@ export function ZealMeter({ zeal, draining = false }: { zeal: number; draining?:
   const shown = zealShown(zeal, draining)
   return (
     <span className={`hud-zeal${shown.draining ? ' draining' : ''}`} title={shown.title}>
+      <span aria-hidden="true">Zeal</span>
       <span
-        className="hud-zeal-bar"
+        className="hud-zeal-bar mt bl"
         role="meter"
         aria-label="Zeal"
         aria-valuemin={0}
@@ -364,7 +256,7 @@ export function ZealMeter({ zeal, draining = false }: { zeal: number; draining?:
       >
         <span className="hud-zeal-fill" style={{ width: `${shown.share * 100}%` }} />
       </span>
-      {shown.label}
+      <span className="mono">{shown.label}</span>
     </span>
   )
 }
@@ -385,7 +277,7 @@ function ControlSwitch({
       type="button"
       role="radio"
       aria-checked={mode === m}
-      className={mode === m ? 'on' : undefined}
+      className={mode === m ? 'btn sm on' : 'btn sm dk'}
       title={title}
       onClick={() => onSwitch(m)}
     >
@@ -396,89 +288,101 @@ function ControlSwitch({
     <span className="hud-control" role="radiogroup" aria-label="Control mode (Tab)">
       {option('unit', 'Unit', 'Unit control: pick residents, then say what they do (Tab)')}
       {option('realm', 'Realm', 'Realm control: say what is to be done and where, then who (Tab)')}
+      <span className="hud-control-key k" aria-hidden="true">
+        Tab
+      </span>
     </span>
   )
 }
 
+/** The kit icon beside a realm bar order, where the artboard (`Game-Realm`) draws one. */
+const REALM_BAR_ICONS: Partial<Record<RealmBarOrder, UiIconName>> = {
+  build: 'build',
+  walkTo: 'walk',
+  explore: 'sight',
+  gather: 'gather',
+  runScript: 'script',
+}
+
+/** The gap, in pixels, between the realm bar and what stops above it. */
+const REALM_BAR_GAP = 8
+
 /**
- * The realm bar over the map in realm control mode (`CONTEXT.md`: Realm order): where the orders
- * that begin with a kind or a place start, beside a line on what the mode is for.
+ * The realm bar in realm control mode (`CONTEXT.md`: Realm order, Screen; ADR 0044): it takes the
+ * command bar's place along the bottom, left of the map dock, and is where the orders that begin
+ * with a kind or a place start, under a heading and a line on what the mode is for. On a desktop
+ * its height, with the gap above it, goes to the screen as `--command-h`, so the sidebar and the
+ * dock stop above it as they do above the command bar. On a phone it sits above the map buttons
+ * (`--map-dock-h`).
  */
 export function RealmBar({
   open,
   onOpen,
+  phone = false,
 }: {
   /** The realm bar's order being given, if one is. */
   open: RealmBarOrder | undefined
   /** Starts the order, or with it open already, drops it. */
   onOpen: (order: RealmBarOrder) => void
+  phone?: boolean
 }) {
+  const ref = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const bar = ref.current
+    const screen = bar?.parentElement
+    if (!bar || !screen || phone) return
+    const observer = new ResizeObserver(() => {
+      const tall = bar.offsetHeight
+      screen.style.setProperty('--command-h', `${tall > 0 ? tall + REALM_BAR_GAP : 0}px`)
+    })
+    observer.observe(bar)
+    return () => {
+      observer.disconnect()
+      screen.style.removeProperty('--command-h')
+    }
+  }, [phone])
+  // On a phone it stands above the map's buttons, which give their height as `--map-dock-h`.
+  useMapDockHeight(ref, phone)
   return (
-    <div className="hud-realm-bar" role="toolbar" aria-label="Realm orders">
-      {REALM_BAR_ORDERS.map(({ id, label, title }) => (
-        <button
-          key={id}
-          type="button"
-          className={open === id ? 'on' : undefined}
-          aria-pressed={open === id}
-          title={title}
-          onClick={() => onOpen(id)}
-        >
-          {label}
-        </button>
-      ))}
-      <span className="hud-realm-bar-hint">{REALM_BAR_HINT}</span>
-    </div>
-  )
-}
-
-/** The narrow icon rail on the left; each button opens its drawer over the map. */
-export function ToolRail({
-  open,
-  onToggle,
-  marked = NONE_MARKED,
-}: {
-  open: OpenDrawer
-  onToggle: (id: DrawerId) => void
-  /** The drawers holding something the Player hasn't seen (`unseenMarks`). */
-  marked?: ReadonlySet<DrawerId>
-}) {
-  return (
-    <nav className="hud-rail" aria-label="Tools">
-      {railGroups().map((g, i) => (
-        <div key={g.id} className="hud-rail-group" role="group" aria-label={g.label}>
-          {i > 0 && <hr className="hud-rail-divider" aria-hidden="true" />}
-          {g.drawers.map((d) => (
+    <section ref={ref} className="realm-bar pn" aria-label="Realm bar">
+      <div className="realm-bar-head">
+        <span className="px t18">Realm orders</span>
+        <span className="realm-bar-hint">{REALM_BAR_HINT}</span>
+      </div>
+      <div className="realm-bar-orders" role="toolbar" aria-label="Realm orders">
+        {REALM_BAR_ORDERS.map(({ id, label, title }) => {
+          const icon = REALM_BAR_ICONS[id]
+          return (
             <button
-              key={d.id}
+              key={id}
               type="button"
-              className={open === d.id ? 'on' : ''}
-              aria-pressed={open === d.id}
-              aria-label={marked.has(d.id) ? `${d.label}, something new` : d.label}
-              data-tip={d.label}
-              onClick={() => onToggle(d.id)}
+              className={open === id ? 'btn lg on' : 'btn lg'}
+              aria-pressed={open === id}
+              title={title}
+              onClick={() => onOpen(id)}
             >
-              <Icon name={d.id} size={20} />
-              {marked.has(d.id) && <UnseenMark />}
+              {icon && <Icon name={icon} />}
+              {label}
             </button>
-          ))}
-        </div>
-      ))}
-    </nav>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
-/** No drawer or tab marked. */
-const NONE_MARKED: ReadonlySet<never> = new Set()
+/** No tab marked. */
+export const NONE_MARKED: ReadonlySet<never> = new Set()
 
-/** The small mark on a rail button or tab whose drawer holds something the Player hasn't seen. */
-function UnseenMark() {
+/** The small mark on a sidebar tab or Diplomacy tab that holds something the Player hasn't seen. */
+export function UnseenMark() {
   return <span className="unseen-mark" aria-hidden="true" />
 }
 
 /**
- * On a phone the tool rail and the top bar's goods, Leader, Wiki and Log out fold into one menu
- * button at the top left (ADR 0012); picking a drawer from it opens that drawer full-screen.
+ * On a phone the sidebar's strip and the top bar's goods, Leader, heir, Zeal, Wiki and Log out fold
+ * into one menu button at the top left (ADR 0012); picking a tab from it opens that tab
+ * full-screen.
  */
 export function PhoneMenu({
   open,
@@ -491,11 +395,13 @@ export function PhoneMenu({
   account,
   onLogout,
   onWiki,
+  zeal,
+  zealDraining,
 }: {
-  open: OpenDrawer
-  onToggle: (id: DrawerId) => void
-  /** The drawers holding something the Player hasn't seen (`unseenMarks`). */
-  marked?: ReadonlySet<DrawerId>
+  open: OpenTab
+  onToggle: (id: SideTabId) => void
+  /** The tabs holding something the Player hasn't seen (`unseenMarks`). */
+  marked?: ReadonlySet<SideTabId>
   goods?: GoodsShown
   leader?: string
   /** The heir's name, null with none (`CONTEXT.md`: Heir); absent before the world comes. */
@@ -506,6 +412,9 @@ export function PhoneMenu({
   onLogout: () => void
   /** The Wiki link was followed (`CONTEXT.md`: First day). */
   onWiki?: () => void
+  /** The Player's Zeal (`CONTEXT.md`: Zeal): on a phone the top bar has no room for it. */
+  zeal?: number
+  zealDraining?: boolean
 }) {
   const [shown, setShown] = useState(false)
   useEffect(() => {
@@ -533,11 +442,33 @@ export function PhoneMenu({
       {shown && (
         <>
           <div className="hud-menu-backdrop" onClick={() => setShown(false)} />
-          <nav className="hud-menu" aria-label="Menu">
-            {railGroups().map((g) => (
+          <nav className="hud-menu pn" aria-label="Menu">
+            {/* As the artboard (`Phone-Menu`): the goods and the realm's people first, the tabs,
+                then Wiki and Log out at the foot. */}
+            {goods && <Goods goods={goods} className="hud-menu-goods" />}
+            {(leader || heir !== undefined || zeal !== undefined) && (
+              <div className="hud-menu-realm">
+                {leader && (
+                  <span className="hud-leader" title="Your Leader">
+                    <Icon name="crown" size={16} /> {leader}
+                  </span>
+                )}
+                {heir !== undefined && (
+                  <HeirShown
+                    heir={heir}
+                    onPickHeir={() => {
+                      setShown(false)
+                      onPickHeir?.()
+                    }}
+                  />
+                )}
+                {zeal !== undefined && <ZealMeter zeal={zeal} draining={zealDraining} />}
+              </div>
+            )}
+            {sidebarGroups().map((g) => (
               <Fragment key={g.id}>
                 <h2 className="hud-menu-heading">{g.label}</h2>
-                {g.drawers.map((d) => (
+                {g.tabs.map((d) => (
                   <button
                     key={d.id}
                     type="button"
@@ -548,30 +479,15 @@ export function PhoneMenu({
                       setShown(false)
                     }}
                   >
-                    <Icon name={d.id} size={18} /> {d.label}
+                    <Icon name={TAB_ICONS[d.id]} /> {d.label}
                     {marked.has(d.id) && <UnseenMark />}
                   </button>
                 ))}
               </Fragment>
             ))}
-            {goods && <Goods goods={goods} className="hud-menu-goods" />}
-            {leader && (
-              <span className="hud-leader" title="Your Leader">
-                <Icon name="crown" size={15} /> {leader}
-              </span>
-            )}
-            {heir !== undefined && (
-              <HeirShown
-                heir={heir}
-                onPickHeir={() => {
-                  setShown(false)
-                  onPickHeir?.()
-                }}
-              />
-            )}
             <div className="hud-menu-links">
               <a
-                className="hud-wiki"
+                className="hud-wiki btn lg"
                 href={WIKI_PATH}
                 target="_blank"
                 rel="noopener"
@@ -579,13 +495,13 @@ export function PhoneMenu({
               >
                 Wiki
               </a>
-              <span className="hud-account" title="Your account">
-                {account}
-              </span>
-              <button type="button" className="hud-logout" onClick={onLogout}>
+              <button type="button" className="hud-logout btn lg" onClick={onLogout}>
                 Log out
               </button>
             </div>
+            <span className="hud-account mu" title="Your account">
+              Signed in as {account}
+            </span>
           </nav>
         </>
       )}
@@ -594,48 +510,9 @@ export function PhoneMenu({
 }
 
 /**
- * A drawer sliding over the map. Every drawer stays mounted and only the open one shows, so a
- * panel keeps what the Player typed into it, and the script library its list, while closed.
- */
-export function Drawer({
-  id,
-  open,
-  onClose,
-  full = false,
-  children,
-}: {
-  id: DrawerId
-  open: OpenDrawer
-  onClose: () => void
-  /** Across the whole screen, whatever the drawer's usual width (the full Residents list). */
-  full?: boolean
-  children: ReactNode
-}) {
-  const label = DRAWERS.find((d) => d.id === id)!.label
-  // Where the panel's head puts its count, right of the title (`PanelHead`).
-  const [status, setStatus] = useState<HTMLElement | null>(null)
-  return (
-    <section
-      className={`hud-drawer${isWide(id) || full ? ' wide' : ''}${full ? ' full' : ''}`}
-      aria-label={`${label} drawer`}
-      hidden={open !== id}
-    >
-      <div className="hud-drawer-head">
-        <h2>{label}</h2>
-        <span className="hud-drawer-status" ref={setStatus} />
-        <button type="button" onClick={onClose} aria-label={`Close ${label}`}>
-          ✕
-        </button>
-      </div>
-      <DrawerStatus.Provider value={status}>{children}</DrawerStatus.Provider>
-    </section>
-  )
-}
-
-/**
- * The Diplomacy drawer's tabs (`CONTEXT.md`: Tool rail). Every tab's panel stays mounted and only
+ * The Diplomacy tab's tabs (`CONTEXT.md`: Sidebar). Every tab's panel stays mounted and only
  * the picked one shows, so a panel keeps what the Player typed into it; only that one puts its
- * count beside the drawer's title.
+ * count beside the tab's title.
  */
 export function DiplomacyTabs({
   tab,
@@ -649,10 +526,10 @@ export function DiplomacyTabs({
   marked?: ReadonlySet<DiplomacyTab>
   panels: Record<DiplomacyTab, ReactNode>
 }) {
-  const status = useContext(DrawerStatus)
+  const status = useContext(PanelStatus)
   return (
     <>
-      <div className="diplomacy-tabs" role="tablist" aria-label="Diplomacy">
+      <div className="tabs diplomacy-tabs" role="tablist" aria-label="Diplomacy">
         {DIPLOMACY_TABS.map((t) => (
           <button
             key={t.id}
@@ -661,10 +538,10 @@ export function DiplomacyTabs({
             id={`diplomacy-tab-${t.id}`}
             aria-selected={tab === t.id}
             aria-controls={`diplomacy-panel-${t.id}`}
-            className={tab === t.id ? 'on' : ''}
+            className={tab === t.id ? 'tab on' : 'tab'}
             onClick={() => onTab(t.id)}
           >
-            <Icon name={t.id} size={15} /> {t.label}
+            <Icon name={TAB_ICONS[t.id]} size={16} /> {t.label}
             {marked.has(t.id) && <UnseenMark />}
           </button>
         ))}
@@ -677,116 +554,39 @@ export function DiplomacyTabs({
           aria-labelledby={`diplomacy-tab-${t.id}`}
           hidden={tab !== t.id}
         >
-          <DrawerStatus.Provider value={tab === t.id ? status : null}>
+          <PanelStatus.Provider value={tab === t.id ? status : null}>
             {panels[t.id]}
-          </DrawerStatus.Provider>
+          </PanelStatus.Provider>
         </div>
       ))}
     </>
   )
 }
 
-/** Where the browser remembers how wide the Player dragged the drawers. */
-const WIDTH_KEY = 'csp.drawerWidth'
-
-function rememberedWidth(): number {
-  try {
-    return rememberedDrawerWidth(localStorage.getItem(WIDTH_KEY))
-  } catch {
-    return DRAWER_WIDTH.initial
-  }
-}
-
-function rememberWidth(width: number) {
-  try {
-    localStorage.setItem(WIDTH_KEY, String(width))
-  } catch {
-    // Without storage it just isn't remembered.
-  }
-}
-
-/** How far one arrow key press moves the drawer's edge. */
-const KEY_STEP = 16
-
 /**
- * The drag handle on the open drawer's right edge: it sets every (not wide) drawer's width, as
- * `--drawer-w` on the page, within `DRAWER_WIDTH`. The width is remembered in the browser; a
- * double click goes back to the initial one. It keeps its own state, so a drag re-renders only it.
+ * How many pixels of the map the sidebar covers from the left (its strip alone while folded) and
+ * the cards in the dock from the right, 0 for each that isn't showing; and how many the strip alone
+ * covers, all the sidebar leaves when folded. The map fills the window, so screen edges measure it.
  */
-export function DrawerEdge({ open }: { open: OpenDrawer }) {
-  const [width, setWidth] = useState(rememberedWidth)
-  const dragging = useRef(false)
-
-  useLayoutEffect(() => {
-    document.documentElement.style.setProperty('--drawer-w', `${width}px`)
-  }, [width])
-
-  if (!open || isWide(open)) return null
-  const settle = (to: number) => {
-    setWidth(to)
-    rememberWidth(to)
-  }
-  // The rail fixes the drawer's left edge; the pointer is where its right edge goes.
-  const toPointer = (x: number) =>
-    drawerWidth(
-      x - (document.querySelector('.hud-drawer:not([hidden])')?.getBoundingClientRect().left ?? 0),
-    )
-  return (
-    <div
-      className="hud-drawer-edge"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Drawer width"
-      aria-valuemin={DRAWER_WIDTH.min}
-      aria-valuemax={DRAWER_WIDTH.max}
-      aria-valuenow={width}
-      tabIndex={0}
-      onPointerDown={(e) => {
-        if (e.button !== 0) return
-        e.preventDefault()
-        e.currentTarget.setPointerCapture(e.pointerId)
-        dragging.current = true
-      }}
-      onPointerMove={(e) => {
-        if (dragging.current) setWidth(toPointer(e.clientX))
-      }}
-      onPointerUp={(e) => {
-        if (!dragging.current) return
-        dragging.current = false
-        settle(toPointer(e.clientX))
-      }}
-      onPointerCancel={() => {
-        dragging.current = false
-        rememberWidth(width)
-      }}
-      onDoubleClick={() => settle(DRAWER_WIDTH.initial)}
-      onKeyDown={(e) => {
-        const step = e.key === 'ArrowLeft' ? -KEY_STEP : e.key === 'ArrowRight' ? KEY_STEP : 0
-        if (!step) return
-        e.preventDefault()
-        settle(drawerWidth(width + step))
-      }}
-    />
+export function mapCovered(): { left: number; right: number; strip: number } {
+  // A bottom sheet and the command bar (`.game-command`) cover the bottom of the map, not its right
+  // side; a hidden card none of it. Only the cards in the dock (`Dock`: a tile card, the who-list,
+  // a realm order card) cover the right; the empty dock lets the map through.
+  const docked = [...document.querySelectorAll('.game-dock > :not([hidden])')].map(
+    (el) => el.getBoundingClientRect().left,
   )
-}
-
-/**
- * How many pixels of the map the open drawer covers from the left and the selection card from
- * the right, 0 for each that isn't showing. The map fills the window, so screen edges measure it.
- */
-export function mapCovered(): { left: number; right: number } {
-  // A bottom sheet covers the bottom of the map, not its right side; a hidden card none of it.
-  const card = document
-    .querySelector('.game-selection:not(.sheet):not([hidden])')
-    ?.getBoundingClientRect()
+  // A folded sidebar on a phone isn't drawn, and measures 0.
+  const side = document.querySelector('.side')?.getBoundingClientRect()
+  const strip = document.querySelector('.side-strip')?.getBoundingClientRect()
   return {
-    left: document.querySelector('.hud-drawer:not([hidden])')?.getBoundingClientRect().right ?? 0,
-    right: card ? window.innerWidth - card.left : 0,
+    left: side?.right ?? 0,
+    right: dockCovers(docked, window.innerWidth),
+    strip: strip && strip.width > 0 ? strip.right : 0,
   }
 }
 
-/** Closes the open drawer on Escape, unless the Player is typing somewhere. */
-export function useEscapeCloses(open: OpenDrawer, close: () => void) {
+/** Folds the open sidebar on Escape, unless the Player is typing somewhere. */
+export function useEscapeCloses(open: OpenTab, close: () => void) {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -799,12 +599,26 @@ export function useEscapeCloses(open: OpenDrawer, close: () => void) {
   }, [open, close])
 }
 
-/** A dialog in the middle of the screen, over a dimmed map. */
-export function CentredDialog({ title, children }: { title: string; children: ReactNode }) {
+/**
+ * A dialog in the middle of the screen, over a dimmed map. Its header bar says what kind of news
+ * it is: `bad` (red, with a warning sign) for a loss, `news` (navy) for word from the game.
+ */
+export function CentredDialog({
+  title,
+  tone,
+  children,
+}: {
+  title: string
+  tone?: 'bad' | 'news'
+  children: ReactNode
+}) {
   return (
     <div className="hud-backdrop">
-      <div className="hud-dialog" role="alertdialog" aria-modal="true" aria-label={title}>
-        <h2>{title}</h2>
+      <div className="hud-dialog pn" role="alertdialog" aria-modal="true" aria-label={title}>
+        <h2 className={`hd${tone ? ` hd-${tone}` : ''}`}>
+          {tone === 'bad' && <Icon name="warning" size={24} />}
+          <span className="grow">{title}</span>
+        </h2>
         {children}
       </div>
     </div>
@@ -835,12 +649,13 @@ export function HorseOfferNotice({
     if (reason) setBusy(false)
   }
   return (
-    <aside className="notice hud-offer" role="status">
-      <span className="notice-text">
+    <aside className="pn notice hud-offer" role="status">
+      <Icon name="horse" size={24} />
+      <span className="notice-text b">
         {NUMBER_WORDS[horses] ?? horses} horses are waiting for you
         {refused && <span className="hud-offer-refused"> — {refused}</span>}
       </span>
-      <button type="button" disabled={busy} onClick={() => void claim()}>
+      <button type="button" className="btn sm gold" disabled={busy} onClick={() => void claim()}>
         Claim
       </button>
     </aside>
@@ -849,7 +664,7 @@ export function HorseOfferNotice({
 
 /**
  * What others sent the Player and they haven't seen yet (`CONTEXT.md`: Notices): who sent what.
- * Opening its drawer or dismissing it puts it away; the things themselves wait in the drawer.
+ * Opening its sidebar tab or dismissing it puts it away; the things themselves wait in the tab.
  */
 export function IncomingNotice({
   line,
@@ -861,15 +676,15 @@ export function IncomingNotice({
   onDismiss: () => void
 }) {
   return (
-    <aside className="notice incoming-notice" role="status">
+    <aside className="pn notice incoming-notice" role="status">
       <span className="notice-text" title={line}>
         {line}
       </span>
-      <button type="button" onClick={onOpen}>
+      <button type="button" className="btn sm" onClick={onOpen}>
         Open
       </button>
-      <button type="button" aria-label="Dismiss" onClick={onDismiss}>
-        ×
+      <button type="button" className="btn sm sq" aria-label="Dismiss" onClick={onDismiss}>
+        <Icon name="close" size={16} />
       </button>
     </aside>
   )
@@ -880,9 +695,9 @@ const BAND_PAD = 6
 
 /**
  * The lane under the top bar every notice shows in (`CONTEXT.md`: Notices): one stack, centred
- * over the map between the open drawer and the card and never over either (`laneSpot`). While it
+ * over the map between the sidebar and the card and never over either (`laneSpot`). While it
  * is a band across the screen (on a phone, or with too little map between them) it sets
- * `--lane-h` on the game, and the drawers and the card start below it.
+ * `--lane-h` on the game, and the sidebar and the card start below it.
  */
 export function NoticeLane({ phone, children }: { phone: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -893,8 +708,8 @@ export function NoticeLane({ phone, children }: { phone: boolean; children: Reac
     const lane = ref.current
     const game = lane?.closest<HTMLElement>('.game')
     if (!lane || !game) return
-    const rail = parseFloat(getComputedStyle(game).getPropertyValue('--rail-w')) || 0
-    const next = laneSpot(window.innerWidth, rail, mapCovered(), phone)
+    const strip = parseFloat(getComputedStyle(game).getPropertyValue('--strip-w')) || 0
+    const next = laneSpot(window.innerWidth, strip, mapCovered(), phone)
     setSpot((was) =>
       was && was.left === next.left && was.right === next.right && was.band === next.band
         ? was
@@ -914,7 +729,7 @@ export function NoticeLane({ phone, children }: { phone: boolean; children: Reac
       lane?.closest<HTMLElement>('.game')?.style.removeProperty('--lane-h')
     }
   }, [])
-  // Drawers, cards and notices come and go with the game's renders, and so the lane's; a drawer
+  // The sidebar, cards and notices come and go with the game's renders, and so the lane's; a panel
   // dragged wider or a notice growing shows only in their sizes.
   useLayoutEffect(() => {
     place.current()
@@ -923,7 +738,7 @@ export function NoticeLane({ phone, children }: { phone: boolean; children: Reac
     if (!lane || !w) return
     w.disconnect()
     w.observe(lane)
-    for (const el of document.querySelectorAll('.hud-drawer, .game-selection')) w.observe(el)
+    for (const el of document.querySelectorAll('.side, .game-dock > *')) w.observe(el)
   })
   return (
     <div
@@ -958,17 +773,18 @@ export function TraderVisitNotice({
   onDismiss: () => void
 }) {
   return (
-    <aside className="notice trader-visit" role="status">
+    <aside className="pn notice trader-visit" role="status">
       <span className="notice-text">{traderVisitLine(visit, tick)}</span>
       <span className="notice-actions">
-        <button type="button" onClick={onShow}>
+        <button type="button" className="btn sm" onClick={onShow}>
           Show
         </button>
-        <button type="button" onClick={onTrade}>
+        <button type="button" className="btn sm gold" onClick={onTrade}>
           Trade
         </button>
         <button
           type="button"
+          className="btn sm"
           aria-label={`Dismiss the trader at ${visit.city}`}
           onClick={onDismiss}
         >
@@ -990,7 +806,7 @@ export function GroupReportNotice({
   const skipped = skippedByWhy(report.skipped)
   return (
     <aside
-      className={`notice group-report${skipped.length ? ' skipped' : ''}`}
+      className={`pn notice group-report${skipped.length ? ' skipped' : ''}`}
       role="status"
       aria-label="Last group order"
       title={[sent, ...skipped.map((s) => `Skipped ${s.names.join(', ')}: ${s.why}`)].join('\n')}
@@ -1003,7 +819,12 @@ export function GroupReportNotice({
           </span>
         ))}
       </span>
-      <button type="button" aria-label="Dismiss the group order's report" onClick={onDismiss}>
+      <button
+        type="button"
+        className="btn sm"
+        aria-label="Dismiss the group order's report"
+        onClick={onDismiss}
+      >
         OK
       </button>
     </aside>
@@ -1026,12 +847,25 @@ export function FirstDayCard({
 }) {
   const { lines, next, ticked } = firstDayView(card)
   return (
-    <aside className="notice first-day" aria-label="First day">
-      <div className="notice-text">
-        <strong>First day</strong>{' '}
-        <span className="first-day-count">
-          {ticked} of {lines.length}
+    <aside className="pn notice first-day" aria-label="First day">
+      <div className="hd first-day-head">
+        <span className="grow">
+          First day ·{' '}
+          <span className="first-day-count">
+            {ticked} of {lines.length}
+          </span>
         </span>
+        <button
+          type="button"
+          className="btn sm sq dk first-day-dismiss"
+          aria-label="Don't show again"
+          title="Don't show again"
+          onClick={onDismiss}
+        >
+          <Icon name="close" size={16} />
+        </button>
+      </div>
+      <div className="notice-text first-day-body">
         <ul>
           {lines.map((l) => (
             <li
@@ -1039,9 +873,7 @@ export function FirstDayCard({
               className={l.done ? 'done' : l.line === next ? 'next' : undefined}
               aria-label={l.done ? `${l.label}: done` : undefined}
             >
-              <span className="first-day-tick" aria-hidden="true">
-                {l.done ? '✓' : '○'}
-              </span>{' '}
+              <span className={`cb first-day-tick${l.done ? ' on' : ''}`} aria-hidden="true" />{' '}
               {l.line === 'openWiki' ? (
                 // A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki).
                 <a href={WIKI_PATH} target="_blank" rel="noopener" onClick={onWiki}>
@@ -1053,17 +885,8 @@ export function FirstDayCard({
             </li>
           ))}
         </ul>
-        <p className="first-day-tip small">{FIRST_DAY_RALLY_TIP}</p>
+        <p className="first-day-tip small mu">{FIRST_DAY_RALLY_TIP}</p>
       </div>
-      <button
-        type="button"
-        className="first-day-dismiss"
-        aria-label="Don't show again"
-        title="Don't show again"
-        onClick={onDismiss}
-      >
-        ✕
-      </button>
     </aside>
   )
 }
@@ -1083,7 +906,7 @@ function HeirShown({ heir, onPickHeir }: { heir: string | null; onPickHeir?: () 
   return (
     <button
       type="button"
-      className="hud-heir none"
+      className="hud-heir none btn sm gold"
       title="Your realm has no heir: pick a resident and name them heir"
       onClick={onPickHeir}
     >

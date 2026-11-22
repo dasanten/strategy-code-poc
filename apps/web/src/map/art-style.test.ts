@@ -17,6 +17,16 @@ describe('art style', () => {
     expect(rememberedArtStyle(() => ({ getItem: () => 'watercolour' }))).toBe(DEFAULT_ART_STYLE)
   })
 
+  it('is Pixel in a fresh browser (ADR 0044)', () => {
+    expect(DEFAULT_ART_STYLE).toBe('pixel')
+    expect(rememberedArtStyle(() => ({ getItem: () => null }))).toBe('pixel')
+  })
+
+  it('keeps a stored pick over the default', () => {
+    expect(rememberedArtStyle(() => ({ getItem: () => 'painted' }))).toBe('painted')
+    expect(rememberedArtStyle(() => ({ getItem: () => 'tokens' }))).toBe('tokens')
+  })
+
   it('is the default when storage is off', () => {
     const off = () => {
       throw new Error('no storage')

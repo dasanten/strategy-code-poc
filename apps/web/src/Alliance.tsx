@@ -9,8 +9,10 @@ import type {
   SeenResident,
   SeenCarriage,
 } from '@csp/shared-types'
-import { PanelHead } from './drawer-head.js'
+import { GroupHead } from './diplomacy-parts.js'
+import { PanelHead } from './panel-head.js'
 import { relationshipClass } from './theme.js'
+import { Icon } from './Icon.js'
 
 /**
  * The Player's alliance (`CONTEXT.md`: Alliance, Alliance leader): found one or answer
@@ -53,45 +55,57 @@ export function AlliancePanel({
 
   if (!alliance) {
     return (
-      <section className="alliance-panel" aria-label="Alliance">
+      <section className="dip" aria-label="Alliance">
         <PanelHead title="Alliance">none</PanelHead>
         {invitations.length > 0 && (
-          <ul className="alliance-list">
-            {invitations.map((inv) => (
-              <li key={inv.allianceId}>
-                <span>
-                  <strong>{inv.name}</strong> (led by the realm of {inv.leader}) invites you
-                </span>
-                <button
-                  type="button"
-                  onClick={() => order({ kind: 'acceptInvite', allianceId: inv.allianceId })}
-                >
-                  Join
-                </button>
-                <button
-                  type="button"
-                  onClick={() => order({ kind: 'declineInvite', allianceId: inv.allianceId })}
-                >
-                  Decline
-                </button>
-              </li>
-            ))}
-          </ul>
+          <>
+            <GroupHead count={invitations.length}>Invitations</GroupHead>
+            <ul className="dip-list">
+              {invitations.map((inv) => (
+                <li key={inv.allianceId} className="sec">
+                  <span className="fx wrap">
+                    <span className="grow">
+                      <span className="b">{inv.name}</span> (led by the realm of {inv.leader})
+                      invites you
+                    </span>
+                    <button
+                      type="button"
+                      className="btn sm pri"
+                      onClick={() => order({ kind: 'acceptInvite', allianceId: inv.allianceId })}
+                    >
+                      Join
+                    </button>
+                    <button
+                      type="button"
+                      className="btn sm"
+                      onClick={() => order({ kind: 'declineInvite', allianceId: inv.allianceId })}
+                    >
+                      Decline
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
-        <form onSubmit={found}>
-          <label>
-            Found an alliance
-            <input
-              value={name}
-              maxLength={ALLIANCE_NAME_MAX_LENGTH}
-              placeholder="Its name"
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </label>
-          <button type="submit">Found</button>
+        <form className="sec dip-form" onSubmit={found} aria-label="Found an alliance">
+          <div className="fx dip-bottom">
+            <label className="fld grow">
+              <span className="px t16">Found an alliance</span>
+              <input
+                value={name}
+                maxLength={ALLIANCE_NAME_MAX_LENGTH}
+                placeholder="Its name"
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </label>
+            <button type="submit" className="btn pri">
+              Found
+            </button>
+          </div>
         </form>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error dip-error">{error}</p>}
       </section>
     )
   }
@@ -102,72 +116,82 @@ export function AlliancePanel({
   const me = alliance.members.find((m) => m.realmId === realmId)
 
   return (
-    <section className="alliance-panel" aria-label="Alliance">
-      {/* In the drawer its name joins the count, right of the drawer's title. */}
+    <section className="dip" aria-label="Alliance">
+      {/* In the sidebar its name joins the count, right of the tab's title. */}
       <PanelHead title={alliance.name}>
         {alliance.name} ·{' '}
         {alliance.members.length === 1 ? '1 member' : `${alliance.members.length} members`}
       </PanelHead>
-      <ul className="alliance-list">
-        {alliance.members.map((m) => (
-          <li
-            key={m.realmId}
-            className={relationshipClass(m.realmId === realmId ? 'own' : 'alliance')}
-          >
-            <span>
-              {m.realmId === realmId ? 'Your realm' : labelOf(m)}
-              {m.realmId === alliance.leaderId && <span className="badge">leader</span>}
+      <div className="sec">
+        <span className="lb">Members</span>
+        <ul className="col dip-members">
+          {alliance.members.map((m) => (
+            <li
+              key={m.realmId}
+              className={`fx wrap ${relationshipClass(m.realmId === realmId ? 'own' : 'alliance')}`}
+            >
+              <span className="dot" aria-hidden="true" />
+              <span className={m.realmId === realmId ? 'b grow' : 'grow'}>
+                {m.realmId === realmId ? 'Your realm' : labelOf(m)}
+              </span>
+              {m.realmId === alliance.leaderId && <span className="chip y">leader</span>}
               {m.leavesAt !== null && (
-                <span className="badge">leaves {formatGameTime(m.leavesAt)}</span>
+                <span className="chip r">leaves {formatGameTime(m.leavesAt)}</span>
               )}
               {/* Only allies see who a realm's heir is (`CONTEXT.md`: Heir). */}
-              {m.realmId !== realmId && m.heir && <span className="badge">heir {m.heir}</span>}
-            </span>
-            {leading && m.realmId !== realmId && m.leavesAt === null && (
-              <button
-                type="button"
-                onClick={() => order({ kind: 'removeFromAlliance', realmId: m.realmId })}
-              >
-                Remove
-              </button>
-            )}
-          </li>
-        ))}
-        {alliance.invites.map((r) => (
-          <li key={r.realmId} className="invited">
-            <span>
-              {labelOf(r)}
-              <span className="badge">invited</span>
-            </span>
-            {leading && (
-              <button
-                type="button"
-                onClick={() => order({ kind: 'withdrawInvite', realmId: r.realmId })}
-              >
-                Withdraw
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
+              {m.realmId !== realmId && m.heir && <span className="chip">heir {m.heir}</span>}
+              {leading && m.realmId !== realmId && m.leavesAt === null && (
+                <button
+                  type="button"
+                  className="btn sm"
+                  onClick={() => order({ kind: 'removeFromAlliance', realmId: m.realmId })}
+                >
+                  Remove
+                </button>
+              )}
+            </li>
+          ))}
+          {alliance.invites.map((r) => (
+            <li
+              key={r.realmId}
+              className={`fx wrap ${relationshipClass(r.city ? 'npcCity' : 'otherRealm')}`}
+            >
+              <span className="dot" aria-hidden="true" />
+              <span className="grow mu">{labelOf(r)}</span>
+              <span className="chip">invited</span>
+              {leading && (
+                <button
+                  type="button"
+                  className="btn sm"
+                  onClick={() => order({ kind: 'withdrawInvite', realmId: r.realmId })}
+                >
+                  Withdraw
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
       {leading && (
-        <form onSubmit={invite}>
-          <label>
-            Invite a realm or NPC city in sight
-            <select value={invitee} onChange={(e) => setInvitee(e.target.value)}>
-              <option value="">
-                {invitable.length === 0 ? 'nobody else in sight' : 'Choose whom'}
-              </option>
-              {invitable.map((r) => (
-                <option key={r.realmId} value={r.realmId}>
-                  {labelOf(r)}
+        <form className="sec" onSubmit={invite} aria-label="Invite">
+          <div className="fx dip-bottom">
+            <label className="fld grow">
+              <span className="lb">Invite a realm or NPC city in sight</span>
+              <select value={invitee} onChange={(e) => setInvitee(e.target.value)}>
+                <option value="">
+                  {invitable.length === 0 ? 'nobody else in sight' : 'Choose whom'}
                 </option>
-              ))}
-            </select>
-          </label>
-          <button type="submit" disabled={!invitee}>
-            Invite
-          </button>
+                {invitable.map((r) => (
+                  <option key={r.realmId} value={r.realmId}>
+                    {labelOf(r)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit" className="btn pri" disabled={!invitee}>
+              Invite
+            </button>
+          </div>
         </form>
       )}
       <AllianceArmy
@@ -179,12 +203,18 @@ export function AlliancePanel({
         carriages={carriages}
         order={order}
       />
+      {error && <p className="error dip-error">{error}</p>}
       {me?.leavesAt === null && (
-        <button type="button" onClick={() => order({ kind: 'leaveAlliance' })}>
-          Leave the alliance
-        </button>
+        <div className="sec">
+          <button
+            type="button"
+            className="btn dng dip-start"
+            onClick={() => order({ kind: 'leaveAlliance' })}
+          >
+            Leave the alliance
+          </button>
+        </div>
       )}
-      {error && <p className="error">{error}</p>}
     </section>
   )
 }
@@ -233,29 +263,29 @@ function AllianceArmy({
   }
 
   return (
-    <div aria-label="Alliance army">
-      <h3>Alliance army</h3>
-      <p className="small">
+    <div className="sec" role="group" aria-label="Alliance army">
+      <h3 className="px t16">Alliance army</h3>
+      <p className="mu small">
         {leading
           ? 'Soldiers and carriages handed over take orders only from you: pick them as residents.'
           : 'Soldiers and carriages handed over take orders only from the alliance leader.'}
       </p>
       {army.length > 0 && (
-        <ul className="alliance-list">
+        <ul className="col dip-members">
           {army.map((p) => (
-            <li key={p.id}>
-              <span>
-                {nameOf(p)}
-                <span className="badge">
-                  {p.realmId === realmId ? 'yours' : `realm of ${p.realm}`}
-                </span>
-                {p.recallAt !== null && (
-                  <span className="badge">back {formatGameTime(p.recallAt)}</span>
-                )}
+            <li key={p.id} className="fx wrap">
+              <Icon name={p.is === 'resident' ? 'sword' : 'cart'} size={16} />
+              <span className="grow">{nameOf(p)}</span>
+              <span className={p.realmId === realmId ? 'chip y' : 'chip bl'}>
+                {p.realmId === realmId ? 'yours' : `realm of ${p.realm}`}
               </span>
+              {p.recallAt !== null && (
+                <span className="chip">back {formatGameTime(p.recallAt)}</span>
+              )}
               {p.realmId === realmId && p.recallAt === null && (
                 <button
                   type="button"
+                  className="btn sm"
                   onClick={() => order({ kind: 'recallFromAlliance', ids: [p.id] })}
                 >
                   Recall
@@ -266,9 +296,9 @@ function AllianceArmy({
         </ul>
       )}
       {!leaving && (
-        <form onSubmit={handOver}>
-          <label>
-            Hand over
+        <form className="fx dip-bottom" onSubmit={handOver} aria-label="Hand over">
+          <label className="fld grow">
+            <span className="lb">Hand over</span>
             <select value={pick} onChange={(e) => setPick(e.target.value)}>
               <option value="">
                 {soldiers.length + ownCarriages.length === 0

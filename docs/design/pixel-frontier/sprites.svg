@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 64" width="160" height="64" shape-rendering="crispEdges">
+<g stroke="#181425" stroke-width="2" stroke-linejoin="miter" paint-order="stroke">
+<!-- row 0: goods -->
+<g><path fill="#e4a672" d="M4 4h8v1h1v7h-10v-7h1z"/><path stroke="none" fill="#ead4aa" d="M5 5h6v1h-6z"/><path stroke="none" fill="#b86f50" d="M6 7h1v3h-1zM9 7h1v3h-1zM3 11h10v1h-10z"/></g>
+<g transform="translate(16 0)"><path fill="#b86f50" d="M2 6h12v5h-12z"/><path stroke="none" fill="#e4a672" d="M11 6h3v5h-3z"/><path stroke="none" fill="#733e39" d="M3 8h7v1h-7zM12 8h1v1h-1z"/></g>
+<g transform="translate(32 0)"><path fill="#8b9bb4" d="M5 4h5v1h2v2h1v5h-10v-5h1v-2h1z"/><path stroke="none" fill="#c0cbdc" d="M5 5h4v2h-4z"/><path stroke="none" fill="#5a6988" d="M8 9h4v2h-4z"/></g>
+<g transform="translate(48 0)"><path fill="#5a6988" d="M5 4h5v1h2v2h1v5h-10v-5h1v-2h1z"/><path stroke="none" fill="#b86f50" d="M5 6h2v2h-2zM9 8h2v2h-2z"/><path stroke="none" fill="#f77622" d="M6 6h1v1h-1zM10 9h1v1h-1z"/><path stroke="none" fill="#3a4466" d="M4 10h3v1h-3z"/></g>
+<g transform="translate(64 0)"><path fill="#c0cbdc" d="M5 5h7v2h2v5h-12v-5h3z"/><path stroke="none" fill="#ffffff" d="M6 6h4v1h-4z"/><path stroke="none" fill="#8b9bb4" d="M3 10h10v1h-10z"/></g>
+<g transform="translate(80 0)"><path fill="#5a6988" d="M5 4h5v1h2v2h1v5h-10v-5h1v-2h1z"/><path stroke="none" fill="#feae34" d="M5 6h2v2h-2zM9 8h2v2h-2zM6 10h1v1h-1z"/><path stroke="none" fill="#fee761" d="M5 6h1v1h-1zM9 8h1v1h-1z"/></g>
+<g transform="translate(96 0)"><path fill="#feae34" d="M5 3h6v3h2v7h-10v-7h2z"/><path stroke="none" fill="#fee761" d="M6 4h4v1h-4zM4 7h8v1h-8z"/><path stroke="none" fill="#f77622" d="M4 9h8v1h-8zM4 11h8v1h-8z"/></g>
+<g transform="translate(112 0)"><path fill="#b86f50" d="M7 6h2v9h-2z"/><path fill="#c0cbdc" d="M7 1h2v1h1v3h-1v1h-2v-1h-1v-3h1z"/></g>
+<g transform="translate(128 0)"><path fill="#c0cbdc" d="M7 1h2v9h-2z"/><path fill="#feae34" d="M4 10h8v2h-8z"/><path fill="#733e39" d="M7 12h2v3h-2z"/><path stroke="none" fill="#ffffff" d="M7 2h1v7h-1z"/></g>
+<g transform="translate(144 0)"><path fill="#124e89" d="M3 2h10v8h-1v2h-1v1h-1v1h-4v-1h-1v-1h-1v-2h-1z"/><path stroke="none" fill="#c0cbdc" d="M7 3h2v10h-2zM4 6h8v2h-8z"/></g>
+<!-- row 1 -->
+<g transform="translate(0 16)"><path fill="#8b9bb4" d="M2 2h4v1h4v-1h4v4h-2v8h-8v-8h-2z"/><path stroke="none" fill="#c0cbdc" d="M5 5h2v7h-2z"/><path stroke="none" fill="#5a6988" d="M9 7h2v6h-2z"/></g>
+<g transform="translate(16 16)"><path fill="#3e8948" d="M4 7h8v6h-1v2h-2v-2h-2v2h-2v-2h-1z"/><path fill="#e4a672" d="M5 1h6v6h-6z"/><path stroke="none" fill="#733e39" d="M5 1h6v1h-6z"/><path stroke="none" fill="#181425" d="M6 3h1v1h-1zM9 3h1v1h-1z"/></g>
+<g transform="translate(32 16)"><path fill="#feae34" d="M2 4h3v3h2v-3h2v3h2v-3h3v9h-12z"/><path stroke="none" fill="#e43b44" d="M7 9h2v2h-2z"/><path stroke="none" fill="#fee761" d="M3 5h1v6h-1z"/><path stroke="none" fill="#f77622" d="M2 12h12v1h-12z"/></g>
+<g transform="translate(48 16)"><path fill="#b86f50" d="M9 1h2v2h2v11h-6v-4h-2v1h-3v-4h2v-2h2v-2h3z"/><path stroke="none" fill="#3e2731" d="M11 3h2v9h-2z"/><path stroke="none" fill="#181425" d="M7 6h1v1h-1zM3 9h1v1h-1z"/></g>
+<g transform="translate(64 16)"><path fill="#b86f50" d="M1 4h14v6h-14z"/><path fill="#5a6988" d="M3 9h4v5h-4zM10 9h4v5h-4z"/><path stroke="none" fill="#733e39" d="M2 6h12v1h-12z"/><path stroke="none" fill="#c0cbdc" d="M4 11h2v1h-2zM11 11h2v1h-2z"/></g>
+<g transform="translate(80 16)"><path fill="#733e39" d="M3 1h2v14h-2z"/><path fill="#e43b44" d="M5 2h9v2h-2v2h2v2h-9z"/><path stroke="none" fill="#fee761" d="M7 4h2v2h-2z"/></g>
+<g transform="translate(96 16)"><path fill="#c0cbdc" d="M2 3h3v2h2v-2h2v2h2v-2h3v11h-12z"/><path stroke="none" fill="#8b9bb4" d="M3 7h10v1h-10z"/><path stroke="none" fill="#181425" d="M7 10h2v4h-2zM4 9h1v2h-1zM11 9h1v2h-1z"/></g>
+<g transform="translate(112 16)"><path fill="#ead4aa" d="M3 2h10v12h-10z"/><path stroke="none" fill="#b86f50" d="M3 2h10v1h-10z"/><path stroke="none" fill="#733e39" d="M5 5h6v1h-6zM5 7h6v1h-6zM5 9h3v1h-3z"/><path stroke="none" fill="#e43b44" d="M9 10h2v2h-2z"/></g>
+<g transform="translate(128 16)"><path fill="#0099db" d="M2 3h6v7h-6z"/><path fill="#feae34" d="M8 6h6v7h-6z"/><path stroke="none" fill="#ffffff" d="M4 5h2v3h-2z"/><path stroke="none" fill="#181425" d="M10 8h2v3h-2z"/></g>
+<g transform="translate(144 16)"><path fill="#e43b44" d="M5 1h6v5h-6z"/><path fill="#feae34" d="M5 7h6v1h1v5h-1v1h-6v-1h-1v-5h1z"/><path stroke="none" fill="#fee761" d="M6 9h2v2h-2z"/></g>
+<!-- row 2 -->
+<g transform="translate(0 32)"><path fill="#2ce8f5" d="M6 3h2v2h-2v2h-2v2h2v2h2v2h-2v-2h-2v-2h-2v-2h2v-2h2z"/><path fill="#2ce8f5" d="M10 3h-2v2h2v2h2v2h-2v2h-2v2h2v-2h2v-2h2v-2h-2v-2h-2z"/></g>
+<g transform="translate(16 32)"><path fill="#a22633" d="M3 2h10v12h-10z"/><path stroke="none" fill="#ead4aa" d="M6 4h5v3h-5zM5 12h8v1h-8z"/><path stroke="none" fill="#181425" d="M4 2h1v12h-1z"/></g>
+<g transform="translate(32 32)"><path fill="#feae34" d="M2 4h6v2h6v4h-1v-2h-1v2h-1v-2h-3v2h-6z"/><path stroke="none" fill="#181425" d="M4 6h2v2h-2z"/></g>
+<g transform="translate(48 32)"><path fill="#733e39" d="M9 9h2v1h1v1h1v1h1v2h-2v-1h-1v-1h-1v-1h-1z"/><path fill="#c0cbdc" d="M3 2h7v7h-7z"/><path stroke="none" fill="#2ce8f5" d="M4 3h5v5h-5z"/><path stroke="none" fill="#ffffff" d="M5 4h1v2h-1z"/></g>
+<g transform="translate(64 32)"><path fill="#ead4aa" d="M5 2h6v1h2v2h1v6h-1v2h-2v1h-6v-1h-2v-2h-1v-6h1v-2h2z"/><path stroke="none" fill="#181425" d="M7 4h2v5h-2zM9 8h3v1h-3z"/></g>
+<g transform="translate(80 32)"><path fill="#8b9bb4" d="M6 1h4v2h2v-1h2v2h-1v2h2v4h-2v2h1v2h-2v-1h-2v2h-4v-2h-2v1h-2v-2h1v-2h-2v-4h2v-2h-1v-2h2v1h2z"/><path stroke="none" fill="#181425" d="M6 6h4v4h-4z"/></g>
+<g transform="translate(96 32)"><path fill="#ffffff" d="M5 4h6v1h2v1h2v4h-2v1h-2v1h-6v-1h-2v-1h-2v-4h2v-1h2z"/><path stroke="none" fill="#0099db" d="M6 5h4v6h-4z"/><path stroke="none" fill="#181425" d="M7 7h2v2h-2z"/></g>
+<g transform="translate(112 32)"><path fill="#ead4aa" d="M2 3h12v10h-12z"/><path stroke="none" fill="#3e8948" d="M3 4h4v4h-4z"/><path stroke="none" fill="#0099db" d="M9 8h4v4h-4z"/><path stroke="none" fill="#e43b44" d="M10 5h2v2h-2z"/><path stroke="none" fill="#b86f50" d="M8 3h1v10h-1z"/></g>
+<g transform="translate(128 32)"><path fill="#e43b44" d="M3 3h4v1h2v-1h4v1h1v5h-1v1h-1v1h-1v1h-1v1h-1v1h-2v-1h-1v-1h-1v-1h-1v-1h-1v-1h-1v-5h1z"/><path stroke="none" fill="#ffffff" d="M4 5h2v2h-2z"/></g>
+<g transform="translate(144 32)"><path fill="#feae34" d="M7 1h2v2h1v2h1v2h1v2h1v2h1v3h-12v-3h1v-2h1v-2h1v-2h1v-2h1z"/><path stroke="none" fill="#181425" d="M7 5h2v5h-2zM7 11h2v2h-2z"/></g>
+<!-- row 3 -->
+<g transform="translate(0 48)"><path fill="#733e39" d="M5 2h5v7h4v5h-9z"/><path stroke="none" fill="#e4a672" d="M6 3h3v1h-3z"/><path stroke="none" fill="#181425" d="M5 13h9v1h-9z"/></g>
+<g transform="translate(16 48)"><path fill="#b86f50" d="M7 4h2v11h-2z"/><path fill="#c0cbdc" d="M4 2h8v1h2v4h-2v-2h-8v2h-2v-4h2z"/></g>
+<g transform="translate(32 48)"><path fill="#b86f50" d="M7 6h2v9h-2z"/><path fill="#8b9bb4" d="M3 2h10v5h-10z"/><path stroke="none" fill="#c0cbdc" d="M4 3h8v1h-8z"/></g>
+<g transform="translate(48 48)"><path fill="#b86f50" d="M2 5h12v9h-12z"/><path fill="#e4a672" d="M1 3h14v3h-14z"/><path stroke="none" fill="#733e39" d="M7 8h2v3h-2z"/></g>
+<g transform="translate(64 48)"><path fill="#63c74d" d="M6 2h4v4h4v4h-4v4h-4v-4h-4v-4h4z"/></g>
+<g transform="translate(80 48)"><path fill="#e43b44" d="M2 2h3v1h1v1h1v1h2v-1h1v-1h1v-1h3v3h-1v1h-1v1h-1v2h1v1h1v1h1v3h-3v-1h-1v-1h-1v-1h-2v1h-1v1h-1v1h-3v-3h1v-1h1v-1h1v-2h-1v-1h-1v-1h-1z"/></g>
+<g transform="translate(96 48)"><path fill="#63c74d" d="M12 3h2v3h-1v2h-1v2h-1v2h-1v2h-4v-2h-1v-2h-2v-3h3v2h1v1h1v-2h1v-2h1v-2h1v-1z"/></g>
+<g transform="translate(112 48)"><path fill="#0099db" fill-rule="evenodd" d="M4 3h8v2h2v6h-2v2h-8v-2h-2v-6h2zM5 6h6v4h-6z"/></g>
+<g transform="translate(128 48)"><path fill="#63c74d" d="M4 2h2v1h2v1h2v1h2v2h1v2h-1v2h-2v1h-2v1h-2v1h-2z"/></g>
+<g transform="translate(144 48)"><path fill="#e43b44" d="M3 3h10v10h-10z"/><path stroke="none" fill="#f6757a" d="M4 4h8v1h-8z"/></g>
+</g>
+</svg>

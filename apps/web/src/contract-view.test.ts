@@ -4,6 +4,7 @@ import type { ContractView, Diplomacy, RealmEvent } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import { commandsSeen } from './alliance-army.js'
 import {
+  contractChip,
   contractStatus,
   namesText,
   offerSummary,
@@ -66,6 +67,18 @@ describe('mercenary contracts in the UI', () => {
     expect(contractStatus(inForce, 'r2')).toBe(
       '1 of 2 weeks paid · next week due by Year 1 · Day 26 · 00:00',
     )
+  })
+
+  it('chips a contract by where it stands, with the share of it paid', () => {
+    expect(contractChip(contract, 'r1')).toEqual({
+      text: 'waiting for them to accept',
+      tone: '',
+      paid: 0,
+    })
+    expect(contractChip(contract, 'r2')).toEqual({ text: 'offered to you', tone: 'y', paid: 0 })
+    const inForce = { ...contract, startedAt: 0, endsAt: 36000, paidWeeks: 1, payBy: 36000 }
+    expect(contractChip(inForce, 'r1')).toEqual({ text: 'running', tone: 'g', paid: 0.5 })
+    expect(contractChip({ ...inForce, weeks: 0 }, 'r1').paid).toBe(0)
   })
 
   it('tells both sides what happened in the realm log', () => {

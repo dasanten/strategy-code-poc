@@ -182,7 +182,7 @@ export function ConditionEditor({
           </>
         )}
       </div>
-      <p className="muted small">
+      <p className="well small condition-preview">
         {condition
           ? problem
             ? `Can’t add it yet: ${problem}.`

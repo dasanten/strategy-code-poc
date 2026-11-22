@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Game screen, picking a target</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui map" style="width: 1440px; height: 900px; position: relative; overflow: hidden">
+
+<div class="tag" style="left: 742px; top: 268px">Ashford</div>
+<!-- the way a walk would take, previewed under the pointer -->
+<div class="way" style="left: 716px; top: 420px; width: 284px; height: 76px; border-left-width: 4px; border-top-width: 4px"></div>
+<div class="way" style="left: 996px; top: 232px; width: 4px; height: 190px; border-left-width: 4px"></div>
+<div style="position: absolute; left: 980px; top: 200px; width: 36px; height: 36px; border: 4px solid var(--gold); background: rgba(254,174,52,.3)"></div>
+<div class="tag" style="left: 1026px; top: 204px; border-color: var(--gold)">Walk here · 31 tiles · about 4 min (4 game hours)</div>
+<div class="tk sel" style="left: 702px; top: 492px"><span class="ic i-person" aria-hidden="true"></span></div>
+<div class="tk" style="left: 800px; top: 420px"><span class="ic i-crown" aria-hidden="true"></span></div>
+<!-- planned building ghost -->
+<div style="position: absolute; left: 608px; top: 560px; width: 64px; height: 64px; border: 4px dashed var(--paper); background: rgba(246,233,201,.25)"></div>
+<div class="tag" style="left: 590px; top: 632px; border-color: var(--paper)">Planned: house</div>
+
+<header class="bar fx" style="position: absolute; left: 0; top: 0; right: 0; height: 44px; padding: 0 10px; gap: 12px; border-width: 0 0 2px">
+<span class="ic s24 i-crown" aria-hidden="true"></span>
+<span class="px t18" style="color: var(--gold)">Realm of Ashford</span>
+<span style="color: var(--tan)">Home city Ashford</span>
+<span class="fx mono" style="gap: 6px"><span class="ic s16 i-clock" aria-hidden="true"></span>Year 2 · Day 131 · 14:21</span>
+<span class="chip g">live</span>
+<span class="grow"></span>
+<span class="fx mono" style="gap: 4px"><span class="ic s16 i-food" role="img" aria-label="Food"></span>412</span>
+<span class="fx mono" style="gap: 4px"><span class="ic s16 i-wood" role="img" aria-label="Wood"></span>96</span>
+<span class="fx mono" style="gap: 4px"><span class="ic s16 i-stone" role="img" aria-label="Stone"></span>40</span>
+<span class="fx mono" style="gap: 4px"><span class="ic s16 i-coins" role="img" aria-label="Coins"></span>73</span>
+<button class="btn sm dk"><span class="ic s16 i-find" aria-hidden="true"></span>Find<span class="k">Ctrl K</span></button>
+<a class="btn sm dk" href="Wiki.dc.html">Wiki</a>
+<button class="btn sm dk">Log out</button>
+</header>
+
+<!-- the pick banner replaces every other notice -->
+<div class="pn fx" role="status" style="position: absolute; left: 440px; top: 56px; width: 560px; padding: 10px 12px; background: var(--sun)">
+<span class="ic s32 i-walk" aria-hidden="true"></span>
+<div class="grow"><div class="px t18">Click where Bram walks to</div><div>Plains · 2231, 1712 · a way of 31 tiles</div></div>
+<button class="btn">Cancel<span class="k">Esc</span></button>
+</div>
+
+<!-- sidebar folded to its tab strip -->
+<nav aria-label="Tools" class="pn col" style="position: absolute; left: 8px; top: 52px; width: 48px; padding: 4px; gap: 4px; align-items: center">
+<button class="btn sq" aria-label="Residents"><span class="ic i-person" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Horses"><span class="ic i-horse" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Armies"><span class="ic i-banner" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Contracts"><span class="ic i-scroll" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Alliance"><span class="ic i-ally" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Standing"><span class="ic i-medal" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Cities"><span class="ic i-city" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Scripts"><span class="ic i-code" aria-hidden="true"></span></button>
+<button class="btn sq" aria-label="Realm log"><span class="ic i-book" aria-hidden="true"></span></button>
+<button class="btn sq sm" aria-label="Unfold the sidebar">»</button>
+</nav>
+
+<!-- the card shrinks to its header; the room it took stays dead so no click lands there by accident -->
+<div style="position: absolute; left: 8px; right: 8px; bottom: 8px; height: 264px; border: 2px dashed rgba(246,233,201,.7); background: rgba(24,20,37,.25)"></div>
+<section class="pn fx" aria-label="Bram" style="position: absolute; left: 8px; bottom: 8px; width: 720px; padding: 10px; gap: 12px">
+<div style="width: 48px; height: 48px; background: var(--ink); border: 4px solid var(--own); display: grid; place-items: center; flex: none"><span class="ic s32 i-person" aria-hidden="true"></span></div>
+<div class="grow"><div class="px t18">Bram</div><div class="b">Building a house: fetching 10 wood from the storage</div></div>
+<div class="col" style="width: 180px; gap: 4px"><span class="mt hp"><i style="width: 92%"></i></span><span class="mt fd"><i style="width: 62%"></i></span><span class="mono mu">12 / 30 kg</span></div>
+<button class="btn on">Walk to: pick a tile…<span class="k">W</span></button>
+</section>
+<div class="pn col" style="position: absolute; right: 8px; bottom: 8px; width: 236px; padding: 8px; gap: 6px">
+<div class="map" style="height: 124px; border: 2px solid var(--ink); position: relative"><div style="position: absolute; left: 84px; top: 40px; width: 70px; height: 44px; border: 2px solid #fff"></div></div>
+<div class="fx" style="gap: 4px"><button class="btn sm sq" aria-label="Zoom in">+</button><button class="btn sm sq" aria-label="Zoom out">−</button><button class="btn sm grow">Select</button><button class="btn sm grow">Region</button></div>
+<div class="mono mu" style="font-size: 11px">Plains · 2231, 1712 · middle zoom</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

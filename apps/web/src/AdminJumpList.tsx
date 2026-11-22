@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import type { AdminPlaces } from '@csp/shared-types'
-import { jumpList, type JumpEntry } from './admin-jump.js'
+import { jumpCount, jumpList, jumpMark, type JumpEntry } from './admin-jump.js'
+import { relationshipClass } from './theme.js'
+import { Icon } from './Icon.js'
 
 /**
  * The admin map's jump list (`CONTEXT.md`: admin map): the whole world's places by name, grouped,
@@ -20,32 +22,31 @@ export function AdminJumpList({
 
   return (
     <aside className="admin-jump" aria-label="Jump list">
-      <input
-        type="search"
-        placeholder="Find an account, realm, city or army"
-        aria-label="Find by name"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+      <div className="sec">
+        <input
+          type="search"
+          className="in"
+          placeholder="Find an account, realm, city or army"
+          aria-label="Find by name"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
       <div className="admin-jump-groups">
-        {!places && <p className="admin-jump-note">Loading places…</p>}
-        {places && groups.length === 0 && <p className="admin-jump-note">Nothing by that name.</p>}
+        {!places && <p className="admin-jump-note mu">Loading places…</p>}
+        {places && groups.length === 0 && (
+          <p className="admin-jump-note mu">Nothing by that name.</p>
+        )}
         {groups.map((g) => (
           <section key={g.title}>
-            <h3>{g.title}</h3>
+            <h3 className="rw grp">
+              <span className="lb grow">{g.title}</span>
+              <span className="mono small">{jumpCount(g)}</span>
+            </h3>
             <ul>
               {g.entries.map((e) => (
-                <li key={e.key} className={e.nested ? 'nested' : undefined}>
-                  <button
-                    type="button"
-                    aria-current={e.key === selectedKey || undefined}
-                    disabled={!e.at}
-                    title={e.at ? `Tile ${e.at.x}, ${e.at.y}` : 'Nowhere on the map'}
-                    onClick={() => onJump(e)}
-                  >
-                    <span className="name">{e.name}</span>
-                    {e.detail && <span className="detail">{e.detail}</span>}
-                  </button>
+                <li key={e.key}>
+                  <JumpRow entry={e} selected={e.key === selectedKey} onJump={onJump} />
                 </li>
               ))}
             </ul>
@@ -53,5 +54,40 @@ export function AdminJumpList({
         ))}
       </div>
     </aside>
+  )
+}
+
+/** One place on the jump list: its mark, its name and what it is; greyed if it is nowhere. */
+function JumpRow({
+  entry: e,
+  selected,
+  onJump,
+}: {
+  entry: JumpEntry
+  selected: boolean
+  onJump: (entry: JumpEntry) => void
+}) {
+  const mark = jumpMark(e.kind)
+  return (
+    <button
+      type="button"
+      className={`rw admin-jump-row${e.nested ? ' nested' : ''}${selected ? ' sel' : ''}${
+        e.kind === 'realm' ? ' realm' : ''
+      }`}
+      aria-current={selected || undefined}
+      disabled={!e.at}
+      title={e.at ? `Tile ${e.at.x}, ${e.at.y}` : 'Nowhere on the map'}
+      onClick={() => onJump(e)}
+    >
+      {'rel' in mark ? (
+        <span className={`dot ${relationshipClass(mark.rel)}`} aria-hidden="true" />
+      ) : (
+        <Icon name={mark.icon} size={16} />
+      )}
+      <span className="grow admin-jump-text">
+        <span className="name">{e.name}</span>
+        {e.detail && <span className="detail mu">{e.detail}</span>}
+      </span>
+    </button>
   )
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { Fragment, useCallback, useEffect, useState, type FormEvent } from 'react'
 import { checkScript, isLangLoaded, loadLang, SCRIPT_NAME_MAX_LENGTH } from '@csp/lang-wasm'
 import type { ScriptDetail, ScriptSummary } from '@csp/shared-types'
 import { api } from './api.js'
@@ -24,6 +24,13 @@ import {
   templateSource,
   type TemplateChoice,
 } from './script-templates.js'
+import {
+  libraryGroups,
+  libraryLine,
+  workshopSteps,
+  type WorkshopStep,
+} from './script-workshop-view.js'
+import { Icon } from './Icon.js'
 
 /** How a default script stands against the game's default (`CONTEXT.md`: Default script). */
 const DEFAULT_STATUS: Record<ReturnType<typeof defaultStatus>, string> = {
@@ -32,7 +39,21 @@ const DEFAULT_STATUS: Record<ReturnType<typeof defaultStatus>, string> = {
   'default changed': 'edited by you · game’s default changed',
 }
 
-const DIFF_CLASS: Record<DiffLine['op'], string> = { ' ': '', '-': 'removed', '+': 'added' }
+const DIFF_CLASS: Record<DiffLine['op'], string> = { ' ': '', '-': 'e', '+': 'add' }
+
+/** A version's chip in History: green when it runs, red with syntax errors. */
+const VERSION_CHIP: Record<ReturnType<typeof versionStatus>, string> = {
+  active: 'chip g',
+  'has errors': 'chip r',
+  saved: 'chip',
+}
+
+/** Why Make active is greyed for a version that can't be made active. */
+const NOT_ACTIVATABLE: Record<ReturnType<typeof versionStatus>, string | undefined> = {
+  active: 'It is the active version',
+  'has errors': 'A version with syntax errors never runs',
+  saved: undefined,
+}
 
 /**
  * Whether the script checker (WebAssembly, `@csp/lang-wasm`) has loaded; it starts loading on
@@ -57,16 +78,16 @@ const TEMPLATE_GROUPS: readonly TemplateChoice['group'][] = [
   'Example scripts (Wiki)',
 ]
 
-/** The Wiki's Script language and Game API sections, each in a new tab. */
+/** The Wiki's Script language and Game API sections, each in a new tab, on the workshop's bar. */
 function HelpLinks() {
   return (
-    <span className="script-help small">
+    <>
       {SCRIPT_HELP_LINKS.map((l) => (
-        <a key={l.href} href={l.href} target="_blank" rel="noreferrer">
+        <a key={l.href} className="btn sm dk" href={l.href} target="_blank" rel="noreferrer">
           {l.label}
         </a>
       ))}
-    </span>
+    </>
   )
 }
 
@@ -74,6 +95,8 @@ function HelpLinks() {
 interface Opened {
   key: string
   source: string
+  /** The saved version it holds; none for a new script. */
+  version?: number
   /** Where to put the cursor, such as a runtime error's line. */
   line?: number
   column?: number
@@ -93,13 +116,25 @@ export interface ScriptToOpen {
 }
 
 /**
- * The Player's script library (`CONTEXT.md`: Script): write and check scripts, save them as new
- * versions, browse a script's history, make an earlier version active again and delete old ones.
+ * The script workshop (ADR 0044; `CONTEXT.md`: Screen, Script): the Player's script library as a
+ * screen of its own over the map. A bar with Back to the map and the Wiki's help; the library on
+ * the left; the editor in the middle, where scripts are written, checked and saved as new
+ * versions; History on the right, to open an earlier version, make it active again or delete old
+ * ones, or for a new script the form that names and creates it. On a phone the three are steps.
+ *
+ * It stays mounted while closed, so the list loads before it opens (residents run scripts from
+ * it) and the editor keeps what was typed.
  */
 export function ScriptLibrary({
+  open = true,
+  onClose,
   onScripts,
   toOpen,
 }: {
+  /** Whether the workshop shows; closed it stays mounted, hidden. */
+  open?: boolean
+  /** Back to the map (or Escape). */
+  onClose?: () => void
   /** Hears the list each time it is loaded, so residents can be given a script to run. */
   onScripts?: (scripts: ScriptSummary[]) => void
   /** A script to open, such as the one a resident's task runs. */
@@ -122,6 +157,8 @@ export function ScriptLibrary({
   const [rename, setRename] = useState<string>()
   const [message, setMessage] = useState<string>()
   const [error, setError] = useState<string>()
+  /** The step shown on a phone, where the library, editor and History come one at a time. */
+  const [step, setStep] = useState<WorkshopStep>('library')
   const langLoaded = useLangLoaded()
 
   /** Runs a library call, showing its error, and refreshes the list afterwards. */
@@ -153,11 +190,17 @@ export function ScriptLibrary({
     setScript(detail)
     setRename(undefined)
     const source = version?.source ?? ''
-    setOpened({ key: `${detail.id}-${version?.version ?? 0}-${Date.now()}`, source, ...at })
+    setOpened({
+      key: `${detail.id}-${version?.version ?? 0}-${Date.now()}`,
+      source,
+      version: version?.version,
+      ...at,
+    })
     setDraft(source)
+    setStep('editor')
   }
 
-  async function open({ id, version, line, column }: ScriptToOpen) {
+  async function openScript({ id, version, line, column }: ScriptToOpen) {
     const detail = await act(() => api.script(id))
     if (!detail) return
     // The version asked for, unless it is gone from the history: then the newest.
@@ -166,8 +209,8 @@ export function ScriptLibrary({
   }
 
   useEffect(() => {
-    if (toOpen) void open(toOpen)
-    // Only a new request opens a script, not a new `open`.
+    if (toOpen) void openScript(toOpen)
+    // Only a new request opens a script, not a new `openScript`.
   }, [toOpen])
 
   /** Resets a default script to the game's current default, once the Player confirms. */
@@ -190,6 +233,8 @@ export function ScriptLibrary({
     setOpened({ key: `new-${Date.now()}`, source: EMPTY_SCRIPT })
     setDraft(EMPTY_SCRIPT)
     setMessage(undefined)
+    // On a phone, the form first: what it starts from and its name.
+    setStep('side')
   }
 
   /** Starts the new script over from a template, its name prefilled from it. */
@@ -219,7 +264,9 @@ export function ScriptLibrary({
     if (!detail) return
     setNewName('')
     setScript(detail)
+    setOpened((o) => ({ ...o, version: detail.latestVersion }))
     setMessage(savedMessage(detail))
+    setStep('editor')
   }
 
   async function save() {
@@ -227,6 +274,7 @@ export function ScriptLibrary({
     const detail = await act(() => api.saveScript(script.id, draft))
     if (!detail) return
     setScript(detail)
+    setOpened((o) => ({ ...o, version: detail.latestVersion }))
     setMessage(savedMessage(detail))
   }
 
@@ -278,7 +326,10 @@ export function ScriptLibrary({
       await api.deleteScript(script.id)
       return true
     })
-    if (done) startNew()
+    if (done) {
+      startNew()
+      setStep('library')
+    }
   }
 
   // Nothing to show until the checker has loaded, a moment after the library opens.
@@ -286,212 +337,308 @@ export function ScriptLibrary({
   const warnings = langLoaded ? scriptWarnings(draft, script?.task != null) : []
   const unsaved = script ? hasUnsavedChanges(script.versions, draft) : true
   const choices = templateChoices(scripts)
+  const fixedName = 'Default scripts can’t be renamed or deleted, only reset'
 
   return (
-    <section className="script-library" aria-label="Scripts">
-      <nav className="script-list" aria-label="Script library">
-        <h3>Library</h3>
-        <ul>
-          <li>
+    <section className="workshop" aria-label="Script workshop" hidden={!open} data-step={step}>
+      <header className="bar workshop-bar">
+        <button type="button" className="btn sm dk" onClick={onClose}>
+          « Back to the map<kbd className="k">Esc</kbd>
+        </button>
+        <Icon name="script" size={24} />
+        <h1 className="px t18 workshop-title">Script workshop</h1>
+        <span className="grow" />
+        <HelpLinks />
+      </header>
+
+      {/* On a phone: the library, the editor and History as three steps. */}
+      <div className="tabs workshop-steps" role="tablist" aria-label="Workshop steps">
+        {workshopSteps(script !== undefined).map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            role="tab"
+            className="tab"
+            aria-selected={step === s.id}
+            onClick={() => setStep(s.id)}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="workshop-body">
+        <nav className="workshop-library" aria-label="Script library">
+          <div className="sec">
             <button
               type="button"
-              className={script ? '' : 'on'}
+              className="btn pri fill"
               aria-current={!script || undefined}
               onClick={startNew}
             >
-              + New script
+              <Icon name="add" size={16} />
+              New script
             </button>
-          </li>
-          {scripts.map((s) => (
-            <li key={s.id}>
-              <button
-                type="button"
-                className={script?.id === s.id ? 'on' : ''}
-                aria-current={script?.id === s.id || undefined}
-                onClick={() => open({ id: s.id, at: Date.now() })}
-              >
-                <span>{s.name}</span>
-                <small>
-                  {s.task && (s.followsDefault ? 'game’s · ' : 'edited · ')}
-                  {s.activeVersion === null ? 'none active' : `v${s.activeVersion}`}
-                </small>
-              </button>
-            </li>
-          ))}
-        </ul>
-
-        {script && script.versions.length > 0 && (
-          <>
-            <div className="script-history-head">
-              <h3>History</h3>
-              {olderVersions(script).length > 0 && (
-                <button type="button" onClick={deleteOlder}>
-                  Delete older versions
-                </button>
-              )}
-            </div>
-            <ul className="script-history">
-              {[...script.versions].reverse().map((v) => {
-                const status = versionStatus(script, v)
-                return (
-                  <li key={v.version} className={status.replace(' ', '-')}>
-                    <span>
-                      <strong>v{v.version}</strong>
-                      <em title={v.errors.map(describeDiagnostic).join('\n') || undefined}>
-                        {status}
-                      </em>
-                      <time dateTime={new Date(v.savedAt * 1000).toISOString()}>
-                        {new Date(v.savedAt * 1000).toLocaleString()}
-                      </time>
-                    </span>
-                    <span className="script-history-actions">
-                      <button type="button" onClick={() => show(script, v)}>
-                        Open
-                      </button>
+          </div>
+          <ul>
+            {libraryGroups(scripts).map((g) => (
+              <Fragment key={g.label}>
+                <li className="rw grp">
+                  <span className="lb grow">{g.label}</span>
+                </li>
+                {g.scripts.map((s) => {
+                  const picked = script?.id === s.id
+                  return (
+                    <li key={s.id}>
                       <button
                         type="button"
-                        onClick={() => makeActive(v.version)}
-                        disabled={!canMakeActive(script, v)}
+                        className={`rw workshop-pick${picked ? ' sel' : ''}`}
+                        aria-current={picked || undefined}
+                        onClick={() => openScript({ id: s.id, at: Date.now() })}
                       >
-                        Make active
+                        <span className="grow">
+                          <span className="b workshop-name">{s.name}</span>
+                          <span className={s.activeVersion === null ? 'bad small' : 'mu small'}>
+                            {libraryLine(s)}
+                          </span>
+                        </span>
                       </button>
-                      {status !== 'active' && (
-                        <button type="button" onClick={() => deleteVersion(v.version)}>
-                          Delete
-                        </button>
-                      )}
-                    </span>
-                  </li>
-                )
-              })}
-            </ul>
-          </>
-        )}
-      </nav>
+                    </li>
+                  )
+                })}
+              </Fragment>
+            ))}
+          </ul>
+        </nav>
 
-      <div className="script-main">
-        {script ? (
-          <div className="script-head">
-            {rename === undefined ? (
+        <main className="workshop-editor">
+          <div className="workshop-head">
+            {!script ? (
+              <span className="px t22">New script</span>
+            ) : rename === undefined ? (
               <>
-                <strong>{script.name}</strong>
-                <span>
+                <span className="px t22 workshop-name">{script.name}</span>
+                <span className={script.activeVersion === null ? 'chip r' : 'chip g'}>
                   {script.activeVersion === null
                     ? 'no active version'
                     : `version ${script.activeVersion} active`}
                 </span>
-                {script.task && <span>{DEFAULT_STATUS[defaultStatus(script)]}</span>}
-                <HelpLinks />
-                <span className="spacer" />
-                {script.task ? (
-                  // A default script can't be renamed or deleted, only reset.
-                  <button type="button" onClick={reset} disabled={script.followsDefault}>
+                {script.task && (
+                  <span className={script.followsDefault ? 'chip' : 'chip y'}>
+                    {DEFAULT_STATUS[defaultStatus(script)]}
+                  </span>
+                )}
+                <span className="grow" />
+                {script.task && (
+                  <button
+                    type="button"
+                    className="btn sm"
+                    onClick={reset}
+                    disabled={script.followsDefault}
+                    title={script.followsDefault ? 'It follows the game’s default' : undefined}
+                  >
                     Reset to default
                   </button>
-                ) : (
-                  <>
-                    <button type="button" onClick={() => setRename(script.name)}>
-                      Rename
-                    </button>
-                    <button type="button" onClick={remove}>
-                      Delete
-                    </button>
-                  </>
                 )}
+                <button
+                  type="button"
+                  className="btn sm"
+                  onClick={() => setRename(script.name)}
+                  disabled={script.task !== null}
+                  title={script.task !== null ? fixedName : undefined}
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  className="btn sm"
+                  onClick={remove}
+                  disabled={script.task !== null}
+                  title={script.task !== null ? fixedName : undefined}
+                >
+                  Delete
+                </button>
               </>
             ) : (
-              <form onSubmit={submitRename}>
+              <form className="workshop-rename" onSubmit={submitRename}>
                 <input
+                  className="in"
                   aria-label="New name"
                   value={rename}
                   maxLength={SCRIPT_NAME_MAX_LENGTH}
                   onChange={(e) => setRename(e.target.value)}
                 />
-                <button type="submit">Rename</button>
-                <button type="button" onClick={() => setRename(undefined)}>
+                <button type="submit" className="btn sm pri">
+                  Rename
+                </button>
+                <button type="button" className="btn sm" onClick={() => setRename(undefined)}>
                   Cancel
                 </button>
               </form>
             )}
           </div>
-        ) : (
-          <form className="script-head" onSubmit={create}>
-            <label className="script-template">
-              <span className="small">Start from</span>
-              <select
-                value={template}
-                onChange={(e) => {
-                  const choice = choices.find((c) => c.value === e.target.value)
-                  if (choice) void startFrom(choice)
-                }}
-              >
-                {TEMPLATE_GROUPS.map((group) => (
-                  <optgroup key={group} label={group}>
-                    {choices
-                      .filter((c) => c.group === group)
-                      .map((c) => (
-                        <option key={c.value} value={c.value}>
-                          {c.label}
-                        </option>
-                      ))}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
-            <input
-              aria-label="Script name"
-              placeholder="Name"
-              value={newName}
-              maxLength={SCRIPT_NAME_MAX_LENGTH}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-            <button type="submit" className="primary" disabled={newName.trim() === ''}>
-              Create
-            </button>
-            <HelpLinks />
-          </form>
-        )}
 
-        {script?.gameDefault && defaultStatus(script) === 'default changed' && (
-          <details className="default-changed">
-            <summary>The game’s default has changed since you edited yours.</summary>
-            <pre className="script-diff">
-              {lineDiff(script.gameDefault.editedFrom ?? '', script.gameDefault.source).map(
-                (l, i) => (
-                  <span key={i} className={DIFF_CLASS[l.op]}>
-                    {l.op} {l.text}
-                    {'\n'}
-                  </span>
-                ),
-              )}
-            </pre>
-            <p className="muted small">
-              From the default you edited to the game’s default now. Reset to default to take it.
-            </p>
-          </details>
-        )}
-        <ScriptEditor
-          key={opened.key}
-          initialSource={opened.source}
-          line={opened.line}
-          column={opened.column}
-          defaultScript={script?.task != null}
-          onChange={setDraft}
-        />
-        <div className="script-foot">
-          <p
-            className={`diagnostics${errors.length > 0 ? ' has-errors' : warnings.length > 0 ? ' has-warnings' : ''}`}
-          >
-            {langLoaded ? diagnosticsText(errors, warnings) : 'Checking…'}
-          </p>
-          {script && (
-            <button type="button" className="primary" onClick={save} disabled={!unsaved}>
-              {unsaved ? `Save as version ${script.latestVersion + 1}` : 'Saved'}
-            </button>
+          {script?.gameDefault && defaultStatus(script) === 'default changed' && (
+            <details className="workshop-diff" open>
+              <summary className="b">
+                The game’s default has changed since you edited yours.
+              </summary>
+              <pre className="code">
+                {lineDiff(script.gameDefault.editedFrom ?? '', script.gameDefault.source).map(
+                  (l, i) => (
+                    <span key={i} className={DIFF_CLASS[l.op]}>
+                      {l.op} {l.text}
+                      {'\n'}
+                    </span>
+                  ),
+                )}
+              </pre>
+              <p className="mu small">
+                From the default you edited to the game’s default now. Reset to default to take it.
+              </p>
+            </details>
           )}
-        </div>
-        {message && <p className="script-message">{message}</p>}
-        {error && <p className="error">{error}</p>}
+          <ScriptEditor
+            key={opened.key}
+            initialSource={opened.source}
+            line={opened.line}
+            column={opened.column}
+            defaultScript={script?.task != null}
+            onChange={setDraft}
+          />
+          <div className="workshop-foot">
+            <div className="grow">
+              <p
+                className={`diagnostics mono${errors.length > 0 ? ' bad' : warnings.length > 0 ? ' warn' : ' ok'}`}
+              >
+                {langLoaded ? diagnosticsText(errors, warnings) : 'Checking…'}
+              </p>
+              {message && <p className="mu small">{message}</p>}
+              {error && (
+                <p className="bad small" role="alert">
+                  {error}
+                </p>
+              )}
+            </div>
+            {script && (
+              <button type="button" className="btn pri" onClick={save} disabled={!unsaved}>
+                {unsaved ? `Save as version ${script.latestVersion + 1}` : 'Saved'}
+              </button>
+            )}
+          </div>
+        </main>
+
+        <aside className="workshop-side" aria-label={script ? 'History' : 'New script'}>
+          {script ? (
+            <>
+              <div className="sec">
+                <span className="px t16">History</span>
+                {olderVersions(script).length > 0 && (
+                  <button type="button" className="btn sm" onClick={deleteOlder}>
+                    Delete older versions
+                  </button>
+                )}
+              </div>
+              <ul>
+                {[...script.versions].reverse().map((v) => {
+                  const status = versionStatus(script, v)
+                  return (
+                    <li
+                      key={v.version}
+                      className={`rw workshop-version${opened.version === v.version ? ' sel' : ''}`}
+                    >
+                      <span className="grow">
+                        <span className="b mono">v{v.version}</span>{' '}
+                        <span
+                          className={VERSION_CHIP[status]}
+                          title={v.errors.map(describeDiagnostic).join('\n') || undefined}
+                        >
+                          {status}
+                        </span>
+                        <br />
+                        <time
+                          className="mu small"
+                          dateTime={new Date(v.savedAt * 1000).toISOString()}
+                        >
+                          {new Date(v.savedAt * 1000).toLocaleString()}
+                        </time>
+                      </span>
+                      <span className="workshop-version-actions">
+                        <button type="button" className="btn sm" onClick={() => show(script, v)}>
+                          Open
+                        </button>
+                        <button
+                          type="button"
+                          className="btn sm"
+                          onClick={() => makeActive(v.version)}
+                          disabled={!canMakeActive(script, v)}
+                          title={NOT_ACTIVATABLE[status]}
+                        >
+                          Make active
+                        </button>
+                        {status !== 'active' && (
+                          <button
+                            type="button"
+                            className="btn sm"
+                            onClick={() => deleteVersion(v.version)}
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          ) : (
+            <form className="sec workshop-new" onSubmit={create}>
+              <span className="px t16">New script</span>
+              <label className="fld">
+                <span className="lb">Start from</span>
+                <select
+                  className="in"
+                  value={template}
+                  onChange={(e) => {
+                    const choice = choices.find((c) => c.value === e.target.value)
+                    if (choice) void startFrom(choice)
+                  }}
+                >
+                  {TEMPLATE_GROUPS.map((group) => (
+                    <optgroup key={group} label={group}>
+                      {choices
+                        .filter((c) => c.group === group)
+                        .map((c) => (
+                          <option key={c.value} value={c.value}>
+                            {c.label}
+                          </option>
+                        ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
+              <label className="fld">
+                <span className="lb">Name</span>
+                <span className="fx">
+                  <input
+                    className="in grow"
+                    aria-label="Script name"
+                    placeholder="Name"
+                    value={newName}
+                    maxLength={SCRIPT_NAME_MAX_LENGTH}
+                    onChange={(e) => setNewName(e.target.value)}
+                  />
+                  <button type="submit" className="btn pri" disabled={newName.trim() === ''}>
+                    Create
+                  </button>
+                </span>
+              </label>
+              <p className="mu small">
+                It starts from what the editor holds: pick a start above, or write it there.
+              </p>
+            </form>
+          )}
+        </aside>
       </div>
     </section>
   )

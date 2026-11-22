@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone, card sheet at half height</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div class="ui map" style="width: 390px; height: 844px; position: relative; overflow: hidden; font-size: 14px; background-size: 1440px 900px; background-position: -560px -260px">
+<div class="tk sel" style="left: 142px; top: 232px"><span class="ic i-person" aria-hidden="true"></span></div>
+<div class="tk" style="left: 240px; top: 160px"><span class="ic i-crown" aria-hidden="true"></span></div>
+
+<header class="bar fx" style="position: absolute; left: 0; top: 0; right: 0; height: 48px; padding: 0 2px 0 0; gap: 8px; border-width: 0 0 2px">
+<a class="btn lg sq dk" aria-label="Menu" href="Phone-Menu.dc.html" style="border-width: 0 2px 0 0">≡</a>
+<span class="px t16 grow" style="color: var(--gold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">Realm of Ashford</span>
+<span class="mono" style="font-size: 12px">Y2 · D131 · 14:20</span>
+<span class="chip g">live</span>
+<button class="btn lg sq dk" aria-label="Find" style="border-width: 0 0 0 2px"><span class="ic i-find" aria-hidden="true"></span></button>
+</header>
+<div class="pn fx" style="position: absolute; left: 0; right: 0; top: 48px; padding: 6px 10px; box-shadow: none; border-width: 0 0 2px"><span class="grow" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span class="b">First day 2 of 4</span> · next: Claim the Horse offer</span><button class="btn sm gold" style="height: 44px">Claim</button></div>
+
+<section class="pn col" aria-label="Bram" style="position: absolute; left: 0; right: 0; bottom: 0; height: 520px; border-width: 2px 0 0; gap: 0">
+<button aria-label="Card height: half the screen. Drag or tap to change it." style="display: block; width: 100%; height: 22px; background: var(--clay); border: 0; border-bottom: 2px solid var(--ink); padding: 0; flex: none"><span style="display: block; width: 48px; height: 6px; margin: 0 auto; background: var(--ink)"></span></button>
+<div class="fx" style="padding: 8px 10px; gap: 10px">
+<div style="width: 48px; height: 48px; background: var(--ink); border: 4px solid var(--own); display: grid; place-items: center; flex: none"><span class="ic s32 i-person" aria-hidden="true"></span></div>
+<div class="grow" style="min-width: 0"><div class="px t18">Bram</div><div class="b">Building a house: fetching 10 wood from the storage</div><div class="mu">4 Wood, 2 Food · 12 / 30 kg</div></div>
+<button class="btn lg sq" aria-label="Close the card"><span class="ic i-x" aria-hidden="true"></span></button>
+</div>
+<div class="fx" style="padding: 0 10px 8px; gap: 8px"><span class="lb">Health</span><span class="mt hp grow"><i style="width: 92%"></i></span><span class="lb">Hunger</span><span class="mt fd grow"><i style="width: 62%"></i></span></div>
+<div class="tabs" role="tablist"><button class="tab on" role="tab" aria-selected="true" style="height: 48px; flex: 1">Orders</button><button class="tab" role="tab" style="height: 44px; flex: 1">Queue · 3</button><button class="tab" role="tab" style="height: 44px; flex: 1">Stats</button><button class="tab" role="tab" style="height: 44px; flex: 1">Script</button></div>
+<div class="grow" style="overflow: hidden; padding: 8px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; align-content: start">
+<span class="lb" style="grid-column: 1 / -1">Move</span>
+<button class="btn lg fill"><span class="ic i-walk" aria-hidden="true"></span>Walk to</button><button class="btn lg fill"><span class="ic i-stop" aria-hidden="true"></span>Stop</button>
+<button class="btn lg fill">Relocate…</button><button class="btn lg fill"><span class="ic i-cart" aria-hidden="true"></span>Drive carriage to</button>
+<button class="btn lg fill">Board carriage</button><button class="btn lg fill">Haul route…</button>
+<span class="lb" style="grid-column: 1 / -1">Work &amp; build</span>
+<button class="btn lg fill on"><span class="ic i-hammer" aria-hidden="true"></span>Help build…</button><button class="btn lg fill">Build line: road</button>
+<button class="btn lg fill">Build line: wall</button><button class="btn lg fill">Tear down…</button>
+<button class="btn fill off why" disabled style="min-height: 44px">Work<small>not on a workplace</small></button><button class="btn fill off why" disabled style="min-height: 44px">Mount horse<small>no free horse here</small></button>
+</div>
+<div class="mu" style="padding: 6px 10px; border-top: 2px solid var(--tan)">Long-press the map to walk there. Goods, Scripts and Other follow below.</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

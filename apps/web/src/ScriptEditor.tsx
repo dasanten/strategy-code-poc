@@ -7,10 +7,15 @@ import {
   type CompletionContext,
   type CompletionResult,
 } from '@codemirror/autocomplete'
-import { StreamLanguage, syntaxTree } from '@codemirror/language'
+import {
+  HighlightStyle,
+  StreamLanguage,
+  syntaxHighlighting,
+  syntaxTree,
+} from '@codemirror/language'
 import { linter, lintGutter, type Diagnostic as LintDiagnostic } from '@codemirror/lint'
 import { EditorView, hoverTooltip } from '@codemirror/view'
-import { oneDark } from '@codemirror/theme-one-dark'
+import { color as oneDarkColor, oneDarkHighlightStyle } from '@codemirror/theme-one-dark'
 import { checkScript, loadLang, type Diagnostic } from '@csp/lang-wasm'
 import {
   apiHover,
@@ -21,6 +26,7 @@ import {
   scriptHighlighting,
   scriptWarnings,
 } from './script-editor.js'
+import { EDITOR_LOOK } from './script-editor-look.js'
 import { THEME } from './theme.js'
 
 const language = StreamLanguage.define(scriptHighlighting)
@@ -99,12 +105,76 @@ function apiTooltips(defaultScript: boolean) {
   })
 }
 
-/** One Dark's colours on the HUD's well, filling the height it is given (ADR 0008). */
-const hudLook = EditorView.theme(
+const look = EDITOR_LOOK
+
+/**
+ * The editor's dark look from the palette (ADR 0044; `script-editor-look`), filling the height it
+ * is given: hard 2 px edges, no rounded corners, lint marks and tooltips in the kit's colours.
+ */
+const pixelLook = EditorView.theme(
   {
-    '&': { height: '100%', backgroundColor: THEME.ui.well },
-    '.cm-gutters': { backgroundColor: THEME.ui.well, borderRight: `1px solid ${THEME.ui.line}` },
+    '&': { height: '100%', color: look.text, backgroundColor: look.ground },
+    '.cm-content': { caretColor: look.cursor },
+    '.cm-cursor, .cm-dropCursor': { borderLeftColor: look.cursor, borderLeftWidth: '2px' },
+    '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection':
+      { backgroundColor: look.selection },
+    '.cm-activeLine': { backgroundColor: look.activeLine },
+    '.cm-selectionMatch': { backgroundColor: look.activeLine },
+    '&.cm-focused .cm-matchingBracket, &.cm-focused .cm-nonmatchingBracket': {
+      backgroundColor: look.selection,
+      outline: `1px solid ${look.keyword}`,
+    },
+    '.cm-gutters': {
+      backgroundColor: look.ground,
+      color: look.gutter,
+      border: 'none',
+      borderRight: `2px solid ${THEME.ui.ink}`,
+    },
+    '.cm-activeLineGutter': { backgroundColor: look.activeLine, color: look.text },
+    '.cm-foldPlaceholder': { backgroundColor: 'transparent', border: 'none', color: look.gutter },
     '.cm-scroller': { fontFamily: THEME.font.mono, fontSize: '13px', lineHeight: '1.55' },
+    '.cm-panels': { backgroundColor: look.tooltip.ground, color: look.tooltip.text },
+    '.cm-searchMatch': { backgroundColor: look.picked.ground, outline: `1px solid ${look.number}` },
+    '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: look.selection },
+    // Lint marks: a wavy underline in red for an error, gold for a warning.
+    '.cm-lintRange-error, .cm-lintRange-warning': {
+      backgroundImage: 'none',
+      textDecorationLine: 'underline',
+      textDecorationStyle: 'wavy',
+      textDecorationThickness: '1px',
+      textUnderlineOffset: '3px',
+    },
+    '.cm-lintRange-error': { textDecorationColor: look.error },
+    '.cm-lintRange-warning': { textDecorationColor: look.warning },
+    // Hovers, completions and lint messages: ink boxes with a steel edge.
+    '.cm-tooltip': {
+      backgroundColor: look.tooltip.ground,
+      color: look.tooltip.text,
+      border: `2px solid ${look.tooltip.edge}`,
+      borderRadius: '0',
+    },
+    '.cm-tooltip .cm-tooltip-arrow:before': {
+      borderTopColor: look.tooltip.edge,
+      borderBottomColor: look.tooltip.edge,
+    },
+    '.cm-tooltip .cm-tooltip-arrow:after': {
+      borderTopColor: look.tooltip.ground,
+      borderBottomColor: look.tooltip.ground,
+    },
+    '.cm-tooltip-autocomplete > ul': { fontFamily: THEME.font.mono },
+    '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+      backgroundColor: look.picked.ground,
+      color: look.picked.text,
+    },
+    '.cm-completionMatchedText': { color: look.matched, textDecoration: 'none' },
+    '.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionMatchedText': {
+      color: look.picked.text,
+      textDecoration: 'underline',
+    },
+    '.cm-completionDetail': { color: look.tooltip.muted },
+    '.cm-diagnostic': { borderRadius: '0' },
+    '.cm-diagnostic-error': { borderLeft: `4px solid ${look.error}` },
+    '.cm-diagnostic-warning': { borderLeft: `4px solid ${look.warning}` },
     '.cm-api-info, .cm-completionInfo': {
       maxWidth: '360px',
       padding: '4px 8px',
@@ -113,6 +183,31 @@ const hudLook = EditorView.theme(
     },
   },
   { dark: true },
+)
+
+/** One Dark's colour for each kind of word, by its role there, as the palette colour it takes. */
+const PALETTE_FOR: Record<string, string> = {
+  [oneDarkColor.violet]: look.keyword,
+  [oneDarkColor.stone]: look.comment,
+  [oneDarkColor.sage]: look.string,
+  [oneDarkColor.chalky]: look.number,
+  [oneDarkColor.whiskey]: look.atom,
+  [oneDarkColor.cyan]: look.operator,
+}
+
+/**
+ * The highlighting: One Dark's (which kind of word gets a colour of its own, so the highlighting
+ * stays what it was), each colour swapped for the palette's (`EDITOR_LOOK`); names in the text
+ * colour.
+ */
+const pixelHighlighting = syntaxHighlighting(
+  HighlightStyle.define(
+    oneDarkHighlightStyle.specs.map((spec) =>
+      typeof spec.color === 'string'
+        ? { ...spec, color: PALETTE_FOR[spec.color] ?? look.text }
+        : spec,
+    ),
+  ),
 )
 
 /**
@@ -146,9 +241,8 @@ export function ScriptEditor({
       parent: hostRef.current!,
       extensions: [
         basicSetup,
-        // Before One Dark, so its colours give way to the HUD's.
-        hudLook,
-        oneDark,
+        pixelLook,
+        pixelHighlighting,
         language,
         autocompletion({ override: [names(defaultScript)] }),
         apiTooltips(defaultScript),

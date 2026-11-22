@@ -60,15 +60,15 @@ export function demandSides(
 
 /**
  * What the notice says of the demands sent to the realm that it hasn't put away: the newest, and
- * how many more. Undefined when there are none, or while the Demands drawer is open.
+ * how many more. Undefined when there are none, or while the Demands tab is open.
  */
 export function demandNoticeLine(
   demands: readonly DemandView[],
   realmId: string,
   putAway: ReadonlySet<string>,
-  drawerOpen: boolean,
+  tabOpen: boolean,
 ): string | undefined {
-  if (drawerOpen) return undefined
+  if (tabOpen) return undefined
   const fresh = demandSides(demands, realmId).incoming.filter((d) => !putAway.has(d.id))
   const newest = fresh.at(-1)
   if (!newest) return undefined

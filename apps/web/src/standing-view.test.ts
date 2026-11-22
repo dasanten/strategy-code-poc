@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatMove,
   formatStanding,
+  standingBar,
   standingName,
   standingRelationship,
   standingWord,
@@ -76,6 +77,15 @@ describe('standing in the UI', () => {
     expect(standingWord(9)).toBe('neutral')
     expect(standingWord(30)).toBe('friendly')
     expect(standingWord(100)).toBe('trusted')
+  })
+
+  it('draws a standing as a bar from −100 to +100, coloured by its word', () => {
+    expect(standingBar(-100)).toEqual({ percent: 0, fill: 'low' })
+    expect(standingBar(-20)).toEqual({ percent: 40, fill: 'mid' })
+    expect(standingBar(0)).toEqual({ percent: 50, fill: '' })
+    expect(standingBar(30)).toEqual({ percent: 65, fill: 'ok' })
+    expect(standingBar(100)).toEqual({ percent: 100, fill: 'ok' })
+    expect(standingBar(250)).toEqual({ percent: 100, fill: 'ok' })
   })
 
   it('signs the points', () => {

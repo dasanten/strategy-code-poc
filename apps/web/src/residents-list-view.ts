@@ -13,7 +13,7 @@ export const FULL_CARD_HEIGHT = 130
 /** Rows drawn beyond each edge of the view, so a quick scroll doesn't show a gap. */
 export const ROW_OVERSCAN = 8
 
-/** One resident in the full list, with the city heading they stand under in the Residents drawer. */
+/** One resident in the full list, with the city heading they stand under in the Residents tab. */
 export interface ListedResident<R> {
   resident: R
   city: string
@@ -23,7 +23,7 @@ export interface ListedResident<R> {
 
 /**
  * The residents of the full list (`CONTEXT.md`: Residents list), one after the other in the order
- * of the drawer's groups (`groupResidents`), each with their group's name as their city: hired,
+ * of the Residents tab's groups (`groupResidents`), each with their group's name as their city: hired,
  * alliance army and homeless residents have no city of the realm's to name.
  */
 export function listedResidents<R>(groups: readonly ResidentGroup<R>[]): ListedResident<R>[] {

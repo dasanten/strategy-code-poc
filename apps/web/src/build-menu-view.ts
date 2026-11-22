@@ -4,6 +4,7 @@ import { TICKS_PER_GAME_HOUR } from './shared/time.js'
 import { buildMenu } from './shared/building.js'
 import type { BuildingKind, ResourceNode } from '@csp/shared-types'
 import { BUILDING_NAMES } from './map/palette.js'
+import { pixelBuilding, pixelSlice, type PixelSheet, type SliceRect } from './map/pixel-art.js'
 
 /** Work in ticks as a span of game time: "2 game days", "1.5 game hours". */
 export const workSpan = (ticks: number) => {
@@ -87,4 +88,50 @@ export function kindProblemOn(
   return buildMenuGroups(node, problem)
     .flatMap((g) => g.kinds)
     .find((k) => k.kind === kind)?.problem
+}
+
+/** Where a kind's pixel sprite lies: which sheet, which slice, and its rectangle there. */
+export interface BuildingSprite {
+  sheet: PixelSheet
+  slice: string
+  rect: SliceRect
+}
+
+/** The kinds drawn on the units sheet, by their slice there (as `pixelUnit` draws them). */
+const UNIT_KINDS: Partial<Record<BuildingKind, string>> = {
+  carriage: 'carriage',
+  boat: 'boat',
+  ship: 'ship',
+  ram: 'ram',
+  catapult: 'catapult',
+}
+
+/** Walls, gates and roads are drawn from tile pieces: the one that reads best on its own. */
+const TILE_KINDS: Partial<Record<BuildingKind, string>> = {
+  wall: 'wall-wood-straight',
+  gate: 'gate-wood-ew',
+  road: 'road-straight',
+}
+
+/**
+ * The pixel sprite (`docs/art.md`: Pixel art, ADR 0043) the Build menu shows for a kind: the map's
+ * own slice for it, a tower, wall or gate by the material picked, a carriage, vessel or siege
+ * machine from the units sheet, and a wall, gate or road as one of its pieces. Undefined when the
+ * registry has no slice for it; whether a slice has anything drawn in it yet is only known once
+ * the sheet has loaded (`BuildingSprite` in BuildMenu.tsx).
+ */
+export function buildingSprite(
+  kind: BuildingKind,
+  material?: 'wood' | 'stone',
+): BuildingSprite | undefined {
+  const at = (sheet: PixelSheet, slice: string) => {
+    const rect = pixelSlice(sheet, slice)
+    return rect ? { sheet, slice, rect } : undefined
+  }
+  const unit = UNIT_KINDS[kind]
+  if (unit) return at('units', unit)
+  const tile = TILE_KINDS[kind]
+  if (tile) return at('tiles', material === 'stone' ? tile.replace('wood', 'stone') : tile)
+  const key = pixelBuilding(kind, false, material === 'stone')
+  return key === undefined ? undefined : at('buildings', key.slice('pixel/buildings/'.length))
 }

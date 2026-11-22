@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Queue planner with drafts, If blocks and Wait until</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<section class="ui pn" aria-label="Bram, Queue" style="width: 1424px; height: 520px; display: flex">
+
+<div class="grow col" style="gap: 0">
+<div class="tabs" role="tablist"><button class="tab" role="tab">Orders</button><button class="tab on" role="tab" aria-selected="true">Queue</button><button class="tab" role="tab">Stats</button><button class="tab" role="tab">Script</button></div>
+<div class="fx wrap" style="padding: 6px 8px; gap: 6px; border-bottom: 2px solid var(--tan)">
+<span class="px t16">Draft</span><span class="chip y">Draft, not started: the queue runs on until you start it.</span>
+<span class="grow"></span>
+<button class="btn sm">Copy</button><button class="btn sm">Paste</button><button class="btn sm">Repeat</button><button class="btn sm">Clear</button><button class="btn sm">Saved…</button><button class="btn sm sq" aria-label="Help">?</button>
+<span class="mu">2 picked · 9 of [MAX] steps and blocks.</span>
+</div>
+<ol class="grow" style="list-style: none; margin: 0; padding: 0; overflow: hidden">
+<li class="rw grp" style="min-height: 30px"><label class="fx b" style="gap: 6px"><span class="cb on"></span>⟲ Loop</label><span class="mu">from the top again after the last step</span></li>
+<li class="rw" style="padding-left: 26px"><span class="ic s16 i-walk" aria-hidden="true"></span><span class="grow">1. Walk to 2231, 1712</span><button class="btn sm sq" aria-label="Remove"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+<li class="rw" style="padding-left: 26px"><span class="ic s16 i-pick" aria-hidden="true"></span><span class="grow">2. Work the quarry</span><button class="btn sm">720 min · 12 min</button><button class="btn sm sq" aria-label="Remove"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+<li style="padding: 0 10px 0 26px"><button class="btn sm on" style="width: 100%; height: 18px">+ next step goes here</button></li>
+<li class="rw grp" style="padding-left: 26px; min-height: 32px"><span class="ic s16 i-loop" aria-hidden="true"></span><span class="b">Repeat</span><select class="in" style="height: 24px" aria-label="Repeat how"><option>until…</option><option>×</option><option>forever</option></select><span class="grow">they carry less than 2 Stone · <span class="mu">2 steps each</span></span><button class="btn sm">Change</button><button class="btn sm">Unwrap</button><button class="btn sm sq" aria-label="Remove the block and its steps"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+<li class="rw sel" style="padding-left: 50px"><span class="ic s16 i-box" aria-hidden="true"></span><span class="grow">3. Fetch 20 Stone from the storage</span><button class="btn sm sq" aria-label="Remove"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+<li class="rw sel" style="padding-left: 50px"><span class="ic s16 i-hammer" aria-hidden="true"></span><span class="grow">4. Build a wall line from 2190, 1780 to 2190, 1800</span><button class="btn sm sq" aria-label="Remove"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+<li class="rw grp" style="padding-left: 26px; min-height: 32px; background: var(--sun)"><span class="b">If</span><span class="grow">their hunger meter is below 30 %</span><button class="btn sm">Change</button><button class="btn sm">Else</button><button class="btn sm">Unwrap</button><button class="btn sm sq" aria-label="Remove the block and its steps"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+<li class="rw" style="padding-left: 50px"><span class="ic s16 i-food" aria-hidden="true"></span><span class="grow">5. Fetch 12 Food from the storage</span><button class="btn sm sq" aria-label="Remove"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+<li class="rw grp" style="padding-left: 38px; min-height: 26px"><span class="b">Else</span></li>
+<li class="rw" style="padding-left: 50px"><span class="ic s16 i-clock" aria-hidden="true"></span><span class="grow">6. Wait until it is at or after 6:00</span><button class="btn sm sq" aria-label="Remove"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+<li class="rw" style="padding-left: 26px"><span class="ic s16 i-code" aria-hidden="true"></span><span class="grow">7. Run Mine run</span><button class="btn sm dng">Duration?</button><button class="btn sm sq" aria-label="Remove"><span class="ic s16 i-x" aria-hidden="true"></span></button></li>
+</ol>
+<div class="fx" style="padding: 6px 10px; border-top: 2px solid var(--tan)"><span class="grow">Start queue makes their queue this draft, repeat blocks and all. Drag a step, Alt+↑/↓ or a + to move it.</span><button class="btn sm">Discard draft</button><button class="btn sm pri">Start queue</button></div>
+</div>
+
+<div class="col" style="width: 470px; border-left: 2px solid var(--ink); gap: 0">
+<div class="sec"><span class="fx"><span class="px t16 grow">Add step</span><span class="mu">New steps go where the + is set.</span></span>
+<span class="lb">Move</span><div class="fx wrap" style="gap: 4px"><button class="btn sm">Walk to</button><button class="btn sm">Explore</button><button class="btn sm">Relocate</button><button class="btn sm">Mount a horse</button><button class="btn sm">Dismount</button><button class="btn sm">Drive the carriage</button><button class="btn sm">Board a carriage</button><button class="btn sm">Board a boat</button><button class="btn sm">Board a ship as crew</button><button class="btn sm">Row the boat</button><button class="btn sm">Sail the ship</button><button class="btn sm">Get off</button><button class="btn sm">Hitch a horse</button><button class="btn sm">Unhitch a horse</button><button class="btn sm">Haul route</button><button class="btn sm">Haul route by boat or ship</button></div>
+<span class="lb">Work &amp; build</span><div class="fx wrap" style="gap: 4px"><button class="btn sm">Work</button><button class="btn sm">Gather</button><button class="btn sm">Build</button><button class="btn sm">Build line: road</button><button class="btn sm">Build line: wall</button><button class="btn sm">Tear down</button><button class="btn sm">Feed the stable</button><button class="btn sm">Feed the stable once</button><button class="btn sm">Breed horses</button><button class="btn sm">Teach</button><button class="btn sm">Train</button></div>
+<span class="lb">Goods</span><div class="fx wrap" style="gap: 4px"><button class="btn sm">Store what they carry</button><button class="btn sm">Fetch</button><button class="btn sm">Pick up</button><button class="btn sm">Put down</button><button class="btn sm">Feed someone Down or a horse</button><button class="btn sm">Put on gear</button><button class="btn sm">Take off gear</button></div>
+<span class="lb">Scripts and flow</span><div class="fx wrap" style="gap: 4px"><button class="btn sm">Run script</button><button class="btn sm">Repeat</button><button class="btn sm">If</button><button class="btn sm on">Wait until</button></div></div>
+<div class="sec" style="background: var(--paper)"><span class="fx"><span class="b grow">Add step: Wait until</span><button class="btn sm">Cancel</button></span>
+<select class="in" aria-label="Kind"><option>Stock at a place</option><option>Carrying</option><option>Full or empty</option><option>Hunger or health</option><option>Mounted</option><option>Aboard</option><option>Game hour</option></select>
+<div class="fx wrap" style="gap: 4px"><button class="btn sm">Ashford storage ·  pick again</button><span>holds</span><select class="in" style="height: 24px" aria-label="Compare"><option>at least</option><option>less than</option></select><input class="in mono" style="width: 52px; height: 24px" value="40" aria-label="Units"><select class="in" style="height: 24px" aria-label="Good"><option>Stone</option></select></div>
+<span class="well" style="padding: 6px 8px">Wait until the Ashford storage holds at least 40 Stone.</span>
+<button class="btn sm pri">Add</button></div>
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1424,"height":520}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

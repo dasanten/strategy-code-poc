@@ -80,6 +80,8 @@ import {
   LOADING_COLOR,
   VOID_COLOR,
   WAYPOINT_COLOR,
+  INK_COLOR,
+  PAPER_COLOR,
   css,
 } from './map/palette.js'
 import { BASE_ART, BUILDING_ART, CITY_ART, NODE_ART, paintedBuildingArt } from './map/art.js'
@@ -151,6 +153,7 @@ import type { PickPreview } from './pick-preview.js'
 import { inBox, pickKey, pickables, toggled, type MapPick, type Point } from './map/selection.js'
 import { LONG_PRESS_MS, TAP_SLOP, longPresses, pressKind } from './map/gestures.js'
 import { controlPickAt, type ControlMode } from './control-mode.js'
+import { Icon } from './Icon.js'
 
 /** No residents selected. */
 const NONE: readonly string[] = []
@@ -252,7 +255,7 @@ export function MapView({
   /**
    * A tile to centre the view on, such as a place named in the realm log, and the zoom to show it
    * at (the zoom in place if none); a new object each time. `cover` is how much of the map the
-   * open drawer and the selection card cover, to centre the tile between them. `zoom` picks the
+   * open sidebar tab and the dock cover, to centre the tile between them. `zoom` picks the
    * zoom from the one now, in place of `scale`.
    */
   focus?: {
@@ -741,7 +744,7 @@ export function MapView({
         ctx.fill()
         if (d.kind !== 'resident') {
           ctx.lineWidth = d.kind === 'home' || d.kind === 'waypoint' ? 2 : 1
-          ctx.strokeStyle = d.kind === 'home' || d.kind === 'waypoint' ? '#ffffff' : '#0e1419'
+          ctx.strokeStyle = d.kind === 'home' || d.kind === 'waypoint' ? '#ffffff' : css(INK_COLOR)
           ctx.stroke()
         }
       }
@@ -815,7 +818,7 @@ export function MapView({
         const [sx, sy] = tileToScreen(cam, view, mapSize, m.x + 0.5, m.y + 0.5)
         g.circle(sx, sy, MARKER_RADIUS)
           .fill(relationshipColor(m.rel))
-          .stroke({ width: 1.5, color: 0x0e1419 })
+          .stroke({ width: 1.5, color: INK_COLOR })
       }
       // Cities remembered out of sight first, faded, under those in sight.
       const emblems = [
@@ -830,7 +833,7 @@ export function MapView({
         drawEmblem(tokens, sx, sy, r, e.rel, e.fade)
         labels.place(e.name, sx, sy + r + 12)
         if (e.id === selectedCityRef.current)
-          g.circle(sx, sy, r + 6).stroke({ width: 2.5, color: 0xffffff })
+          g.circle(sx, sy, r + 6).stroke({ width: 2.5, color: PAPER_COLOR })
       }
       // The city a click would pick, outlined in its relationship colour.
       const hovered = cityUnder()
@@ -869,9 +872,9 @@ export function MapView({
         const head = sy - PIN_HEIGHT
         g.poly([sx, sy, sx - PIN_RADIUS * 0.8, head + 2, sx + PIN_RADIUS * 0.8, head + 2])
           .fill(WAYPOINT_COLOR)
-          .stroke({ width: 1.5, color: 0x0e1419 })
-        g.circle(sx, head, PIN_RADIUS).fill(WAYPOINT_COLOR).stroke({ width: 1.5, color: 0x0e1419 })
-        g.circle(sx, head, PIN_RADIUS * 0.35).fill(0x0e1419)
+          .stroke({ width: 1.5, color: INK_COLOR })
+        g.circle(sx, head, PIN_RADIUS).fill(WAYPOINT_COLOR).stroke({ width: 1.5, color: INK_COLOR })
+        g.circle(sx, head, PIN_RADIUS * 0.35).fill(INK_COLOR)
         labels.place(w.name, sx, head - PIN_RADIUS - 10)
       }
     }
@@ -1378,131 +1381,148 @@ export function MapView({
   return (
     <div className="map-view">
       <div ref={hostRef} className="map" aria-label="World map" role="img" />
-      {/* On a phone zoom is pinch only: the zoom buttons hide and the rest sit in a row. */}
-      <div className="map-buttons">
-        <button
-          type="button"
-          className="zoom"
-          aria-label="Zoom in"
-          onClick={() => controlsRef.current?.zoom(1.5)}
-        >
-          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
-            <path d="M9 3v12M3 9h12" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          className="zoom"
-          aria-label="Zoom out"
-          onClick={() => controlsRef.current?.zoom(1 / 1.5)}
-        >
-          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
-            <path d="M3 9h12" />
-          </svg>
-        </button>
-        {!admin && (
-          <button
-            type="button"
-            aria-label="Centre on my residents"
-            onClick={() => controlsRef.current?.centre()}
-          >
-            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
-              <circle cx="9" cy="9" r="5" />
-              <path d="M9 1v3M9 14v3M1 9h3M14 9h3" />
-            </svg>
-          </button>
-        )}
-        {onSelectMany && (
-          <button
-            type="button"
-            aria-label="Select"
-            aria-pressed={boxMode}
-            title="Select: a drag boxes residents instead of panning (or hold Shift)"
-            onClick={() => setBoxMode(!boxMode)}
-          >
-            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
-              <path d="M2 2h3M8 2h2M13 2h3v3M16 8v2M16 13v3h-3M10 16H8M5 16H2v-3M2 10V8M2 5V2" />
-            </svg>
-          </button>
-        )}
-        <button
-          type="button"
-          aria-label={admin ? 'Territory' : 'Region map'}
-          aria-pressed={mode === 'region'}
-          title={
-            (admin ? 'Territory' : 'Region map') +
-            (mode === 'region' ? ': on at every zoom' : ': territory over the terrain')
-          }
-          onClick={() => setMode(mode === 'region' ? 'terrain' : 'region')}
-        >
-          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
-            <path d="M2 4l4.5-2 5 2L16 2v12l-4.5 2-5-2L2 16zM6.5 2v12M11.5 4v12" />
-          </svg>
-        </button>
-      </div>
-      {legendOpen ? (
-        <div className="map-legend-panel">
-          <button
-            type="button"
-            className="map-fold"
-            aria-label="Fold the legend"
-            onClick={() => toggleLegend(false)}
-          >
-            ×
-          </button>
-          {look === 'fill' ? <RegionLegend region={world.region} /> : <Legend />}
-          <label className="art-style">
-            Art style
-            <select value={style} onChange={(e) => setArtStyle(e.target.value as ArtStyle)}>
-              {ART_STYLES.map((s) => (
-                <option key={s} value={s}>
-                  {ART_STYLE_NAMES[s]}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      ) : (
-        <button type="button" className="map-legend-button" onClick={() => toggleLegend(true)}>
-          Legend
-        </button>
-      )}
-      <div className="map-corner">
-        {!admin &&
-          (minimapOpen ? (
-            <div className="minimap">
-              <canvas
-                ref={minimapRef}
-                aria-label="Minimap: click to centre the map there"
-                style={{ width: MINIMAP_SIDE, height: MINIMAP_SIDE }}
-                onPointerDown={(e) => {
-                  e.currentTarget.setPointerCapture(e.pointerId)
-                  minimapAt(e)
-                }}
-                onPointerMove={(e) => {
-                  if (e.currentTarget.hasPointerCapture(e.pointerId)) minimapAt(e)
-                }}
-              />
+      {/* The map dock, bottom right at the end of the command bar's row (ADR 0044): the minimap,
+          the map's buttons, the Legend and the readout. On a phone zoom is pinch only: the zoom
+          buttons hide and the rest sit in a row above the sheet. */}
+      <div className="map-dock pn">
+        {!admin && minimapOpen && (
+          <div className="minimap">
+            <div className="minimap-head fx">
+              <span className="lb grow">Minimap</span>
               <button
                 type="button"
-                className="map-fold"
+                className="btn sm sq map-fold"
                 aria-label="Fold the minimap"
                 onClick={() => toggleMinimap(false)}
               >
-                ×
+                –
               </button>
             </div>
-          ) : (
-            <button type="button" className="minimap-button" onClick={() => toggleMinimap(true)}>
+            <canvas
+              ref={minimapRef}
+              aria-label="Minimap: click to centre the map there"
+              style={{ width: MINIMAP_SIDE, height: MINIMAP_SIDE }}
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId)
+                minimapAt(e)
+              }}
+              onPointerMove={(e) => {
+                if (e.currentTarget.hasPointerCapture(e.pointerId)) minimapAt(e)
+              }}
+            />
+          </div>
+        )}
+        <div className="map-buttons fx">
+          <button
+            type="button"
+            className="btn sm sq zoom"
+            aria-label="Zoom in"
+            onClick={() => controlsRef.current?.zoom(1.5)}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            className="btn sm sq zoom"
+            aria-label="Zoom out"
+            onClick={() => controlsRef.current?.zoom(1 / 1.5)}
+          >
+            −
+          </button>
+          {!admin && (
+            <button
+              type="button"
+              className="btn sm sq"
+              aria-label="Centre on my residents"
+              title="Centre on my residents"
+              onClick={() => controlsRef.current?.centre()}
+            >
+              <Icon name="crown" size={16} />
+            </button>
+          )}
+          {onSelectMany && (
+            <button
+              type="button"
+              className="btn sm grow"
+              aria-pressed={boxMode}
+              title="Select: a drag boxes residents instead of panning (or hold Shift)"
+              onClick={() => setBoxMode(!boxMode)}
+            >
+              Select
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn sm grow"
+            aria-label={admin ? 'Territory' : 'Region map'}
+            aria-pressed={mode === 'region'}
+            title={
+              (admin ? 'Territory' : 'Region map') +
+              (mode === 'region' ? ': on at every zoom' : ': territory over the terrain')
+            }
+            onClick={() => setMode(mode === 'region' ? 'terrain' : 'region')}
+          >
+            {admin ? 'Territory' : 'Region'}
+          </button>
+        </div>
+        <div className="map-more fx">
+          <button
+            type="button"
+            className="btn sm grow map-legend-button"
+            aria-pressed={legendOpen}
+            onClick={() => toggleLegend(!legendOpen)}
+          >
+            Legend
+          </button>
+          {!admin && !minimapOpen && (
+            <button
+              type="button"
+              className="btn sm grow minimap-button"
+              onClick={() => toggleMinimap(true)}
+            >
               Minimap
             </button>
-          ))}
+          )}
+        </div>
         {loading ? (
-          <div className="map-readout" role="status">
+          <div className="map-readout mono" role="status">
             Loading the map…
           </div>
         ) : (
-          <div className="map-readout">{readoutText(hover, tier, look !== 'none')}</div>
+          <div className="map-readout mono">{readoutText(hover, tier, look !== 'none')}</div>
+        )}
+        {/* The legend opens over the dock, clear of the sidebar and the command bar. */}
+        {legendOpen && (
+          <div className="map-legend-panel pn">
+            <div className="hd">
+              <span className="grow">Legend</span>
+              <button
+                type="button"
+                className="btn sm sq dk map-fold"
+                aria-label="Fold the legend"
+                onClick={() => toggleLegend(false)}
+              >
+                –
+              </button>
+            </div>
+            <div className="map-legend-body">
+              {look === 'fill' ? <RegionLegend region={world.region} /> : <Legend />}
+              <label className="art-style sec">
+                <span className="lb">Art style</span>
+                <select
+                  className="in"
+                  value={style}
+                  onChange={(e) => setArtStyle(e.target.value as ArtStyle)}
+                >
+                  {ART_STYLES.map((s) => (
+                    <option key={s} value={s}>
+                      {ART_STYLE_NAMES[s]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -1543,29 +1563,44 @@ function Legend() {
   }
   return (
     <div className="map-legend">
-      {terrains.map((t) => (
-        <div key={t}>
-          <span className="swatch" style={{ background: css(TERRAIN_COLORS[t]!) }} />
-          <span>{TERRAIN_NAMES[t]}</span>
-          <span className="rule">{speed(t)}</span>
+      <div className="sec">
+        <span className="lb">Terrain</span>
+        <div className="map-legend-grid">
+          {terrains.map((t) => (
+            <div key={t}>
+              <span className="swatch" style={{ background: css(TERRAIN_COLORS[t]!) }} />
+              <span className="grow">{TERRAIN_NAMES[t]}</span>
+              <span className="rule mono mu">{speed(t)}</span>
+            </div>
+          ))}
         </div>
-      ))}
-      {(Object.keys(NODE_NAMES) as (keyof typeof NODE_NAMES)[]).map((k) => (
-        <div key={k}>
-          <span className="swatch diamond" style={{ background: css(NODE_COLORS[k]) }} />
-          <span>{NODE_NAMES[k]}</span>
-          <span className="rule">node</span>
-        </div>
-      ))}
-      <div>
-        <span className="swatch" style={{ background: css(CARAVAN_COLOR) }} />
-        <span>Caravan</span>
-        <span className="rule">Trade Org</span>
       </div>
-      <div>
-        <span className="swatch" style={{ background: css(CARAVAN_COLOR) }} />
-        <span>Wandering trader</span>
-        <span className="rule">Trade Org</span>
+      <div className="sec">
+        <span className="lb">Nodes</span>
+        <div className="map-legend-grid">
+          {(Object.keys(NODE_NAMES) as (keyof typeof NODE_NAMES)[]).map((k) => (
+            <div key={k}>
+              <span className="swatch diamond" style={{ background: css(NODE_COLORS[k]) }} />
+              <span className="grow">{NODE_NAMES[k]}</span>
+              <span className="rule mono mu">node</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="sec">
+        <span className="lb">Traders</span>
+        <div className="map-legend-grid">
+          <div>
+            <span className="swatch" style={{ background: css(CARAVAN_COLOR) }} />
+            <span className="grow">Caravan</span>
+            <span className="rule mono mu">Trade Org</span>
+          </div>
+          <div>
+            <span className="swatch" style={{ background: css(CARAVAN_COLOR) }} />
+            <span className="grow">Wandering trader</span>
+            <span className="rule mono mu">Trade Org</span>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -1579,14 +1614,19 @@ function RegionLegend({ region }: { region: RegionState | null }) {
   const groups = region ? regionGroups(region) : []
   return (
     <div className="map-legend region-legend">
-      {groups.length === 0 && <div className="rule">No territory on explored terrain yet</div>}
-      {groups.map((g) => (
-        <div key={g.key}>
-          <span className="swatch" style={{ background: css(g.colour) }} />
-          <span>{g.name}</span>
-          <span className="rule">{g.members.length > 0 ? g.members.join(', ') : ''}</span>
-        </div>
-      ))}
+      <div className="sec">
+        <span className="lb">Region map</span>
+        {groups.length === 0 && <div className="rule mu">No territory on explored terrain yet</div>}
+        {groups.map((g) => (
+          <div key={g.key} className="region-legend-row">
+            <span className="swatch" style={{ background: css(g.colour) }} />
+            <span className="grow">
+              <span className="b">{g.name}</span>
+              {g.members.length > 0 && <span className="mu"> · {g.members.join(', ')}</span>}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -1618,7 +1658,7 @@ function drawPath(
   if (far)
     g.circle(...end, FAR_WAY_END_RADIUS)
       .fill(LEADER_COLOR)
-      .stroke({ width: 1.5, color: 0xffffff })
+      .stroke({ width: 1.5, color: PAPER_COLOR })
   else g.circle(...end, 5).fill(LEADER_COLOR)
 }
 
@@ -2027,11 +2067,11 @@ function drawStructures(
     over
       .moveTo(px, py)
       .lineTo(px, py + h)
-      .stroke({ width: Math.max(1.5, tile * 0.06), color: 0x0e1419, alpha: fade })
+      .stroke({ width: Math.max(1.5, tile * 0.06), color: INK_COLOR, alpha: fade })
     over
       .poly([px, py, px + h * 0.6, py + h * 0.22, px, py + h * 0.44])
       .fill({ color, alpha: fade })
-      .stroke({ width: 1, color: 0x0e1419, alpha: fade })
+      .stroke({ width: 1, color: INK_COLOR, alpha: fade })
   }
   for (const p of piles) {
     // A small heap in the tile's lower corner, so a building on the tile still shows.

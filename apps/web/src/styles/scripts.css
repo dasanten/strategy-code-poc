@@ -1,0 +1,541 @@
+/* Queue, Stats and Script tabs (T119.10) ----------
+   The Script tab of the command bar (`CONTEXT.md`: Debugging a script; artboard
+   `Card-Stats-Script`): what they run and how it last ran, the Defence and Alarm script pickers,
+   the script's params, its memory and their script log, in columns side by side (`.script-col`)
+   that each scroll inside the bar. In the phone's sheet the columns stack. The tab itself is laid
+   out in card.css's block of the same name. */
+.script-tab {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: -8px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+.script-col {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+/* A column with nothing in it (a script without params) takes no room. */
+.script-col:empty {
+  display: none;
+}
+.script-col + .script-col {
+  border-left: 2px solid var(--tan);
+}
+.script-tab h3 {
+  margin: 0;
+}
+.script-tab p {
+  margin: 0;
+}
+.script-tab .order-buttons button {
+  min-height: 0;
+  min-width: 0;
+}
+/* Runs Work · version 4 · edited by you, and Edit. */
+.task-script {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* How it last ran: waiting, the steps used against the budget with its meter, the last error. */
+.script-run {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.script-run-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+}
+.script-run-info p {
+  margin: 0;
+}
+.script-steps {
+  font-family: var(--font-mono);
+}
+.script-steps.out-of-steps {
+  color: var(--ui-warn-text);
+  font-weight: 600;
+}
+.script-error-message {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+/* Defence and Alarm script: the picker as wide as the column. */
+.script-pick select {
+  width: 100%;
+}
+/* A param: its name and type, its buttons beside; what it is for and the value it uses under. */
+.script-param {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 6px;
+  align-items: center;
+}
+.script-param-name {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.script-param > .buttons {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.script-param > :not(.script-param-name, .buttons) {
+  grid-column: 1 / -1;
+}
+.script-param .amount {
+  width: 56px;
+  height: 24px;
+}
+.script-param select {
+  max-width: 10em;
+  height: 24px;
+}
+.script-params {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.script-params p {
+  margin: 0;
+}
+/* The script's memory, read-only: a code block, names quieter than values. */
+.memory-tree {
+  margin: 0;
+  padding: 6px 8px;
+  list-style: none;
+  font-size: 12px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.memory-name {
+  color: var(--fog);
+}
+/* Their script log, newest first. */
+.script-log-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+/* In the phone's sheet the columns stack and the sheet scrolls. */
+.game-selection.sheet .script-tab {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.game-selection.sheet .script-col {
+  overflow: visible;
+}
+.game-selection.sheet .script-col + .script-col {
+  border-left: 0;
+  border-top: 2px solid var(--tan);
+}
+.game-selection.sheet .script-tab button {
+  min-height: 44px;
+}
+
+/* The form before a script starts: the rows scroll between its title and Start and Cancel. */
+.hud-dialog.start-params {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
+}
+.start-params h2 {
+  flex: none;
+  /* The kit's header bar (`.hd`), across the dialog's top edge. */
+  margin: -20px -22px 10px;
+}
+.start-params .hud-dialog-actions {
+  flex: none;
+  margin-top: 10px;
+}
+.start-params .error {
+  flex: none;
+  margin-top: 6px;
+}
+.start-params-rows {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Out of the way while a param is picked on the map; the map gets the taps. */
+.start-params-backdrop.picking {
+  visibility: hidden;
+}
+/* A param's row: its name and the value in use on the left, its field on the right. */
+.start-param {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 2px solid var(--ui-line);
+}
+.start-param:last-child {
+  border-bottom: 0;
+}
+.start-param-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.start-param .buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.start-param .amount {
+  width: 4.5em;
+  min-height: 36px;
+  box-sizing: border-box;
+}
+.start-param select {
+  max-width: 9.5em;
+  min-height: 36px;
+  text-overflow: ellipsis;
+}
+.start-param .buttons button {
+  min-height: 36px;
+  padding-inline: 10px;
+}
+.start-param-why {
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  margin-left: 6px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+.hud-dialog .start-param-note {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+
+/* The form before a script starts is a bottom sheet, up to the top bar; above the keyboard, too. */
+.game.phone .start-params-backdrop {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0;
+}
+.game.phone .hud-dialog.start-params {
+  width: 100%;
+  max-height: calc(100% - var(--top-h));
+  padding: 14px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-width: 2px 0 0;
+}
+.game.phone .start-params h2 {
+  margin: -14px -14px 10px;
+}
+.game.phone .start-params .hud-dialog-actions button {
+  flex: 1;
+  min-height: 44px;
+}
+/* At 16px a phone doesn't zoom the page when the field takes focus. */
+.game.phone .start-param input,
+.game.phone .start-param select {
+  font-size: 16px;
+}
+.game.phone .start-param .buttons button,
+.game.phone .start-param input,
+.game.phone .start-param select {
+  min-height: 44px;
+}
+.game.phone .start-param-why {
+  width: 28px;
+  height: 28px;
+}
+
+/* ---------- The script workshop (ADR 0044; `ScriptLibrary`) ----------
+   A screen of its own over the map and the command bar: its bar across the top, then the library
+   on the left, the editor in the middle and History (or the New script form) on the right. On a
+   phone the three are steps, one at a time, picked by the tabs under the bar. */
+.workshop {
+  position: fixed;
+  inset: 0;
+  /* Over the map, the top bar, the sidebar, the card and the notices; under a dialog. */
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  background: var(--parch);
+  color: var(--ui-text);
+}
+.workshop[hidden] {
+  display: none;
+}
+.workshop-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* The top bar's height on a desktop; not `--top-h`, which grows when the top bar wraps. */
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border-width: 0 0 2px;
+}
+.workshop-title {
+  margin: 0;
+  color: var(--gold);
+  white-space: nowrap;
+}
+.workshop-bar .k {
+  margin-left: 6px;
+}
+/* The steps are for a phone only. */
+.workshop-steps {
+  display: none;
+}
+.workshop-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr) 310px;
+}
+
+/* The library: New script, then the default scripts and the Player's own, each with its line. */
+.workshop-library {
+  min-height: 0;
+  overflow-y: auto;
+  border-right: 2px solid var(--ink);
+}
+.workshop-library ul,
+.workshop-side ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+/* Each script is a row (.rw) that is a button: the row's look, not a button's. */
+.workshop-pick {
+  width: 100%;
+  height: auto;
+  justify-content: flex-start;
+  border-width: 0 0 2px;
+  border-style: solid;
+  border-color: var(--tan);
+  box-shadow: none;
+  color: var(--ui-text);
+  font-weight: 400;
+  text-align: left;
+}
+.workshop-pick:not(.sel) {
+  background: transparent;
+}
+.workshop-pick:hover:not(.sel) {
+  background: var(--paper);
+}
+.workshop-pick.sel:hover:not(:disabled) {
+  background: var(--sun);
+}
+.workshop-pick .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.workshop-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The editor: the script's head, the default's diff, the code, and the check with Save. */
+.workshop-editor {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.workshop-head {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--tan);
+}
+.workshop-rename {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+.workshop-rename .in {
+  flex: 1;
+  min-width: 0;
+  max-width: 360px;
+}
+.workshop-diff {
+  flex: none;
+  padding: 0 12px 8px;
+  border-bottom: 2px solid var(--tan);
+}
+.workshop-diff summary {
+  padding: 6px 0;
+  cursor: pointer;
+}
+.workshop-diff .code {
+  max-height: 200px;
+  margin: 0 0 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+/* A line the game's default added: green, as the kit's removed line (.e) is red. */
+.workshop-diff .code .add {
+  background: var(--pine);
+  color: #fff;
+}
+.workshop-diff p {
+  margin: 0;
+}
+.workshop-editor .editor {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.workshop-foot {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 12px;
+  border-top: 2px solid var(--ink);
+  background: var(--paper);
+}
+.workshop-foot p {
+  margin: 0;
+}
+.workshop-foot .diagnostics {
+  max-height: 8em;
+  overflow: auto;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.workshop-foot .diagnostics.warn {
+  color: var(--ui-warn-text);
+  font-weight: 600;
+}
+
+/* On the right: History, a row a version, or the New script form. */
+.workshop-side {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  border-left: 2px solid var(--ink);
+}
+.workshop-side .sec > .btn {
+  align-self: flex-start;
+}
+.workshop-version {
+  flex-wrap: wrap;
+}
+.workshop-version time {
+  font-variant-numeric: tabular-nums;
+}
+.workshop-version-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.workshop-new {
+  background: var(--paper);
+  border-bottom: 2px solid var(--tan);
+}
+.workshop-new p {
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  .workshop-body {
+    grid-template-columns: 220px minmax(0, 1fr) 260px;
+  }
+}
+
+/* On a phone: one step at a time, the step tabs under the bar. */
+.game.phone .workshop-steps {
+  display: flex;
+  flex: none;
+}
+.game.phone .workshop-bar {
+  height: var(--top-h);
+  gap: 6px;
+  padding: 0 4px;
+  overflow-x: auto;
+}
+/* Back to the map and the help links, a finger's size in the 48 px bar (`--top-h`). */
+.game.phone .workshop-bar .btn {
+  flex: none;
+  height: 44px;
+  padding: 0 10px;
+  font-size: 14px;
+}
+.game.phone .workshop-steps .tab {
+  height: 44px;
+  font-size: 14px;
+}
+.game.phone .workshop-steps .tab[aria-selected='true'] {
+  height: 48px;
+}
+/* The library's rows, History's buttons, Save: all a finger's size. */
+.game.phone .workshop-body :is(button:not(.cm-editor *), select, .in) {
+  min-height: 44px;
+}
+.game.phone .workshop-foot {
+  flex-wrap: wrap;
+}
+.game.phone .workshop-bar .k,
+.game.phone .workshop-bar .ic,
+.game.phone .workshop-title {
+  display: none;
+}
+.game.phone .workshop-body {
+  display: block;
+}
+.game.phone .workshop-body > * {
+  display: none;
+  height: 100%;
+  box-sizing: border-box;
+  border: 0;
+}
+.game.phone .workshop[data-step='library'] .workshop-library {
+  display: block;
+}
+.game.phone .workshop[data-step='editor'] .workshop-editor,
+.game.phone .workshop[data-step='side'] .workshop-side {
+  display: flex;
+}
+.game.phone .workshop-foot {
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+}
+/* At 16px a phone doesn't zoom the page when the field takes focus. */
+.game.phone .workshop input,
+.game.phone .workshop select {
+  font-size: 16px;
+}

@@ -12,15 +12,33 @@ export function sideName(side: RealmLabel, cities: readonly { id: string }[] = [
   return `the realm of ${side.realm}`
 }
 
+/** Whether a contract not yet accepted was offered by the other side, for the Player to answer. */
+function offeredToYou(c: ContractView, realmId: string): boolean {
+  return c.startedAt === null && (c.offeredBy === 'lender' ? c.lender : c.hirer).realmId !== realmId
+}
+
 /** Where a contract stands, as the Player sees it. */
 export function contractStatus(c: ContractView, realmId: string): string {
-  if (c.startedAt === null) {
-    const theirs = (c.offeredBy === 'lender' ? c.lender : c.hirer).realmId !== realmId
-    return theirs ? 'Offered to you' : 'Waiting for them to accept'
-  }
+  if (c.startedAt === null)
+    return offeredToYou(c, realmId) ? 'Offered to you' : 'Waiting for them to accept'
   const paid = `${c.paidWeeks} of ${c.weeks} weeks paid`
   if (c.payBy === null) return `${paid} · ends ${formatGameTime(c.endsAt!)}`
   return `${paid} · next week due by ${formatGameTime(c.payBy)}`
+}
+
+/**
+ * The chip on a contract in the Contracts tab: offered to the Player (gold, theirs to answer),
+ * waiting for the other side (plain), or running (green), with how much of it is paid so far.
+ */
+export function contractChip(
+  c: ContractView,
+  realmId: string,
+): { text: string; tone: '' | 'y' | 'g'; paid: number } {
+  const paid = c.weeks > 0 ? Math.min(1, c.paidWeeks / c.weeks) : 0
+  if (c.startedAt !== null) return { text: 'running', tone: 'g', paid }
+  return offeredToYou(c, realmId)
+    ? { text: 'offered to you', tone: 'y', paid }
+    : { text: 'waiting for them to accept', tone: '', paid }
 }
 
 /** Who the offer is made to or asked of (`CONTEXT.md`: Mercenary contract). */

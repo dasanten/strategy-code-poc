@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sidebar, Standing</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<aside class="ui pn col" style="width: 360px; height: 860px; gap: 0">
+<div class="hd"><span class="ic i-medal" aria-hidden="true"></span><span class="grow">Standing</span></div>
+
+<div class="sec" style="background: var(--sun)"><span class="b">Oakhollow asks to join your realm</span><span>Town hall at 2520, 1930</span>
+<div class="fx" style="gap: 4px"><button class="btn sm pri grow">Accept</button><button class="btn sm grow">Decline</button><button class="btn sm">Show on map</button></div></div>
+
+<table class="tb"><thead><tr><th>Organization</th><th class="n" title="How they regard you">They → you</th><th class="n" title="How you regard them">You</th></tr></thead>
+<tbody>
+<tr><td><span class="fx"><span class="dot" style="background: var(--npc)"></span><span class="b">Oakhollow</span></span><span class="mt" style="margin-top: 4px"><i style="width: 88%; background: var(--leaf)"></i></span></td><td class="n ok">high +76</td><td class="n">+12</td></tr>
+<tr><td><span class="fx"><span class="dot" style="background: var(--trade)"></span><span class="b">Trade Organization</span></span><span class="mt" style="margin-top: 4px"><i style="width: 61%; background: var(--leaf)"></i></span></td><td class="n ok">good +22</td><td class="n">0</td></tr>
+<tr><td><span class="fx"><span class="dot" style="background: var(--ally)"></span><span class="b">Realm of Harrow</span></span><span class="mt" style="margin-top: 4px"><i style="width: 50%; background: var(--fog)"></i></span></td><td class="n">neutral 0</td><td class="n">+4</td></tr>
+<tr><td><span class="fx"><span class="dot" style="background: var(--npc)"></span><span class="b">Dunmoor</span></span><span class="mt" style="margin-top: 4px"><i style="width: 34%; background: var(--orange)"></i></span></td><td class="n bad">low −31</td><td class="n">0</td></tr>
+<tr><td><span class="fx"><span class="dot" style="background: var(--other)"></span><span class="b">Realm of Mire</span></span><span class="mt" style="margin-top: 4px"><i style="width: 12%; background: var(--red)"></i></span></td><td class="n bad">very low −74</td><td class="n">−40</td></tr>
+</tbody></table>
+<div class="sec"><span class="mu">With nobody to list: "Everyone regards you neutrally." The bar runs from −100 to +100, with marks where an NPC city stops trading and where the Trade Organization sends its army.</span></div>
+
+<div class="sec"><span class="px t16">Admin directives</span>
+<div class="well" style="padding: 8px; border-color: var(--blood)">The Trade Organization punishes <span class="b">Realm of Mire and its alliance</span>: farming new Players.<br>Until: Mirefield destroyed; 40% of its soldiers killed.<br><span class="mu">(can be bought off for 500 Coins at any Trade Org warehouse)</span></div></div>
+
+<span class="grow"></span>
+<div class="sec"><span class="mu">Known crimes lower standing; trade and kept contracts raise it; it slowly drifts back to neutral. An NPC city that holds you in high standing and sees enough respect asks to join.</span><a href="Wiki.dc.html" style="color: var(--navy)">Wiki: Standing &amp; reactions</a></div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":360,"height":860}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

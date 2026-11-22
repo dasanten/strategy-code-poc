@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AdminPlaces } from '@csp/shared-types'
-import { ADMIN_JUMP_FIGURE_SCALE, jumpList, jumpScale } from './admin-jump.js'
+import { ADMIN_JUMP_FIGURE_SCALE, jumpCount, jumpList, jumpMark, jumpScale } from './admin-jump.js'
 import { ADMIN_LINK_SCALE } from './admin-map.js'
 
 const places: AdminPlaces = {
@@ -132,5 +132,21 @@ describe('admin map jump list', () => {
     expect(jumpScale('hq')).toBe(ADMIN_LINK_SCALE)
     expect(jumpScale('leader')).toBe(ADMIN_JUMP_FIGURE_SCALE)
     expect(jumpScale('army')).toBe(ADMIN_JUMP_FIGURE_SCALE)
+  })
+
+  it('counts the places of a group, leaving out what is listed under a realm', () => {
+    expect(jumpList(places, '').map(jumpCount)).toEqual([3, 2, 3, 1])
+  })
+
+  it('marks a place in the colour of whose it is and a figure with its icon', () => {
+    expect(jumpMark('realm')).toEqual({ rel: 'otherRealm' })
+    expect(jumpMark('npcCity')).toEqual({ rel: 'npcCity' })
+    expect(jumpMark('hq')).toEqual({ rel: 'tradeOrg' })
+    expect(jumpMark('post')).toEqual({ rel: 'tradeOrg' })
+    expect(jumpMark('leader')).toEqual({ icon: 'crown' })
+    expect(jumpMark('city')).toEqual({ icon: 'city' })
+    expect(jumpMark('caravan')).toEqual({ icon: 'caravan' })
+    expect(jumpMark('trader')).toEqual({ icon: 'cart' })
+    expect(jumpMark('army')).toEqual({ icon: 'banner' })
   })
 })

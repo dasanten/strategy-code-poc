@@ -3,12 +3,12 @@ import { WAYPOINT_NAME_MAX_LENGTH } from '@csp/balance'
 import { addWaypointProblem } from './shared/waypoints.js'
 import { nameProblem } from './shared/names.js'
 import type { Waypoint } from '@csp/shared-types'
-import { PanelHead } from './drawer-head.js'
+import { PanelHead } from './panel-head.js'
 import { menuSpot, suggestedWaypointName, waypointCount, waypointPlace } from './waypoints-view.js'
 
 /*
  * Waypoints (`CONTEXT.md`: Waypoint): the Player's named markers. Added from the map's tile menu
- * (right-click or long-press) or the tile card, listed in the Waypoints drawer. Each change is an
+ * (right-click or long-press) or the tile card, listed in the Waypoints tab. Each change is an
  * order the server checks (`addWaypoint`, `renameWaypoint`, `removeWaypoint`); its answer shows
  * under the form when it turns one down.
  */
@@ -129,32 +129,34 @@ export function TileMenu({
   return (
     <div
       ref={ref}
-      className="tile-menu"
+      className="tile-menu pn"
       role="dialog"
       aria-label="Tile menu"
       style={{ left: spot.left, top: spot.top }}
     >
-      <div className="panel-head">
-        <h3>Add waypoint here</h3>
-        <span className="small muted">{waypointPlace(tile)}</span>
+      <div className="hd">
+        <h3 className="grow">Add waypoint here</h3>
+        <span className="mono">{waypointPlace(tile)}</span>
       </div>
-      <WaypointNameForm
-        initial={suggestedWaypointName(held)}
-        submitLabel="Add waypoint"
-        problem={addProblem(held, tile.x, tile.y, size)}
-        onSubmit={async (name) => {
-          const turnedDown = await onAdd(name)
-          if (!turnedDown) onClose()
-          return turnedDown
-        }}
-        onCancel={onClose}
-      />
+      <div className="tile-menu-body">
+        <WaypointNameForm
+          initial={suggestedWaypointName(held)}
+          submitLabel="Add waypoint"
+          problem={addProblem(held, tile.x, tile.y, size)}
+          onSubmit={async (name) => {
+            const turnedDown = await onAdd(name)
+            if (!turnedDown) onClose()
+            return turnedDown
+          }}
+          onCancel={onClose}
+        />
+      </div>
     </div>
   )
 }
 
 /**
- * The Waypoints drawer (`CONTEXT.md`: Waypoint): the Player's waypoints, oldest first, each with
+ * The Waypoints tab (`CONTEXT.md`: Waypoint): the Player's waypoints, oldest first, each with
  * where it is. Its name centres the map on it; Rename and Remove act on it at once. While an
  * order waits for a place (`CONTEXT.md`: Picking a target), Pick gives it the waypoint's tile.
  */
@@ -178,36 +180,39 @@ export function WaypointsPanel({
     <section className="waypoints" aria-label="Waypoints">
       <PanelHead title="Waypoints">{waypointCount(waypoints)}</PanelHead>
       {waypoints.length === 0 && (
-        <p className="muted">
+        <p className="sec mu">
           No waypoints yet. Right-click a tile on the map, or long-press it on a touch screen, to
           add one.
         </p>
       )}
       {onPick && waypoints.length > 0 && (
-        <p className="small muted">Pick a waypoint for the place the order waits for.</p>
+        <p className="sec b waypoint-picking">Pick a waypoint for the place the order waits for.</p>
       )}
       {error && (
-        <p className="small muted" role="status">
+        <p className="sec bad" role="status">
           Turned down: {error}
         </p>
       )}
-      <ul className="waypoint-list">
+      <ul className="waypoint-rows">
         {waypoints.map((w) => (
-          <li key={w.id} className="waypoint-row">
-            <div className="waypoint-head">
+          <li key={w.id} className={renaming === w.id ? 'rw waypoint renaming' : 'rw waypoint'}>
+            <div className="fx waypoint-buttons">
               <button
                 type="button"
-                className="waypoint-name"
+                className="btn sm grow waypoint-show"
                 title="Show on the map"
                 onClick={() => onCentre(w)}
               >
-                <span className="name">{w.name}</span>
-                <small className="muted">{waypointPlace(w)}</small>
+                <span className="waypoint-mark" aria-hidden="true">
+                  ◆
+                </span>
+                <span className="waypoint-label">{w.name}</span>
+                <span className="mono mu">{waypointPlace(w)}</span>
               </button>
               {onPick && (
                 <button
                   type="button"
-                  className="primary"
+                  className="btn sm pri"
                   aria-label={`Pick ${w.name}`}
                   onClick={() => onPick(w)}
                 >
@@ -216,6 +221,7 @@ export function WaypointsPanel({
               )}
               <button
                 type="button"
+                className="btn sm"
                 aria-pressed={renaming === w.id}
                 onClick={() => setRenaming(renaming === w.id ? undefined : w.id)}
               >
@@ -223,6 +229,7 @@ export function WaypointsPanel({
               </button>
               <button
                 type="button"
+                className="btn sm"
                 aria-label={`Remove ${w.name}`}
                 onClick={async () => setError(await onRemove(w))}
               >

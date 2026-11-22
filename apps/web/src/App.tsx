@@ -71,7 +71,12 @@ import { isWallOrGate } from './shared/walls.js'
 import { CreativeBar } from './CreativeBar.js'
 import { showsCreativeBar } from './creative-bar.js'
 import { CreativeSection } from './CreativeSection.js'
-import { creativeCities, creativeOffer, creativeProblem, offersAnything } from './creative-section.js'
+import {
+  creativeCities,
+  creativeOffer,
+  creativeProblem,
+  offersAnything,
+} from './creative-section.js'
 import {
   CreativeAddSection,
   CreativeGroupMove,
@@ -92,7 +97,7 @@ import {
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
 import { commandsSeen } from './alliance-army.js'
-import { ArmiesPanel, type ArmyPick } from './Armies.js'
+import { ArmiesPanel, ArmyCard, type ArmyPick } from './Armies.js'
 import { ContractsPanel } from './Contracts.js'
 import { demandNoticeLine, demandSides } from './demand-view.js'
 import { DemandsPanel } from './Demands.js'
@@ -121,22 +126,19 @@ import {
   rememberGoodsPick,
   rememberedGoodsPick,
   showBeside,
-  NO_DRAWER,
+  foldOrUnfold,
   openDiplomacy,
   showsTab,
-  toggleDrawer,
+  toggleTab,
   withOpen,
-  type Drawers,
-  type DrawerId,
+  type SideTabId,
   type GoodsPick,
-  type OpenDrawer,
+  type OpenTab,
 } from './hud-view.js'
-import { cityPlace, cityScale } from './cities-drawer-view.js'
+import { cityPlace, cityScale } from './cities-tab-view.js'
 import {
   CentredDialog,
   DiplomacyTabs,
-  Drawer,
-  DrawerEdge,
   FirstDayCard,
   GroupReportNotice,
   HorseOfferNotice,
@@ -145,18 +147,18 @@ import {
   NoticeLane,
   PhoneMenu,
   RealmBar,
-  ToolRail,
   TopBar,
   mapCovered,
   useEscapeCloses,
 } from './Hud.js'
+import { SideTab, Sidebar, useSidebar } from './Sidebar.js'
 import type { Covered } from './map/camera.js'
 import { cardHidden, laneNotices, visitKey } from './notices-view.js'
 import { ResidentsFullList } from './ResidentsFullList.js'
 import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
 import { groupHorses } from './horses-view.js'
 import { HorsesList } from './Horses.js'
-import { Founding } from './Founding.js'
+import { Founding, RealmEnded } from './Founding.js'
 import {
   appendRequest,
   appendToEach,
@@ -215,8 +217,9 @@ import {
 } from './vehicle-orders.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
-import { isWikiPath, pageFor } from './pages.js'
+import { isKitPath, isWikiPath, pageFor } from './pages.js'
 import { Wiki } from './Wiki.js'
+import { Kit } from './Kit.js'
 import { RealmLog } from './RealmLog.js'
 import {
   heirTakeover,
@@ -248,6 +251,8 @@ import {
 import { BuildMenu } from './BuildMenu.js'
 import { kindProblemOn } from './build-menu-view.js'
 import { WhoList } from './WhoList.js'
+import { Dock } from './Dock.js'
+import { barBesideTile } from './dock-view.js'
 import {
   WHO_SUGGESTS,
   lineProblem,
@@ -327,6 +332,7 @@ import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
 import { useLand } from './useLand.js'
 import { landMarks, regionAt } from './map/land.js'
+import { Icon } from './Icon.js'
 
 /**
  * The form shown before a script with params starts (`CONTEXT.md`: Script parameter, Before it
@@ -428,6 +434,7 @@ function toFeed(world: NonNullable<ReturnType<typeof useWorld>['world']>) {
 export function App() {
   // The Wiki needs no account, so it shows without asking who is logged in.
   if (isWikiPath(window.location.pathname)) return <Wiki />
+  if (isKitPath(window.location.pathname)) return <Kit />
   return <Pages />
 }
 
@@ -477,14 +484,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }, [])
   // The first-day lines reported and not turned down, so each goes out once (`reportFirstDay`).
   const firstDayReported = useRef(new Set<ClientFirstDayLine>())
-  // A tile picked on the map with no resident of the Player's on it; its card shows over the
-  // resident's, who stays picked to be sent there.
+  // A tile picked on the map with no resident of the Player's on it; its card shows in the dock
+  // beside the resident's (on a phone over it), who stays picked to be sent there.
   const [selectedTile, setSelectedTile] = useState<{ x: number; y: number }>()
+  // The dock on the right (`Dock`) once it is mounted; none on a phone.
+  const [dock, setDock] = useState<HTMLElement | null>(null)
   // The map's tile menu (`CONTEXT.md`: Waypoint): the tile right-clicked or long-pressed with
   // nothing else to do there, and where in the window it was pressed.
   const [tileMenu, setTileMenu] = useState<{ x: number; y: number; at: { x: number; y: number } }>()
   const closeTileMenu = useCallback(() => setTileMenu(undefined), [])
-  // The horse last picked in the Horses drawer, to mark its row among others on the same tile.
+  // The horse last picked in the Horses tab, to mark its row among others on the same tile.
   const [pickedHorseId, setPickedHorseId] = useState<string>()
   // The resident card's open tab and panel, kept here so they stay as the Player picks others;
   // the tab is also remembered in this browser (ADR 0012).
@@ -498,6 +507,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [orderError, setOrderError] = useState<string | undefined>()
   const [armyPick, setArmyPick] = useState<ArmyPick>()
   const [armyError, setArmyError] = useState<string | undefined>()
+  // The army whose card is in the command bar, opened from the Armies tab (`CONTEXT.md`: Army).
+  const [openArmyId, setOpenArmyId] = useState<string>()
   // The param of the picked resident's script whose value the map is waiting for (`CONTEXT.md`:
   // Script parameter).
   const [paramPick, setParamPick] = useState<ScriptParam>()
@@ -698,7 +709,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // A script to open in the library, such as the one a resident's task runs; `at` reopens it.
   const [scriptToOpen, setScriptToOpen] = useState<ScriptToOpen>()
   // A place to show on the map, such as one from the realm log or a resident picked in the list:
-  // asked for, then centred between the open drawer and the selection card once they are drawn.
+  // asked for, then centred between the open sidebar tab and the selection card once they are drawn.
   // A place to show on the map; `zoom` picks the zoom from the one now (the zoom stays without).
   const [toShow, setToShow] = useState<{ x: number; y: number; zoom?: (scale: number) => number }>()
   const [focus, setFocus] = useState<{
@@ -707,19 +718,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     zoom?: (scale: number) => number
     cover: Covered
   }>()
-  // The drawer open over the map, if any (ADR 0008: one at a time).
-  // The Diplomacy drawer's tab is kept with it, and stays while the drawer is closed.
-  const [drawers, setDrawers] = useState<Drawers>(NO_DRAWER)
-  const openDrawer = drawers.open
-  const setOpenDrawer = useCallback(
-    (open: OpenDrawer | ((open: OpenDrawer) => OpenDrawer)) =>
-      setDrawers((d) => withOpen(d, typeof open === 'function' ? open(d.open) : open)),
-    [],
+  // The sidebar's open tab, if any (ADR 0044: one at a time), as the browser kept it.
+  // The Diplomacy tab's own tab is kept with it, and stays while the sidebar is folded.
+  const [sidebar, setSidebar] = useSidebar()
+  const openTab = sidebar.open
+  const setOpenTab = useCallback(
+    (open: OpenTab | ((open: OpenTab) => OpenTab)) =>
+      setSidebar((s) => withOpen(s, typeof open === 'function' ? open(s.open) : open)),
+    [setSidebar],
   )
-  const demandsShown = showsTab(drawers, 'demands')
-  const offersShown = showsTab(drawers, 'directOffers')
+  const demandsShown = showsTab(sidebar, 'demands')
+  const offersShown = showsTab(sidebar, 'directOffers')
   // The notice of demands sent to the realm (`CONTEXT.md`: Demand), until the Player dismisses it
-  // or has them in front of them in the drawer.
+  // or has them in front of them in the sidebar.
   const [demandsPutAway, setDemandsPutAway] = useState<ReadonlySet<string>>(new Set())
   const demands = world?.diplomacy.demands
   const homeRealm = world?.home.realmId
@@ -736,7 +747,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       ? demandNoticeLine(demands, homeRealm, demandsPutAway, demandsShown)
       : undefined
   // The notice of what others sent the realm (`CONTEXT.md`: Notices), until the Player dismisses it
-  // or has it in front of them in the drawer.
+  // or has it in front of them in the sidebar.
   const [incomingPutAway, setIncomingPutAway] = useState<ReadonlySet<string>>(new Set())
   const incoming = useMemo(
     () => (world ? incomingItems(world.diplomacy, world.home.realmId) : []),
@@ -750,8 +761,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (offersShown) putIncomingAway()
   }, [offersShown, putIncomingAway])
   const incomingNotice = incomingNoticeLine(incoming, incomingPutAway, offersShown)
-  // What the Player hasn't seen in a drawer yet, for the marks on the rail and the Diplomacy tabs
-  // (`CONTEXT.md`: Tool rail): what was sent to the realm, seen once its tab was in front of them,
+  // What the Player hasn't seen in a sidebar tab yet, for the marks on its strip and the Diplomacy tabs
+  // (`CONTEXT.md`: Sidebar): what was sent to the realm, seen once its tab was in front of them,
   // and realm log lines newer than the last one they had open.
   const [seenIds, setSeenIds] = useState<SeenIds>(NOTHING_SEEN)
   const sent = useMemo(
@@ -761,7 +772,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         : { contracts: [], demands: [], directOffers: [] },
     [world],
   )
-  const tabShown = openDrawer === 'diplomacy' ? drawers.tab : undefined
+  const tabShown = openTab === 'diplomacy' ? sidebar.tab : undefined
   useEffect(() => {
     if (tabShown === 'contracts' || tabShown === 'demands' || tabShown === 'directOffers') {
       setSeenIds((s) => seeTab(s, tabShown, sent[tabShown]))
@@ -772,7 +783,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   useEffect(() => {
     if (!events || !homeRealm) return
     const newest = newestLine(events)
-    if (openDrawer === 'realmLog' && newest !== null) {
+    if (openTab === 'realmLog' && newest !== null) {
       setLogSeenUpTo((upTo) => {
         if (upTo !== null && upTo >= newest) return upTo
         rememberLogSeen(homeRealm, newest)
@@ -782,7 +793,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       // Until the log was open in this browser, what it held on arrival counts as seen.
       setLogSeenUpTo((upTo) => upTo ?? rememberedLogSeen(homeRealm) ?? newest ?? -1)
     }
-  }, [events, homeRealm, openDrawer])
+  }, [events, homeRealm, openTab])
   const marks = unseenMarks(sent, seenIds, events ?? [], logSeenUpTo)
   // The notice that the heir took over (`CONTEXT.md`: Leader death with an heir), until the Player
   // puts it away; remembered in this browser, so it shows at once or on their next login.
@@ -797,31 +808,37 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     rememberTakeoverSeen(homeRealm, takeover.seq)
     setTakeoverSeen(takeover.seq)
   }
-  const closeDrawer = useCallback(() => setOpenDrawer(undefined), [setOpenDrawer])
-  // The Residents drawer opened fully (`CONTEXT.md`: Residents list); closing it goes back.
+  const foldSidebar = useCallback(() => setOpenTab(undefined), [setOpenTab])
+  // The Residents tab opened fully (`CONTEXT.md`: Residents list); closing it goes back.
   const [residentsFull, setResidentsFull] = useState(false)
-  const fullList = residentsFull && openDrawer === 'residents'
+  const fullList = residentsFull && openTab === 'residents'
   useEffect(() => {
-    if (openDrawer !== 'residents') setResidentsFull(false)
-  }, [openDrawer])
-  useEscapeCloses(openDrawer, closeDrawer)
-  /** Opens a script in the library, at a version and line when given. */
+    if (openTab !== 'residents') setResidentsFull(false)
+  }, [openTab])
+  useEscapeCloses(openTab, foldSidebar)
+  /** Opens a script in the script workshop, at a version and line when given. */
   const openScript = (id: number, where?: Omit<ScriptToOpen, 'id' | 'at'>) => {
     setScriptToOpen({ id, at: Date.now(), ...where })
-    setOpenDrawer('scripts')
+    setOpenTab('scripts')
   }
   /**
    * The Script tab's live view of the script a resident or army runs (`CONTEXT.md`: Debugging a
    * script): how it last ran, and its memory.
    */
+  const scriptRunInfo = (id: string, scriptId: number) => (
+    <ScriptRunInfo
+      run={runs.get(id)}
+      tick={world?.tick ?? 0}
+      onOpenError={({ version, line, column }) => openScript(scriptId, { version, line, column })}
+    />
+  )
+  const scriptMemoryTree = (id: string) => (
+    <ScriptMemoryTree id={id} memory={memories.get(id)} watch={watchScript} />
+  )
   const scriptDebug = (id: string, scriptId: number) => (
     <>
-      <ScriptRunInfo
-        run={runs.get(id)}
-        tick={world?.tick ?? 0}
-        onOpenError={({ version, line, column }) => openScript(scriptId, { version, line, column })}
-      />
-      <ScriptMemoryTree id={id} memory={memories.get(id)} watch={watchScript} />
+      {scriptRunInfo(id, scriptId)}
+      {scriptMemoryTree(id)}
     </>
   )
   // What the map waits for while an order that needs a target is given (ADR 0012: pick mode).
@@ -914,6 +931,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     (mode: ControlMode) => {
       if (mode === 'realm') {
         setSelectedIds([])
+        setOpenArmyId(undefined)
         setStarting(undefined)
         cancelPick()
       }
@@ -941,23 +959,32 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     return () => window.removeEventListener('keydown', onKey)
   }, [controlMode, switchControlMode])
   // Picking a resident, a group or an army some other way than a map click (the Residents list,
-  // a saved group's key, the Armies drawer, a notice) switches to unit control mode.
-  const pickedArmy = armyPick !== undefined
+  // a saved group's key, the Armies tab, a notice) switches to unit control mode.
+  const openArmy = world?.armies.find((a) => a.id === openArmyId)
+  const pickedArmy = armyPick !== undefined || openArmy !== undefined
+  // One card in the command bar at a time: a resident or group picked closes the army's.
+  useEffect(() => {
+    if (selectedIds.length > 0) setOpenArmyId(undefined)
+  }, [selectedIds.length])
   useEffect(() => {
     const next = modeAfterPick(controlMode, { residents: selectedIds.length, army: pickedArmy })
     if (next !== controlMode) setControlMode(next)
   }, [controlMode, selectedIds.length, pickedArmy, setControlMode])
   // Escape leaves the top-most thing first: pick mode, an open panel (the form before a script
-  // starts among them), the tile card, the resident or group card, then the drawer. A card
-  // hidden behind the wide drawer is passed over, so Escape closes the drawer in front of it.
-  const hideCard = cardHidden(openDrawer, fullList)
+  // starts among them), the tile card, the resident or group card, then the open sidebar tab. A card
+  // hidden behind the script workshop or the full list is passed over, so Escape closes what is
+  // in front of it.
+  const hideCard = cardHidden(openTab, fullList)
   const shownCard = !hideCard
   const anySelected = selectedIds.length > 0
   const picked = pick !== undefined
   const formOpen = starting !== undefined
   const tileOpen = selectedTile !== undefined
+  // The command bar beside an open tile card: both on a desktop, the tile card's keys winning.
+  const besideTile = barBesideTile(phone, tileOpen)
   // The realm order's Build menu or who-list, which Escape closes as it does a card.
   const realmCard = realmOrder !== undefined && !realmPicking
+  const armyOpen = openArmy !== undefined
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing =
@@ -967,11 +994,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         pick: picked,
         panel: formOpen || (shownCard && panelOpen()),
         tile: shownCard && tileOpen,
-        card: shownCard && (anySelected || realmCard),
+        card: shownCard && (anySelected || realmCard || armyOpen),
       })
-      // With nothing else open, the drawer's own Escape closes it.
+      // With nothing else open, the sidebar's own Escape closes it.
       if (!step) return
-      // Ahead of the drawer's own Escape, which would close it too.
+      // Ahead of the sidebar's own Escape, which would close it too.
       e.stopImmediatePropagation()
       if (step === 'pick') return cancelPick()
       if (step === 'panel') {
@@ -982,17 +1009,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setSelectedIds([])
       setPicking(false)
       setRealmOrder(undefined)
+      setOpenArmyId(undefined)
     }
     window.addEventListener('keydown', onKey, { capture: true })
     return () => window.removeEventListener('keydown', onKey, { capture: true })
-  }, [anySelected, realmCard, picked, formOpen, tileOpen, shownCard, cancelPick])
+  }, [anySelected, realmCard, armyOpen, picked, formOpen, tileOpen, shownCard, cancelPick])
   useLayoutEffect(() => {
     if (!toShow) return
     const covered = mapCovered()
-    const shown = showBeside(window.innerWidth, covered.left, covered.right)
-    if (shown.closeDrawer) closeDrawer()
+    const shown = showBeside(window.innerWidth, covered.left, covered.right, covered.strip)
+    if (shown.foldSidebar) foldSidebar()
     setFocus({ ...toShow, cover: shown })
-  }, [toShow, closeDrawer])
+  }, [toShow, foldSidebar])
   const showOnMap = (x: number, y: number) => setToShow({ x, y })
   /**
    * Reports a first-day line only the client sees done, once, while the card shows
@@ -1086,7 +1114,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setStarting({ script, params, values, ...(atWork ? { base: values } : {}), start })
     return true
   }
-  // The city picked on the map or opened in the Cities drawer.
+  // The city picked on the map or opened in the Cities tab.
   const [openCityId, setOpenCityId] = useState<string>()
   // The warehouse or storage Trade here scrolls the open city to; a new object each press.
   const [tradeAt, setTradeAt] = useState<{ buildingId: string }>()
@@ -1662,7 +1690,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setGroupPicking(false)
     if (!world) return
     if (mode === 'creativeMove') {
-      setGroupError(await creativeMove(group.map((r) => r.id), x, y))
+      setGroupError(
+        await creativeMove(
+          group.map((r) => r.id),
+          x,
+          y,
+        ),
+      )
       return
     }
     if (mode === 'build') {
@@ -2380,12 +2414,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const heirId = world?.home.heirId ?? null
   const heirName = world && heirId ? world.residents.find((r) => r.id === heirId)?.name : undefined
   const heirShown = world && leader ? (heirName ?? null) : undefined
-  const pickHeir = () => setOpenDrawer('residents')
-  const drawer = (id: DrawerId, panel: ReactNode, full = false) => (
-    <Drawer id={id} open={openDrawer} onClose={closeDrawer} full={full}>
-      {panel}
-    </Drawer>
-  )
+  const pickHeir = () => setOpenTab('residents')
+  const sideTab = (id: SideTabId, panel: ReactNode) => <SideTab id={id}>{panel}</SideTab>
 
   const residentsPanel = world && {
     groups: groupResidents(own, {
@@ -2449,7 +2479,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             selectedCityId={openCityId}
             onSelectCity={(id) => {
               setOpenCityId(id)
-              setOpenDrawer('cities')
+              setOpenTab('cities')
             }}
             picking={
               picking !== false ||
@@ -2470,10 +2500,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             land={landShown}
           />
         ) : (
-          <p className="game-waiting">Waiting for the server…</p>
+          <div className="game-waiting">
+            <p className="waiting-panel pn fx">
+              <Icon name="clock" />
+              <span className="px t16">Waiting for the server…</span>
+            </p>
+          </div>
         )}
       </section>
       <TopBar
+        phone={phone}
         realm={world ? (world.home.realmName ?? leader?.name) : undefined}
         account={account.name}
         cityName={homeCity?.name}
@@ -2491,6 +2527,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       />
       {world && controlMode === 'realm' && (
         <RealmBar
+          phone={phone}
           open={realmBarOpen}
           onOpen={(order) => {
             setSelectedTile(undefined)
@@ -2509,11 +2546,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           }}
         />
       )}
-      {phone ? (
+      {phone && (
         <PhoneMenu
-          open={openDrawer}
-          onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
-          marked={marks.rail}
+          open={openTab}
+          onToggle={(id) => setOpenTab((open) => toggleTab(open, id))}
+          marked={marks.strip}
           goods={goods}
           leader={leader?.name}
           heir={heirShown}
@@ -2521,279 +2558,290 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           account={account.name}
           onLogout={logout}
           onWiki={() => reportFirstDay('openWiki')}
-        />
-      ) : (
-        <ToolRail
-          open={openDrawer}
-          onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
-          marked={marks.rail}
+          zeal={world?.zeal}
+          zealDraining={leader?.order?.kind === 'rally'}
         />
       )}
-      {residentsPanel &&
-        drawer(
-          'residents',
-          fullList ? (
-            <ResidentsFullList
-              {...residentsPanel}
-              onPick={(ids) => {
-                select(ids)
-                // The group card has no room beside the full list, so the short list comes back.
-                setResidentsFull(false)
-                const first = own.find((r) => r.id === ids[0])
-                if (first) showOnMap(Math.floor(first.x), Math.floor(first.y))
+      <Sidebar
+        open={openTab}
+        marked={marks.strip}
+        phone={phone}
+        full={fullList}
+        onToggle={(id) => setOpenTab((open) => toggleTab(open, id))}
+        onFold={() => setSidebar(foldOrUnfold)}
+        onClose={foldSidebar}
+      >
+        {residentsPanel &&
+          sideTab(
+            'residents',
+            fullList ? (
+              <ResidentsFullList
+                {...residentsPanel}
+                onPick={(ids) => {
+                  select(ids)
+                  // The group card has no room beside the full list, so the short list comes back.
+                  setResidentsFull(false)
+                  const first = own.find((r) => r.id === ids[0])
+                  if (first) showOnMap(Math.floor(first.x), Math.floor(first.y))
+                }}
+                onClose={() => setResidentsFull(false)}
+              />
+            ) : (
+              <ResidentsList {...residentsPanel} onOpenFull={() => setResidentsFull(true)} />
+            ),
+          )}
+        {world &&
+          sideTab(
+            'horses',
+            <HorsesList
+              groups={groupHorses(
+                world.horses.filter((h) => h.realmId === world.home.realmId),
+                world.buildings,
+                world.carriages,
+                world.residents,
+                world.cities,
+                world.tick,
+              )}
+              tick={world.tick}
+              phone={phone}
+              selectedId={(() => {
+                // A horse whose tile card is open, the last one picked here first, or the one the
+                // picked resident rides.
+                const shown = world.horses.filter(
+                  (h) =>
+                    h.realmId === world.home.realmId &&
+                    (selectedTile
+                      ? Math.floor(h.x) === selectedTile.x && Math.floor(h.y) === selectedTile.y
+                      : selected?.riding === h.id),
+                )
+                return (shown.find((h) => h.id === pickedHorseId) ?? shown[0])?.id
+              })()}
+              onSelect={(h) => {
+                setPickedHorseId(h.id)
+                const x = Math.floor(h.x)
+                const y = Math.floor(h.y)
+                // A ridden horse shows on its rider's card; any other on its tile's card.
+                const rider = own.find((r) => r.riding === h.id)
+                if (rider) {
+                  setSelectedIds([rider.id])
+                  setSelectedTile(undefined)
+                } else {
+                  setSelectedIds([])
+                  setSelectedTile({ x, y })
+                }
+                showOnMap(x, y)
               }}
-              onClose={() => setResidentsFull(false)}
-            />
-          ) : (
-            <ResidentsList {...residentsPanel} onOpenFull={() => setResidentsFull(true)} />
-          ),
-          fullList,
-        )}
-      {world &&
-        drawer(
-          'horses',
-          <HorsesList
-            groups={groupHorses(
-              world.horses.filter((h) => h.realmId === world.home.realmId),
-              world.buildings,
-              world.carriages,
-              world.residents,
-              world.cities,
-              world.tick,
-            )}
-            tick={world.tick}
-            phone={phone}
-            selectedId={(() => {
-              // A horse whose tile card is open, the last one picked here first, or the one the
-              // picked resident rides.
-              const shown = world.horses.filter(
-                (h) =>
-                  h.realmId === world.home.realmId &&
-                  (selectedTile
-                    ? Math.floor(h.x) === selectedTile.x && Math.floor(h.y) === selectedTile.y
-                    : selected?.riding === h.id),
-              )
-              return (shown.find((h) => h.id === pickedHorseId) ?? shown[0])?.id
-            })()}
-            onSelect={(h) => {
-              setPickedHorseId(h.id)
-              const x = Math.floor(h.x)
-              const y = Math.floor(h.y)
-              // A ridden horse shows on its rider's card; any other on its tile's card.
-              const rider = own.find((r) => r.riding === h.id)
-              if (rider) {
-                setSelectedIds([rider.id])
-                setSelectedTile(undefined)
-              } else {
-                setSelectedIds([])
-                setSelectedTile({ x, y })
-              }
-              showOnMap(x, y)
-            }}
-          />,
-        )}
-      {world &&
-        drawer(
-          'waypoints',
-          <WaypointsPanel
-            waypoints={world.waypoints}
-            onCentre={(w) => showOnMap(w.x, w.y)}
-            onRename={(w, name) => sendOrder({ kind: 'renameWaypoint', waypointId: w.id, name })}
-            onRemove={(w) => sendOrder({ kind: 'removeWaypoint', waypointId: w.id })}
-            // A waypoint is a place like a tile: picked, it is its tile (`CONTEXT.md`: Waypoint).
-            onPick={pick ? (w) => pickTile(w.x, w.y) : undefined}
-          />,
-        )}
-      {world &&
-        drawer(
-          'armies',
-          <ArmiesPanel
-            armies={world.armies}
-            own={own}
-            inSight={world.residents}
-            carriages={world.carriages}
-            realmId={world.home.realmId}
-            picking={armyPick}
-            onPick={(pick) => {
-              setArmyPick(pick)
-              setPicking(false)
-              setArmyError(undefined)
-            }}
-            pickError={armyError}
-            scripts={scripts}
-            sendOrder={sendOrder}
-            scriptMemory={(id) =>
-              scriptDebug(id, world.armies.find((a) => a.id === id)?.script?.scriptId ?? 0)
-            }
-          />,
-        )}
-      {world &&
-        drawer(
-          'diplomacy',
-          <DiplomacyTabs
-            tab={drawers.tab}
-            onTab={(tab) => setDrawers(openDiplomacy(tab))}
-            marked={marks.tabs}
-            panels={{
-              contracts: (
-                <ContractsPanel
-                  contracts={world.diplomacy.contracts}
-                  realmId={world.home.realmId}
-                  own={own}
-                  inSight={world.residents}
-                  horses={world.horses}
-                  buildings={world.buildings}
-                  cities={world.cities}
-                  realms={realms}
-                  scripts={scripts}
-                  tick={world.tick}
-                  sendOrder={sendOrder}
-                />
-              ),
-              demands: (
-                <DemandsPanel
-                  demands={world.diplomacy.demands}
-                  realmId={world.home.realmId}
-                  knownRealms={world.diplomacy.knownRealms}
-                  knownNpcOrgs={world.diplomacy.knownNpcOrgs}
-                  cities={world.cities}
-                  buildings={world.buildings}
-                  carriedWays={world.diplomacy.carriedWays ?? []}
-                  noCaravans={world.diplomacy.noCaravans === true}
-                  lastSeen={world.lastSeen.cities}
-                  tick={world.tick}
-                  sendOrder={sendOrder}
-                />
-              ),
-              directOffers: (
-                <DirectOffersPanel
-                  offers={world.diplomacy.directOffers}
-                  knownRealms={world.diplomacy.directOfferRealms}
-                  carriedWays={world.diplomacy.carriedWays ?? []}
-                  buildings={world.buildings}
-                  cities={world.cities}
-                  residents={world.residents}
-                  carriages={world.carriages}
-                  horses={world.horses}
-                  realmId={world.home.realmId}
-                  tick={world.tick}
-                  mapSize={world.map.size}
-                  noCaravans={world.diplomacy.noCaravans === true}
-                  arrivesIn={arrivesIn || undefined}
-                  onShowPlace={showOnMap}
-                  giveOrder={giveOrder}
-                  sendOrder={sendOrder}
-                />
-              ),
-              alliance: (
-                <AlliancePanel
-                  diplomacy={world.diplomacy}
-                  residents={world.residents}
-                  carriages={world.carriages}
-                  realmId={world.home.realmId}
-                  sendOrder={sendOrder}
-                />
-              ),
-              standing: (
-                <StandingPanel
-                  standings={world.diplomacy.standings}
-                  joinRequests={world.diplomacy.joinRequests}
-                  directives={world.diplomacy.directives}
-                  sendOrder={sendOrder}
-                />
-              ),
-            }}
-          />,
-        )}
-      {world &&
-        drawer(
-          'cities',
-          <CityInspector
-            cities={world.cities}
-            lastSeen={world.lastSeen}
-            residents={world.residents}
-            buildings={world.buildings}
-            traders={world.traders}
-            traderVisits={world.traderVisits}
-            realmId={world.home.realmId}
-            realms={realms}
-            carriages={world.carriages}
-            horses={world.horses}
-            tick={world.tick}
-            mapSize={world.map.size}
-            onSetGate={async (gateId, open) =>
-              setOrderError(await giveOrder({ kind: 'setGate', gateId, open }))
-            }
-            onBuyCity={async (residentId, cityId) =>
-              setOrderError(await giveOrder({ kind: 'buyCity', residentId, cityId }))
-            }
-            onTrade={async ({ side, ...trade }) =>
-              setOrderError(await giveOrder({ kind: side, ...trade }))
-            }
-            onSwap={async (swap) => setOrderError(await giveOrder({ kind: 'swap', ...swap }))}
-            onBuyHorse={async (buy) => setOrderError(await giveOrder({ kind: 'buyHorse', ...buy }))}
-            onSellHorse={async (sale) =>
-              setOrderError(await giveOrder({ kind: 'sellHorse', ...sale }))
-            }
-            onTransfer={async (transfer) =>
-              setOrderError(await giveOrder({ kind: 'transfer', ...transfer }))
-            }
-            onSend={async ({ residentId, carriageId, x, y }) =>
-              setOrderError(
-                await giveOrder(
-                  carriageId
-                    ? { kind: 'drive', residentId, carriageId, x, y }
-                    : { kind: 'walkTo', residentId, x, y },
+            />,
+          )}
+        {world &&
+          sideTab(
+            'waypoints',
+            <WaypointsPanel
+              waypoints={world.waypoints}
+              onCentre={(w) => showOnMap(w.x, w.y)}
+              onRename={(w, name) => sendOrder({ kind: 'renameWaypoint', waypointId: w.id, name })}
+              onRemove={(w) => sendOrder({ kind: 'removeWaypoint', waypointId: w.id })}
+              // A waypoint is a place like a tile: picked, it is its tile (`CONTEXT.md`: Waypoint).
+              onPick={pick ? (w) => pickTile(w.x, w.y) : undefined}
+            />,
+          )}
+        {world &&
+          sideTab(
+            'armies',
+            <ArmiesPanel
+              armies={world.armies}
+              own={own}
+              inSight={world.residents}
+              openId={openArmy?.id}
+              onOpen={(id) => {
+                // The army's card takes the command bar: a resident or group picked lets go.
+                if (id) setSelectedIds([])
+                // On a phone the tab fills the screen over the sheet: it folds, as it does when a
+                // resident is picked from Residents (`showBeside`), so the army's sheet shows.
+                if (id && phone) foldSidebar()
+                cancelPick()
+                setArmyError(undefined)
+                setOpenArmyId(id)
+              }}
+              sendOrder={sendOrder}
+            />,
+          )}
+        {world &&
+          sideTab(
+            'diplomacy',
+            <DiplomacyTabs
+              tab={sidebar.tab}
+              onTab={(tab) => setSidebar((s) => openDiplomacy(s, tab))}
+              marked={marks.tabs}
+              panels={{
+                contracts: (
+                  <ContractsPanel
+                    contracts={world.diplomacy.contracts}
+                    realmId={world.home.realmId}
+                    own={own}
+                    inSight={world.residents}
+                    horses={world.horses}
+                    buildings={world.buildings}
+                    cities={world.cities}
+                    realms={realms}
+                    scripts={scripts}
+                    tick={world.tick}
+                    sendOrder={sendOrder}
+                  />
                 ),
-              )
-            }
-            arrivesIn={arrivesIn || undefined}
-            directives={world.diplomacy.directives}
-            debt={world.diplomacy.debt ?? 0}
-            noCaravans={world.diplomacy.noCaravans === true}
-            allies={new Set(world.diplomacy.alliance?.members.map((m) => m.realmId))}
-            openId={openCityId}
-            onOpen={(id) => {
-              setOpenCityId(id)
-              // Opening a row shows the city on the map, outlined (`CONTEXT.md`: Cities drawer).
-              const at = id && cityPlace(id, knownCities, knownBuildings)
-              if (at) setToShow({ ...at, zoom: cityScale })
-            }}
-            scrollTo={tradeAt}
-            standings={world.diplomacy.standings}
-            events={world.events}
-            onBuyOff={async (residentId, directiveId, carriageId) =>
-              setOrderError(
-                await sendOrder({ kind: 'buyOff', residentId, directiveId, carriageId }),
-              )
-            }
-            onPayDebt={async (residentId, coins, carriageId) =>
-              setOrderError(await sendOrder({ kind: 'payDebt', residentId, coins, carriageId }))
-            }
-            onPostOffer={async (offer) =>
-              setOrderError(await sendOrder({ kind: 'postOffer', ...offer }))
-            }
-            onTakeDownOffer={async (offerId) =>
-              setOrderError(await sendOrder({ kind: 'takeDownOffer', offerId }))
-            }
-            onAcceptOffer={async (accept) =>
-              setOrderError(await giveOrder({ kind: 'acceptOffer', ...accept }))
-            }
-          />,
-        )}
-      {/* Mounted before the world arrives too: it loads the scripts the inspector can run. */}
-      {drawer('scripts', <ScriptLibrary onScripts={setScripts} toOpen={scriptToOpen} />)}
-      {world &&
-        drawer(
-          'realmLog',
-          <RealmLog
-            events={world.events}
-            realmId={world.home.realmId}
-            deliveries={world.diplomacy.deliveries}
-            onShowPlace={(p) => showOnMap(p.x, p.y)}
-          />,
-        )}
-      <DrawerEdge open={fullList ? undefined : openDrawer} />
+                demands: (
+                  <DemandsPanel
+                    demands={world.diplomacy.demands}
+                    realmId={world.home.realmId}
+                    knownRealms={world.diplomacy.knownRealms}
+                    knownNpcOrgs={world.diplomacy.knownNpcOrgs}
+                    cities={world.cities}
+                    buildings={world.buildings}
+                    carriedWays={world.diplomacy.carriedWays ?? []}
+                    noCaravans={world.diplomacy.noCaravans === true}
+                    lastSeen={world.lastSeen.cities}
+                    tick={world.tick}
+                    sendOrder={sendOrder}
+                  />
+                ),
+                directOffers: (
+                  <DirectOffersPanel
+                    offers={world.diplomacy.directOffers}
+                    knownRealms={world.diplomacy.directOfferRealms}
+                    carriedWays={world.diplomacy.carriedWays ?? []}
+                    buildings={world.buildings}
+                    cities={world.cities}
+                    residents={world.residents}
+                    carriages={world.carriages}
+                    horses={world.horses}
+                    realmId={world.home.realmId}
+                    tick={world.tick}
+                    mapSize={world.map.size}
+                    noCaravans={world.diplomacy.noCaravans === true}
+                    arrivesIn={arrivesIn || undefined}
+                    onShowPlace={showOnMap}
+                    giveOrder={giveOrder}
+                    sendOrder={sendOrder}
+                  />
+                ),
+                alliance: (
+                  <AlliancePanel
+                    diplomacy={world.diplomacy}
+                    residents={world.residents}
+                    carriages={world.carriages}
+                    realmId={world.home.realmId}
+                    sendOrder={sendOrder}
+                  />
+                ),
+                standing: (
+                  <StandingPanel
+                    standings={world.diplomacy.standings}
+                    joinRequests={world.diplomacy.joinRequests}
+                    directives={world.diplomacy.directives}
+                    sendOrder={sendOrder}
+                  />
+                ),
+              }}
+            />,
+          )}
+        {world &&
+          sideTab(
+            'cities',
+            <CityInspector
+              cities={world.cities}
+              lastSeen={world.lastSeen}
+              residents={world.residents}
+              buildings={world.buildings}
+              traders={world.traders}
+              traderVisits={world.traderVisits}
+              realmId={world.home.realmId}
+              realms={realms}
+              carriages={world.carriages}
+              horses={world.horses}
+              tick={world.tick}
+              mapSize={world.map.size}
+              onSetGate={async (gateId, open) =>
+                setOrderError(await giveOrder({ kind: 'setGate', gateId, open }))
+              }
+              onBuyCity={async (residentId, cityId) =>
+                setOrderError(await giveOrder({ kind: 'buyCity', residentId, cityId }))
+              }
+              onTrade={async ({ side, ...trade }) =>
+                setOrderError(await giveOrder({ kind: side, ...trade }))
+              }
+              onSwap={async (swap) => setOrderError(await giveOrder({ kind: 'swap', ...swap }))}
+              onBuyHorse={async (buy) =>
+                setOrderError(await giveOrder({ kind: 'buyHorse', ...buy }))
+              }
+              onSellHorse={async (sale) =>
+                setOrderError(await giveOrder({ kind: 'sellHorse', ...sale }))
+              }
+              onTransfer={async (transfer) =>
+                setOrderError(await giveOrder({ kind: 'transfer', ...transfer }))
+              }
+              onSend={async ({ residentId, carriageId, x, y }) =>
+                setOrderError(
+                  await giveOrder(
+                    carriageId
+                      ? { kind: 'drive', residentId, carriageId, x, y }
+                      : { kind: 'walkTo', residentId, x, y },
+                  ),
+                )
+              }
+              arrivesIn={arrivesIn || undefined}
+              directives={world.diplomacy.directives}
+              debt={world.diplomacy.debt ?? 0}
+              noCaravans={world.diplomacy.noCaravans === true}
+              allies={new Set(world.diplomacy.alliance?.members.map((m) => m.realmId))}
+              openId={openCityId}
+              onOpen={(id) => {
+                setOpenCityId(id)
+                // Opening a row shows the city on the map, outlined (`CONTEXT.md`: Cities tab).
+                const at = id && cityPlace(id, knownCities, knownBuildings)
+                if (at) setToShow({ ...at, zoom: cityScale })
+              }}
+              scrollTo={tradeAt}
+              standings={world.diplomacy.standings}
+              events={world.events}
+              onBuyOff={async (residentId, directiveId, carriageId) =>
+                setOrderError(
+                  await sendOrder({ kind: 'buyOff', residentId, directiveId, carriageId }),
+                )
+              }
+              onPayDebt={async (residentId, coins, carriageId) =>
+                setOrderError(await sendOrder({ kind: 'payDebt', residentId, coins, carriageId }))
+              }
+              onPostOffer={async (offer) =>
+                setOrderError(await sendOrder({ kind: 'postOffer', ...offer }))
+              }
+              onTakeDownOffer={async (offerId) =>
+                setOrderError(await sendOrder({ kind: 'takeDownOffer', offerId }))
+              }
+              onAcceptOffer={async (accept) =>
+                setOrderError(await giveOrder({ kind: 'acceptOffer', ...accept }))
+              }
+            />,
+          )}
+        {world &&
+          sideTab(
+            'realmLog',
+            <RealmLog
+              events={world.events}
+              realmId={world.home.realmId}
+              deliveries={world.diplomacy.deliveries}
+              onShowPlace={(p) => showOnMap(p.x, p.y)}
+            />,
+          )}
+      </Sidebar>
+      {/* The script workshop, a screen over the map that the Scripts tab opens (ADR 0044). Mounted
+          before the world arrives too, and while closed: it loads the scripts the inspector can
+          run. */}
+      <ScriptLibrary
+        open={openTab === 'scripts'}
+        onClose={foldSidebar}
+        onScripts={setScripts}
+        toOpen={scriptToOpen}
+      />
       {/* Every notice in one lane under the top bar (`CONTEXT.md`: Notices). */}
       <NoticeLane phone={phone}>
         {/* First in the lane under the top bar, so the notices stack below it. */}
@@ -2818,8 +2866,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               under={pick.kind === 'plan' && pick.error ? undefined : preview?.label}
               onConfirm={pickAt?.tapped ? () => pickTile(pickAt.x, pickAt.y) : undefined}
               onWaypoints={
-                world && world.waypoints.length > 0 && openDrawer !== 'waypoints'
-                  ? () => setOpenDrawer('waypoints')
+                world && world.waypoints.length > 0 && openTab !== 'waypoints'
+                  ? () => setOpenTab('waypoints')
                   : undefined
               }
               onCancel={cancelPick}
@@ -2834,14 +2882,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             <IncomingNotice
               key={kind}
               line={demandNotice}
-              onOpen={() => setDrawers(openDiplomacy('demands'))}
+              onOpen={() => setSidebar((s) => openDiplomacy(s, 'demands'))}
               onDismiss={putDemandsAway}
             />
           ) : kind === 'incoming' && incomingNotice ? (
             <IncomingNotice
               key={kind}
               line={incomingNotice}
-              onOpen={() => setDrawers(openDiplomacy('directOffers'))}
+              onOpen={() => setSidebar((s) => openDiplomacy(s, 'directOffers'))}
               onDismiss={putIncomingAway}
             />
           ) : kind === 'firstDay' && world ? (
@@ -2863,7 +2911,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   onTrade={() => {
                     setOpenCityId(v.cityId)
                     setTradeAt({ buildingId: v.traderId })
-                    setOpenDrawer('cities')
+                    setOpenTab('cities')
                   }}
                   onDismiss={() => setDismissedVisits((seen) => new Set([...seen, visitKey(v)]))}
                 />
@@ -2887,8 +2935,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           onClose={closeTileMenu}
         />
       )}
+      {!phone && <Dock onMount={setDock} />}
       {world && selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={workPick !== undefined} hidden={hideCard}>
+        <CardSheet phone={phone} dock={dock} pinnedPeek={workPick !== undefined} hidden={hideCard}>
           <TileCard
             card={describeTile(
               {
@@ -3114,7 +3163,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onOpenCity={(id, buildingId) => {
               setOpenCityId(id)
               setTradeAt(buildingId ? { buildingId } : undefined)
-              setOpenDrawer('cities')
+              setOpenTab('cities')
             }}
             // The same `renameCity` order a script's `renameCity` requests, asked by the Leader.
             onRenameCity={async (cityId, name) => {
@@ -3134,7 +3183,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onSelectResident={(id) => select([id])}
             onOpenHorse={(id) => {
               setPickedHorseId(id)
-              setOpenDrawer('horses')
+              setOpenTab('horses')
             }}
             tile={selectedTile}
             waypoints={world.waypoints}
@@ -3195,10 +3244,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           />
         </CardSheet>
       )}
-      {world && selected && !selectedTile && (
+      {world && selected && besideTile.shows && (
         <CardSheet
           phone={phone}
           pinnedPeek={pick !== undefined && pick.kind !== 'army'}
+          bar
+          keysOff={!besideTile.keys}
           hidden={hideCard}
         >
           <InsertPointContext.Provider value={insertFor(selected.id)}>
@@ -3460,7 +3511,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   />
                 )
               }
-              scriptMemory={selected.script && scriptDebug(selected.id, selected.script.scriptId)}
+              scriptRun={selected.script && scriptRunInfo(selected.id, selected.script.scriptId)}
+              scriptMemory={selected.script && scriptMemoryTree(selected.id)}
               scriptLog={
                 <ScriptLog
                   id={selected.id}
@@ -3501,10 +3553,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           </InsertPointContext.Provider>
         </CardSheet>
       )}
-      {world && group.length > 1 && !selectedTile && (
+      {world && group.length > 1 && besideTile.shows && (
         <CardSheet
           phone={phone}
           pinnedPeek={pick?.kind === 'group' || pick?.kind === 'plan'}
+          bar
+          keysOff={!besideTile.keys}
           hidden={hideCard}
         >
           <GroupCard
@@ -3586,8 +3640,43 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           />
         </CardSheet>
       )}
+      {world && openArmy && besideTile.shows && (
+        // The army opened in the Armies tab, its card in the command bar as a resident's is.
+        <CardSheet
+          phone={phone}
+          pinnedPeek={armyPick !== undefined}
+          bar
+          keysOff={!besideTile.keys}
+          hidden={hideCard}
+        >
+          <ArmyCard
+            key={openArmy.id}
+            army={openArmy}
+            own={own}
+            inSight={world.residents}
+            carriages={world.carriages}
+            realmId={world.home.realmId}
+            picking={armyPick}
+            onPick={(p) => {
+              setArmyPick(p)
+              setPicking(false)
+              setArmyError(undefined)
+            }}
+            pickError={armyError}
+            scripts={scripts}
+            sendOrder={sendOrder}
+            scriptMemory={
+              openArmy.script && scriptDebug(openArmy.id, openArmy.script.scriptId ?? 0)
+            }
+            onClose={() => {
+              setOpenArmyId(undefined)
+              setArmyPick(undefined)
+            }}
+          />
+        </CardSheet>
+      )}
       {world && realmOrder?.step === 'menu' && !selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={false} hidden={hideCard}>
+        <CardSheet phone={phone} dock={dock} pinnedPeek={false} hidden={hideCard}>
           <SelectionCard
             rel="own"
             title={realmOrder.at ? `Build at ${realmOrder.at.x}, ${realmOrder.at.y}` : 'Build'}
@@ -3631,7 +3720,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CardSheet>
       )}
       {world && realmOrder?.step === 'script' && !selectedTile && !starting && (
-        <CardSheet phone={phone} pinnedPeek={false} hidden={hideCard}>
+        <CardSheet phone={phone} dock={dock} pinnedPeek={false} hidden={hideCard}>
           <RealmScriptCard
             scripts={scripts}
             onRun={(scriptId) => realmScriptOrder({ kind: 'runScript', scriptId })}
@@ -3640,7 +3729,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CardSheet>
       )}
       {world && realmOrder?.step === 'relocate' && !selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={false} hidden={hideCard}>
+        <CardSheet phone={phone} dock={dock} pinnedPeek={false} hidden={hideCard}>
           <RealmRelocateCard
             choices={realmRelocateChoices(
               { cities: knownCities, buildings: knownBuildings, residents: world.residents },
@@ -3660,7 +3749,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CardSheet>
       )}
       {world && who && realmOrder && !selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={false} hidden={hideCard}>
+        <CardSheet phone={phone} dock={dock} pinnedPeek={false} hidden={hideCard}>
           <WhoList
             key={who.key}
             title={who.title}
@@ -3670,6 +3759,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               realmOrder.step === 'vehicle'
                 ? vehicleSuggests(realmOrder.order)
                 : WHO_SUGGESTS[who.order.kind]
+            }
+            // Shift on Confirm arms Build, a line and Walk to again (`confirmRealmOrder`, `confirmPlace`).
+            armable={
+              realmOrder.step === 'who' ||
+              realmOrder.step === 'lineWho' ||
+              (realmOrder.step === 'place' && realmOrder.order.kind === 'walkTo')
             }
             most={realmOrder.step === 'vehicle' ? vehicleMost(realmOrder.order) : undefined}
             mostNote={
@@ -3735,7 +3830,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         />
       )}
       {status === 'updated' && (
-        <CentredDialog title="The game was updated">
+        <CentredDialog title="The game was updated" tone="news">
           <p>A new version of the game is out. Reload the page to play on.</p>
           <div className="hud-dialog-actions">
             <button type="button" className="primary" onClick={() => window.location.reload()}>
@@ -3745,7 +3840,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CentredDialog>
       )}
       {takeover && (
-        <CentredDialog title="Your heir has taken over">
+        <CentredDialog title="Your heir has taken over" tone="bad">
           <p>
             Your Leader has died. {takeover.heir} is your Leader now and leads your realm on from{' '}
             {takeover.city}, under its name, with its standing, contracts and alliance.
@@ -3767,19 +3862,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           </div>
         </CentredDialog>
       )}
-      {world && realmEnded(world.events) && (
-        <CentredDialog title="Your realm has ended">
-          <p>
-            Your Leader has died and your realm has ended. The realm log says what became of your
-            cities. You start afresh with a new Leader and a new starting city.
-          </p>
-          <div className="hud-dialog-actions">
-            <button type="button" className="primary" onClick={() => window.location.reload()}>
-              Start afresh
-            </button>
-          </div>
-        </CentredDialog>
-      )}
+      {world && realmEnded(world.events) && <RealmEnded />}
     </div>
   )
   return (

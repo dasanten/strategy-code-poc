@@ -6,3 +6,4 @@ packages/balance/balance.d.ts
 packages/balance/src/constants.ts
 packages/lang-wasm/generated
 packages/lang-wasm/script-data.json
+docs/design

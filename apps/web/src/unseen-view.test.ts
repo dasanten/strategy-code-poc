@@ -35,7 +35,7 @@ describe('unseen marks', () => {
     const sent = sentToRealm({ contracts: [], demands: [demand('d1')], directOffers: [] }, us)
     const marks = unseenMarks(sent, NOTHING_SEEN, noLines, 0)
     expect([...marks.tabs]).toEqual(['demands'])
-    expect([...marks.rail]).toEqual(['diplomacy'])
+    expect([...marks.strip]).toEqual(['diplomacy'])
   })
 
   it('marks the Direct offers tab for a direct offer sent to the realm, not one it sent', () => {
@@ -68,7 +68,7 @@ describe('unseen marks', () => {
   it('clears a tab once it was open, and marks it again for something newer', () => {
     let sent = sentToRealm({ contracts: [], demands: [demand('d1')], directOffers: [] }, us)
     const seen = seeTab(NOTHING_SEEN, 'demands', sent.demands)
-    expect(unseenMarks(sent, seen, noLines, 0).rail.size).toBe(0)
+    expect(unseenMarks(sent, seen, noLines, 0).strip.size).toBe(0)
     expect(seeTab(seen, 'demands', sent.demands)).toBe(seen)
     sent = sentToRealm(
       { contracts: [], demands: [demand('d1'), demand('d3')], directOffers: [] },
@@ -85,25 +85,25 @@ describe('unseen marks', () => {
     const seen = seeTab(NOTHING_SEEN, 'demands', sent.demands)
     const marks = unseenMarks(sent, seen, noLines, 0)
     expect([...marks.tabs]).toEqual(['directOffers'])
-    expect([...marks.rail]).toEqual(['diplomacy'])
+    expect([...marks.strip]).toEqual(['diplomacy'])
   })
 
   it('marks the Realm log button for lines newer than when it was last open', () => {
     const sent = sentToRealm({ contracts: [], demands: [], directOffers: [] }, us)
     const log = [{ seq: 3 }, { seq: 4 }]
-    expect([...unseenMarks(sent, NOTHING_SEEN, log, 3).rail]).toEqual(['realmLog'])
+    expect([...unseenMarks(sent, NOTHING_SEEN, log, 3).strip]).toEqual(['realmLog'])
     // Opening the log sees it up to its newest line, which clears the mark.
     const upTo = newestLine(log)
     expect(upTo).toBe(4)
-    expect(unseenMarks(sent, NOTHING_SEEN, log, upTo).rail.size).toBe(0)
-    expect(unseenMarks(sent, NOTHING_SEEN, [...log, { seq: 5 }], upTo).rail.has('realmLog')).toBe(
+    expect(unseenMarks(sent, NOTHING_SEEN, log, upTo).strip.size).toBe(0)
+    expect(unseenMarks(sent, NOTHING_SEEN, [...log, { seq: 5 }], upTo).strip.has('realmLog')).toBe(
       true,
     )
   })
 
   it('marks no log lines before it knows what was seen', () => {
     const sent = sentToRealm({ contracts: [], demands: [], directOffers: [] }, us)
-    expect(unseenMarks(sent, NOTHING_SEEN, [{ seq: 1 }], null).rail.size).toBe(0)
+    expect(unseenMarks(sent, NOTHING_SEEN, [{ seq: 1 }], null).strip.size).toBe(0)
     expect(newestLine([])).toBeNull()
   })
 

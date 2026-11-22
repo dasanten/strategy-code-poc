@@ -1,0 +1,505 @@
+/* ---------- The map and everything over it that is not a card (ADR 0044) ----------
+   The map dock bottom right, the legend over it, the notice lane, the dialogs and the tile menu.
+   Atoms come from kit.css; this file only places them. */
+
+.map-view {
+  position: relative;
+  height: min(70vh, 720px);
+  min-height: 360px;
+  overflow: hidden;
+  border: 2px solid var(--ink);
+  background: var(--terrain-void);
+}
+.map-view .map {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---------- The map dock (`MapView`; artboards Main, Game-Region, Game-Pick) ----------
+   At the right end of the command bar's row, also when nothing is picked: the minimap, the map's
+   buttons, Legend and the readout. `--dock-w` is its width, for the command bar to leave room. */
+.game,
+.map-view {
+  --dock-w: 236px;
+}
+.map-dock {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 1;
+  width: var(--dock-w);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+}
+.map-dock .fx {
+  gap: 4px;
+}
+.minimap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.minimap canvas {
+  display: block;
+  align-self: center;
+  border: 2px solid var(--ink);
+  background: var(--ink);
+  cursor: crosshair;
+  touch-action: none;
+}
+/* What is under the pointer, or the zoom (`readoutText`): one quiet line, wrapping if long. */
+.map-readout {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--ui-muted);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+/* ---------- The legend (`Legend`, `RegionLegend`) and the Art style picker ----------
+   Opens over the dock, right-aligned with it: clear of the sidebar on the left and of the command
+   bar along the bottom. Its height stops under the top bar and the notice band; the rest scrolls. */
+.map-legend-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: 400px;
+  max-width: calc(100vw - 16px);
+  /* 100% is the dock's height, under which the panel opens. */
+  max-height: calc(100vh - var(--top-h, 0px) - var(--lane-h, 0px) - 32px - 100%);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.map-legend-panel > .hd {
+  flex: none;
+}
+.map-legend-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.map-legend-body .sec {
+  gap: 6px;
+}
+.map-legend-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 12px;
+}
+.map-legend-grid > div,
+.region-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.map-legend .rule {
+  font-size: 11px;
+}
+.map-legend .swatch {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 2px solid var(--ink);
+}
+.map-legend .swatch.diamond {
+  width: 9px;
+  height: 9px;
+  margin: 0 1.5px;
+  transform: rotate(45deg);
+}
+/* The Art style picker under the legend (`CONTEXT.md`: Art style): its name, then the choice. */
+.art-style {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.map-legend-body > .map-legend + .sec {
+  border-top: 2px solid var(--tan);
+}
+
+/* ---------- The notice lane (`NoticeLane`; `CONTEXT.md`: Notices) ----------
+   One stack under the top bar, centred over the map between the sidebar and the card, its edges
+   set inline. As a band across the screen it sets `--lane-h`, and the sidebar and the card start
+   below it. */
+.notice-lane {
+  position: absolute;
+  top: calc(var(--top-h) + 10px);
+  left: calc(var(--strip-w) + 12px);
+  right: 12px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.notice-lane.band {
+  top: calc(var(--top-h) + 6px);
+}
+.notice-lane:empty {
+  display: none;
+}
+/* A notice (the Horse offer, a demand, the first-day card, a trader's stop, a group order's
+   report, the pick banner): a panel with its words, then its buttons. */
+.notice {
+  pointer-events: auto;
+  width: 560px;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  color: var(--ui-text);
+  font-family: var(--font-ui);
+}
+.notice-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.notice-actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+.notice > .btn,
+.notice > button {
+  flex: none;
+}
+.notice.group-report.skipped {
+  border-left: 6px solid var(--ui-warn);
+}
+.hud-offer-refused {
+  color: var(--ui-bad);
+}
+
+/* Pick mode (ADR 0012): the banner says what to pick, with Cancel; while it shows it replaces the
+   other notices (`laneNotices`). Sunlit, so it reads as a mode and not as news. */
+.notice.pick-banner {
+  padding: 10px 12px;
+  background: var(--sun);
+}
+.pick-banner-text {
+  display: grid;
+  gap: 2px;
+}
+.pick-banner-text strong {
+  font: 600 18px/1.2 var(--font-pixel);
+}
+/* A wall line's Wood or Stone (`CONTEXT.md`: Wood or stone), beside Cancel. */
+.material-pick {
+  display: flex;
+  gap: 4px;
+}
+
+/* The first-day card (`FirstDayCard`): a header bar with how far along and ✕, then the checklist
+   in a wrapping row, ticked lines struck through. */
+.notice.first-day {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+.first-day-head {
+  min-height: 28px;
+  padding: 4px 4px 4px 10px;
+  font-size: 14px;
+}
+.first-day-body {
+  padding: 8px 10px;
+}
+.first-day ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.first-day li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.first-day li a {
+  color: var(--navy);
+}
+.first-day li.done {
+  color: var(--ui-muted);
+  text-decoration: line-through;
+}
+.first-day li.done a {
+  color: inherit;
+}
+.first-day-tip {
+  margin: 6px 0 0;
+}
+
+/* On a phone every notice is one line, its button at the end; the whole text is its title. */
+.game.phone .notice {
+  width: auto;
+  padding: 4px 4px 4px 8px;
+}
+.game.phone .notice-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.game.phone .notice .ic.s24 {
+  display: none;
+}
+/* Its buttons a finger's size (artboards `Phone-Map`, `Phone-Card`); no keys on a touch screen. */
+.game.phone .notice :is(button, .btn) {
+  height: 44px;
+  min-width: 44px;
+  font-size: 14px;
+}
+.game.phone .notice kbd {
+  display: none;
+}
+/* The pick banner: what to pick over the hint, as the artboard's two lines, its buttons after;
+   with more buttons than fit beside the words (a wall's Wood | Stone, Waypoints) they go below. */
+.game.phone .notice.pick-banner {
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  padding: 4px 4px 4px 8px;
+}
+.game.phone .pick-banner-text {
+  flex: 1 1 150px;
+}
+.game.phone .pick-banner-text > * {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.game.phone .pick-banner-text strong {
+  font-size: 15px;
+}
+/* The first-day card: how far along, then only the first line still to do, then ✕. Its header bar
+   gives way to the line (`display: contents`), so its words take the panel's ink. */
+.game.phone .notice.first-day {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 8px;
+}
+.game.phone .first-day-head {
+  display: contents;
+}
+.game.phone .first-day-head > .grow {
+  flex: none;
+  order: 0;
+  color: var(--bark);
+  font: 700 13px/1.2 var(--font-ui);
+}
+.game.phone .first-day-body {
+  order: 1;
+  flex: 1 1 auto;
+  padding: 0;
+}
+.game.phone .first-day-dismiss {
+  order: 2;
+}
+.game.phone .first-day ul,
+.game.phone .first-day li {
+  display: inline;
+}
+.game.phone .first-day li:not(.next) {
+  display: none;
+}
+/* The Rally tip is a second line: the Wiki and the full card on a wider screen have it. */
+.game.phone .first-day-tip {
+  display: none;
+}
+/* Its ✕ stays the header bar's dark button, on the panel's paper. */
+.game.phone .first-day-dismiss {
+  width: 44px;
+}
+/* But a trader's stop says where it is, which is what the notice is for: its buttons go below. */
+.game.phone .notice.trader-visit {
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.game.phone .trader-visit .notice-text {
+  flex: 1 1 100%;
+  white-space: normal;
+}
+.game.phone .trader-visit .notice-actions {
+  margin-left: auto;
+}
+
+/* ---------- Dialogs (`CentredDialog`, the Start form) ---------- */
+.hud-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(24, 20, 37, 0.6);
+}
+.hud-dialog {
+  width: min(440px, 100%);
+  box-sizing: border-box;
+  padding: 20px 22px;
+}
+/* The header bar across the dialog's top edge. */
+.hud-dialog h2 {
+  margin: -20px -22px 14px;
+}
+.hud-dialog p {
+  margin: 0;
+  line-height: 1.5;
+}
+.hud-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+/* What a dialog's header bar says by its colour: a loss, word from the game, a start. */
+.hd.hd-bad {
+  background: var(--blood);
+  box-shadow: inset 0 2px 0 var(--red);
+}
+.hd.hd-news {
+  background: var(--navy);
+  box-shadow: inset 0 2px 0 var(--sky);
+}
+.hd.hd-go {
+  background: var(--pine);
+  box-shadow: inset 0 2px 0 var(--leaf);
+}
+
+/* ---------- The tile menu (`TileMenu`; `CONTEXT.md`: Waypoint) ----------
+   At the point right-clicked or long-pressed: its header bar with the tile, then the form. */
+.tile-menu {
+  position: fixed;
+  z-index: 7;
+  width: min(280px, calc(100vw - 16px));
+  box-sizing: border-box;
+}
+.tile-menu .hd h3 {
+  margin: 0;
+  font: inherit;
+}
+.tile-menu .hd .mono {
+  font-size: 12px;
+}
+.tile-menu-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+/* A dialog's and the tile menu's controls a finger's size on a phone; fields at 16px, so a phone
+   doesn't zoom in on them. */
+@media (max-width: 640px) {
+  .hud-dialog-actions :is(button, .btn) {
+    min-height: 44px;
+  }
+}
+.game.phone .tile-menu :is(button, select, input:not([type='checkbox'], [type='radio'])) {
+  min-height: 44px;
+}
+.game.phone .tile-menu :is(select, input:not([type='checkbox'], [type='radio'])) {
+  font-size: 16px;
+}
+
+/* ---------- On a phone (artboard `Phone-Map`) ----------
+   The dock gives up its panel: above the card's sheet (`--sheet-h`) the map's buttons sit in a
+   row, Centre, Select, Region and Legend bottom left and Minimap at the right end; zoom is pinch
+   only. The readout is one line above the row, the minimap (open) above that at the right. The
+   legend opens above it all, no higher than the room left under the top bar. */
+.game.phone .map-dock {
+  left: 8px;
+  right: 8px;
+  bottom: calc(var(--sheet-h, 0px) + 8px);
+  width: auto;
+  padding: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'minimap minimap'
+    'readout readout'
+    'buttons more';
+  align-items: end;
+  gap: 6px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  pointer-events: none;
+}
+.game.phone .map-dock > * {
+  pointer-events: auto;
+}
+.game.phone .map-buttons {
+  grid-area: buttons;
+}
+.game.phone .map-more {
+  grid-area: more;
+}
+.game.phone .map-dock .btn {
+  height: 44px;
+  min-width: 44px;
+  padding: 0 10px;
+  font-size: 14px;
+}
+.game.phone .map-dock .btn.sq {
+  width: 44px;
+  padding: 0;
+}
+.game.phone .map-dock .btn.grow {
+  flex: none;
+}
+.game.phone .map-dock .zoom {
+  display: none;
+}
+/* Minimap at the right end of the row, as the artboard's. */
+.game.phone .minimap-button {
+  margin-left: auto;
+}
+.game.phone .minimap {
+  grid-area: minimap;
+  justify-self: end;
+  padding: 6px;
+  background: var(--parch);
+  border: 2px solid var(--ink);
+}
+/* One line: what is under the finger, the zoom, or that the map is loading. */
+.game.phone .map-readout {
+  grid-area: readout;
+  justify-self: start;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+  background: var(--parch);
+  border: 2px solid var(--ink);
+  color: var(--ui-text);
+}
+.game.phone .map-readout:empty {
+  display: none;
+}
+.game.phone .map-legend-panel {
+  left: 0;
+  right: 0;
+  width: auto;
+  max-width: none;
+  bottom: calc(100% + 6px);
+  /* 100% is the map dock's height, under which the panel opens. */
+  max-height: min(
+    40vh,
+    calc(100vh - var(--top-h) - var(--lane-h, 0px) - var(--sheet-h, 0px) - 100% - 24px)
+  );
+}

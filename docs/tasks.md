@@ -141,6 +141,15 @@ depend on each other; 114 and 115 each bump the world format, in that order.
 any realm, saves and restores checkpoints and makes small test worlds). Nothing else is open, so
 it goes next; it changes no rule of the live game.
 
+**Agreed with Daniel on 2026-11-22,** from his wish for a completely new UI now that the functions
+are in: Pixel frontier UI (Epic 119, ADR 0044: one pixel look for everyone, a command bar along
+the bottom, a sidebar with tabs, a dock on the right, a script workshop, Pixel as the default art
+style; every screen and function stays, nothing is added). Nothing else is open, so it goes next.
+It is built on its epic branch, replacing the old UI there, and `dev` keeps the old UI until the
+whole epic merges; a feature epic that reaches `dev` meanwhile is merged into it. The functions
+the design sketches beyond the game (Find, idle and hungry buttons, list and log filters, a saved
+groups strip) wait for an epic after it.
+
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
@@ -259,6 +268,8 @@ I sleep.
 | 115 | [Drifters](https://github.com/dasanten/strategy-code-poc/issues/1455) | ticketed |
 | 116 | [Zeal](https://github.com/dasanten/strategy-code-poc/issues/1456) | ticketed |
 | 117 | [Creative mode](https://github.com/dasanten/strategy-code-poc/issues/1498) | ticketed |
+| 118 | [Pixel art](https://github.com/dasanten/strategy-code-poc/issues/1514) | done in one session |
+| 119 | [Pixel frontier UI](https://github.com/dasanten/strategy-code-poc/issues/1519) | ticketed |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sidebar, Horses</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<aside class="ui pn col" style="width: 360px; height: 860px; gap: 0">
+<div class="hd"><span class="ic i-horse" aria-hidden="true"></span><span class="grow">Horses</span><span class="mono" style="font-size: 12px">6 horses</span></div>
+<div class="fx" style="padding: 6px 8px; gap: 4px; border-bottom: 2px solid var(--tan)"><input class="in grow" style="height: 24px" aria-label="Find a horse" placeholder="Find a horse"><button class="btn sm on">All</button><button class="btn sm">Hungry</button></div>
+<table class="tb"><thead><tr><th>Name</th><th title="Speed / Strength / Endurance">Stats</th><th>Age</th><th>Health</th><th>Hunger</th></tr></thead></table>
+
+<div class="rw grp"><span class="lb grow">Stable, Ashford</span><span class="mono">3</span></div>
+<div class="rw sel"><span class="grow"><span class="b">Bramble</span><br><span class="mu">In the stable · breeding</span></span><span class="mono">12/8/10</span><span class="mono">5 y</span><span class="mt hp" style="width: 44px"><i style="width: 100%"></i></span><span class="mt fd" style="width: 44px"><i style="width: 80%"></i></span></div>
+<div class="rw"><span class="grow"><span class="b">Soot</span><br><span class="mu">In the stable · breeding</span></span><span class="mono">10/11/9</span><span class="mono">7 y</span><span class="mt hp" style="width: 44px"><i style="width: 90%"></i></span><span class="mt fd" style="width: 44px"><i style="width: 70%"></i></span></div>
+<div class="rw"><span class="grow"><span class="b">Pip</span><br><span class="mu">In the stable</span></span><span class="mono">9/9/12</span><span class="mono">3 y</span><span class="mt hp" style="width: 44px"><i style="width: 60%"></i></span><span class="mt hp" style="width: 44px"><i style="width: 20%"></i></span></div>
+
+<div class="rw grp"><span class="lb grow">Hitched</span><span class="mono">1</span></div>
+<div class="rw"><span class="grow"><span class="b">Thistle</span><br><span class="mu">Pulling the carriage Tobin drives</span></span><span class="mono">11/12/8</span><span class="mono">6 y</span><span class="mt hp" style="width: 44px"><i style="width: 100%"></i></span><span class="mt fd" style="width: 44px"><i style="width: 66%"></i></span></div>
+
+<div class="rw grp"><span class="lb grow">Ridden</span><span class="mono">1</span></div>
+<div class="rw"><span class="grow"><span class="b">Wren</span><br><span class="mu">Ridden by Ana</span></span><span class="mono">11/9/9</span><span class="mono">4 y</span><span class="mt hp" style="width: 44px"><i style="width: 100%"></i></span><span class="mt fd" style="width: 44px"><i style="width: 35%"></i></span></div>
+
+<div class="rw grp"><span class="lb grow">Loose</span><span class="mono">1</span></div>
+<div class="rw"><span class="grow"><span class="b">Flint</span><br><span class="mu">Loose at 2260, 1731</span></span><span class="mono">8/12/10</span><span class="mono">9 y</span><span class="mt hp" style="width: 44px"><i style="width: 80%"></i></span><span class="mt fd" style="width: 44px"><i style="width: 64%"></i></span></div>
+
+<span class="grow"></span>
+<div class="sec"><span class="mu">Tap a row to centre the map on the horse and pick it. Stats read Speed / Strength / Endurance. Rename a horse on its tile card. With no horses: "Your realm has no horses."</span></div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":360,"height":860}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

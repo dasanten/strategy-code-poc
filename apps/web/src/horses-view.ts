@@ -35,7 +35,7 @@ export function horseNeed(
   return `${h.hunger <= 0 ? 'Starving' : 'Hungry'} · ${FEED_HORSE_HINT}`
 }
 
-/** One horse of the Horses drawer and where it stands, in words. */
+/** One horse of the Horses tab and where it stands, in words. */
 export interface HorseRow<H> {
   horse: H
   /**
@@ -45,7 +45,7 @@ export interface HorseRow<H> {
   place: string
 }
 
-/** One heading of the Horses drawer and the horses under it. */
+/** One heading of the Horses tab and the horses under it. */
 export interface HorseGroup<H> {
   /** A stable's id, or `hitched`, `ridden` or `loose`. */
   key: string
@@ -54,7 +54,7 @@ export interface HorseGroup<H> {
 }
 
 /**
- * The realm's horses grouped for the Horses drawer (`CONTEXT.md`: Horses drawer) by where they
+ * The realm's horses grouped for the Horses tab (`CONTEXT.md`: Horses tab) by where they
  * stand: a horse on a stable's footprint is that stable's, hitched or ridden or not; else one
  * hitched to a carriage (`carriage.horseId`), one somebody rides, and the rest loose. Stables come
  * first, by name ("Stable, Oakford", with its corner when the city has more than one), then
@@ -123,7 +123,7 @@ export function groupHorses<
   return groups.filter((g) => g.rows.length > 0)
 }
 
-/** A horse's row in the Horses drawer on a phone (`horseLines`). */
+/** A horse's row in the Horses tab on a phone (`horseLines`). */
 export interface HorseLines {
   /** First line: its name, age and Speed/Strength/Endurance. */
   name: string
@@ -137,7 +137,7 @@ export interface HorseLines {
 }
 
 /**
- * A horse's row in the Horses drawer on a phone (ADR 0012), laid out like a resident's: two lines
+ * A horse's row in the Horses tab on a phone (ADR 0012), laid out like a resident's: two lines
  * in place of the table's columns, "Zephyr · 3 years · 12/8/10" and where it stands with its
  * health and hunger meters at the end.
  */

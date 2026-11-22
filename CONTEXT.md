@@ -387,7 +387,7 @@ The shared language of the game. Domain terms only — no implementation details
   side's from their storage as it unloads there. A storage short of coins on unloading gives what it
   has, the goods stay delivered and the Trade Organization bears the loss. A Player can send one to any realm they know of: one they see residents of, an ally, one whose
   city they have seen (Last seen), one with a standing toward them or they toward it, or their side
-  in a contract, demand or Direct offer. Both sides see it in their Direct offers drawer until it ends, and a
+  in a contract, demand or Direct offer. Both sides see it in their Diplomacy tab's Direct offers until it ends, and a
   notice tells the one it is sent to, with the place. In person, it is otherwise an offer like any
   other: anyone in sight of the storage sees it and that it is for another realm, and the sender can
   take it down. Declined, lapsed or taken down, its goods are ordinary again and both sides are told;
@@ -1263,7 +1263,7 @@ The shared language of the game. Domain terms only — no implementation details
   arrives at once, like a mercenary offer, wherever the other side is, and sending them is limited.
   A Player can send one to any realm they know of: one they see residents of, an ally, one whose city
   they have seen (Last seen), one with a standing toward them or they toward it, or their side in a
-  contract, demand or Direct offer. Both sides see it in their Demands drawer until it is answered, and a notice
+  contract, demand or Direct offer. Both sides see it in their Diplomacy tab's Demands until it is answered, and a notice
   tells the one it is sent to. They accept, decline or let it lapse; the sender hears that at once,
   and it lapses too when either side's Leader dies. The note is plain text.
   - **The threat is only words.** Ignoring a demand does nothing by itself. Whatever was threatened
@@ -1281,7 +1281,7 @@ The shared language of the game. Domain terms only — no implementation details
     (Respect) without a break for a set time, so an army that stays at the gate can take a city
     without a fight. With none of the sender's fighters near it declines at once; otherwise it waits,
     **wavering**, and declines when the deadline comes first. Declining drops its standing toward the
-    sender. Both sides see in the Demands drawer that it wavers and how long is left, or that the
+    sender. Both sides see in the Diplomacy tab's Demands that it wavers and how long is left, or that the
     time has started again. It carries out goods the
     same way: set aside at its storage, for the sender alone to fetch; with none of them there it
     declines. **The Trade Organization** always declines, and being asked costs standing. A Player
@@ -1599,7 +1599,7 @@ The shared language of the game. Domain terms only — no implementation details
   or from a script, like renaming a resident: free, instant, from anywhere; names need not be
   unique. The name shows wherever the horse shows: the tile card, the stable, the carriage it
   pulls, its rider's card and the realm log. Scripts see it.
-- **Horses drawer:** a drawer on the tool rail, like the Residents drawer, listing the realm's
+- **Horses tab:** a tab of the sidebar (People), like the Residents tab, listing the realm's
   horses grouped by where they stand: each stable by name, hitched to a carriage, ridden, loose.
   A row shows name, stats, age, health and hunger; tapping it centres the map on the horse and
   picks it.
@@ -2115,12 +2115,13 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   duration only when it has or needs one; loop, repeat and If are brackets around their steps.
   Add step is a palette grouped as the Orders tab is (Move, Work & build, Goods, Scripts) plus
   Flow (Repeat, If, Wait until), and a step can be added between two others.
-- **Tool rail:** the rail groups its drawers as People (Residents, Horses, Armies), Diplomacy
-  and Realm (Cities, Waypoints, Scripts, Realm log). Diplomacy is one drawer with a tab each for
-  Contracts, Demands, Direct offers, Alliance and Standing. A rail button and a tab show a mark
-  while their drawer holds something the Player hasn't seen: what a notice would announce, and
-  new lines of the realm log.
-- **Cities drawer:** lists the cities the Player knows as Your cities, Others in sight and Last
+- **Sidebar:** the sidebar on the left (Screen) groups its tabs as People (Residents, Horses,
+  Armies), Diplomacy and Realm (Cities, Waypoints, Scripts, Realm log). Diplomacy is one tab with
+  a tab each for Contracts, Demands, Direct offers, Alliance and Standing. A tab's button on the
+  strip and a Diplomacy tab show a mark while they hold something the Player hasn't seen: what a
+  notice would announce, and new lines of the realm log. _Avoid:_ tool rail, drawer (the old
+  layout's words).
+- **Cities tab:** a tab of the sidebar (Realm) listing the cities the Player knows as Your cities, Others in sight and Last
   seen. A row shows the name, whose it is in that relation's colour, and for the Player's own
   cities residents against housing and the key goods in its storages. Opening a row centres the
   map on the city and outlines its area, as picking it on the map does, and shows it in sections:
@@ -2130,6 +2131,26 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
 - **Tick:** one step of the world, one per second.
 - **Realm log:** what happened in a Player's realm (residents going hungry, deaths, Food
   spoiling), shown only to that Player, also what happened while they were offline.
+- **Screen:** how the game screen is laid out (ADR 0044, replacing the layout of ADR 0008 and
+  0012; built in Epic 119). The map fills the screen, with four fixed places over
+  it. The **top bar** (control mode, realm, clock, goods, Leader, Zeal, heir). The **sidebar** on
+  the left: one tab each for the realm's lists, in groups (People, Diplomacy, Realm; see
+  Sidebar), one open at a time, folding to its strip of tabs. The **command
+  bar** along the bottom: the card of whatever is picked (a resident, a group, an army), its
+  header on the left and its tabs beside it, and in realm control mode the realm bar in its place.
+  The **map dock** bottom right, at the command bar's right end: the minimap and the map's
+  buttons. The **dock** on the right: tile cards,
+  the who-list and the realm order cards, so a tile and a resident can be open together. A panel
+  an order opens (Goods, Build, Haul route, …) opens above the command bar. The Script library is
+  a screen of its own over the map, the **script workshop**. On a phone the command bar is the
+  bottom sheet (peek, half, full) and the sidebar is the menu, as before. Only the UI: every
+  order, list and form stays what it was.
+- **Pixel frontier:** the look of the whole UI (ADR 0044): panels, buttons and type drawn like
+  Daniel's pixel art, in its palette, with hard edges and no rounded corners or blur. One look for
+  every Player; the Art style picks only how the map is drawn. A UI icon (a sidebar tab, an order,
+  a mark) comes from the `ui` sheet of `art/pixel`, and one not drawn yet shows a placeholder
+  drawn in code. A good's icon in the UI comes from the pixel goods sheet whatever the Art style;
+  a good not drawn yet keeps its line icon.
 - **Resident card:** what the UI shows for a picked resident (and, laid out the same, a group or
   an army): a header that always shows (name, Doing, hunger and health, what they carry) and one
   open tab under it: Orders, Queue, Stats or Script. Orders are grouped by kind (Move, Work &
@@ -2138,14 +2159,14 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   becomes possible is added at the end of its group, and the rows are sorted afresh only when
   something else is picked (ADR 0019). A group card has the same rows, with the group's own
   reasons.
-- **Art style:** how the map and the goods icons are drawn, picked by the Player in the map's
-  legend and remembered per browser (ADR 0043): **Tokens** (line art only), **Painted** (painted
-  sprites where there are some, tokens otherwise; the default) or **Pixel** (Daniel's pixel art,
-  and the Painted look for whatever has none yet). It changes nothing in the world. In Pixel,
+- **Art style:** how the map is drawn, picked by the Player in the map's legend and remembered per browser (ADR 0043): **Tokens** (line art only), **Painted** (painted
+  sprites where there are some, tokens otherwise) or **Pixel** (Daniel's pixel art, and the
+  Painted look for whatever has none yet; the default since ADR 0044, for whoever hasn't picked
+  one). It changes nothing in the world. In Pixel,
   walls and roads join their neighbours, a gate shows open or closed, a carriage shows with or
   without its hitched horse, and up close a resident wears their equipped armour, shield and
   weapon.
-- **Goods on cards:** each kind of good has one icon. Every inventory a card or drawer shows
+- **Goods on cards:** each kind of good has one icon. Every inventory a card or sidebar tab shows
   (what a resident carries, a carriage's load, a storage's or stable's stock, a workplace's pile,
   a site's materials, trade lists) is a compact grid of icon and amount, the name on hover or
   long-press; a resident's own food shows apart from the rest. Cards give facts as labelled rows
@@ -2174,7 +2195,7 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   on or have queued, and the footprint of every build they are ordered or queued to do. The
   picked residents' plans are drawn stronger. Only the owning Player sees them; pure drawing.
 - **Picking a target:** an order that needs a tile or building (walk to, store at, build here)
-  shrinks the card to its header and shows "Tap where …" with Cancel until the Player picks one
+  shrinks the command bar to the card's header and shows "Tap where …" with Cancel until the Player picks one
   on the map; then the card comes back as it was. On a phone every card is a bottom sheet (peek,
   half, full), one finger pans, pinch zooms, a tap picks, a long-press does what right-click does,
   and a Select toggle makes a drag pick a group. While the card is shrunk, the room it took
@@ -2183,8 +2204,8 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   or wall with its tile count, the footprint of a building (marked where it doesn't fit), or the
   building a Store, Fetch or Work would use. On a touch screen the first tap shows the preview
   and the banner gains Confirm; a tap elsewhere moves the preview. Escape leaves the top-most
-  thing first: pick mode, then an open panel on the card, then a tile card, then the card, then
-  the drawer.
+  thing first: pick mode, then an open panel on the card, then a tile card in the dock, then
+  the card in the command bar, then the open sidebar tab.
 - **Picking on the map:** what a click (or tap) picks on a tile, in this order: a resident of the
   Player's, then a building (a carriage or horse of the Player's with nobody on it counts as
   one), then the bare tile. A click on a stack of the Player's residents picks them all as a
@@ -2193,20 +2214,20 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   driven off (Stealing a carriage or horse). With a pointer, what a click would pick is outlined
   on hover.
 - **Control mode:** how the Player gives orders, picked with a Unit | Realm switch that is always
-  on the HUD (and the Tab key), kept per browser; a new Player starts in unit control mode. Only
+  in the top bar (and the Tab key), kept per browser; a new Player starts in unit control mode. Only
   the UI (ADR 0041): either way the same order requests go to residents, and nothing new is kept
   in the world. **Unit control mode:** pick a resident, a group or an army, then say what they do,
   as everything above describes. **Realm control mode:** say what is to be done and where, then
   who does it. There a click on the map picks a building, else the bare tile; residents are drawn
   but not picked, and a drag picks no group. Picking a resident, a group or an army some other way
-  (the Residents list, a saved group's key, the Armies drawer) switches to unit control mode.
+  (the Residents list, a saved group's key, the Armies tab) switches to unit control mode.
   Armies are commanded only in unit control mode.
 - **Realm order:** an order given in realm control mode: every order of the group card that names
   a place or a building (build, a road or wall line, work, tear down, feed the stable, breed
   horses, teach, train, walk to, explore, relocate, store at, fetch from, a haul route, drive, row,
-  board, run a script). The **realm bar** on the HUD starts those that begin with a kind or a
+  board, run a script). The **realm bar**, in the command bar's place, starts those that begin with a kind or a
   place (Build with the Build menu, Build line, Walk to, Explore, Run script); the card of a
-  picked building, carriage, vessel or tile starts those about it (Work here, Build this site,
+  picked building, carriage, vessel or tile (in the dock) starts those about it (Work here, Build this site,
   Tear down, Store here, Haul with this carriage, …). The target is picked as in Picking a target,
   with the same previews, and an order's own form (a haul route, Customise) comes before the
   who-list. Orders without a target (stop, drop, mount, equip, …) and fighting (attack, climb a
@@ -2232,14 +2253,14 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   Tapping one shows what it is for, what it costs and Build. A kind that can't go on this tile is
   dimmed, and tapping it says why. It is the same on a resident's card, a group card and the
   planner. Only the UI: where a kind may be built doesn't change.
-- **Residents list:** the Residents drawer opens fully, to a list of the realm's residents with their
+- **Residents list:** the Residents tab of the sidebar opens fully, to a list of the realm's residents with their
   stats, skills, gear, what they carry and what they are doing. It can be searched by name, filtered
   (has weapons, idle, child, by city, and the like) and sorted by any column; the choice is kept per
   browser. Tapping a row opens that resident. **Pick these** picks everyone listed, or those ticked,
   as a Group on the map. Only the UI: nothing new is kept in the world. It works on a phone.
 - **Notices:** what the HUD tells the Player unasked (the Horse offer, a Direct offer or demand sent
   to them, the pick banner, a group order's report, the first-day card, a wandering trader at one of their cities) shows in one lane under the top bar, over the map and never
-  over a drawer or card. While the pick banner shows it replaces the others; they come back after.
+  over the sidebar, the dock or the command bar. While the pick banner shows it replaces the others; they come back after.
 - **First day:** a new realm's HUD shows a checklist card: claim the Horse offer, pick a
   resident, give them an order, open the Wiki. Each line is ticked when the game sees it done;
   the card goes for good once all are ticked or the Player dismisses it. Kept per Player, not per
@@ -2250,7 +2271,7 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   counts with what the Player last saw in it (Last seen), and the total says so when part of it is
   that old.
   The pick is kept per browser; a city no longer the realm's goes back to Entire realm. Only the UI.
-- **Minimap:** a small map bottom right of the screen (ADR 0008): the Player's explored terrain
+- **Minimap:** a small map in the map dock bottom right of the screen (ADR 0008, 0044): the Player's explored terrain
   at a glance with their home city, their other cities, their residents and carriages away from
   home and the cities they know (Last seen), each a dot in its relationship colour, and the
   current view as a rectangle; a click centres the map there. It folds to a button, remembered
@@ -2264,7 +2285,7 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   out; road sites are left out there.
 - **Waypoint:** a named marker the Player puts on a tile (from the map's right-click or
   long-press, or a script's `addWaypoint`), seen only by that Player: on the map at every zoom
-  tier, on the minimap, and in the Waypoints drawer, where it can be renamed, centred on or
+  tier, on the minimap, and in the Waypoints tab of the sidebar, where it can be renamed, centred on or
   removed. Kept in the world per Player, not per realm, so it survives a Leader death. A waypoint
   is a place like a tile: a walk-to target, a queue step's place, a `waypoint` script param.
   Scripts see their Player's waypoints and can add and remove them; a waypoint a script adds is
