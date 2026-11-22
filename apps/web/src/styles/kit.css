@@ -232,7 +232,7 @@ button.primary:hover:not(:disabled) {
     inset 2px 2px 0 var(--red);
 }
 /* Plain buttons on a dark bar or a header bar are .dk too, with as little weight as a plain button
-   so that a placed button (`.hud-rail button.on`) still wins. */
+   so that a placed button (`.side-strip .btn.on`) still wins. */
 .btn.dk,
 :where(.bar, .hd) button,
 .btn.dk:hover:not(:disabled),

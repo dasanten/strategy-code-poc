@@ -914,12 +914,17 @@ export function Wiki() {
         </p>
         <h3>The sidebar</h3>
         <p>
-          The sidebar’s Diplomacy tab has a tab each for Contracts, Demands, Direct offers, Alliance
+          The sidebar on the left has a strip of tabs in three groups: People (Residents, Horses,
+          Armies), Diplomacy, and Realm (Cities, Waypoints, Scripts, Realm log). One tab is open at
+          a time, beside the strip; its button again, Escape or the « button at the foot of the
+          strip folds the sidebar to its strip, and » opens it again on the tab you had open. Drag
+          its right edge to make it wider; the width, and whether it was folded, stay for your next
+          visit. The Diplomacy tab has a tab each for Contracts, Demands, Direct offers, Alliance
           and Standing; it reopens on the tab you left it on, and a notice’s Open takes you to its
-          tab. A small dot on a sidebar tab or a Diplomacy tab says it holds something you haven’t
-          seen yet: a demand, Direct offer or contract offer sent to you, or Realm log lines newer
-          than the last time you had the log open. Opening it there clears the dot. On a phone the
-          menu button shows the dot too.
+          tab. A small dot on a tab says it holds something you haven’t seen yet: a demand, Direct
+          offer or contract offer sent to you, or Realm log lines newer than the last time you had
+          the log open. Opening it there clears the dot. On a phone the strip is in the menu, a tab
+          fills the screen, and the menu button shows the dot too.
         </p>
         <p>
           The Residents tab’s Open full list button opens the list across the screen, with

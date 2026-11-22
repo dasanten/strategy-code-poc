@@ -168,7 +168,7 @@
   grid-template-columns: 250px minmax(0, 1fr);
   gap: 16px;
 }
-.hud-drawer .script-list h3:first-child {
+.side-panel .script-list h3:first-child {
   margin-top: 4px;
 }
 .script-list {
@@ -226,7 +226,7 @@
   align-items: center;
   gap: 8px;
 }
-.hud-drawer form.script-head,
+.side-panel form.script-head,
 .script-head form {
   display: flex;
   flex-wrap: wrap;

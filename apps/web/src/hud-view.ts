@@ -2,21 +2,24 @@ import { buildingRealm } from './shared/city.js'
 import type { Building, City, Good } from '@csp/shared-types'
 import { agoText } from './last-seen.js'
 
-/** The groups of the tool rail, in rail order (`CONTEXT.md`: Tool rail). */
-export const RAIL_GROUPS = [
+/**
+ * The groups of the sidebar's strip, in strip order (`CONTEXT.md`: Screen): the groups the tool
+ * rail had.
+ */
+export const SIDEBAR_GROUPS = [
   { id: 'people', label: 'People' },
   { id: 'diplomacy', label: 'Diplomacy' },
   { id: 'realm', label: 'Realm' },
 ] as const
 
-export type RailGroupId = (typeof RAIL_GROUPS)[number]['id']
+export type SidebarGroupId = (typeof SIDEBAR_GROUPS)[number]['id']
 
 /**
- * The drawers the tool rail opens over the map (ADR 0008), in rail order, each in its group
- * (`CONTEXT.md`: Tool rail). Cities holds the city inspector until selecting a city shows it on the
- * selection card.
+ * The sidebar's tabs (ADR 0044), in strip order, each in its group (`CONTEXT.md`: Screen): one for
+ * each drawer the tool rail had, in the same order. Scripts opens wide until it becomes the script
+ * workshop.
  */
-export const DRAWERS = [
+export const SIDE_TABS = [
   { id: 'residents', label: 'Residents', group: 'people' },
   { id: 'horses', label: 'Horses', group: 'people' },
   { id: 'armies', label: 'Armies', group: 'people' },
@@ -25,30 +28,35 @@ export const DRAWERS = [
   { id: 'waypoints', label: 'Waypoints', group: 'realm' },
   { id: 'scripts', label: 'Scripts', group: 'realm', wide: true },
   { id: 'realmLog', label: 'Realm log', group: 'realm' },
-] as const satisfies readonly { id: string; label: string; group: RailGroupId; wide?: boolean }[]
+] as const satisfies readonly {
+  id: string
+  label: string
+  group: SidebarGroupId
+  wide?: boolean
+}[]
 
-export type Drawer = (typeof DRAWERS)[number]
+export type SideTabEntry = (typeof SIDE_TABS)[number]
 
-/** The rail's groups with their drawers, both in rail order; the rail draws a divider between them. */
-export function railGroups(): { id: RailGroupId; label: string; drawers: Drawer[] }[] {
-  return RAIL_GROUPS.map((g) => ({
+/** The strip's groups with their tabs, in strip order; the strip draws a divider between them. */
+export function sidebarGroups(): { id: SidebarGroupId; label: string; tabs: SideTabEntry[] }[] {
+  return SIDEBAR_GROUPS.map((g) => ({
     id: g.id,
     label: g.label,
-    drawers: DRAWERS.filter((d) => d.group === g.id),
+    tabs: SIDE_TABS.filter((t) => t.group === g.id),
   }))
 }
 
-export type DrawerId = (typeof DRAWERS)[number]['id']
+export type SideTabId = (typeof SIDE_TABS)[number]['id']
 
-/** At most one drawer is open; none shows the whole map. */
-export type OpenDrawer = DrawerId | undefined
+/** The sidebar's open tab; undefined while it is folded to its strip. */
+export type OpenTab = SideTabId | undefined
 
-/** A rail button: opens its drawer in place of the open one, or closes it when it is open. */
-export function toggleDrawer(open: OpenDrawer, clicked: DrawerId): OpenDrawer {
+/** A tab on the strip: opens it in place of the open one, or folds the sidebar when it is open. */
+export function toggleTab(open: OpenTab, clicked: SideTabId): OpenTab {
   return open === clicked ? undefined : clicked
 }
 
-/** The tabs of the Diplomacy drawer, in order (`CONTEXT.md`: Tool rail). */
+/** The Diplomacy tab's own tabs, in order (`CONTEXT.md`: Tool rail). */
 export const DIPLOMACY_TABS = [
   { id: 'contracts', label: 'Contracts' },
   { id: 'demands', label: 'Demands' },
@@ -60,53 +68,95 @@ export const DIPLOMACY_TABS = [
 export type DiplomacyTab = (typeof DIPLOMACY_TABS)[number]['id']
 
 /**
- * The drawer open over the map, and the Diplomacy drawer's tab. The tab stays what it was while
- * the drawer is closed or another one is open, so the Diplomacy button reopens it there.
+ * The sidebar: the tab open in it (none while folded), the one its fold button unfolds to, and the
+ * Diplomacy tab's own tab. `last` and the Diplomacy tab stay what they were while it is folded or
+ * another tab is open, so unfolding, or the Diplomacy button, comes back to them.
  */
-export interface Drawers {
-  open: OpenDrawer
+export interface Sidebar {
+  open: OpenTab
+  /** The tab the fold button unfolds to: the one open last. */
+  last: SideTabId
   tab: DiplomacyTab
 }
 
-/** No drawer open, the Diplomacy drawer on its first tab. */
-export const NO_DRAWER: Drawers = { open: undefined, tab: DIPLOMACY_TABS[0].id }
-
-/** Opens the drawer, or closes them all with undefined; the Diplomacy tab stays. */
-export function withOpen(drawers: Drawers, open: OpenDrawer): Drawers {
-  return { ...drawers, open }
+/** Folded, unfolding to Residents, the Diplomacy tab on its first tab. */
+export const FOLDED: Sidebar = {
+  open: undefined,
+  last: SIDE_TABS[0].id,
+  tab: DIPLOMACY_TABS[0].id,
 }
 
-/** Opens the Diplomacy drawer on the tab, as a notice's Open does, or picks the tab in it. */
-export function openDiplomacy(tab: DiplomacyTab): Drawers {
-  return { open: 'diplomacy', tab }
+/** Opens the tab, or folds the sidebar with undefined; the Diplomacy tab stays. */
+export function withOpen(sidebar: Sidebar, open: OpenTab): Sidebar {
+  return { ...sidebar, open, last: open ?? sidebar.last }
 }
 
-/** Whether the Player has this Diplomacy tab in front of them: its drawer open and on it. */
-export function showsTab(drawers: Drawers, tab: DiplomacyTab): boolean {
-  return drawers.open === 'diplomacy' && drawers.tab === tab
+/** The strip's fold button: folds the open sidebar, or unfolds it to the tab open last. */
+export function foldOrUnfold(sidebar: Sidebar): Sidebar {
+  return withOpen(sidebar, sidebar.open ? undefined : sidebar.last)
 }
 
-/** Whether the drawer is a wide one (the script editor needs the room). */
-export function isWide(id: DrawerId): boolean {
-  return DRAWERS.some((d) => d.id === id && 'wide' in d && d.wide)
+/** Opens the Diplomacy tab on its tab, as a notice's Open does, or picks the tab in it. */
+export function openDiplomacy(sidebar: Sidebar, tab: DiplomacyTab): Sidebar {
+  return { ...withOpen(sidebar, 'diplomacy'), tab }
 }
 
-/** The least map, in pixels, the open drawer and card must leave between them to show a place. */
+/** Whether the Player has this Diplomacy tab in front of them: the sidebar open on it. */
+export function showsTab(sidebar: Sidebar, tab: DiplomacyTab): boolean {
+  return sidebar.open === 'diplomacy' && sidebar.tab === tab
+}
+
+function isTabId(id: unknown): id is SideTabId {
+  return SIDE_TABS.some((t) => t.id === id)
+}
+
+/**
+ * What the browser keeps of the sidebar across a reload: the tab open, null while folded, and the
+ * one it unfolds to.
+ */
+export function sidebarToKeep(sidebar: Sidebar): string {
+  return JSON.stringify({ open: sidebar.open ?? null, last: sidebar.last })
+}
+
+/**
+ * The sidebar as the browser kept it (`sidebarToKeep`), folded when it kept nothing or nonsense.
+ * On a phone it starts folded all the same: there a tab covers the whole map.
+ */
+export function rememberedSidebar(kept: string | null, phone = false): Sidebar {
+  let parsed: unknown = null
+  try {
+    if (kept !== null) parsed = JSON.parse(kept)
+  } catch {
+    // Nonsense kept: folded, as with nothing.
+  }
+  if (typeof parsed !== 'object' || parsed === null) return FOLDED
+  const { open, last } = parsed as { open?: unknown; last?: unknown }
+  const unfoldsTo = isTabId(last) ? last : FOLDED.last
+  return withOpen({ ...FOLDED, last: unfoldsTo }, isTabId(open) && !phone ? open : undefined)
+}
+
+/** Whether the tab opens wide (the script editor needs the room, until the script workshop). */
+export function isWide(id: SideTabId): boolean {
+  return SIDE_TABS.some((t) => t.id === id && 'wide' in t && t.wide)
+}
+
+/** The least map, in pixels, the open sidebar and the card must leave between them for a place. */
 export const MIN_OPEN_MAP = 160
 
 /**
- * Where to show a place on the map while an open drawer covers `left` pixels of it and the
- * selection card `right`: in the map left between them; with the drawer closed when they leave
- * too little; on the whole screen when even the card alone does.
+ * Where to show a place on the map while the sidebar covers `left` pixels of it and the card
+ * `right`: in the map left between them; with the sidebar folded to its strip (`strip` pixels)
+ * when they leave too little; on the whole screen when even the card alone does.
  */
 export function showBeside(
   mapWidth: number,
   left: number,
   right: number,
+  strip = 0,
 ): { left: number; right: number; closeDrawer: boolean } {
   if (mapWidth - left - right >= MIN_OPEN_MAP) return { left, right, closeDrawer: false }
-  const closeDrawer = left > 0
-  if (mapWidth - right >= MIN_OPEN_MAP) return { left: 0, right, closeDrawer }
+  const closeDrawer = left > strip
+  if (mapWidth - strip - right >= MIN_OPEN_MAP) return { left: strip, right, closeDrawer }
   return { left: 0, right: 0, closeDrawer }
 }
 
@@ -233,16 +283,16 @@ export function rememberGoodsPick(
   }
 }
 
-/** How wide, in pixels, the Player can drag a drawer (the wide script drawer keeps its own). */
-export const DRAWER_WIDTH = { min: 280, max: 640, initial: 380 } as const
+/** How wide (px) the Player can drag the sidebar's panel (the wide Scripts tab has its own). */
+export const SIDE_WIDTH = { min: 280, max: 640, initial: 380 } as const
 
-/** A drawer width the Player dragged to or the browser remembered, kept within the limits. */
-export function drawerWidth(wanted: number): number {
-  if (!Number.isFinite(wanted)) return DRAWER_WIDTH.initial
-  return Math.round(Math.min(DRAWER_WIDTH.max, Math.max(DRAWER_WIDTH.min, wanted)))
+/** A panel width the Player dragged to or the browser remembered, kept within the limits. */
+export function sideWidth(wanted: number): number {
+  if (!Number.isFinite(wanted)) return SIDE_WIDTH.initial
+  return Math.round(Math.min(SIDE_WIDTH.max, Math.max(SIDE_WIDTH.min, wanted)))
 }
 
 /** The width the browser remembered, or the initial one when it has none (or nonsense). */
-export function rememberedDrawerWidth(stored: string | null): number {
-  return stored === null ? DRAWER_WIDTH.initial : drawerWidth(Number.parseFloat(stored))
+export function rememberedSideWidth(stored: string | null): number {
+  return stored === null ? SIDE_WIDTH.initial : sideWidth(Number.parseFloat(stored))
 }
