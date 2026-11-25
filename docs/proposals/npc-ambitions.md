@@ -1,6 +1,6 @@
 # Proposal: NPC cities with ambitions
 
-Settled with Daniel on 2026-10-31 in a grilling session. The rules are in `CONTEXT.md` (Crew
+Settled with Daniel on 2026-10-31 in a grilling session. The rules are in `docs/context/` (Crew
 food, NPC city, NPC reserve, NPC trader, Full city, Founding, Trade Org HQ, Trading post); the
 compute model is ADR 0016. This file says what to build, in what order, and with which numbers.
 Ticketed as [Epic 48](https://github.com/dasanten/strategy-code-poc/issues/567), tickets #568–#573.

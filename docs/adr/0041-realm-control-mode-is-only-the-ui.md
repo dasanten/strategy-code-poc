@@ -1,6 +1,6 @@
 # Realm control mode is only the UI
 
-Status: decided (2026-11-18, with Daniel). Rules in `CONTEXT.md` under **Control mode**, **Realm
+Status: decided (2026-11-18, with Daniel). Rules in `docs/context/screen.md` under **Control mode**, **Realm
 order** and **Who-list**; built in Epic 112.
 
 ## Context

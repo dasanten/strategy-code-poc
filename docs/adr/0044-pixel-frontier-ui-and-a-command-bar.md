@@ -3,7 +3,7 @@
 Status: decided (2026-11-22, with Daniel). Replaces the screen layout and panel style of ADR 0008
 and the card placement of ADR 0012; their other decisions stand (the board-game map, relationship
 colours, zoom tiers, the art registry, tabs on cards, pick mode, bottom sheets on phones). Rules in
-`CONTEXT.md` under **Screen** and **Pixel frontier**; built in Epic 119. The design is in
+`docs/context/screen.md` under **Screen** and **Pixel frontier**; built in Epic 119. The design is in
 `docs/design/pixel-frontier/`.
 
 ## Context

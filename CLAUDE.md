@@ -1,8 +1,10 @@
 # Working on this repo
 
-- **Game rules and terms:** `CONTEXT.md`. Use its words in code, UI and docs. If a rule you need
-  is missing, ask Daniel and add it there before building on it.
-- **Decisions:** `docs/adr/`. The game vision in `CONTEXT.md` wins over ADR 0001 where they
+- **Game rules and terms:** `CONTEXT.md` is the index of `docs/context/`, one file per section.
+  Read the index, then only the section files your ticket names and those whose terms it uses. Use
+  their words in code, UI and docs. If a rule you need is missing, ask Daniel and add it to its
+  section file (a new term also to the index) before building on it.
+- **Decisions:** `docs/adr/`. The game vision in `CONTEXT.md` and `docs/context/` wins over ADR 0001 where they
   conflict.
 - **What to do next:** GitHub tickets, how they work in `docs/tasks.md`. `/next-ticket` picks the
   next one and works it into a PR. PRs reference their tickets (`Closes #n`, `Part of #epic`).

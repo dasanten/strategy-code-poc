@@ -1,6 +1,6 @@
 # Siege machines are built in the field
 
-Status: decided (2026-11-15, with Daniel). Rules in `CONTEXT.md` under **Siege machine**; built in
+Status: decided (2026-11-15, with Daniel). Rules in `docs/context/military.md` under **Siege machine**; built in
 Epic 110.
 
 ## Decisions

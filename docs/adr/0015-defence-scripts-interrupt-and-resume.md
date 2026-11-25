@@ -39,12 +39,12 @@ they are under attack: nothing in their view says who struck them.
 
 "A Player order given meanwhile ends both" held only until the next blow, which started the
 defence script again: an order to get away was lost within ticks. Now what the Player gives under
-attack isn't interrupted by further blows (`CONTEXT.md`: A Player's order under attack). An order
+attack isn't interrupted by further blows (`docs/context/control.md`: A Player's order under attack). An order
 that ends by itself stands until done; what goes on until stopped holds until no blow has landed
 for the calm time, or a resident sent to Work mid-fight would never defend themselves again. We
 didn't make every order immune to blows, however old: a worker must still react to an ambush.
 
-Defend also no longer abandons a carriage (`CONTEXT.md`: On a carriage under attack): the carriage
+Defend also no longer abandons a carriage (`docs/context/control.md`: On a carriage under attack): the carriage
 is the way out, so an unarmed driver drives on and an unarmed passenger stays aboard while it moves.
 A driver's drive or haul route is still kept aside when they are struck, but it goes on until the
 defence script gives them another order. Blows land every few ticks: stopping the carriage at each

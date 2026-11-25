@@ -1,6 +1,6 @@
 # Creative mode is local only
 
-Status: decided (2026-11-21, with Daniel). Rules in `CONTEXT.md` under **Creative mode**; built in
+Status: decided (2026-11-21, with Daniel). Rules in `docs/context/people.md` under **Creative mode**; built in
 Epic 117.
 
 ## Context
@@ -8,7 +8,7 @@ Epic 117.
 One tick is one game minute and one real second (`TICK_MS`), so testing a change by hand means
 waiting: a house takes real hours, a child grows up over real days, and a fresh full-size world
 takes a long time to set up. Daniel wants to test locally as an admin without waiting. Until now
-being an admin gives no power in the world (`CONTEXT.md`, **Admin**), and every action goes
+being an admin gives no power in the world (`docs/context/people.md`, **Admin**), and every action goes
 through the game API (ADR 0002).
 
 ## Decisions
