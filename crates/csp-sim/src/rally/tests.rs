@@ -18,7 +18,7 @@ use super::*;
 use crate::invariants::check_all;
 use crate::order_sender::OrderSender;
 use crate::orders::{order_kinds, OrderQueue, OrderReply};
-use crate::queue::{queue_steps_problem, QUEUE_STEP_KINDS};
+use crate::queue::{can_be_queue_step, queue_steps_problem};
 use crate::realm_test_world::{building, plains, realm_id, resident, world_with_realms};
 use crate::script_api::SCRIPT_API;
 use crate::script_bindings::{army_script_order_kinds, script_order_kinds};
@@ -413,7 +413,7 @@ fn no_script_call_or_queue_step_can_start_it() {
     );
     assert!(!script_order_kinds().contains(&RALLY));
     assert!(!army_script_order_kinds().contains(&RALLY));
-    assert!(!QUEUE_STEP_KINDS.contains(&RALLY));
+    assert!(!can_be_queue_step(RALLY));
     assert_eq!(
         queue_steps_problem(Some(&json!([{ "order": { "kind": RALLY } }]))).as_deref(),
         Some("step 1: rally can't be a queue step")

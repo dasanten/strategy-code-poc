@@ -10,8 +10,9 @@ use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{OrderRequest, Waypoint, WorldState};
 use serde_json::Value;
 
+use crate::order_meta::OrderMeta;
 use crate::order_sender::OrderSender;
-use crate::orders::{OrderKind, OrderKinds};
+use crate::orders::OrderKind;
 use crate::random::new_id;
 use crate::sight::InvariantViolation;
 
@@ -131,6 +132,9 @@ impl OrderKind for AddWaypoint {
     }
 }
 
+pub(crate) static ADD_WAYPOINT_META: OrderMeta =
+    OrderMeta::request("addWaypoint", &AddWaypoint).keeps_script();
+
 /// The rename order (`renameWaypoint`): one of the Player's waypoints takes the new name, trimmed.
 pub struct RenameWaypoint;
 
@@ -168,6 +172,9 @@ impl OrderKind for RenameWaypoint {
     }
 }
 
+pub(crate) static RENAME_WAYPOINT_META: OrderMeta =
+    OrderMeta::request("renameWaypoint", &RenameWaypoint).keeps_script();
+
 /// The remove order (`removeWaypoint`): one of the Player's waypoints goes; a Player left with
 /// none has no entry.
 pub struct RemoveWaypoint;
@@ -202,12 +209,8 @@ impl OrderKind for RemoveWaypoint {
     }
 }
 
-/// Adds the waypoint order kinds (`waypointOrders`).
-pub fn add_waypoint_orders(kinds: &mut OrderKinds) {
-    kinds.insert("addWaypoint", AddWaypoint);
-    kinds.insert("renameWaypoint", RenameWaypoint);
-    kinds.insert("removeWaypoint", RemoveWaypoint);
-}
+pub(crate) static REMOVE_WAYPOINT_META: OrderMeta =
+    OrderMeta::request("removeWaypoint", &RemoveWaypoint).keeps_script();
 
 fn whole_on_map(v: f64, size: i32) -> bool {
     v.fract() == 0.0 && v >= 0.0 && v < size as f64

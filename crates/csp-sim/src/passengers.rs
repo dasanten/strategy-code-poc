@@ -7,6 +7,7 @@ use csp_shared::terrain::{is_passable_terrain, terrain_at, TerrainMap};
 use csp_shared::world::{OrderRequest, Resident, Vessel, VesselKind, WorldState};
 
 use crate::combat::{attack_target, Target};
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{bool_field, int_field, str_field, OrderKind};
 use crate::queries::building::building_at;
@@ -108,6 +109,8 @@ impl OrderKind for Board {
         r.order = None;
     }
 }
+
+pub(crate) static BOARD_META: OrderMeta = OrderMeta::request("board", &Board).queue_step();
 
 /// Why a passenger can't get off onto (x, y) (`getOffTileProblem`): a tile right next to their
 /// carriage that is walkable and has no wall or gate on it.
@@ -213,46 +216,7 @@ impl OrderKind for GetOff {
     }
 }
 
-/// The orders that act on a tile, and so get a passenger off their carriage first
-/// (`GETS_OFF_FIRST`).
-pub const GETS_OFF_FIRST: [&str; 36] = [
-    "walkTo",
-    "relocate",
-    "drive",
-    "unhitch",
-    "hitch",
-    "haul",
-    "pickUp",
-    "drop",
-    "store",
-    "fetch",
-    "build",
-    "tearDown",
-    "repair",
-    "workAt",
-    "gather",
-    "teach",
-    "train",
-    "breed",
-    "attack",
-    "climb",
-    "mount",
-    "roadLine",
-    "wallLine",
-    "buyCity",
-    "buy",
-    "sell",
-    "swap",
-    "buyHorse",
-    "sellHorse",
-    "handIn",
-    "transfer",
-    "buyOff",
-    "payDebt",
-    "acceptOffer",
-    "feed",
-    "crew",
-];
+pub(crate) static GET_OFF_META: OrderMeta = OrderMeta::request("getOff", &GetOff).queue_step();
 
 /// An order kind that first gets the ordered resident off their carriage (`getsOffFirst`).
 pub struct GetsOffFirst<K>(pub K);

@@ -10,6 +10,7 @@ use csp_shared::world::{EquipOrder, Good, OrderRequest, Resident, ResidentOrder,
 use serde_json::Value;
 
 use crate::equipment::{equipped, hands_full, set_slot, slot_name, slot_named, slot_of, Slot};
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::names::{good_name, good_of, held};
@@ -86,6 +87,8 @@ impl OrderKind for Equip {
     }
 }
 
+pub(crate) static EQUIP_META: OrderMeta = OrderMeta::request("equip", &Equip).queue_step();
+
 /// The take-off order (`takeOff`): a resident of the Player's realm empties `slot`; its item
 /// stays carried.
 pub struct TakeOff;
@@ -127,6 +130,8 @@ impl OrderKind for TakeOff {
         r.order = Some(equip_order(slot, None));
     }
 }
+
+pub(crate) static TAKE_OFF_META: OrderMeta = OrderMeta::request("takeOff", &TakeOff).queue_step();
 
 /// Whether a resident is in the middle of swapping or taking off gear.
 pub fn is_equipping(r: &Resident) -> bool {

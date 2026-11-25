@@ -4,6 +4,7 @@
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{BuildingKind, OrderRequest, WorldState};
 
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{realm_of, OrderSender};
 use crate::orders::{bool_field, str_field, OrderKind};
 
@@ -62,6 +63,8 @@ impl OrderKind for SetGate {
         gate.closed = if bool_field(order, "open") == Some(true) { None } else { Some(true) };
     }
 }
+
+pub(crate) static SET_GATE_META: OrderMeta = OrderMeta::request("setGate", &SetGate);
 
 #[cfg(test)]
 mod tests;

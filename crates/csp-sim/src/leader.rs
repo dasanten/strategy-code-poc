@@ -4,9 +4,11 @@
 //! the order queue (T86.2) to wire.
 
 use csp_shared::balance::MAP_SIZE;
-use csp_shared::world::{RealmEventWhat, WorldState};
+use csp_shared::world::{OrderRequest, RealmEventWhat, WorldState};
 
 use crate::events::record_event;
+use crate::order_meta::OrderMeta;
+use crate::orders::str_field;
 use crate::queries::city_area::in_city_area;
 use crate::queries::leader::{hand_over_problem, serves_others, ServesOthers as Serves};
 use crate::queries::residents::can_work;
@@ -79,6 +81,20 @@ pub fn apply_hand_over(
     // A handover to the heir clears it (`CONTEXT.md`: Heir).
     crate::heir::lapse_heirs(world);
 }
+
+fn hand_over_request(o: &OrderRequest) -> HandOverRequest<'_> {
+    HandOverRequest {
+        resident_id: str_field(o, "residentId"),
+        new_leader_id: str_field(o, "newLeaderId"),
+    }
+}
+
+pub(crate) static HAND_OVER_META: OrderMeta = OrderMeta::fns(
+    "handOver",
+    |w, s, o, t| validate_hand_over(w, s.user_id, &hand_over_request(o), t.map(|t| t.size)),
+    |w, s, o, t| apply_hand_over(w, s.user_id, &hand_over_request(o), t.map(|t| t.size)),
+)
+.keeps_script();
 
 /// Invariant (`leadersServeNoOne`): every realm's Leader is a living adult of that realm who
 /// serves no one else. A Leader who is Down still leads.

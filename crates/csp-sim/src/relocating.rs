@@ -5,12 +5,14 @@
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap_distance, TerrainMap};
 use csp_shared::world::{
-    BuildingKind, OrderEnded, OrderEndedKind, RealmEventWhat, RelocateOrder, Resident,
-    ResidentOrder, Tile, WorldState,
+    BuildingKind, OrderEnded, OrderEndedKind, OrderRequest, RealmEventWhat, RelocateOrder,
+    Resident, ResidentOrder, Tile, WorldState,
 };
 
 use crate::events::record_event;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
+use crate::orders::{ids_field, text_field};
 use crate::queries::city::town_hall_of;
 use crate::queries::city_area::{city_area_tiles, free_housing, in_city_area};
 use crate::queries::people::relocate_problem;
@@ -89,6 +91,27 @@ pub fn apply_relocate(world: &mut WorldState, o: &RelocateRequest, terrain: Opti
         progress: 0.0,
     }));
 }
+
+fn relocate_request(o: &OrderRequest) -> RelocateRequest {
+    let group = o
+        .fields
+        .get("group")
+        .map(|g| g.as_array().map(|_| ids_field(o, "group").unwrap_or_default()));
+    RelocateRequest {
+        resident_id: text_field(o, "residentId"),
+        city_id: text_field(o, "cityId"),
+        group,
+    }
+}
+
+pub(crate) static RELOCATE_META: OrderMeta = OrderMeta::fns(
+    "relocate",
+    |w, s, o, _| validate_relocate(w, s, &relocate_request(o)),
+    |w, _, o, t| apply_relocate(w, &relocate_request(o), t),
+)
+.queue_step()
+.gets_off_first()
+.blocked_carrying_child();
 
 /// The tile of a city's area nearest to `from` that a resident can stand on (`nearestAreaTile`):
 /// passable land, as far as `terrain` tells, with no wall or gate. None when its area has none.

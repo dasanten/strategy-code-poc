@@ -16,6 +16,8 @@ use crate::carrying::{CarryAction, CarryKind};
 use crate::goods_deps::{
     building_organization, carriage_organization, ordered_resident, realm_of, OrderSender,
 };
+use crate::order_meta::OrderMeta;
+use crate::orders::map_size;
 use crate::queries::command::commander_of_resident;
 use crate::queries::command::steals_carriage;
 use crate::queries::goods::{can_handle, free_stock, put_away_units};
@@ -323,6 +325,15 @@ pub fn apply_store(world: &mut WorldState, sender: &OrderSender, order: &OrderRe
     }));
 }
 
+pub(crate) static STORE_META: OrderMeta = OrderMeta::fns(
+    "store",
+    |w, s, o, t| validate_store(w, s, o, map_size(t)),
+    |w, s, o, t| apply_store(w, s, o, map_size(t)),
+)
+.queue_step()
+.gets_off_first()
+.npc_city();
+
 /// Checks a fetch order (`fetch.validate`): one of the Player's residents walks to `from` (by
 /// default the nearest storage or carriage of their realm holding the goods) and takes them.
 pub fn validate_fetch(
@@ -356,6 +367,15 @@ pub fn apply_fetch(world: &mut WorldState, sender: &OrderSender, order: &OrderRe
         progress: 0.0,
     }));
 }
+
+pub(crate) static FETCH_META: OrderMeta = OrderMeta::fns(
+    "fetch",
+    |w, s, o, t| validate_fetch(w, s, o, map_size(t)),
+    |w, s, o, t| apply_fetch(w, s, o, map_size(t)),
+)
+.queue_step()
+.gets_off_first()
+.npc_city();
 
 /// A store or fetch order's place (`placeOf`).
 pub fn place_of(o: &ResidentOrder) -> Option<&GoodsPlace> {

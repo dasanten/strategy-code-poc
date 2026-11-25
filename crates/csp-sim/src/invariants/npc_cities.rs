@@ -7,7 +7,8 @@ use csp_shared::world::WorldState;
 
 use super::shared::{kind_of, Out};
 use super::{invariant, violation, Invariant};
-use crate::npc_behaviour::{is_npc_order, run_by_npc_city};
+use crate::npc_behaviour::run_by_npc_city;
+use crate::order_meta::running_meta;
 
 pub(super) const INVARIANTS: &[Invariant] = &[
     invariant("npc-orders-allowed", npc_orders_allowed),
@@ -59,7 +60,8 @@ pub fn npc_orders_allowed(world: &WorldState, _: &TerrainMap) -> Out {
             continue;
         }
         let kind = kind_of(o);
-        let allowed = is_npc_order(o) || (kind == "drive" && drivers.contains(r.id.as_str()));
+        let allowed =
+            running_meta(o).npc_city || (kind == "drive" && drivers.contains(r.id.as_str()));
         if !allowed {
             out.push(violation(
                 name,

@@ -3,9 +3,11 @@
 //! heir lapses, with a line in the realm log, once they no longer qualify. The orders are plain
 //! `validate`/`apply` pairs, like renaming (ADR 0002).
 
-use csp_shared::world::{HeirLapse, RealmEventWhat, WorldState};
+use csp_shared::world::{HeirLapse, OrderRequest, RealmEventWhat, WorldState};
 
 use crate::events::record_event;
+use crate::order_meta::OrderMeta;
+use crate::orders::str_field;
 use crate::queries::leader::{heir_problem, lives_in_realm, serves_others, ServesOthers};
 use crate::queries::residents::can_work;
 use crate::sight::InvariantViolation;
@@ -54,6 +56,17 @@ pub fn apply_name_heir(world: &mut WorldState, user_id: u64, o: &HeirRequest) {
     world.realms[ri].heir_id = Some(heir_id.to_string());
 }
 
+fn heir_request(o: &OrderRequest) -> HeirRequest<'_> {
+    HeirRequest { resident_id: str_field(o, "residentId"), heir_id: str_field(o, "heirId") }
+}
+
+pub(crate) static NAME_HEIR_META: OrderMeta = OrderMeta::fns(
+    "nameHeir",
+    |w, s, o, _| validate_name_heir(w, s.user_id, &heir_request(o)),
+    |w, s, o, _| apply_name_heir(w, s.user_id, &heir_request(o)),
+)
+.keeps_script();
+
 /// `clearHeir.validate`.
 pub fn validate_clear_heir(world: &WorldState, user_id: u64, o: &HeirRequest) -> Option<String> {
     match asker(world, user_id, o) {
@@ -72,6 +85,13 @@ pub fn apply_clear_heir(world: &mut WorldState, user_id: u64, o: &HeirRequest) {
         world.realms[ri].heir_id = None;
     }
 }
+
+pub(crate) static CLEAR_HEIR_META: OrderMeta = OrderMeta::fns(
+    "clearHeir",
+    |w, s, o, _| validate_clear_heir(w, s.user_id, &heir_request(o)),
+    |w, s, o, _| apply_clear_heir(w, s.user_id, &heir_request(o)),
+)
+.keeps_script();
 
 /// Why the realm at `ri`'s heir no longer qualifies, if they don't (`CONTEXT.md`: Heir).
 fn lapse_of(world: &WorldState, ri: usize) -> Option<HeirLapse> {

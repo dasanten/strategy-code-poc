@@ -11,6 +11,7 @@ use csp_shared::world::{
     TrainingSubject, WorldState,
 };
 
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{npc_training_problem, ordered_resident, OrderSender};
 use crate::queries::balance::{skill_of, skill_value, subject_parts, training_gain};
 use crate::queries::building::{building_at, teacher_at, train_problem, trainees_of};
@@ -61,6 +62,13 @@ pub fn apply_train(world: &mut WorldState, order: &OrderRequest) {
     world.residents[ri].order =
         Some(ResidentOrder::Train(TrainOrder { building_id: building_id.to_string(), learning }));
 }
+
+pub(crate) static TRAIN_META: OrderMeta =
+    OrderMeta::fns("train", |w, s, o, _| validate_train(w, s, o), |w, _, o, _| apply_train(w, o))
+        .gets_off_first()
+        .adults_only()
+        .npc_city()
+        .goes_on_until_stopped();
 
 /// What a trainee at `ground` would learn this tick (`lesson`): the subject its teacher teaches
 /// and their gain in it; no subject while there is no teacher or they are at the ceiling.

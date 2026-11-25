@@ -14,6 +14,7 @@ use csp_shared::world::{
     Stock, Tile, WorldState,
 };
 
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::queries::balance::{build_work, construction_learned, skill_of};
 use crate::queries::building::{build_materials, build_work_of, site_work_of, CARRYING_A_CHILD};
@@ -413,6 +414,16 @@ pub fn apply_repair(world: &mut WorldState, order: &OrderRequest) {
         }));
     }
 }
+
+pub(crate) static REPAIR_META: OrderMeta = OrderMeta::fns(
+    "repair",
+    |w, s, o, _| validate_repair(w, s, o),
+    |w, _, o, _| apply_repair(w, o),
+)
+.gets_off_first()
+.adults_only()
+.npc_city()
+.blocked_carrying_child();
 
 #[cfg(test)]
 #[path = "repair/tests.rs"]

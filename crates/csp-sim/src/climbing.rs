@@ -6,6 +6,7 @@ use csp_shared::terrain::{wrap_delta, TerrainMap};
 use csp_shared::world::{BuildingKind, ClimbOrder, OrderRequest, ResidentOrder, Tile, WorldState};
 
 use crate::defence::Alarms;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::orders::{str_field, OrderKind};
 use crate::walls::{climb_landing, foreign_wall};
@@ -84,6 +85,8 @@ impl OrderKind for Climb {
         }
     }
 }
+
+pub(crate) static CLIMB_META: OrderMeta = OrderMeta::request("climb", &Climb).gets_off_first();
 
 /// Requests this tick's climbing (`requestClimbing`).
 pub fn request_climbing(world: &WorldState) -> Vec<ClimbAction> {

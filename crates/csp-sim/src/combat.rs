@@ -8,9 +8,11 @@ use csp_shared::balance::{MAP_SIZE, SIGHT_RANGE, STRIKE_TICKS, WALL_DEFENCE};
 use csp_shared::footprint::{is_at, near_footprint};
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::{
-    AttackOrder, Building, CrimeKind, DeathCause, Good, Realm, RealmEventWhat, Resident,
-    ResidentOrder, Struck, Task, Tile, WalkOrder, WorldState,
+    AttackOrder, Building, CrimeKind, DeathCause, Good, OrderRequest, Realm, RealmEventWhat,
+    Resident, ResidentOrder, Struck, Task, Tile, WalkOrder, WorldState,
 };
+
+use serde_json::Value;
 
 use crate::cities::update_city_membership;
 use crate::crimes::{
@@ -21,8 +23,10 @@ use crate::defence::{defends_by_script, end_hold_if_over, start_defence, Alarms}
 use crate::equipment::Slot;
 use crate::events::record_event;
 use crate::goods_made::GoodsMade;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::commands;
 use crate::order_sender::{ordered_resident, OrderSender};
+use crate::orders::text_field;
 use crate::queries::alliance::contract_of;
 use crate::queries::carriages::{driven_carriage_id, stands_still};
 use crate::queries::city::town_hall_of;
@@ -385,6 +389,22 @@ pub fn apply_attack(world: &mut WorldState, order: &AttackRequest, size: Option<
     world.residents[i].order =
         Some(ResidentOrder::Attack(attack_order(target_id, defending, defending || no_crime)));
 }
+
+fn attack_request(order: &OrderRequest) -> AttackRequest {
+    AttackRequest {
+        resident_id: text_field(order, "residentId"),
+        target_id: text_field(order, "targetId"),
+        shoot: order.fields.get("shoot").and_then(Value::as_bool).unwrap_or(false),
+    }
+}
+
+pub(crate) static ATTACK_META: OrderMeta = OrderMeta::fns(
+    "attack",
+    |w, s, o, t| validate_attack(w, s, &attack_request(o), t.map(|t| t.size)).map(str::to_string),
+    |w, _, o, t| apply_attack(w, &attack_request(o), t.map(|t| t.size)),
+)
+.gets_off_first()
+.npc_city();
 
 /// Requests this tick's blows from residents' attack orders (`requestStrikes`), on a map of
 /// `size` tiles. An order whose target is gone or out of the attacker's sight ends. An attacker in

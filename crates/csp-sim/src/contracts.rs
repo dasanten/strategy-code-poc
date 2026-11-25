@@ -20,6 +20,7 @@ use serde_json::Value;
 use crate::armies::leave_armies;
 use crate::events::record_event;
 use crate::npc_behaviour::walk_to;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{realm_of, OrderSender};
 use crate::orders::{str_field, OrderKind};
 use crate::queries::alliance::realm_name;
@@ -329,6 +330,9 @@ pub const OFFER_CONTRACT: ContractOrder = ContractOrder {
     },
 };
 
+pub(crate) static OFFER_CONTRACT_META: OrderMeta =
+    OrderMeta::request("offerContract", &OFFER_CONTRACT);
+
 /// The offer named by `contractId` that the realm is a side of, or a reason (`offerOf`).
 fn offer_of(world: &WorldState, realm_id: &str, order: &OrderRequest) -> Result<usize, String> {
     let id = str_field(order, "contractId");
@@ -403,6 +407,9 @@ pub const ACCEPT_CONTRACT: ContractOrder = ContractOrder {
     },
 };
 
+pub(crate) static ACCEPT_CONTRACT_META: OrderMeta =
+    OrderMeta::request("acceptContract", &ACCEPT_CONTRACT);
+
 /// Declining an offer, or taking back one's own (`cancelContract`).
 pub const CANCEL_CONTRACT: ContractOrder = ContractOrder {
     check: |world, realm_id, order, _size| offer_of(world, realm_id, order).err(),
@@ -411,6 +418,9 @@ pub const CANCEL_CONTRACT: ContractOrder = ContractOrder {
         world.contracts.retain(|x| Some(&x.id) != id.as_ref());
     },
 };
+
+pub(crate) static CANCEL_CONTRACT_META: OrderMeta =
+    OrderMeta::request("cancelContract", &CANCEL_CONTRACT);
 
 /// A reason the resident can't pay `weeks` of the contract now, if any (`cannotPay`).
 fn cannot_pay(
@@ -483,14 +493,7 @@ impl OrderKind for Pay {
     }
 }
 
-/// The contract order kinds, besides the resident's pay order (`contractOrders`).
-pub fn contract_orders() -> Vec<(&'static str, ContractOrder)> {
-    vec![
-        ("offerContract", OFFER_CONTRACT),
-        ("acceptContract", ACCEPT_CONTRACT),
-        ("cancelContract", CANCEL_CONTRACT),
-    ]
-}
+pub(crate) static PAY_META: OrderMeta = OrderMeta::request("pay", &Pay);
 
 /// Puts the coins for `weeks` game weeks into the contract's storage and counts them as paid
 /// (`payInto`); each week raises standing both ways between its sides.

@@ -17,6 +17,7 @@ use csp_shared::world::{
     WalkOrder, WorldState,
 };
 
+use crate::order_meta::{running_meta, OrderMeta};
 use crate::passengers::get_off_vessel;
 use crate::queries::vessels::{
     across_docked_ship, beside_vessel, between_vessels, crew_short, floats_on, row_target,
@@ -131,6 +132,9 @@ impl OrderKind for WalkTo {
     }
 }
 
+pub(crate) static WALK_TO_META: OrderMeta =
+    OrderMeta::request("walkTo", &WalkTo).queue_step().gets_off_first().npc_city();
+
 /// A number field of an order as the TypeScript `apply` takes it, unchecked.
 fn num_field(order: &OrderRequest, name: &str) -> Option<f64> {
     order.fields.get(name).and_then(|v| v.as_f64())
@@ -222,27 +226,6 @@ fn reset_path(world: &mut WorldState, i: usize) {
     }
 }
 
-/// The TypeScript `kind` of an order.
-fn kind_name(o: &ResidentOrder) -> &'static str {
-    match o {
-        ResidentOrder::WalkTo(_) => "walkTo",
-        ResidentOrder::Drive(_) => "drive",
-        ResidentOrder::Haul(_) => "haul",
-        ResidentOrder::Attack(_) => "attack",
-        ResidentOrder::RoadLine(_) => "roadLine",
-        ResidentOrder::WallLine(_) => "wallLine",
-        ResidentOrder::Store(_) => "store",
-        ResidentOrder::Fetch(_) => "fetch",
-        ResidentOrder::Relocate(_) => "relocate",
-        ResidentOrder::Row(_) => "row",
-        ResidentOrder::Sail(_) => "sail",
-        ResidentOrder::HaulByWater(_) => "haulByWater",
-        ResidentOrder::Crew(_) => "crew",
-        ResidentOrder::Push(_) => "push",
-        _ => "other",
-    }
-}
-
 /// Where a moving order goes (`targetOf`): its target, a haul route's next stop, the tile an
 /// attack order's target stands on, a line's next tile, a store or fetch order's place; nowhere
 /// when that target is gone.
@@ -272,7 +255,7 @@ fn target_of(world: &WorldState, o: &ResidentOrder) -> Option<(f64, f64)> {
 /// The search for a moving order's path, by kind, target and whether the resident rides
 /// (`searchKey`).
 fn search_key(world: &WorldState, riding: bool, o: &ResidentOrder) -> String {
-    let kind = kind_name(o);
+    let kind = running_meta(o).kind;
     let how = if riding { format!("{kind}:riding") } else { kind.to_string() };
     match target_of(world, o) {
         Some((x, y)) => format!("{how}:{},{}", js(x), js(y)),

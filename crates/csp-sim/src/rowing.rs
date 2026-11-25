@@ -8,6 +8,7 @@ use csp_shared::world::{
     OrderRequest, Resident, ResidentOrder, RowOrder, Tile, Vessel, VesselKind, WorldState,
 };
 
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, realm_of, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::carriages::driven_carriage_id;
@@ -150,6 +151,8 @@ impl OrderKind for Row {
         }));
     }
 }
+
+pub(crate) static ROW_META: OrderMeta = OrderMeta::request("row", &Row).queue_step();
 
 #[cfg(test)]
 pub(crate) mod tests;

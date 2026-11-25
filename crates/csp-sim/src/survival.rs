@@ -191,7 +191,9 @@ pub fn down_do_nothing(world: &WorldState) -> Vec<InvariantViolation> {
     for r in &world.residents {
         let Some(until) = r.down_until else { continue };
         let problems = [
-            r.order.as_ref().map(|o| format!("has a {} order", order_kind(o))),
+            r.order
+                .as_ref()
+                .map(|o| format!("has a {} order", crate::order_meta::running_meta(o).kind)),
             r.script.is_some().then(|| "runs a script".to_string()),
             r.queue.is_some().then(|| "has a queue".to_string()),
             r.interrupted.is_some().then(|| "was interrupted by a defence script".to_string()),
@@ -256,52 +258,6 @@ fn js_number(n: f64) -> String {
         format!("{}", n as i64)
     } else {
         format!("{n}")
-    }
-}
-
-/// An order's `kind`, as the TypeScript names it.
-pub fn order_kind(o: &ResidentOrder) -> &'static str {
-    match o {
-        ResidentOrder::WalkTo(_) => "walkTo",
-        ResidentOrder::Drive(_) => "drive",
-        ResidentOrder::Haul(_) => "haul",
-        ResidentOrder::HaulByWater(_) => "haulByWater",
-        ResidentOrder::PickUp(_) => "pickUp",
-        ResidentOrder::Drop(_) => "drop",
-        ResidentOrder::Store(_) => "store",
-        ResidentOrder::Fetch(_) => "fetch",
-        ResidentOrder::Build(_) => "build",
-        ResidentOrder::TearDown(_) => "tearDown",
-        ResidentOrder::Repair(_) => "repair",
-        ResidentOrder::WorkAt(_) => "workAt",
-        ResidentOrder::Breed(_) => "breed",
-        ResidentOrder::Attack(_) => "attack",
-        ResidentOrder::Climb(_) => "climb",
-        ResidentOrder::Teach(_) => "teach",
-        ResidentOrder::Train(_) => "train",
-        ResidentOrder::RoadLine(_) => "roadLine",
-        ResidentOrder::WallLine(_) => "wallLine",
-        ResidentOrder::Pay(_) => "pay",
-        ResidentOrder::BuyCity(_) => "buyCity",
-        ResidentOrder::Trade(_) => "trade",
-        ResidentOrder::Swap(_) => "swap",
-        ResidentOrder::BuyHorse(_) => "buyHorse",
-        ResidentOrder::SellHorse(_) => "sellHorse",
-        ResidentOrder::HandIn(_) => "handIn",
-        ResidentOrder::BuyOff(_) => "buyOff",
-        ResidentOrder::PayDebt(_) => "payDebt",
-        ResidentOrder::AcceptOffer(_) => "acceptOffer",
-        ResidentOrder::Relocate(_) => "relocate",
-        ResidentOrder::Feed(_) => "feed",
-        ResidentOrder::Equip(_) => "equip",
-        ResidentOrder::Row(_) => "row",
-        ResidentOrder::Sail(_) => "sail",
-        ResidentOrder::Crew(_) => "crew",
-        ResidentOrder::Push(_) => "push",
-        ResidentOrder::Ram(_) => "ram",
-        ResidentOrder::Throw(_) => "throw",
-        ResidentOrder::Gather(_) => "gather",
-        ResidentOrder::Rally(_) => "rally",
     }
 }
 

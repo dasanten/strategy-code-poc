@@ -1,20 +1,22 @@
 //! UI orders (`apps/server/src/orders.ts`, ADR 0002): the order kinds, the queue of orders
 //! accepted during a tick and applied together at the start of the next one.
 //!
-//! `orderKinds` imports every module's order kind in the TypeScript. Here [`order_kinds`] is the
-//! registry the rule tickets add theirs to, one `kinds.insert(..)` line each; an order kind that
-//! acts on a tile is wrapped to get a passenger off first (`GETS_OFF_FIRST`) as it goes in.
+//! The registry ([`order_kinds`]) is built from what each kind says about itself
+//! (`order_meta::ORDER_METAS`).
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{OrderRequest, WorldState};
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::order_meta::{meta_of, ORDER_METAS};
 use crate::order_sender::OrderSender;
-use crate::passengers::{GetsOffFirst, GETS_OFF_FIRST};
+use crate::passengers::GetsOffFirst;
+use crate::queries::people::Given;
 use crate::queries::residents::is_down;
 use crate::tick::{ApplyOrders, Scratch};
 
@@ -37,6 +39,29 @@ pub trait OrderKind: Send + Sync {
         terrain: Option<&TerrainMap>,
     );
 }
+
+/// A declared order kind (`OrderMeta::request`) is one too.
+impl OrderKind for &'static dyn OrderKind {
+    fn validate(
+        &self,
+        world: &WorldState,
+        sender: &OrderSender,
+        order: &OrderRequest,
+        terrain: Option<&TerrainMap>,
+    ) -> Option<String> {
+        (**self).validate(world, sender, order, terrain)
+    }
+    fn apply(
+        &self,
+        world: &mut WorldState,
+        sender: &OrderSender,
+        order: &OrderRequest,
+        terrain: Option<&TerrainMap>,
+    ) {
+        (**self).apply(world, sender, order, terrain)
+    }
+}
+
 /// A shared order kind is one too, so it can be wrapped (`getsOffFirst`).
 impl OrderKind for Arc<dyn OrderKind> {
     fn validate(
@@ -79,6 +104,32 @@ pub fn bool_field(order: &OrderRequest, name: &str) -> Option<bool> {
     order.fields.get(name).and_then(Value::as_bool)
 }
 
+/// A string field of an order, if it is one, owned.
+pub fn text_field(order: &OrderRequest, name: &str) -> Option<String> {
+    str_field(order, name).map(str::to_string)
+}
+
+/// A field that lists ids, if it is a list.
+pub fn ids_field(order: &OrderRequest, name: &str) -> Option<Vec<String>> {
+    order.fields.get(name).and_then(Value::as_array).map(|a| {
+        a.iter().map(|v| v.as_str().map_or_else(|| v.to_string(), str::to_string)).collect()
+    })
+}
+
+/// A name field as the renaming checks take it (`Given`): missing, text, or something else.
+pub fn given_field<'o>(order: &'o OrderRequest, name: &str) -> Given<'o> {
+    match order.fields.get(name) {
+        None => Given::Missing,
+        Some(Value::String(s)) => Given::Text(s),
+        Some(_) => Given::NotText,
+    }
+}
+
+/// The side of the map an order is checked on.
+pub fn map_size(terrain: Option<&TerrainMap>) -> i32 {
+    terrain.map_or(MAP_SIZE, |t| t.size)
+}
+
 /// The order kinds by name (`Record<string, OrderKind>`). Only the kinds put in count, so a
 /// name such as `"constructor"` finds nothing (`orderKindOf`).
 #[derive(Clone, Default)]
@@ -87,14 +138,15 @@ pub struct OrderKinds {
 }
 
 impl OrderKinds {
-    /// Adds a kind under `name`; one in [`GETS_OFF_FIRST`] gets a passenger off first.
+    /// Adds a kind under `name`; one whose `gets_off_first` is set gets a passenger off
+    /// first.
     pub fn insert(&mut self, name: &str, kind: impl OrderKind + 'static) {
         self.insert_arc(name, Arc::new(kind));
     }
 
     pub fn insert_arc(&mut self, name: &str, kind: Arc<dyn OrderKind>) {
-        let kind: Arc<dyn OrderKind> =
-            if GETS_OFF_FIRST.contains(&name) { Arc::new(GetsOffFirst(kind)) } else { kind };
+        let gets_off_first = meta_of(name).is_some_and(|m| m.gets_off_first);
+        let kind = if gets_off_first { Arc::new(GetsOffFirst(kind)) } else { kind };
         self.kinds.insert(name.to_string(), kind);
     }
 
@@ -108,53 +160,16 @@ impl OrderKinds {
     }
 }
 
-/// The order kinds that exist (`orderKinds`). Each rule ticket adds its kinds here.
+/// The order kinds that exist (`orderKinds`), but for those built on the script library, which
+/// its host adds.
 pub fn order_kinds() -> OrderKinds {
     let mut kinds = OrderKinds::default();
-    crate::building::add_building_orders(&mut kinds);
-    crate::queues::add_queue_orders(&mut kinds);
-    crate::waypoints::add_waypoint_orders(&mut kinds);
-    crate::order_kinds::add_rule_orders(&mut kinds);
-    crate::order_kinds::add_later_rule_orders(&mut kinds);
+    for m in ORDER_METAS {
+        if let Some(kind) = m.order_kind() {
+            kinds.insert_arc(m.kind, kind);
+        }
+    }
     kinds
-}
-
-/// The order kinds that leave a resident's script running (`keeps` in `applyAll`): pairing, the
-/// Leader handover, naming an heir, renaming and claiming the Horse offer change nobody's order,
-/// nor do picking a param value, a defence or Alarm script, the demand, offer and waypoint
-/// orders; editing a queue keeps its current step going.
-const KEEPS_SCRIPT: [&str; 25] = [
-    "runScript",
-    "pair",
-    "handOver",
-    "nameHeir",
-    "clearHeir",
-    "rename",
-    "renameCity",
-    "renameHorse",
-    "claimHorses",
-    // `demandOrders` (T86.11).
-    "sendDemand",
-    "acceptDemand",
-    "declineDemand",
-    "setScriptParam",
-    "setDefenceScript",
-    "setAlarmScript",
-    "editQueue",
-    "postOffer",
-    "takeDownOffer",
-    "sendDirectOffer",
-    "declineOffer",
-    "sendCarriedOffer",
-    "acceptCarriedOffer",
-    // `waypointOrders` (T86.11).
-    "addWaypoint",
-    "renameWaypoint",
-    "removeWaypoint",
-];
-
-fn keeps_script(kind: &str) -> bool {
-    KEEPS_SCRIPT.contains(&kind)
 }
 
 /// The ids an order names as `residentId` and `residentIds`.
@@ -243,7 +258,8 @@ impl OrderQueue {
                 continue;
             }
             let kind_name = order.kind.as_str();
-            let keeps = keeps_script(kind_name);
+            let meta = meta_of(kind_name);
+            let keeps = meta.is_some_and(|m| m.keeps_script);
             let resident_id = str_field(&order, "residentId").map(str::to_string);
             let ri = resident_id
                 .as_deref()
@@ -284,8 +300,7 @@ impl OrderQueue {
                     a.script = None;
                 }
             }
-            let to_army = crate::armies::ArmyOrderKind::of(kind_name).is_some()
-                || kind_name == "armyRunScript";
+            let to_army = meta.is_some_and(|m| m.to_army);
             let before = if to_army { None } else { Some(member_orders(world)) };
             // Accepted by `receive`, so the kind exists.
             let kind = self.kinds.get(kind_name).expect("accepted orders have a kind").clone();

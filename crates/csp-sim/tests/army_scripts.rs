@@ -8,7 +8,7 @@ mod tasks_support;
 use csp_lang::interpreter::Host as _;
 use csp_shared::time::TICKS_PER_GAME_YEAR;
 use csp_shared::world::{Army, ArmyOrder, OrderRequest};
-use csp_sim::armies::ArmyOrderKind;
+use csp_sim::order_meta::meta_of;
 use csp_sim::order_sender::OrderSender;
 use csp_sim::orders::OrderReply;
 use csp_sim::script_api::ARMY_SCRIPT_API;
@@ -326,7 +326,7 @@ fn bind_every_name_in_the_army_script_api_every_army_order_but_forming_and_disba
     }
     // `armyOrders` but forming and disbanding.
     let commands = ["armyWalkTo", "armyGuard", "armyAttack", "armyFollow", "armyStop"];
-    assert!(commands.iter().all(|k| ArmyOrderKind::of(k).is_some()));
+    assert!(commands.iter().all(|k| meta_of(k).is_some_and(|m| m.to_army)));
     let mut want: Vec<&str> = commands.to_vec();
     want.extend(["addWaypoint", "removeWaypoint"]);
     want.sort();

@@ -9,14 +9,15 @@ use csp_sim::explored::{ExploredTerrain, MapTerrain};
 use csp_sim::order_sender::{Account, OrderSender};
 use csp_sim::orders::{order_kinds, OrderKinds};
 use csp_sim::queues::QueueHost;
-use csp_sim::script_params::SetScriptParamOrder;
+use csp_sim::script_params::{SetScriptParamOrder, SET_SCRIPT_PARAM_META};
 use csp_sim::script_runner::{
     ArmyRunScriptOrder, DefaultScriptHost, RunScriptOrder, ScriptHost, SetAlarmScriptOrder,
-    SetDefenceScriptOrder, TaskOrder,
+    SetDefenceScriptOrder, TaskOrder, ARMY_RUN_SCRIPT_META, RUN_SCRIPT_META, SET_ALARM_SCRIPT_META,
+    SET_DEFENCE_SCRIPT_META, TASK_META,
 };
 use csp_sim::scripts::{RunnableScript, ScriptLibrary};
 use csp_sim::tick::ScriptErrorWhere;
-use csp_sim::workplace_settings::{SetWorkSettingsOrder, WorkSettingsHost};
+use csp_sim::workplace_settings::{SetWorkSettingsOrder, WorkSettingsHost, SET_WORK_SETTINGS_META};
 use rusqlite::{Connection, OptionalExtension};
 
 use crate::scripts::{default_script_id, runnable_script, Defaults};
@@ -149,15 +150,15 @@ impl QueueHost for SharedHost {
 pub fn library_order_kinds(host: &Arc<LibraryHost>) -> OrderKinds {
     let mut kinds = order_kinds();
     let script_host: Arc<dyn ScriptHost + Send + Sync> = host.clone();
-    kinds.insert("runScript", RunScriptOrder { host: script_host.clone() });
+    kinds.insert(RUN_SCRIPT_META.kind, RunScriptOrder { host: script_host.clone() });
     kinds.insert(
-        "armyRunScript",
+        ARMY_RUN_SCRIPT_META.kind,
         ArmyRunScriptOrder { host: script_host.clone(), builtins: order_kinds() },
     );
-    kinds.insert("setScriptParam", SetScriptParamOrder { library: host.clone() });
-    kinds.insert("setDefenceScript", SetDefenceScriptOrder { host: script_host.clone() });
-    kinds.insert("setAlarmScript", SetAlarmScriptOrder { host: script_host });
-    kinds.insert("setWorkSettings", SetWorkSettingsOrder { host: host.clone() });
-    kinds.insert("task", TaskOrder::new(host.clone()));
+    kinds.insert(SET_SCRIPT_PARAM_META.kind, SetScriptParamOrder { library: host.clone() });
+    kinds.insert(SET_DEFENCE_SCRIPT_META.kind, SetDefenceScriptOrder { host: script_host.clone() });
+    kinds.insert(SET_ALARM_SCRIPT_META.kind, SetAlarmScriptOrder { host: script_host });
+    kinds.insert(SET_WORK_SETTINGS_META.kind, SetWorkSettingsOrder { host: host.clone() });
+    kinds.insert(TASK_META.kind, TaskOrder::new(host.clone()));
     kinds
 }
