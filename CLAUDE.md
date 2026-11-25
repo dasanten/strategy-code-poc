@@ -18,7 +18,8 @@
 - **Wiki** (`/wiki`, one file per section: `apps/web/src/wiki/<topic>.tsx`): a ticket that changes
   a rule also updates its wiki section. Numbers come from `@csp/balance`, never typed into its text.
 - **Keep scripting cheap to add** (ADR 0002): everything goes through the game API
-  (`crates/csp-sim/src/script_api.rs`, `script_tables.rs`); orders only request actions; order
+  (`crates/csp-sim/src/script_api.rs`; the tables in `script_tables/`, one module per table, each
+  default script its own `default_scripts/*.script`); orders only request actions; order
   state is plain serialisable data. After changing the script tables, run `pnpm script-data:rust`.
 - **World state is never reset** (ADR 0006): a change to its shape bumps `WORLD_FORMAT_VERSION`
   (`crates/csp-shared/src/world/world_format.rs`) and ships a migration step in
