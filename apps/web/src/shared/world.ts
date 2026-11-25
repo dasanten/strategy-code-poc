@@ -3,33 +3,11 @@
 
 import { GOOD_KINDS, GOOD_SPECS } from '@csp/balance'
 import type {
-  Alliance,
-  Army,
-  Building,
   BuildingKind,
-  Caravan,
-  Carriage,
-  City,
-  CrimeKind,
-  DemandTerms,
-  DirectOfferTerms,
-  DirectiveGoal,
   Good,
-  GoodsSpot,
-  Horse,
-  MercenaryContract,
-  Pile,
-  RealmEvent,
-  Remembered,
-  Resident,
   ResourceKind,
-  ResourceNode,
   SkillName,
-  Stock,
-  Trader,
   TrainingSubject,
-  Waypoint,
-  WorkplaceSettings,
   Weapon,
 } from '@csp/shared-types'
 
