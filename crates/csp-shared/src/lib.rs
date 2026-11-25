@@ -5,6 +5,7 @@ pub mod balance;
 pub mod balance_export;
 pub mod building_spec;
 pub mod chunks;
+pub mod craft_spec;
 pub mod footprint;
 pub mod goods;
 pub mod protocol;

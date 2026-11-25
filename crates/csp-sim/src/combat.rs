@@ -739,7 +739,7 @@ fn break_machine(
     }
     let against = CrimeAgainst {
         victim_org: world.siege_machines[mi].realm_id.clone(),
-        building: Some(crate::siege::site_kind(world.siege_machines[mi].kind)),
+        building: Some(world.siege_machines[mi].kind.spec().built_as),
         ..CrimeAgainst::default()
     };
     let attacker_id = world.residents[ai].id.clone();

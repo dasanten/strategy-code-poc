@@ -4,8 +4,8 @@
 //! A new number is one declaration inside its domain file's `balance!` block: that defines the
 //! constant and puts it in the export (`balance_json`), under its own name and in the order of the
 //! declarations. Then run `pnpm balance:rust`. The numbers of a building kind are in its spec
-//! (`building_specs.rs`), which the tables keyed by a kind are made from. A number the client has
-//! no use for stands outside the block and says `Not exported` in its comment. All are read as
+//! (`building_specs.rs`), which the tables keyed by a kind are made from, and those of a kind of
+//! vessel or siege machine in its own (`craft_specs.rs`). A number the client has no use for stands outside the block and says `Not exported` in its comment. All are read as
 //! `balance::NAME`, whichever file they are in. A few numbers sit in the file before or after their
 //! domain's (T120.3): there they keep their place in the export.
 //!
@@ -49,6 +49,7 @@ mod armies;
 mod building_specs;
 mod buildings;
 mod cities;
+mod craft_specs;
 mod decay;
 mod demands;
 mod exploring;

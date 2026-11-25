@@ -1,27 +1,24 @@
-//! Boats and ships.
+//! Boats and ships. The numbers of a kind of vessel are in its spec (`craft_specs.rs`).
+
+use super::craft_specs::{BOAT, SHIP};
 
 balance! {
-/// Most weight a boat carries, in kg (`CONTEXT.md`: Boat): passengers at `PASSENGER_WEIGHT` and
-/// goods together, so three residents and a little cargo, or a single rower's worth of goods eight
-/// times over. Its rower doesn't count against it.
-pub const BOAT_CAPACITY: f64 = 250.0;
+/// Most weight a boat carries, in kg (`CONTEXT.md`: Boat).
+pub const BOAT_CAPACITY: f64 = BOAT.capacity;
 
-/// Most weight a ship carries, in kg (`CONTEXT.md`: Ship: far more than a carriage): passengers at
-/// `PASSENGER_WEIGHT` and goods together, five carriages' worth. Its crew don't count against it.
-pub const SHIP_CAPACITY: f64 = 2000.0;
+/// Most weight a ship carries, in kg (`CONTEXT.md`: Ship).
+pub const SHIP_CAPACITY: f64 = SHIP.capacity;
 
-/// The fewest crew aboard a ship for it to sail (`CONTEXT.md`: Crew, Sailing): a captain and three
-/// hands to work the sails, so a small realm can man one but it takes a few of its residents.
-pub const SHIP_MIN_CREW: f64 = 4.0;
+/// The fewest crew aboard a ship for it to sail (`CONTEXT.md`: Crew, Sailing).
+pub const SHIP_MIN_CREW: f64 = SHIP.min_crew;
 
 /// How fast a ship sails with an unskilled crew, as a share of walking on Plains (`CONTEXT.md`:
-/// Sailing): faster than a boat is rowed, as wind does the work; the crew's Seafaring adds to it as
-/// it does to rowing (`SEAFARING_SKILL_EFFECT`, from their average).
-pub const SAIL_SPEED: f64 = 1.6;
+/// Sailing).
+pub const SAIL_SPEED: f64 = SHIP.speed;
 
 /// How fast an average rower moves a boat over water, as a share of walking on Plains
-/// (`CONTEXT.md`: Rowing): a little quicker than walking round the shore, so crossing pays off.
-pub const ROW_SPEED: f64 = 1.2;
+/// (`CONTEXT.md`: Rowing).
+pub const ROW_SPEED: f64 = BOAT.speed;
 
 /// How much faster a boat goes for each point of its rower's Strength above
 /// `ROW_STRENGTH_AVERAGE`, and slower below it (`CONTEXT.md`: Seafaring: a stronger rower goes

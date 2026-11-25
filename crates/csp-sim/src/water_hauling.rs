@@ -13,7 +13,7 @@
 //! other haven, docking there, while the rest of the crew stays aboard. It sails only with the
 //! fewest crew it takes, the captain among them.
 
-use csp_shared::balance::{GOOD_WEIGHT, SHIP_MIN_CREW};
+use csp_shared::balance::GOOD_WEIGHT;
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, TerrainMap};
 use csp_shared::world::{
     Good, GoodsSpot, HaulPhase, HaulStop, OrderRequest, Resident, ResidentOrder, Stock, Tile,
@@ -151,7 +151,7 @@ fn route_problem(world: &WorldState, r: &Resident, v: &Vessel) -> Option<String>
     } else if r.riding.is_some() {
         "no horse goes aboard: dismount first".into()
     } else {
-        let short = (SHIP_MIN_CREW as usize).saturating_sub(captain_and_crew(world, v, r));
+        let short = (v.kind.spec().min_crew as usize).saturating_sub(captain_and_crew(world, v, r));
         if short == 0 {
             return None;
         }
