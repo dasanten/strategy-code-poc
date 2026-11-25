@@ -245,8 +245,8 @@ mod tests {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/balance");
         for entry in std::fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
-            // A spec's numbers reach the export through the tables made from the specs.
-            if path.ends_with("building_specs.rs") {
+            // A spec's numbers reach the export through the tables and constants made from the specs.
+            if path.ends_with("building_specs.rs") || path.ends_with("craft_specs.rs") {
                 continue;
             }
             let text = std::fs::read_to_string(&path).unwrap();
