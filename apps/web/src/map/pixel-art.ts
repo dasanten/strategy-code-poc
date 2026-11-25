@@ -51,6 +51,7 @@ const BUILDING_SLICE: Partial<Record<BuildingKind, string>> = {
   quarry: 'quarry',
   lumberCamp: 'lumber-camp',
   smelter: 'smelter',
+  kiln: 'smelter',
   mint: 'mint',
   smithy: 'smithy',
   trainingGround: 'training-ground',

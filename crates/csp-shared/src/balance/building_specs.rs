@@ -29,6 +29,7 @@ impl BuildingKind {
             BuildingKind::Smelter => &SMELTER,
             BuildingKind::Mint => &MINT,
             BuildingKind::Smithy => &SMITHY,
+            BuildingKind::Kiln => &KILN,
             BuildingKind::TrainingGround => &TRAINING_GROUND,
             BuildingKind::Road => &ROAD,
             BuildingKind::Carriage => &CARRIAGE,
@@ -630,4 +631,31 @@ const CATAPULT: BuildingSpec = BuildingSpec {
     workplace: None,
     housing_room: None,
     decay_days: None,
+};
+
+const KILN: BuildingSpec = BuildingSpec {
+    label: "Kiln",
+    purpose: "A kiln burns wood into coal; not on Mountain.",
+    footprint: 2,
+    stands: Stands::OffNodes { city_area: false, shore: false },
+    shares_a_tile: false,
+    keeps_goods: false,
+    build: Some(BuildSpec {
+        menu: BuildMenu::Industry,
+        menu_place: 4,
+        materials: Table(&[("stone", 30.0), ("wood", 10.0)]),
+        work: 3.0 * TICKS_PER_GAME_DAY,
+        stone: None,
+    }),
+    workplace: Some(Workplace {
+        max_workers: 3.0,
+        skill: SkillName::Smelting,
+        wreck_worth: 250.0,
+        processing: Some(Processing {
+            recipes: &[Recipe { input: Table(&[("wood", 3.0)]), output: Table(&[("coal", 1.0)]) }],
+            batches_per_day: 2.0,
+        }),
+    }),
+    housing_room: None,
+    decay_days: Some(10800.0),
 };

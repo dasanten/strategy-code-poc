@@ -827,6 +827,11 @@ export interface Balance {
       iron: number
       [key: string]: number
     }
+    kiln: {
+      stone: number
+      wood: number
+      [key: string]: number
+    }
     trainingGround: {
       wood: number
       stone: number
@@ -915,6 +920,7 @@ export interface Balance {
     smelter: number
     mint: number
     smithy: number
+    kiln: number
     trainingGround: number
     road: number
     carriage: number
@@ -965,6 +971,7 @@ export interface Balance {
     smelter: number
     mint: number
     smithy: number
+    kiln: number
     [key: string]: number
   }
   readonly WORKPLACE_WRECK_WORTH: {
@@ -975,6 +982,7 @@ export interface Balance {
     smelter: number
     mint: number
     smithy: number
+    kiln: number
     [key: string]: number
   }
   readonly WORKPLACE_SKILL: {
@@ -985,6 +993,7 @@ export interface Balance {
     smelter: string
     mint: string
     smithy: string
+    kiln: string
     [key: string]: string
   }
   readonly RECIPES: {
@@ -1237,6 +1246,23 @@ export interface Balance {
         [key: string]: number
       }
     })[]
+    kiln: ({
+      input: {
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        coal: number
+        [key: string]: number
+      }
+      [key: string]: {
+        wood: number
+        [key: string]: number
+      } | {
+        coal: number
+        [key: string]: number
+      }
+    })[]
     [key: string]: ({
       input: {
         ironOre: number
@@ -1483,12 +1509,29 @@ export interface Balance {
         arrows: number
         [key: string]: number
       }
+    })[] | ({
+      input: {
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        coal: number
+        [key: string]: number
+      }
+      [key: string]: {
+        wood: number
+        [key: string]: number
+      } | {
+        coal: number
+        [key: string]: number
+      }
     })[]
   }
   readonly BATCHES_PER_DAY: {
     smelter: number
     mint: number
     smithy: number
+    kiln: number
     [key: string]: number
   }
   readonly WORK_OUTPUT_PER_DAY: {
@@ -1534,6 +1577,7 @@ export interface Balance {
     smelter: number
     mint: number
     smithy: number
+    kiln: number
     trainingGround: number
     road: number
     haven: number
@@ -1735,6 +1779,7 @@ export interface Balance {
     smelter: number
     mint: number
     smithy: number
+    kiln: number
     trainingGround: number
     road: number
     carriage: number

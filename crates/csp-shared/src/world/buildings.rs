@@ -28,6 +28,7 @@ pub enum BuildingKind {
     Smelter = "smelter",
     Mint = "mint",
     Smithy = "smithy",
+    Kiln = "kiln",
     TrainingGround = "trainingGround",
     Road = "road",
     Carriage = "carriage",

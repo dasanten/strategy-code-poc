@@ -730,6 +730,10 @@
       "wood": 20.0,
       "iron": 10.0
     },
+    "kiln": {
+      "stone": 30.0,
+      "wood": 10.0
+    },
     "trainingGround": {
       "wood": 50.0,
       "stone": 10.0
@@ -777,6 +781,7 @@
     "smelter": 5760.0,
     "mint": 7200.0,
     "smithy": 7200.0,
+    "kiln": 4320.0,
     "trainingGround": 4320.0,
     "road": 90.0,
     "carriage": 2880.0,
@@ -817,7 +822,8 @@
     "lumberCamp": 6.0,
     "smelter": 4.0,
     "mint": 4.0,
-    "smithy": 4.0
+    "smithy": 4.0,
+    "kiln": 3.0
   },
   "WORKPLACE_WRECK_WORTH": {
     "farm": 200.0,
@@ -826,7 +832,8 @@
     "lumberCamp": 200.0,
     "smelter": 400.0,
     "mint": 560.0,
-    "smithy": 600.0
+    "smithy": 600.0,
+    "kiln": 250.0
   },
   "WORKPLACE_SKILL": {
     "farm": "farming",
@@ -835,7 +842,8 @@
     "lumberCamp": "woodcutting",
     "smelter": "smelting",
     "mint": "smelting",
-    "smithy": "smithing"
+    "smithy": "smithing",
+    "kiln": "smelting"
   },
   "RECIPES": {
     "smelter": [
@@ -966,12 +974,23 @@
           "arrows": 40.0
         }
       }
+    ],
+    "kiln": [
+      {
+        "input": {
+          "wood": 3.0
+        },
+        "output": {
+          "coal": 1.0
+        }
+      }
     ]
   },
   "BATCHES_PER_DAY": {
     "smelter": 2.0,
     "mint": 2.0,
-    "smithy": 2.0
+    "smithy": 2.0,
+    "kiln": 2.0
   },
   "WORK_OUTPUT_PER_DAY": {
     "food": 2.0,
@@ -1014,6 +1033,7 @@
     "smelter": 10800.0,
     "mint": 10800.0,
     "smithy": 10800.0,
+    "kiln": 10800.0,
     "trainingGround": 5400.0,
     "road": 2700.0,
     "haven": 5400.0
@@ -1207,6 +1227,7 @@
     "smelter": 2,
     "mint": 2,
     "smithy": 2,
+    "kiln": 2,
     "trainingGround": 3,
     "road": 1,
     "carriage": 1,

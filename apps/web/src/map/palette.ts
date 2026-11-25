@@ -85,6 +85,7 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   quarry: 0xb3ada3,
   lumberCamp: 0x6b7f3c,
   smelter: 0x9a4a2f,
+  kiln: 0x8a3a1f,
   mint: 0xc9a227,
   smithy: 0x4a4e57,
   trainingGround: 0xb8925a,

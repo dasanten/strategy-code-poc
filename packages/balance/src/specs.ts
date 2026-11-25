@@ -273,6 +273,21 @@ export const BUILDING_SPECS = {
     },
     "processes": true
   },
+  "kiln": {
+    "label": "Kiln",
+    "purpose": "A kiln burns wood into coal; not on Mountain.",
+    "footprint": 2,
+    "stands": "offNodes",
+    "inCityArea": false,
+    "onShore": false,
+    "sharesATile": false,
+    "keepsGoods": false,
+    "buildMenu": {
+      "group": "Industry",
+      "place": 4
+    },
+    "processes": true
+  },
   "trainingGround": {
     "label": "Training ground",
     "purpose": "A training ground is where residents train a stat or a skill under a teacher; not on Mountain. Like a workplace, nobody owns it.",
@@ -574,7 +589,7 @@ export const MACHINE_SPECS = {
 } as const satisfies Record<SiegeMachineKind, MachineSpec>
 
 /** Every building kind, in the order of the specs. */
-export const BUILDING_KINDS = ['townHall', 'house', 'storage', 'warehouse', 'wall', 'gate', 'tower', 'farm', 'stable', 'mine', 'quarry', 'lumberCamp', 'smelter', 'mint', 'smithy', 'trainingGround', 'road', 'carriage', 'haven', 'boat', 'ship', 'ram', 'catapult'] as const satisfies readonly BuildingKind[]
+export const BUILDING_KINDS = ['townHall', 'house', 'storage', 'warehouse', 'wall', 'gate', 'tower', 'farm', 'stable', 'mine', 'quarry', 'lumberCamp', 'smelter', 'mint', 'smithy', 'kiln', 'trainingGround', 'road', 'carriage', 'haven', 'boat', 'ship', 'ram', 'catapult'] as const satisfies readonly BuildingKind[]
 
 /** Every good, in the order of the specs (`CONTEXT.md`: Good). */
 export const GOOD_KINDS = ['food', 'wood', 'stone', 'ironOre', 'iron', 'goldOre', 'coins', 'spear', 'sword', 'shield', 'armour', 'coal', 'steel', 'steelSword', 'steelShield', 'steelArmour', 'tools', 'bow', 'crossbow', 'arrows'] as const satisfies readonly Good[]

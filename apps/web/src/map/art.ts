@@ -22,6 +22,7 @@ export const BUILDING_ART: Record<BuildingKind, string> = {
   quarry: 'quarry.svg',
   lumberCamp: 'lumber-camp.svg',
   smelter: 'smelter.svg',
+  kiln: 'smelter.svg',
   mint: 'mint.svg',
   smithy: 'smithy.svg',
   trainingGround: 'training-ground.svg',
