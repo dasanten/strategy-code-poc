@@ -16,7 +16,7 @@ use crate::carrying::{CarryAction, CarryKind};
 use crate::goods_deps::{
     building_organization, carriage_organization, ordered_resident, realm_of, OrderSender,
 };
-use crate::order_meta::OrderMeta;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::orders::map_size;
 use crate::queries::command::commander_of_resident;
 use crate::queries::command::steals_carriage;
@@ -335,7 +335,7 @@ pub(crate) static STORE_META: OrderMeta = OrderMeta::fns(
     |w, s, o, t| validate_store(w, s, o, map_size(t)),
     |w, s, o, t| apply_store(w, s, o, map_size(t)),
 )
-.queue_step()
+.queue_step(StepGroup::Goods)
 .gets_off_first()
 .npc_city()
 .script(&[STORE_ACTION]);
@@ -420,7 +420,7 @@ pub(crate) static FETCH_META: OrderMeta = OrderMeta::fns(
     |w, s, o, t| validate_fetch(w, s, o, map_size(t)),
     |w, s, o, t| apply_fetch(w, s, o, map_size(t)),
 )
-.queue_step()
+.queue_step(StepGroup::Goods)
 .gets_off_first()
 .npc_city()
 .script(&[FETCH_ACTION]);

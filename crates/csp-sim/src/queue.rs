@@ -4,7 +4,7 @@
 //! know.
 
 use crate::conditions::condition_of;
-use crate::order_meta::{meta_of, OrderMeta};
+use crate::order_meta::{meta_of, OrderMeta, StepGroup};
 use csp_lang::js::{json_string, number_to_string, utf16_len};
 use csp_shared::balance::{
     QUEUE_MAX_DEPTH, QUEUE_MAX_REPEAT, QUEUE_MAX_STEPS, QUEUE_STEP_MAX_CHARS,
@@ -24,7 +24,8 @@ pub fn can_be_queue_step(kind: &str) -> bool {
 /// kind does. Its order carries only its `condition`.
 pub const WAIT_UNTIL: &str = "waitUntil";
 
-pub(crate) static WAIT_UNTIL_META: OrderMeta = OrderMeta::not_requested(WAIT_UNTIL).queue_step();
+pub(crate) static WAIT_UNTIL_META: OrderMeta =
+    OrderMeta::not_requested(WAIT_UNTIL).queue_step(StepGroup::Flow);
 
 /// Steps that run a script (a task's default or the Player's own) rather than a built-in order
 /// (`runsScript`).

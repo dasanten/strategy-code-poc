@@ -1,5 +1,5 @@
 import { QUEUE_DEFAULT_STEP_MINUTES } from '@csp/balance'
-import { queueSteps, queueStepsProblem } from './shared/queue.js'
+import { QUEUE_STEP_KINDS, neverEnds, queueSteps, queueStepsProblem } from './shared/queue.js'
 import type { OrderRequest, Queue } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
@@ -21,6 +21,7 @@ import {
   STORE_ALL,
   stepLabel,
   type Queued,
+  type StepGroup,
 } from './queue-view.js'
 import {
   dropItem,
@@ -566,5 +567,63 @@ describe('a step acting on no place', () => {
       { kind: 'runScript', scriptId: 's' },
     ] as OrderRequest[])
       expect(appendRequest(idle, { ...order, residentId: 'w1' })?.steps).toEqual([{ order }])
+  })
+})
+
+describe('queue steps read from the order kinds (T121.8)', () => {
+  it('are the kinds the hand-written list had, each in the group it had', () => {
+    const before: Record<string, StepGroup> = {
+      walkTo: 'move',
+      drive: 'move',
+      row: 'move',
+      sail: 'move',
+      unhitch: 'move',
+      hitch: 'move',
+      board: 'move',
+      getOff: 'move',
+      pickUp: 'goods',
+      drop: 'goods',
+      store: 'goods',
+      fetch: 'goods',
+      build: 'work',
+      tearDown: 'work',
+      workAt: 'work',
+      teach: 'work',
+      haul: 'move',
+      roadLine: 'work',
+      wallLine: 'work',
+      mount: 'move',
+      dismount: 'move',
+      relocate: 'move',
+      feed: 'goods',
+      equip: 'goods',
+      takeOff: 'goods',
+      task: 'work',
+      runScript: 'scripts',
+      waitUntil: 'flow',
+    }
+    expect([...QUEUE_STEP_KINDS].sort()).toEqual(Object.keys(before).sort())
+    for (const [kind, group] of Object.entries(before)) {
+      expect([kind, stepGroup({ kind } as OrderRequest)]).toEqual([kind, group])
+    }
+    expect(stepGroup({ kind: 'task', task: 'explore' } as OrderRequest)).toBe('move')
+    expect(stepGroup({ kind: 'attack' } as OrderRequest)).toBe('work')
+  })
+
+  it('never end on their own for work, haul routes and teaching, as before', () => {
+    for (const kind of QUEUE_STEP_KINDS) {
+      const order = { kind } as OrderRequest
+      expect([kind, neverEnds(order)]).toEqual([kind, ['workAt', 'haul', 'teach'].includes(kind)])
+    }
+  })
+
+  it('each have a row text of their own', () => {
+    for (const kind of QUEUE_STEP_KINDS) {
+      if (kind === 'task') continue
+      expect(
+        stepLabel({ kind, x: 1, y: 2, to: { x: 1, y: 2 } } as OrderRequest, {}),
+        kind,
+      ).not.toBe(kind)
+    }
   })
 })

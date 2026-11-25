@@ -10,7 +10,7 @@ use csp_shared::world::{
 
 use crate::cities::{dissolve_city, update_city_membership};
 use crate::crimes::{building_organization, commit_crime, CrimeAgainst};
-use crate::order_meta::OrderMeta;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::queries::balance::{build_work, construction_learned, skill_of};
 use crate::queries::building::{
@@ -254,7 +254,7 @@ pub fn apply_tear_down(world: &mut WorldState, order: &OrderRequest) {
 
 pub(crate) static TEAR_DOWN_META: OrderMeta =
     OrderMeta::fns("tearDown", validate_tear_down, |w, _, o, _| apply_tear_down(w, o))
-        .queue_step()
+        .queue_step(StepGroup::Work)
         .gets_off_first()
         .adults_only()
         .npc_city()

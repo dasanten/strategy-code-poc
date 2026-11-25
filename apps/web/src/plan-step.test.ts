@@ -141,6 +141,12 @@ describe('Add step', () => {
         k.id,
         order.kind === 'task' ? order.task : undefined,
       ])
+      // The kind of order the step says it makes, which the palette groups it by.
+      expect([k.id, k.makes?.kind, k.makes?.task]).toEqual([
+        k.id,
+        order.kind,
+        order.kind === 'task' ? order.task : undefined,
+      ])
     }
   })
 

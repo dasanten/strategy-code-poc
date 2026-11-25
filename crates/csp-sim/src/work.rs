@@ -12,7 +12,7 @@ use csp_shared::world::{
 };
 
 use crate::mending::{has_mend_input, mend_input, mend_pace, mend_piece, piece_to_mend, MEND};
-use crate::order_meta::OrderMeta;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::balance::{batch_work, skill_of, work_learned, work_output, workplace_skill};
 use crate::queries::building::{building_at, work_problem, CARRYING_A_CHILD};
@@ -104,7 +104,7 @@ pub(crate) static WORK_AT_META: OrderMeta = OrderMeta::fns(
     |w, s, o, _| validate_work_at(w, s, o),
     |w, _, o, _| apply_work_at(w, o),
 )
-.queue_step()
+.queue_step(StepGroup::Work)
 .never_ends()
 .gets_off_first()
 .adults_only()
