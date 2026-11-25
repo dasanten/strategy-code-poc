@@ -27,6 +27,8 @@ use crate::ruins::is_ruin;
 use crate::running::{
     no_ties_mut, same_when_equal, Arrival, By, Going, GoingMut, Handles, RunningOrder, Ties, To,
 };
+use crate::script_actions::{arg, arg_as, place_if_any, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use csp_shared::balance::MAP_SIZE;
 
 /// `Number.MAX_SAFE_INTEGER`: a fetch of as many as there are.
@@ -335,7 +337,17 @@ pub(crate) static STORE_META: OrderMeta = OrderMeta::fns(
 )
 .queue_step()
 .gets_off_first()
-.npc_city();
+.npc_city()
+.script(&[STORE_ACTION]);
+
+const STORE_ACTION: ScriptAction = ScriptAction {
+    name: "store",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("goods"), place_if_any("to?", "to"), arg_as("ownFood?", "ownFood")]),
+    cost: 10.0,
+    description: "Walk to `to` (a storage, a stable or a carriage of mine, or beside a boat of mine; by default the nearest storage of my realm), put the goods down there and, at a storage with Food, top up my own food. Goods like {wood: 10}, or a list like [\"wood\"] for all I carry of them (Food beyond my own food). `ownFood`, units of Food, is the own food to keep and top up to instead of the usual. My order is \"store\" until done; then `me.orderEnded` says how it ended.",
+    returns: ScriptType::String,
+};
 
 impl RunningOrder for StoreOrder {
     fn going(&self) -> Option<Going<'_>> {
@@ -410,7 +422,17 @@ pub(crate) static FETCH_META: OrderMeta = OrderMeta::fns(
 )
 .queue_step()
 .gets_off_first()
-.npc_city();
+.npc_city()
+.script(&[FETCH_ACTION]);
+
+const FETCH_ACTION: ScriptAction = ScriptAction {
+    name: "fetch",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("goods"), place_if_any("from?", "from")]),
+    cost: 10.0,
+    description: "Walk to `from` (a storage, a stable or a carriage of mine, or beside a boat of mine; by default the nearest storage or carriage of my realm holding any of the goods) and take the goods there, as much as fits. Goods like {wood: 10}, or a list like [\"wood\"] for as much as there is. My order is \"fetch\" until done; then `me.orderEnded` says how it ended.",
+    returns: ScriptType::String,
+};
 
 impl RunningOrder for FetchOrder {
     fn going(&self) -> Option<Going<'_>> {

@@ -15,6 +15,8 @@ use crate::queries::carriages::carriage_pulled_by;
 use crate::queries::residents::is_down;
 use crate::queries::riding::{horse_of_resident, horse_ridden, mount_problem};
 use crate::running::RunningOrder;
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::stealing::{take_over, Taken};
 
 /// A path found before mounting or dismounting kept to the ground and walls of the other way of
@@ -89,7 +91,16 @@ impl OrderKind for Mount {
 }
 
 pub(crate) static MOUNT_META: OrderMeta =
-    OrderMeta::request("mount", &Mount).queue_step().gets_off_first();
+    OrderMeta::request("mount", &Mount).queue_step().gets_off_first().script(&[MOUNT_ACTION]);
+
+const MOUNT_ACTION: ScriptAction = ScriptAction {
+    name: "mount",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[arg("horseId")]),
+    cost: 10.0,
+    description: "Get on a horse on my tile that pulls no carriage, and ride it. Another realm’s horse is stolen by that: it joins my realm at once, which is theft (see Standing).",
+    returns: ScriptType::String,
+};
 
 /// The dismount order (`dismount`): a resident gets off their horse, which stays on the tile.
 pub struct Dismount;
@@ -126,7 +137,17 @@ impl OrderKind for Dismount {
     }
 }
 
-pub(crate) static DISMOUNT_META: OrderMeta = OrderMeta::request("dismount", &Dismount).queue_step();
+pub(crate) static DISMOUNT_META: OrderMeta =
+    OrderMeta::request("dismount", &Dismount).queue_step().script(&[DISMOUNT_ACTION]);
+
+const DISMOUNT_ACTION: ScriptAction = ScriptAction {
+    name: "dismount",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[]),
+    cost: 10.0,
+    description: "Get off the horse I ride; it stays on my tile.",
+    returns: ScriptType::String,
+};
 
 /// Ends riding that can't go on (`stepRiders`), at the end of each tick: the horse died or is
 /// Down, is no longer the rider's realm's, was hitched, or has another rider, or the rider left

@@ -21,6 +21,8 @@ use crate::queries::names::placed;
 use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
 use crate::running::{in_place, no_ties_mut, On, RunningOrder, Ties};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::survival::drop_goods;
 use crate::tick::Scratch;
 use crate::world_index::{building_index, resident_index};
@@ -256,7 +258,17 @@ pub(crate) static TEAR_DOWN_META: OrderMeta =
         .gets_off_first()
         .adults_only()
         .npc_city()
-        .blocked_carrying_child();
+        .blocked_carrying_child()
+        .script(&[TEAR_DOWN_ACTION]);
+
+const TEAR_DOWN_ACTION: ScriptAction = ScriptAction {
+    name: "tearDown",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("buildingId")]),
+    cost: 10.0,
+    description: "Tear down the building or site on my tile.",
+    returns: ScriptType::String,
+};
 
 impl RunningOrder for TearDownOrder {
     in_place!();

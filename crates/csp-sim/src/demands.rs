@@ -40,6 +40,8 @@ use crate::queries::offers::offer_storage;
 use crate::queries::persuasion::respect_seen_by;
 use crate::queries::standing::{organization_label, standing_organization, TRADE_ORG};
 use crate::queries::warehouse_trade::delivery_storage;
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::sight::{sight_of, Spot};
 use crate::standing::change_standing;
 use crate::transfers::{order_debt_collection, order_pick_up};
@@ -319,7 +321,16 @@ impl OrderKind for SendDemand {
 }
 
 pub(crate) static SEND_DEMAND_META: OrderMeta =
-    OrderMeta::request("sendDemand", &SendDemand).keeps_script();
+    OrderMeta::request("sendDemand", &SendDemand).keeps_script().script(&[SEND_DEMAND_ACTION]);
+
+const SEND_DEMAND_ACTION: ScriptAction = ScriptAction {
+    name: "sendDemand",
+    group: ActionGroup::Ruling,
+    request: Request::Fields(&[arg("realmId"), arg("terms"), arg("note"), arg("days")]),
+    cost: 10.0,
+    description: "Send a realm my realm knows of a demand, wherever it is: `terms` is `{ kind: \"city\", cityId: id }` for a city of theirs I know of, or `{ kind: \"goods\", goods: { food: 5, coins: 20 } }`, with a note of at most 280 characters and a deadline 1 to 60 game days away. My realm sends at most 3 a game day. It is only words: nothing happens by itself when it is ignored. `realmId` can also be an NPC city I know of, or `\"trade-org\"`: the game answers within a game hour.",
+    returns: ScriptType::String,
+};
 
 /// The demand `demandId` sent to the Player's realm, or a reason it can't be answered
 /// (`demandToAnswer`).
@@ -642,8 +653,18 @@ impl OrderKind for AcceptDemand {
     }
 }
 
-pub(crate) static ACCEPT_DEMAND_META: OrderMeta =
-    OrderMeta::request("acceptDemand", &AcceptDemand).keeps_script();
+pub(crate) static ACCEPT_DEMAND_META: OrderMeta = OrderMeta::request("acceptDemand", &AcceptDemand)
+    .keeps_script()
+    .script(&[ACCEPT_DEMAND_ACTION]);
+
+const ACCEPT_DEMAND_ACTION: ScriptAction = ScriptAction {
+    name: "acceptDemand",
+    group: ActionGroup::Ruling,
+    request: Request::Fields(&[arg("demandId"), arg("handOver")]),
+    cost: 10.0,
+    description: "Accept a demand sent to my realm. A demand for a city hands it over at once, also my last one; a city no longer mine is refused. A demand for goods or Coins names how they go in `handOver`: `{ way: \"setAside\", storageId: id }`, at a storage of mine for the sender alone to fetch, or `{ way: \"transfer\", fromCityId: id, toCityId: id }`, by Transfers from a city of mine to one of theirs whose storage I see, for a fee I pay. What the storage holds goes, up to what was demanded; with none of it there, it is refused. For the Trade Organization’s demand for my debt, its caravan fetches what is set aside at a storage in a city for no fee, and a Transfer goes to its nearest warehouse whatever `toCityId` says; what they bring in comes off the debt.",
+    returns: ScriptType::String,
+};
 
 /// Declining a demand (`declineDemand`): that is all that happens.
 pub struct DeclineDemand;
@@ -673,7 +694,18 @@ impl OrderKind for DeclineDemand {
 }
 
 pub(crate) static DECLINE_DEMAND_META: OrderMeta =
-    OrderMeta::request("declineDemand", &DeclineDemand).keeps_script();
+    OrderMeta::request("declineDemand", &DeclineDemand)
+        .keeps_script()
+        .script(&[DECLINE_DEMAND_ACTION]);
+
+const DECLINE_DEMAND_ACTION: ScriptAction = ScriptAction {
+    name: "declineDemand",
+    group: ActionGroup::Ruling,
+    request: Request::Fields(&[arg("demandId")]),
+    cost: 10.0,
+    description: "Decline a demand sent to my realm.",
+    returns: ScriptType::String,
+};
 
 /// A realm's Leader died (`lapseDemandsOnLeaderDeath`, `CONTEXT.md`: Self-managed city): its
 /// demands, sent or received, lapse at once. Call it before the realm ends.

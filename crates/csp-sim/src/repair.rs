@@ -22,6 +22,8 @@ use crate::queries::names::{held, held_in, kind_name, placed};
 use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
 use crate::running::{in_place, no_ties_mut, On, RunningOrder, Ties};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::world_index::{building_index, resident_index};
 
 /// How a building's condition reads (`CONTEXT.md`: Decay): good, worn, nearly a ruin.
@@ -424,7 +426,17 @@ pub(crate) static REPAIR_META: OrderMeta = OrderMeta::fns(
 .gets_off_first()
 .adults_only()
 .npc_city()
-.blocked_carrying_child();
+.blocked_carrying_child()
+.script(&[REPAIR_ACTION]);
+
+const REPAIR_ACTION: ScriptAction = ScriptAction {
+    name: "repair",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("buildingId")]),
+    cost: 10.0,
+    description: "Repair the worn building on my tile: what I carry of the materials it lacks goes in, then my work; once it has all of both it is good again. My order is \"repair\" until done.",
+    returns: ScriptType::String,
+};
 
 impl RunningOrder for RepairOrder {
     in_place!();

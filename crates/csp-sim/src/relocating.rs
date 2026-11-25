@@ -17,6 +17,8 @@ use crate::queries::city::town_hall_of;
 use crate::queries::city_area::{city_area_tiles, free_housing, in_city_area};
 use crate::queries::people::relocate_problem;
 use crate::running::{no_ties, same_when_equal, Arrival, By, Going, GoingMut, RunningOrder, To};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 
 /// The input of a relocate order (`RelocateRequest`): which resident, the realm's city they move
 /// to, and the group they relocate with, their own id among them, when given to a group.
@@ -112,7 +114,17 @@ pub(crate) static RELOCATE_META: OrderMeta = OrderMeta::fns(
 )
 .queue_step()
 .gets_off_first()
-.blocked_carrying_child();
+.blocked_carrying_child()
+.script(&[RELOCATE_ACTION]);
+
+const RELOCATE_ACTION: ScriptAction = ScriptAction {
+    name: "relocate",
+    group: ActionGroup::Ruling,
+    request: Request::Fields(&[arg("cityId")]),
+    cost: 10.0,
+    description: "Walk to `cityId`, another city of my realm, and become its resident on stepping into its area, at once if I stand in it already: refused unless it has free housing for me, counting residents already relocating there, or while I carry a child. My order is \"relocate\" until done; then `me.orderEnded` says how it ended: reason null once I moved in, else why not (\"no free housing\", \"it is no longer your realm’s\" or \"the city is gone\"), and I keep my old city.",
+    returns: ScriptType::String,
+};
 
 impl RunningOrder for RelocateOrder {
     fn going(&self) -> Option<Going<'_>> {

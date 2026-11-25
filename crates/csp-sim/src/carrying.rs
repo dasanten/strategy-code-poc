@@ -28,6 +28,8 @@ use crate::queries::guard::outpost_storage_guarded;
 use crate::queries::names::{good_of, held};
 use crate::queries::vessels::{beside_vessel, units_that_fit_vessel};
 use crate::running::{in_place, no_ties_mut, Handles, RunningOrder, Ties};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::storing::carried_for_order;
 
 /// Whether an action takes goods from a spot or puts carried goods there.
@@ -181,7 +183,17 @@ pub(crate) static PICK_UP_META: OrderMeta = OrderMeta::fns(
 )
 .queue_step()
 .gets_off_first()
-.npc_city();
+.npc_city()
+.script(&[PICK_UP_ACTION]);
+
+const PICK_UP_ACTION: ScriptAction = ScriptAction {
+    name: "pickUp",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("spot"), arg("goods")]),
+    cost: 10.0,
+    description: "Take goods from a spot on my tile: {kind: \"ground\"}, {kind: \"storage\", storageId}, {kind: \"site\", siteId}, {kind: \"carriage\", carriageId}, a boat beside me, {kind: \"vessel\", vesselId}, or a Down resident lying there, {kind: \"resident\", residentId}; goods like {food: 3}.",
+    returns: ScriptType::String,
+};
 
 impl RunningOrder for PickUpOrder {
     in_place!();
@@ -235,7 +247,17 @@ pub(crate) static DROP_META: OrderMeta =
     OrderMeta::fns("drop", |w, s, o, _| validate_drop(w, s, o), |w, s, o, _| apply_drop(w, s, o))
         .queue_step()
         .gets_off_first()
-        .npc_city();
+        .npc_city()
+        .script(&[DROP_ACTION]);
+
+const DROP_ACTION: ScriptAction = ScriptAction {
+    name: "drop",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("spot"), arg("goods")]),
+    cost: 10.0,
+    description: "Put carried goods down at a spot on my tile, or in a boat beside me ({kind: \"vessel\", vesselId}), as far as they fit.",
+    returns: ScriptType::String,
+};
 
 impl RunningOrder for DropOrder {
     in_place!();

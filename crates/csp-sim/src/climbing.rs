@@ -10,6 +10,8 @@ use crate::order_meta::OrderMeta;
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::orders::{str_field, OrderKind};
 use crate::running::{in_place, no_ties_mut, RunningOrder, Ties};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::walls::{climb_landing, foreign_wall};
 
 /// An action a resident with a climb order requests: climb a tick further up the wall.
@@ -87,7 +89,17 @@ impl OrderKind for Climb {
     }
 }
 
-pub(crate) static CLIMB_META: OrderMeta = OrderMeta::request("climb", &Climb).gets_off_first();
+pub(crate) static CLIMB_META: OrderMeta =
+    OrderMeta::request("climb", &Climb).gets_off_first().script(&[CLIMB_ACTION]);
+
+const CLIMB_ACTION: ScriptAction = ScriptAction {
+    name: "climb",
+    group: ActionGroup::Fighting,
+    request: Request::Fields(&[arg("wallId")]),
+    cost: 10.0,
+    description: "Climb over the wall or gate of another realm next to me.",
+    returns: ScriptType::String,
+};
 
 impl RunningOrder for ClimbOrder {
     in_place!();

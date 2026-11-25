@@ -16,6 +16,8 @@ use crate::queries::names::held;
 use crate::queries::vessels::{
     docked_at, resident_beside_vessel, vessel_by_id, vessel_of_resident,
 };
+use crate::script_actions::{ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 
 /// The most take-and-put rounds one load order makes: goods move a resident's hands' worth at a
 /// time, and a full ship is many of them.
@@ -110,7 +112,26 @@ impl OrderKind for Load {
     }
 }
 
-pub(crate) static LOAD_META: OrderMeta = OrderMeta::request("load", &Load);
+pub(crate) static LOAD_META: OrderMeta =
+    OrderMeta::request("load", &Load).script(&[LOAD_SHIP_ACTION, UNLOAD_SHIP_ACTION]);
+
+const LOAD_SHIP_ACTION: ScriptAction = ScriptAction {
+    name: "loadShip",
+    group: ActionGroup::Movement,
+    request: Request::ByHand(&["ship", "goods"]),
+    cost: 10.0,
+    description: "Move goods like {iron: 20} from the storage of the haven I stand on straight onto a ship of my realm docked there, by it or its id, as many as there are and fit, at once.",
+    returns: ScriptType::String,
+};
+
+const UNLOAD_SHIP_ACTION: ScriptAction = ScriptAction {
+    name: "unloadShip",
+    group: ActionGroup::Movement,
+    request: Request::ByHand(&["ship", "goods"]),
+    cost: 10.0,
+    description: "Move goods like {ironOre: 40} off a ship of my realm, by it or its id, straight into the storage of the haven it is docked at and I stand on, as many as are aboard, at once.",
+    returns: ScriptType::String,
+};
 
 /// Moves up to `goods` from the spot `from` to the spot `to`, both at the resident's place, a
 /// handful at a time through their hands; what `to` won't take goes back to `from`.

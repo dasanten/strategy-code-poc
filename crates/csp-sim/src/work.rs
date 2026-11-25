@@ -24,6 +24,8 @@ use crate::queries::names::{good_name, good_of, held, kind_name, placed};
 use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
 use crate::running::{in_place, RunningOrder, Ties, TiesMut};
+use crate::script_actions::{arg_as, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::survival::drop_goods;
 use crate::tick::Scratch;
 use crate::veins::{take_from_vein, Take};
@@ -108,7 +110,17 @@ pub(crate) static WORK_AT_META: OrderMeta = OrderMeta::fns(
 .adults_only()
 .npc_city()
 .blocked_carrying_child()
-.goes_on_until_stopped();
+.goes_on_until_stopped()
+.script(&[WORK_AT_ACTION]);
+
+const WORK_AT_ACTION: ScriptAction = ScriptAction {
+    name: "workAt",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg_as("makes?", "makes")]),
+    cost: 10.0,
+    description: "Work the workplace on my tile; at a smithy, say what to make, or \"mend\" to mend the most worn weapon, piece of armour or set of Tools there (carried by its workers or on its pile) back to good, for a share of its recipe.",
+    returns: ScriptType::String,
+};
 
 impl RunningOrder for WorkOrder {
     in_place!();

@@ -16,6 +16,8 @@ use crate::queries::combat::in_contact;
 use crate::queries::goods::units_that_fit;
 use crate::queries::residents::{can_work, is_down};
 use crate::running::{in_place, no_ties, RunningOrder};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::survival::wake;
 use crate::tick::Scratch;
 
@@ -147,8 +149,21 @@ impl OrderKind for Feed {
     }
 }
 
-pub(crate) static FEED_META: OrderMeta =
-    OrderMeta::request("feed", &Feed).queue_step().gets_off_first().adults_only().npc_city();
+pub(crate) static FEED_META: OrderMeta = OrderMeta::request("feed", &Feed)
+    .queue_step()
+    .gets_off_first()
+    .adults_only()
+    .npc_city()
+    .script(&[FEED_ACTION]);
+
+const FEED_ACTION: ScriptAction = ScriptAction {
+    name: "feed",
+    group: ActionGroup::Fighting,
+    request: Request::Fields(&[arg("targetId"), arg("units")]),
+    cost: 10.0,
+    description: "Feed a resident who is Down or a horse that isn’t full, of any realm, on or next to my tile, with up to that many units of the Food in my hands. A resident gets it in their hands, eats at once and wakes at low health. A horse eats until it is full, and wakes if it was Down; the rest stays with me.",
+    returns: ScriptType::String,
+};
 
 impl RunningOrder for FeedOrder {
     in_place!();

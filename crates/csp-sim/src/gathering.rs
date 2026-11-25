@@ -31,6 +31,8 @@ use crate::queries::names::{good_of, kind_name, placed};
 use crate::queries::residents::{can_work, carry_capacity, good_weight, stock_weight};
 use crate::queue::field_str as str_field;
 use crate::running::{in_place, no_ties, RunningOrder};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
 use crate::world_index::resident_index;
 use csp_shared::footprint::covers;
@@ -284,7 +286,17 @@ pub(crate) static GATHER_META: OrderMeta =
     OrderMeta::fns("gather", validate_gather, |w, _, o, _| apply_gather(w, o))
         .gets_off_first()
         .adults_only()
-        .blocked_carrying_child();
+        .blocked_carrying_child()
+        .script(&[GATHER_ACTION]);
+
+const GATHER_ACTION: ScriptAction = ScriptAction {
+    name: "gather",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("good")]),
+    cost: 10.0,
+    description: "Gather \"wood\" or \"food\" by hand on the Forest tile I stand on, or \"stone\" on a Hills tile, with nothing built on it and no node: a little slower than working a node, and it teaches the skill. Each tile's patch holds about one load for everyone and grows back over some game days once picked over. My order is \"gather\" until my hands are full or the patch is gone; then `me.orderEnded` says which (\"hands full\" or \"picked over\"). Children can't.",
+    returns: ScriptType::String,
+};
 
 impl RunningOrder for GatherOrder {
     in_place!();

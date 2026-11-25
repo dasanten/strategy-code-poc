@@ -14,6 +14,7 @@ use csp_shared::world::{OrderRequest, ResidentOrder, WorldState};
 
 use crate::order_sender::OrderSender;
 use crate::orders::OrderKind;
+use crate::script_actions::ScriptAction;
 
 pub type Validate =
     fn(&WorldState, &OrderSender, &OrderRequest, Option<&TerrainMap>) -> Option<String>;
@@ -85,6 +86,8 @@ pub struct OrderMeta {
     pub blocked_carrying_child: bool,
     /// Running: it goes on until stopped, so given under attack it holds until calm.
     pub goes_on_until_stopped: bool,
+    /// The actions a resident's script asks for it with; none for an order a script can't give.
+    pub script: &'static [ScriptAction],
 }
 
 impl OrderMeta {
@@ -101,6 +104,7 @@ impl OrderMeta {
             npc_city: false,
             blocked_carrying_child: false,
             goes_on_until_stopped: false,
+            script: &[],
         }
     }
 
@@ -150,6 +154,10 @@ impl OrderMeta {
     }
     pub const fn goes_on_until_stopped(self) -> Self {
         OrderMeta { goes_on_until_stopped: true, ..self }
+    }
+
+    pub const fn script(self, script: &'static [ScriptAction]) -> Self {
+        OrderMeta { script, ..self }
     }
 
     /// The order kind for the registry, if this one is in it without a host.
@@ -229,47 +237,79 @@ running_orders! {
     Rally => crate::rally::RALLY_META,
 }
 
-/// Every order kind's facts.
+/// Every order kind's facts. Their order is also that of their script actions in the game API.
 pub static ORDER_METAS: &[&OrderMeta] = &[
     &crate::walking::WALK_TO_META,
     &crate::driving::DRIVE_META,
-    &crate::driving::UNHITCH_META,
-    &crate::driving::HITCH_META,
     &crate::riding::MOUNT_META,
     &crate::riding::DISMOUNT_META,
+    &crate::driving::UNHITCH_META,
+    &crate::driving::HITCH_META,
     &crate::passengers::BOARD_META,
-    &crate::passengers::GET_OFF_META,
-    &crate::rowing::ROW_META,
     &crate::loading::LOAD_META,
+    &crate::rowing::ROW_META,
     &crate::sailing::SAIL_META,
     &crate::siege::CREW_META,
-    &crate::siege::PUSH_META,
     &crate::siege::RAM_META,
     &crate::siege::THROW_META,
-    &crate::climbing::CLIMB_META,
-    &crate::gates::SET_GATE_META,
-    &crate::horse_grant::CLAIM_HORSES_META,
+    &crate::siege::PUSH_META,
+    &crate::passengers::GET_OFF_META,
+    &crate::hauling::HAUL_META,
+    &crate::hauling::STOP_META,
+    &crate::carrying::PICK_UP_META,
+    &crate::carrying::DROP_META,
+    &crate::storing::STORE_META,
+    &crate::storing::FETCH_META,
+    &crate::building::BUILD_META,
+    &crate::teardown::TEAR_DOWN_META,
+    &crate::repair::REPAIR_META,
+    &crate::work::WORK_AT_META,
+    &crate::gathering::GATHER_META,
+    &crate::teaching::TEACH_META,
+    &crate::training::TRAIN_META,
+    &crate::breeding::BREED_META,
+    &crate::pairing::PAIR_META,
+    &crate::combat::ATTACK_META,
     &crate::reviving::FEED_META,
     &crate::equipping::EQUIP_META,
     &crate::equipping::TAKE_OFF_META,
-    &crate::trade_org_debt::PAY_DEBT_META,
-    &crate::demands::SEND_DEMAND_META,
-    &crate::demands::ACCEPT_DEMAND_META,
-    &crate::demands::DECLINE_DEMAND_META,
+    &crate::climbing::CLIMB_META,
+    &crate::contracts::PAY_META,
+    &crate::buying::BUY_CITY_META,
+    &crate::trading::BUY_META,
+    &crate::trading::SELL_META,
+    &crate::trading::SWAP_META,
+    &crate::trading::BUY_HORSE_META,
+    &crate::trading::SELL_HORSE_META,
+    &crate::transfers::HAND_IN_META,
     &crate::offers::POST_OFFER_META,
     &crate::offers::TAKE_DOWN_OFFER_META,
     &crate::offers::ACCEPT_OFFER_META,
     &crate::offers::SEND_DIRECT_OFFER_META,
-    &crate::offers::DECLINE_OFFER_META,
     &crate::offers::SEND_CARRIED_OFFER_META,
     &crate::offers::ACCEPT_CARRIED_OFFER_META,
-    &crate::contracts::PAY_META,
+    &crate::offers::DECLINE_OFFER_META,
     &crate::directives::BUY_OFF_META,
+    &crate::trade_org_debt::PAY_DEBT_META,
+    &crate::leader::HAND_OVER_META,
+    &crate::heir::NAME_HEIR_META,
+    &crate::heir::CLEAR_HEIR_META,
+    &crate::renaming::RENAME_META,
+    &crate::renaming::RENAME_CITY_META,
+    &crate::relocating::RELOCATE_META,
+    &crate::renaming::RENAME_HORSE_META,
+    &crate::horse_grant::CLAIM_HORSES_META,
+    &crate::demands::SEND_DEMAND_META,
+    &crate::demands::ACCEPT_DEMAND_META,
+    &crate::demands::DECLINE_DEMAND_META,
+    &crate::road_line::ROAD_LINE_META,
+    &crate::road_line::WALL_LINE_META,
+    &crate::waypoints::ADD_WAYPOINT_META,
+    &crate::waypoints::REMOVE_WAYPOINT_META,
+    &crate::gates::SET_GATE_META,
     &crate::queues::QUEUE_META,
     &crate::queues::EDIT_QUEUE_META,
-    &crate::waypoints::ADD_WAYPOINT_META,
     &crate::waypoints::RENAME_WAYPOINT_META,
-    &crate::waypoints::REMOVE_WAYPOINT_META,
     &crate::alliances::FOUND_ALLIANCE_META,
     &crate::alliances::INVITE_TO_ALLIANCE_META,
     &crate::alliances::WITHDRAW_INVITE_META,
@@ -282,16 +322,7 @@ pub static ORDER_METAS: &[&OrderMeta] = &[
     &crate::contracts::OFFER_CONTRACT_META,
     &crate::contracts::ACCEPT_CONTRACT_META,
     &crate::contracts::CANCEL_CONTRACT_META,
-    &crate::building::BUILD_META,
-    &crate::teardown::TEAR_DOWN_META,
-    &crate::repair::REPAIR_META,
     &crate::rally::RALLY_META,
-    &crate::work::WORK_AT_META,
-    &crate::teaching::TEACH_META,
-    &crate::training::TRAIN_META,
-    &crate::road_line::ROAD_LINE_META,
-    &crate::road_line::WALL_LINE_META,
-    &crate::combat::ATTACK_META,
     &crate::armies::FORM_ARMY_META,
     &crate::armies::DISBAND_ARMY_META,
     &crate::armies::ARMY_WALK_TO_META,
@@ -301,30 +332,7 @@ pub static ORDER_METAS: &[&OrderMeta] = &[
     &crate::armies::ARMY_STOP_META,
     &crate::persuasion::ACCEPT_JOIN_META,
     &crate::persuasion::DECLINE_JOIN_META,
-    &crate::gathering::GATHER_META,
-    &crate::carrying::PICK_UP_META,
-    &crate::carrying::DROP_META,
-    &crate::hauling::STOP_META,
-    &crate::buying::BUY_CITY_META,
-    &crate::trading::SWAP_META,
-    &crate::trading::BUY_HORSE_META,
-    &crate::trading::SELL_HORSE_META,
-    &crate::transfers::HAND_IN_META,
-    &crate::storing::STORE_META,
-    &crate::storing::FETCH_META,
-    &crate::hauling::HAUL_META,
-    &crate::trading::BUY_META,
-    &crate::trading::SELL_META,
     &crate::transfers::TRANSFER_META,
-    &crate::breeding::BREED_META,
-    &crate::pairing::PAIR_META,
-    &crate::relocating::RELOCATE_META,
-    &crate::renaming::RENAME_META,
-    &crate::renaming::RENAME_CITY_META,
-    &crate::renaming::RENAME_HORSE_META,
-    &crate::heir::NAME_HEIR_META,
-    &crate::heir::CLEAR_HEIR_META,
-    &crate::leader::HAND_OVER_META,
     &crate::script_runner::RUN_SCRIPT_META,
     &crate::script_runner::SET_DEFENCE_SCRIPT_META,
     &crate::script_runner::SET_ALARM_SCRIPT_META,

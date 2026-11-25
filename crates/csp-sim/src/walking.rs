@@ -25,6 +25,8 @@ use crate::queries::vessels::{
 use crate::running::{
     moving, same_when_equal, Arrival, By, Going, GoingMut, RunningOrder, Ties, TiesMut, To,
 };
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::water_hauling::stop_tile;
 
 use crate::armies::waiting_for_army;
@@ -134,8 +136,20 @@ impl OrderKind for WalkTo {
     }
 }
 
-pub(crate) static WALK_TO_META: OrderMeta =
-    OrderMeta::request("walkTo", &WalkTo).queue_step().gets_off_first().npc_city();
+pub(crate) static WALK_TO_META: OrderMeta = OrderMeta::request("walkTo", &WalkTo)
+    .queue_step()
+    .gets_off_first()
+    .npc_city()
+    .script(&[WALK_TO_ACTION]);
+
+const WALK_TO_ACTION: ScriptAction = ScriptAction {
+    name: "walkTo",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[arg("x"), arg("y")]),
+    cost: 10.0,
+    description: "Walk to a tile.",
+    returns: ScriptType::String,
+};
 
 impl RunningOrder for WalkOrder {
     fn going(&self) -> Option<Going<'_>> {

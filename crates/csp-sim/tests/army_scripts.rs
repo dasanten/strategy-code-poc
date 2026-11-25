@@ -319,7 +319,7 @@ fn bind_every_name_in_the_army_script_api_every_army_order_but_forming_and_disba
     for b in ARMY_SCRIPT_API {
         assert!(bound.global(b.name).is_some(), "{}", b.name);
     }
-    for b in csp_sim::script_api::SCRIPT_API {
+    for b in csp_sim::script_api::SCRIPT_API.iter() {
         if !ARMY_SCRIPT_API.iter().any(|a| a.name == b.name) {
             assert!(bound.global(b.name).is_none(), "{}", b.name);
         }

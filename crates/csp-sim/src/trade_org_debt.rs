@@ -26,6 +26,8 @@ use crate::queries::trade_org::trade_org_hq;
 use crate::queries::warehouse_trade::js_number;
 use crate::queries::warehouse_trade::{buy_off_coin_warehouse_at, debt_of, pay_debt_problem};
 use crate::running::{in_place, no_ties, RunningOrder};
+use crate::script_actions::{arg, arg_as, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::standing::organization_exists;
 
 /// How a debt first reads in the log (`first` of `oweTradeOrg`).
@@ -219,7 +221,16 @@ impl OrderKind for PayDebt {
 }
 
 pub(crate) static PAY_DEBT_META: OrderMeta =
-    OrderMeta::request("payDebt", &PayDebt).gets_off_first();
+    OrderMeta::request("payDebt", &PayDebt).gets_off_first().script(&[PAY_DEBT_ACTION]);
+
+const PAY_DEBT_ACTION: ScriptAction = ScriptAction {
+    name: "payDebt",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("coins"), arg_as("carriageId?", "carriageId")]),
+    cost: 10.0,
+    description: "On a Trade Org warehouse, pay up to `coins` of my realm’s debt to the Trade Organization with the coins in my hands, or on my carriage there: what I hold, up to what is owed.",
+    returns: ScriptType::String,
+};
 
 impl RunningOrder for PayDebtOrder {
     in_place!();

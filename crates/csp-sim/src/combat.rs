@@ -50,6 +50,8 @@ use crate::random::{hash_str, Mulberry32};
 use crate::running::{
     same_when_equal, Arrival, By, Going, GoingMut, RunningOrder, Ties, TiesMut, To,
 };
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::survival::{die_all, drop_goods};
 use crate::wear::wear_slot;
 
@@ -403,7 +405,26 @@ pub(crate) static ATTACK_META: OrderMeta = OrderMeta::fns(
     |w, _, o, t| apply_attack(w, &attack_request(o), t.map(|t| t.size)),
 )
 .gets_off_first()
-.npc_city();
+.npc_city()
+.script(&[ATTACK_ACTION, SHOOT_ACTION]);
+
+const ATTACK_ACTION: ScriptAction = ScriptAction {
+    name: "attack",
+    group: ActionGroup::Fighting,
+    request: Request::Fields(&[arg("targetId")]),
+    cost: 10.0,
+    description: "Go after a resident I see and strike them, or strike a wall or gate of another realm until it falls. With a Bow or Crossbow and Arrows I walk only until they are in my `reach` and shoot from there.",
+    returns: ScriptType::String,
+};
+
+const SHOOT_ACTION: ScriptAction = ScriptAction {
+    name: "shoot",
+    group: ActionGroup::Fighting,
+    request: Request::ByHand(&["targetId"]),
+    cost: 10.0,
+    description: "Shoot a resident I see who is in my `reach` now, with my Bow or Crossbow and an Arrow a shot, without a step. The order goes on as an attack: should they get out of reach I go after them, so `stop()` to stay where I am.",
+    returns: ScriptType::String,
+};
 
 impl RunningOrder for AttackOrder {
     fn going(&self) -> Option<Going<'_>> {

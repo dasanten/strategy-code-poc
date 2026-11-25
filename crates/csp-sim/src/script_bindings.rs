@@ -11,6 +11,8 @@
 //! The data a query answers is built as plain JSON (`serde_json::Value`), as the TypeScript
 //! builds plain objects, then turned into a script value through the query's view.
 
+pub(crate) mod irregular;
+
 use std::cell::OnceCell;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -19,7 +21,7 @@ use csp_lang::interpreter::{CallError, Host, HostError};
 use csp_lang::js::{json_string, number_to_string, trim};
 use csp_lang::{plain_value, NativeFunction, NotPlain, Object, Value};
 use csp_shared::balance::{
-    DOING_MAX_LENGTH, HAUL_KEEP_FOOD, RECIPES, ROAD_LINE_MAX_TILES, SCRIPT_ACTION_VALUE_MAX,
+    DOING_MAX_LENGTH, RECIPES, ROAD_LINE_MAX_TILES, SCRIPT_ACTION_VALUE_MAX,
 };
 use csp_shared::protocol::SeenEntity;
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap_distance, Terrain, TerrainMap};
@@ -49,6 +51,7 @@ use crate::queries::standing::organization_label;
 use crate::queue::queue_view;
 use crate::random::{hash_str, Mulberry32};
 use crate::regions::{Region, RegionKind, Regions};
+use crate::script_actions::{script_action, script_actions, Given, Request};
 use crate::script_api::{binding, Is, ScriptBinding, ARMY_SCRIPT_API, SCRIPT_API};
 use crate::script_deps::breeding_pair;
 use crate::script_deps::last_seen_out_of_sight;
@@ -109,14 +112,16 @@ pub struct ScriptContext<'a> {
     pub params: Option<&'a [ParamWithValue]>,
 }
 
-/// The order kinds a resident's script can request (`SCRIPT_ORDER_KINDS`): one per action in
-/// `SCRIPT_API`, but `doing`, `log`, `end` and `wait`, which ask for none.
+/// The order kinds a resident's script can request (`SCRIPT_ORDER_KINDS`): those its actions ask
+/// for. `load` is not among them, though loadShip and unloadShip ask for it (#1617).
 pub fn script_order_kinds() -> Vec<&'static str> {
-    SCRIPT_API
-        .iter()
-        .filter(|b| b.is == Is::Action && !["doing", "log", "end", "wait"].contains(&b.name))
-        .map(|b| b.name)
-        .collect()
+    let mut kinds: Vec<&'static str> = Vec::new();
+    for (kind, _) in script_actions() {
+        if kind != "load" && !kinds.contains(&kind) {
+            kinds.push(kind);
+        }
+    }
+    kinds
 }
 
 /// The army order each action of an army's script asks for (`ARMY_SCRIPT_ORDERS`).
@@ -574,6 +579,14 @@ fn place_id(value: &Value) -> Result<Option<Json>, CallError> {
     plain(Some(value))
 }
 
+/// A thing's id, or the id itself; null for nothing given.
+fn place_or_null(value: Option<&Value>) -> Result<Option<Json>, CallError> {
+    match value.filter(|v| !v.is_null()) {
+        None => Ok(Some(Json::Null)),
+        Some(v) => place_id(v),
+    }
+}
+
 fn whole(v: Option<&Value>) -> Option<i32> {
     v.and_then(Value::as_number).filter(|n| n.fract() == 0.0 && n.is_finite()).map(|n| n as i32)
 }
@@ -702,7 +715,7 @@ pub fn bind_script(ctx: ScriptContext<'_>) -> Result<ScriptBindings<'_>, HostErr
             let Some(i) = i else {
                 return Err(HostError(format!("no resident {id} to run a script for")));
             };
-            (SCRIPT_API, ("residentId", id.to_string()), Some(i))
+            (SCRIPT_API.as_slice(), ("residentId", id.to_string()), Some(i))
         }
         (None, None) => return Err(HostError("a script runs for a resident or an army".into())),
     };
@@ -1743,13 +1756,7 @@ impl<'a> ScriptBindings<'a> {
 
     /// The actions (`actions[name]`).
     fn action(&mut self, name: &str, args: &[Value]) -> Result<Value, CallError> {
-        let a = |i: usize| args.get(i);
         let p = |i: usize| plain(args.get(i));
-        let or_null = |i: usize| plain(Some(args.get(i).unwrap_or(&Value::Null)));
-        let place = |i: usize| match args.get(i).filter(|v| !v.is_null()) {
-            None => Ok(Some(Json::Null)),
-            Some(v) => place_id(v),
-        };
         if self.ctx.army_id.is_some() {
             return match name {
                 "walkTo" | "guard" => {
@@ -1765,274 +1772,26 @@ impl<'a> ScriptBindings<'a> {
                 _ => Err(host_error(format!("the script binding {name} is not implemented"))),
             };
         }
-        let r = self.me();
-        let here = || {
-            building_at(self.world(), r.x as i32, r.y as i32, self.size())
-                .map(|b| json!(b.id))
-                .or(Some(Json::Null))
+        let Some((kind, action)) = script_action(name) else {
+            return self.own_action(name, args);
         };
-        match name {
-            "walkTo" => self.request("walkTo", vec![("x", p(0)?), ("y", p(1)?)]),
-            "drive" => {
-                let mut input = vec![("carriageId", p(0)?), ("x", p(1)?), ("y", p(2)?)];
-                if a(3).is_some() {
-                    input.push(("horseId", p(3)?));
+        match action.request {
+            Request::Fields(params) => {
+                let mut fields = Vec::with_capacity(params.len());
+                for (i, param) in params.iter().enumerate() {
+                    let value = match param.given {
+                        Given::Plain => p(i)?,
+                        Given::Place => place_or_null(args.get(i))?,
+                        Given::PlaceIfAny => match args.get(i).filter(|v| !v.is_null()) {
+                            None => None,
+                            Some(v) => place_id(v)?,
+                        },
+                    };
+                    fields.push((param.field, value));
                 }
-                self.request("drive", input)
+                self.request(kind, fields)
             }
-            "haul" => {
-                let returns =
-                    plain(Some(a(4).filter(|v| !v.is_null()).unwrap_or(&Value::list(vec![]))))?;
-                let keep = plain(Some(
-                    a(5).filter(|v| !v.is_null()).unwrap_or(&Value::Number(HAUL_KEEP_FOOD)),
-                ))?;
-                self.request(
-                    "haul",
-                    vec![
-                        ("carriageId", p(0)?),
-                        ("x", p(1)?),
-                        ("y", p(2)?),
-                        ("goods", p(3)?),
-                        ("returnGoods", returns),
-                        ("keepFood", keep),
-                    ],
-                )
-            }
-            "mount" => self.request("mount", vec![("horseId", p(0)?)]),
-            "dismount" => self.request("dismount", vec![]),
-            "unhitch" => self.request("unhitch", vec![("carriageId", place(0)?)]),
-            "hitch" => {
-                self.request("hitch", vec![("carriageId", place(0)?), ("horseId", place(1)?)])
-            }
-            "board" => {
-                let mut input = vec![("carriageId", p(0)?)];
-                if a(1).is_some_and(|v| !v.is_null()) {
-                    input.push(("asCrew", p(1)?));
-                }
-                self.request("board", input)
-            }
-            "loadShip" | "unloadShip" => {
-                let unload = Some(Json::Bool(name == "unloadShip"));
-                let input = vec![("vesselId", place(0)?), ("goods", p(1)?), ("unload", unload)];
-                self.request("load", input)
-            }
-            "row" => self.request("row", vec![("vesselId", place(0)?), ("x", p(1)?), ("y", p(2)?)]),
-            "crew" => self.request("crew", vec![("machineId", place(0)?)]),
-            "ram" => self.request("ram", vec![("machineId", place(0)?), ("targetId", place(1)?)]),
-            "throw" => {
-                let at = if a(2).is_some_and(|v| !v.is_null()) {
-                    vec![("x", p(1)?), ("y", p(2)?)]
-                } else {
-                    vec![("targetId", place(1)?)]
-                };
-                let mut input = vec![("machineId", place(0)?)];
-                input.extend(at);
-                self.request("throw", input)
-            }
-            "push" => {
-                self.request("push", vec![("machineId", place(0)?), ("x", p(1)?), ("y", p(2)?)])
-            }
-            "sail" => {
-                self.request("sail", vec![("vesselId", place(0)?), ("x", p(1)?), ("y", p(2)?)])
-            }
-            "getOff" => {
-                let given = a(0).filter(|v| !v.is_null()).or(a(1).filter(|v| !v.is_null()));
-                let input = if given.is_none() { vec![] } else { vec![("x", p(0)?), ("y", p(1)?)] };
-                self.request("getOff", input)
-            }
-            "stop" => self.request("stop", vec![]),
-            "pickUp" | "drop" => self.request(name, vec![("spot", p(0)?), ("goods", p(1)?)]),
-            "store" => {
-                let mut input = vec![("goods", p(0)?)];
-                if let Some(to) = a(1).filter(|v| !v.is_null()) {
-                    input.push(("to", place_id(to)?));
-                }
-                if a(2).is_some_and(|v| !v.is_null()) {
-                    input.push(("ownFood", p(2)?));
-                }
-                self.request("store", input)
-            }
-            "fetch" => {
-                let mut input = vec![("goods", p(0)?)];
-                if let Some(from) = a(1).filter(|v| !v.is_null()) {
-                    input.push(("from", place_id(from)?));
-                }
-                self.request("fetch", input)
-            }
-            "build" => {
-                let mut input = vec![("building", p(0)?)];
-                if a(1).is_some_and(|v| !v.is_null()) {
-                    input.push(("material", p(1)?));
-                }
-                self.request("build", input)
-            }
-            "tearDown" => self.request("tearDown", vec![("buildingId", p(0)?)]),
-            "repair" => self.request("repair", vec![("buildingId", p(0)?)]),
-            "gather" => self.request("gather", vec![("good", p(0)?)]),
-            "workAt" => {
-                let input = if a(0).is_some_and(|v| !v.is_null()) {
-                    vec![("makes", p(0)?)]
-                } else {
-                    vec![]
-                };
-                self.request("workAt", input)
-            }
-            "teach" => self.request("teach", vec![("buildingId", here()), ("subject", p(0)?)]),
-            "train" => self.request("train", vec![("buildingId", here())]),
-            "breed" => self.request("breed", vec![("stableId", p(0)?), ("horseIds", p(1)?)]),
-            "pair" => self.request("pair", vec![("partnerId", p(0)?)]),
-            "attack" => self.request("attack", vec![("targetId", p(0)?)]),
-            "shoot" => {
-                self.request("attack", vec![("targetId", p(0)?), ("shoot", Some(Json::Bool(true)))])
-            }
-            "feed" => self.request("feed", vec![("targetId", p(0)?), ("units", p(1)?)]),
-            "equip" => self.request("equip", vec![("good", p(0)?)]),
-            "takeOff" => self.request("takeOff", vec![("slot", p(0)?)]),
-            "climb" => self.request("climb", vec![("wallId", p(0)?)]),
-            "pay" => self.request("pay", vec![("contractId", p(0)?), ("weeks", p(1)?)]),
-            "buyCity" => self.request("buyCity", vec![("cityId", p(0)?)]),
-            "buy" | "sell" => {
-                let mut input =
-                    vec![("good", p(0)?), ("units", p(1)?), ("carriageId", or_null(2)?)];
-                if a(3).is_some_and(|v| !v.is_null()) {
-                    input.push(("cityId", p(3)?));
-                }
-                self.request(name, input)
-            }
-            "swap" => self.request(
-                "swap",
-                vec![
-                    ("give", p(0)?),
-                    ("want", p(1)?),
-                    ("units", p(2)?),
-                    ("carriageId", or_null(3)?),
-                ],
-            ),
-            "buyHorse" | "sellHorse" => self.request(name, vec![("horseId", place(0)?)]),
-            "handIn" => self.request(
-                "handIn",
-                vec![
-                    ("good", p(0)?),
-                    ("units", p(1)?),
-                    ("toCityId", p(2)?),
-                    ("carriageId", or_null(3)?),
-                ],
-            ),
-            "buyOff" => {
-                self.request("buyOff", vec![("directiveId", p(0)?), ("carriageId", or_null(1)?)])
-            }
-            "payDebt" => {
-                self.request("payDebt", vec![("coins", p(0)?), ("carriageId", or_null(1)?)])
-            }
-            "postOffer" => self.request(
-                "postOffer",
-                vec![
-                    ("storageId", p(0)?),
-                    ("gives", p(1)?),
-                    ("givesUnits", p(2)?),
-                    ("wants", p(3)?),
-                    ("wantsUnits", p(4)?),
-                    ("times", p(5)?),
-                ],
-            ),
-            "takeDownOffer" | "acceptCarriedOffer" | "declineOffer" => {
-                self.request(name, vec![("offerId", p(0)?)])
-            }
-            "acceptOffer" => self.request(
-                "acceptOffer",
-                vec![("offerId", p(0)?), ("times", p(1)?), ("carriageId", or_null(2)?)],
-            ),
-            "sendDirectOffer" => self.request(
-                "sendDirectOffer",
-                vec![
-                    ("toId", p(0)?),
-                    ("storageId", p(1)?),
-                    ("gives", p(2)?),
-                    ("givesUnits", p(3)?),
-                    ("wants", p(4)?),
-                    ("wantsUnits", p(5)?),
-                    ("times", p(6)?),
-                ],
-            ),
-            "sendCarriedOffer" => self.request(
-                "sendCarriedOffer",
-                vec![
-                    ("toId", p(0)?),
-                    ("fromCityId", p(1)?),
-                    ("toCityId", p(2)?),
-                    ("gives", p(3)?),
-                    ("givesUnits", p(4)?),
-                    ("wants", p(5)?),
-                    ("wantsUnits", p(6)?),
-                    ("times", p(7)?),
-                    ("feeBy", p(8)?),
-                ],
-            ),
-            "handOver" => self.request("handOver", vec![("newLeaderId", p(0)?)]),
-            "nameHeir" => self.request("nameHeir", vec![("heirId", p(0)?)]),
-            "clearHeir" => self.request("clearHeir", vec![]),
-            "rename" => {
-                let mut input = vec![("targetId", p(0)?), ("name", p(1)?)];
-                if a(2).is_some_and(|v| !v.is_null()) {
-                    input.push(("realmName", p(2)?));
-                }
-                self.request("rename", input)
-            }
-            "renameCity" => self.request("renameCity", vec![("cityId", p(0)?), ("name", p(1)?)]),
-            "relocate" => self.request("relocate", vec![("cityId", p(0)?)]),
-            "renameHorse" => self.request("renameHorse", vec![("horseId", p(0)?), ("name", p(1)?)]),
-            "claimHorses" => self.request("claimHorses", vec![]),
-            "sendDemand" => self.request(
-                "sendDemand",
-                vec![("realmId", p(0)?), ("terms", p(1)?), ("note", p(2)?), ("days", p(3)?)],
-            ),
-            "acceptDemand" => {
-                self.request("acceptDemand", vec![("demandId", p(0)?), ("handOver", p(1)?)])
-            }
-            "declineDemand" => self.request("declineDemand", vec![("demandId", p(0)?)]),
-            "roadLine" | "wallLine" => {
-                let from = json!({ "x": r.x, "y": r.y });
-                let mut to = Map::new();
-                if let Some(x) = p(0)? {
-                    to.insert("x".into(), x);
-                }
-                if let Some(y) = p(1)? {
-                    to.insert("y".into(), y);
-                }
-                let mut input = vec![("from", Some(from)), ("to", Some(Json::Object(to)))];
-                if name == "wallLine" && a(2).is_some_and(|v| !v.is_null()) {
-                    input.push(("material", p(2)?));
-                }
-                self.request(name, input)
-            }
-            "doing" => {
-                let doing = doing_text(a(0))?;
-                let mut memory = self.ctx.memory.borrow_mut();
-                match doing {
-                    None => {
-                        memory.remove("doing");
-                    }
-                    Some(text) => memory.insert("doing", Value::string(&text)),
-                }
-                Ok(Value::Null)
-            }
-            "end" => {
-                self.end_reason = short_text(a(0), "end")?;
-                self.ended = true;
-                Ok(Value::Null)
-            }
-            "wait" => {
-                self.waited = true;
-                Ok(Value::Null)
-            }
-            "log" => {
-                if let Some(line) = short_text(a(0), "log")? {
-                    self.logged.push(line);
-                }
-                Ok(Value::Null)
-            }
-            "addWaypoint" | "removeWaypoint" => self.waypoint_action(name, args),
-            _ => Err(host_error(format!("the script binding {name} is not implemented"))),
+            Request::ByHand(_) => self.irregular_action(name, kind, args),
         }
     }
 
