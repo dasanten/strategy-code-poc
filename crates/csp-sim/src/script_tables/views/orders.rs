@@ -1,0 +1,390 @@
+//! The views of orders and what comes of them.
+
+use crate::script_views::{ScriptField, ScriptType, ScriptView};
+
+pub(super) const ORDERS: &[ScriptView] = &[
+    ScriptView {
+        name: "residentOrder",
+        description: "A resident’s order, as plain data; which fields it has depends on its `kind`, the others are null.",
+        fields: &[
+            ScriptField {
+                name: "kind",
+                r#type: ScriptType::String,
+                description: "The order: \"walkTo\", \"drive\", \"haul\", \"pickUp\", \"drop\", \"store\", \"fetch\", \"build\", \"tearDown\", \"workAt\", \"teach\", \"train\", \"breed\", \"attack\", \"climb\", \"roadLine\", \"wallLine\", \"pay\", \"buyCity\", \"trade\", \"swap\", \"buyHorse\", \"sellHorse\", \"handIn\", \"buyOff\", \"payDebt\", \"acceptOffer\", \"relocate\" (on their way to `cityId`, to live there), \"row\" or \"haulByWater\" (a haul route rowing a boat).",
+                null_when: None,
+            },
+            ScriptField {
+                name: "target",
+                r#type: ScriptType::View("tile"),
+                description: "Where a walk or drive goes, or the tile of the city’s area a relocation heads for.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "at",
+                r#type: ScriptType::View("tile"),
+                description: "The tile a build, work, tear-down, breeding or climb is on.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "progress",
+                r#type: ScriptType::Number,
+                description: "How far into the next step or piece of work; for breeding, the ticks tended so far.",
+                null_when: Some("for orders that have none"),
+            },
+            ScriptField {
+                name: "buildingId",
+                r#type: ScriptType::String,
+                description: "The building worked, taught or trained at, or torn down.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "subject",
+                r#type: ScriptType::String,
+                description: "The stat or skill taught.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "learning",
+                r#type: ScriptType::String,
+                description: "The stat or skill a trainee gained in on the last tick.",
+                null_when: Some("while a trainee waits (no teacher, or at their ceiling), and for other orders"),
+            },
+            ScriptField {
+                name: "building",
+                r#type: ScriptType::String,
+                description: "The kind of building being built.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "siteId",
+                r#type: ScriptType::String,
+                description: "The construction site being built.",
+                null_when: Some("for other orders, and until it is laid out"),
+            },
+            ScriptField {
+                name: "makes",
+                r#type: ScriptType::String,
+                description: "What a smithy is to make.",
+                null_when: Some("for other orders, and at other workplaces"),
+            },
+            ScriptField {
+                name: "mends",
+                r#type: ScriptType::Boolean,
+                description: "Whether I mend worn gear at a smithy (`workAt(\"mend\")`) rather than make anything.",
+                null_when: Some("for other orders, and while not mending"),
+            },
+            ScriptField {
+                name: "carriageId",
+                r#type: ScriptType::String,
+                description: "The carriage driven, hauled with or traded from.",
+                null_when: Some("for other orders, and when none"),
+            },
+            ScriptField {
+                name: "vesselId",
+                r#type: ScriptType::String,
+                description: "The boat rowed, or rowed on a haul route by water.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "stableId",
+                r#type: ScriptType::String,
+                description: "The stable horses are bred at.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "horseIds",
+                r#type: ScriptType::List(&ScriptType::String),
+                description: "The two horses being bred.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "targetId",
+                r#type: ScriptType::String,
+                description: "Who is attacked.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "wallId",
+                r#type: ScriptType::String,
+                description: "The wall or gate climbed.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "from",
+                r#type: ScriptType::Any,
+                description: "Where goods are picked up from (a spot), fetched from (a spot: a storage or carriage), or a haul’s first stop (a tile).",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "to",
+                r#type: ScriptType::Any,
+                description: "Where goods are dropped (a spot), stored (a spot: a storage or carriage), or a haul’s second stop (a tile).",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "goods",
+                r#type: ScriptType::Any,
+                description: "The goods picked up, dropped, stored or fetched, like {food: 3} (null units for a store or fetch of as many as there are), or the goods a haul takes to its second stop, as a list.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "returnGoods",
+                r#type: ScriptType::List(&ScriptType::String),
+                description: "The goods a haul brings back.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "keepFood",
+                r#type: ScriptType::Number,
+                description: "The Food a haul keeps on board for the horse.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "stop",
+                r#type: ScriptType::String,
+                description: "The haul stop a carriage or boat is at or bound for: \"from\" or \"to\".",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "phase",
+                r#type: ScriptType::String,
+                description: "A haul’s \"loading\" or \"driving\", a road line’s \"walking\" or \"building\", a store’s \"walking\", \"putting\" or \"refilling\", a fetch’s \"walking\" or \"taking\".",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "tiles",
+                r#type: ScriptType::List(&ScriptType::Any),
+                description: "The road line’s tiles still to build, as [x, y] pairs.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "side",
+                r#type: ScriptType::String,
+                description: "A trade’s \"buy\" or \"sell\".",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "good",
+                r#type: ScriptType::String,
+                description: "The good traded or handed in.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "units",
+                r#type: ScriptType::Number,
+                description: "The units traded, wanted in a swap or handed in.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "give",
+                r#type: ScriptType::String,
+                description: "The good a swap gives.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "want",
+                r#type: ScriptType::String,
+                description: "The good a swap wants.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "cityId",
+                r#type: ScriptType::String,
+                description: "The city bought, a caravan trade’s city, or the city they relocate to.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "toCityId",
+                r#type: ScriptType::String,
+                description: "Where handed-in goods go.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "contractId",
+                r#type: ScriptType::String,
+                description: "The mercenary contract paid.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "weeks",
+                r#type: ScriptType::Number,
+                description: "The weeks paid.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "directiveId",
+                r#type: ScriptType::String,
+                description: "The directive bought off.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "army",
+                r#type: ScriptType::String,
+                description: "The army that gave this order.",
+                null_when: Some("for an order of the resident’s own"),
+            },
+        ],
+    },
+    ScriptView {
+        name: "armyOrder",
+        description: "An army’s order; which fields it has depends on its `kind`, the others are null.",
+        fields: &[
+            ScriptField {
+                name: "kind",
+                r#type: ScriptType::String,
+                description: "The order: \"walkTo\", \"attack\", \"guard\" or \"follow\".",
+                null_when: None,
+            },
+            ScriptField {
+                name: "target",
+                r#type: ScriptType::View("tile"),
+                description: "Where a walk goes.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "at",
+                r#type: ScriptType::View("tile"),
+                description: "Where it guards.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "targetId",
+                r#type: ScriptType::String,
+                description: "Who it attacks or follows.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
+                name: "started",
+                r#type: ScriptType::Boolean,
+                description: "Whether its members got their orders yet.",
+                null_when: None,
+            },
+        ],
+    },
+    ScriptView {
+        name: "tile",
+        description: "A tile.",
+        fields: &[
+            ScriptField {
+                name: "x",
+                r#type: ScriptType::Number,
+                description: "From west to east.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "y",
+                r#type: ScriptType::Number,
+                description: "From north to south.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "region",
+                r#type: ScriptType::String,
+                description: "The name of the region it lies in.",
+                null_when: Some("on water, or on a tile the Player hasn’t explored"),
+            },
+            ScriptField {
+                name: "regionKind",
+                r#type: ScriptType::String,
+                description: "What its region is: \"heartland\", \"frontier\" or \"island\".",
+                null_when: Some("on water, or on a tile the Player hasn’t explored"),
+            },
+            ScriptField {
+                name: "pickedOver",
+                r#type: ScriptType::Boolean,
+                description: "Whether its patch is gone (a Forest or Hills tile gathered bare), so it gives nothing until it has grown back; false for a tile with no patch.",
+                null_when: Some("out of sight, or for a tile an order or a view holds rather than a query answers with"),
+            },
+        ],
+    },
+    ScriptView {
+        name: "orderEnded",
+        description: "How a resident’s last store, fetch or relocate order ended.",
+        fields: &[
+            ScriptField {
+                name: "kind",
+                r#type: ScriptType::String,
+                description: "The order: \"store\", \"fetch\" or \"relocate\".",
+                null_when: None,
+            },
+            ScriptField {
+                name: "tick",
+                r#type: ScriptType::Number,
+                description: "The tick it ended.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "reason",
+                r#type: ScriptType::String,
+                description: "Why it ended before it was done: \"no way\", \"the storage is gone\" or \"the carriage is gone\"; for a relocate, why they didn’t move in: \"no free housing\", \"it is no longer your realm’s\" or \"the city is gone\".",
+                null_when: Some("when it was done (a relocating resident moved in)"),
+            },
+        ],
+    },
+    ScriptView {
+        name: "pair",
+        description: "A resident’s pair, to have a child.",
+        fields: &[
+            ScriptField {
+                name: "partnerId",
+                r#type: ScriptType::String,
+                description: "Who they are paired with.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "since",
+                r#type: ScriptType::Number,
+                description: "The tick they paired.",
+                null_when: None,
+            },
+        ],
+    },
+    ScriptView {
+        name: "carrying",
+        description: "A child a resident carries.",
+        fields: &[
+            ScriptField {
+                name: "since",
+                r#type: ScriptType::Number,
+                description: "The tick they started carrying it.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "partnerId",
+                r#type: ScriptType::String,
+                description: "The other parent.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "partnerName",
+                r#type: ScriptType::String,
+                description: "The other parent’s name.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "partnerBase",
+                r#type: ScriptType::Any,
+                description: "The other parent’s base stats, like {strength: 5, …}.",
+                null_when: None,
+            },
+        ],
+    },
+    ScriptView {
+        name: "runningScript",
+        description: "The script a resident runs.",
+        fields: &[
+            ScriptField {
+                name: "scriptId",
+                r#type: ScriptType::Number,
+                description: "The script in its Player’s library; 0 while it runs a default without one.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "memory",
+                r#type: ScriptType::Any,
+                description: "Its memory, to read but not change.",
+                null_when: Some("for a resident of another Player"),
+            },
+        ],
+    },
+];
