@@ -15,7 +15,7 @@ use serde_json::{json, Value};
 
 use super::step_alliances;
 use crate::invariants::check_all;
-use crate::invariants::checks::alliances_sound;
+use crate::invariants::realms::alliances_sound;
 use crate::order_sender::OrderSender;
 use crate::orders::{order_kinds, OrderQueue, OrderReply};
 use crate::queries::alliance::alliance_of;

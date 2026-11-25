@@ -199,7 +199,7 @@ fn the_trade_org_hq_and_its_trading_posts_never_fall_to_ruin() {
 
 #[test]
 fn the_invariant_catches_a_trade_org_building_nearly_a_ruin() {
-    use crate::invariants::checks::trade_org_kept_up;
+    use crate::invariants::buildings::trade_org_kept_up;
     let mut v = village(None);
     let wall = v
         .world
