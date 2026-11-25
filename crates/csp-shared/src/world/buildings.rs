@@ -9,8 +9,8 @@ use super::{KeptBreeding, Stock};
 /// and in the balance tables.
 macro_rules! building_kinds {
     ($($(#[$attr:meta])* $kind:ident = $name:literal,)*) => {
-        /// The kinds of building (`BuildingKind`). What a kind is and does is its
-        /// [`spec`](BuildingKind::spec).
+        // What a kind is and does is its `spec`.
+        /// The kinds of building (`BuildingKind`).
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
         pub enum BuildingKind {
             $($(#[$attr])* #[serde(rename = $name)] $kind,)*
