@@ -17,7 +17,9 @@ use serde_json::Value;
 use crate::events::record_event;
 use crate::goods_deps::{end_offer, new_id, realm_name, OrderSender};
 use crate::holders::{move_between, Holder};
+use crate::order_meta::OrderMeta;
 use crate::order_sender::commands;
+use crate::orders::map_size;
 use crate::queries::city::for_sale;
 use crate::queries::goods::{free_stock, units_that_fit, units_that_fit_carriage};
 use crate::queries::names::{good_of, held, placed};
@@ -175,6 +177,13 @@ pub fn apply_transfer(
     order_pick_up(world, size, &realm, &s("fromCityId"), &s("toCityId"), good, units);
 }
 
+pub(crate) static TRANSFER_META: OrderMeta = OrderMeta::fns(
+    "transfer",
+    |w, s, o, _| validate_transfer(w, s, o),
+    |w, s, o, t| apply_transfer(w, s, o, map_size(t)),
+)
+.gets_off_first();
+
 /// Checks a hand-in order (`handInOrder.validate`).
 pub fn validate_hand_in(
     world: &WorldState,
@@ -214,6 +223,13 @@ pub fn apply_hand_in(world: &mut WorldState, _sender: &OrderSender, order: &Orde
         }));
     }
 }
+
+pub(crate) static HAND_IN_META: OrderMeta = OrderMeta::fns(
+    "handIn",
+    |w, s, o, _| validate_hand_in(w, s, o),
+    |w, s, o, _| apply_hand_in(w, s, o),
+)
+.gets_off_first();
 
 fn holder_stock(world: &WorldState, h: Holder) -> Stock {
     crate::holders::stock_of(world, h)

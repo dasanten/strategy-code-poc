@@ -6,7 +6,7 @@
 //!
 //! **By hand only: the one exception to ADR 0002.** Every other order kind is something a script
 //! could request as well. This one isn't: the game API has no call for it
-//! (`script_api::SCRIPT_API`), it can't be a queue step (`queue::QUEUE_STEP_KINDS`), and a script
+//! (`script_api::SCRIPT_API`), it can't be a queue step (`queue::can_be_queue_step`), and a script
 //! running for the Leader can't start it. A script would spend the pool the moment it fills, and
 //! being there would again give nothing (ADR 0042). `tests` prove it.
 //!
@@ -20,6 +20,7 @@ use csp_shared::world::{
     Building, BuildingKind, OrderRequest, RallyOrder, Resident, ResidentOrder, WorldState,
 };
 
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, realm_of, OrderSender};
 use crate::queries::balance::workplace_skill;
 use crate::queries::building::building_at;
@@ -97,6 +98,9 @@ pub fn apply_rally(world: &mut WorldState, order: &OrderRequest) {
     world.residents[ri].order =
         Some(ResidentOrder::Rally(RallyOrder { building_id, worked_at: None }));
 }
+
+pub(crate) static RALLY_META: OrderMeta =
+    OrderMeta::fns(RALLY, |w, s, o, _| validate_rally(w, s, o), |w, _, o, _| apply_rally(w, o));
 
 /// The account of the Player whose Leader `r` is, if `r` is a realm's Leader.
 fn leader_of(world: &WorldState, r: &Resident) -> Option<u64> {

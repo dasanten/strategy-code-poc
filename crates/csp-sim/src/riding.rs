@@ -7,6 +7,7 @@ use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{OrderRequest, WorldState};
 
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{str_field, OrderKind};
 use crate::queries::alliance::commander_of;
@@ -88,6 +89,9 @@ impl OrderKind for Mount {
     }
 }
 
+pub(crate) static MOUNT_META: OrderMeta =
+    OrderMeta::request("mount", &Mount).queue_step().gets_off_first();
+
 /// The dismount order (`dismount`): a resident gets off their horse, which stays on the tile.
 pub struct Dismount;
 
@@ -122,6 +126,8 @@ impl OrderKind for Dismount {
         fresh_path(world, i);
     }
 }
+
+pub(crate) static DISMOUNT_META: OrderMeta = OrderMeta::request("dismount", &Dismount).queue_step();
 
 /// Ends riding that can't go on (`stepRiders`), at the end of each tick: the horse died or is
 /// Down, is no longer the rider's realm's, was hitched, or has another rider, or the rider left

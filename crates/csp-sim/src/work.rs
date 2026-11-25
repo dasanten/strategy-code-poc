@@ -12,6 +12,7 @@ use csp_shared::world::{
 };
 
 use crate::mending::{has_mend_input, mend_input, mend_pace, mend_piece, piece_to_mend, MEND};
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::balance::{batch_work, skill_of, work_learned, work_output, workplace_skill};
 use crate::queries::building::{building_at, work_problem, CARRYING_A_CHILD};
@@ -94,6 +95,19 @@ pub fn apply_work_at(world: &mut WorldState, order: &OrderRequest) {
         }
     }
 }
+
+pub(crate) static WORK_AT_META: OrderMeta = OrderMeta::fns(
+    "workAt",
+    |w, s, o, _| validate_work_at(w, s, o),
+    |w, _, o, _| apply_work_at(w, o),
+)
+.queue_step()
+.never_ends()
+.gets_off_first()
+.adults_only()
+.npc_city()
+.blocked_carrying_child()
+.goes_on_until_stopped();
 
 /// An action a resident with a work-at order requests (`WorkAction`).
 #[derive(Debug, Clone, PartialEq, Eq)]

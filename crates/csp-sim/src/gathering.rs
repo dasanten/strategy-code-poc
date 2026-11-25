@@ -23,6 +23,7 @@ use csp_shared::world::{
 
 use crate::invariants::violation;
 use crate::new_veins::vein_unseen_by;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::balance::{gather_output, skill_of, work_learned};
 use crate::queries::building::CARRYING_A_CHILD;
@@ -277,6 +278,12 @@ pub fn apply_gather(world: &mut WorldState, order: &OrderRequest) {
         progress: 0.0,
     }));
 }
+
+pub(crate) static GATHER_META: OrderMeta =
+    OrderMeta::fns("gather", validate_gather, |w, _, o, _| apply_gather(w, o))
+        .gets_off_first()
+        .adults_only()
+        .blocked_carrying_child();
 
 /// Ends the resident's gather order, saying why (`me.orderEnded`); `None` when they left the tile
 /// or something now stands on it.

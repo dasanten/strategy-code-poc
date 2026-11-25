@@ -16,6 +16,8 @@ use csp_shared::world::{City, JoinRequest, Outweighed, RealmEventWhat, WorldStat
 use crate::capture::join_realm;
 use crate::events::record_event;
 use crate::npc_plan::plan_due;
+use crate::order_meta::OrderMeta;
+use crate::orders::str_field;
 use crate::queries::city::{for_sale, town_hall_of};
 use crate::queries::demand::demand_yield_needed;
 use crate::queries::persuasion::{
@@ -181,6 +183,12 @@ pub fn apply_accept_join(
     record_event(world, Some(&realm_id), what);
 }
 
+pub(crate) static ACCEPT_JOIN_META: OrderMeta = OrderMeta::fns(
+    "acceptJoin",
+    |w, s, o, _| validate_accept_join(w, s.user_id, str_field(o, "cityId")).map(str::to_string),
+    |w, s, o, t| apply_accept_join(w, s.user_id, str_field(o, "cityId"), t.map(|t| t.size)),
+);
+
 /// `declineJoin.validate`.
 pub fn validate_decline_join(
     world: &WorldState,
@@ -198,6 +206,12 @@ pub fn apply_decline_join(world: &mut WorldState, user_id: u64, city_id: Option<
     q.declined = true;
     q.at = tick;
 }
+
+pub(crate) static DECLINE_JOIN_META: OrderMeta = OrderMeta::fns(
+    "declineJoin",
+    |w, s, o, _| validate_decline_join(w, s.user_id, str_field(o, "cityId")).map(str::to_string),
+    |w, s, o, _| apply_decline_join(w, s.user_id, str_field(o, "cityId")),
+);
 
 /// Invariant (`joinRequestsSound`): each ask from an NPC city to a realm that exists, at most one
 /// per city and realm, at most one standing ask per city, made no later than now, a standing one

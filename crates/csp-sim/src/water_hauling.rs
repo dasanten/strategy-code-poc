@@ -24,6 +24,7 @@ use serde_json::Value;
 use crate::carrying::CarryAction;
 use crate::hauling::{read_goods, stop_action, OnBoard, RouteGoods, CARRYING_A_CHILD};
 use crate::loading::move_straight;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{int_field, str_field};
 use crate::queries::carriages::driven_carriage_id;
@@ -202,6 +203,9 @@ pub fn apply_water_haul(
         moving: None,
     }));
 }
+
+pub(crate) static HAUL_BY_WATER_META: OrderMeta =
+    OrderMeta::not_requested("haulByWater").blocked_carrying_child().goes_on_until_stopped();
 
 fn route_mut(world: &mut WorldState, ri: usize) -> &mut WaterHaulOrder {
     match world.residents[ri].order.as_mut() {

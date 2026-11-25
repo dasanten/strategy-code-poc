@@ -10,6 +10,7 @@ use csp_shared::world::{
     BuildingKind, OrderRequest, ResidentOrder, TeachOrder, TrainingSubject, WorldState,
 };
 
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{npc_training_problem, ordered_resident, OrderSender};
 use crate::queries::building::{building_at, teach_problem, teacher_at};
 use crate::queries::names::placed;
@@ -65,6 +66,15 @@ pub fn apply_teach(world: &mut WorldState, order: &OrderRequest) {
     world.residents[ri].order =
         Some(ResidentOrder::Teach(TeachOrder { building_id: building_id.to_string(), subject }));
 }
+
+pub(crate) static TEACH_META: OrderMeta =
+    OrderMeta::fns("teach", |w, s, o, _| validate_teach(w, s, o), |w, _, o, _| apply_teach(w, o))
+        .queue_step()
+        .never_ends()
+        .gets_off_first()
+        .adults_only()
+        .npc_city()
+        .goes_on_until_stopped();
 
 /// Ends the teaching that no longer holds (`stepTeaching`): a teacher who has left the ground's
 /// footprint, whose ground is gone, or who is one teacher too many there stops.

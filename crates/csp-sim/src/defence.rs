@@ -13,6 +13,7 @@ use csp_shared::world::{
     RunningScript, Task, WorldState,
 };
 
+use crate::order_meta::running_meta;
 use crate::queries::alliance::commander_of;
 use crate::queries::carriages::{driven_carriage_id, horse_for};
 use crate::queries::residents::is_down;
@@ -232,18 +233,6 @@ pub fn resume_interrupted(world: &mut WorldState, i: usize) -> bool {
     true
 }
 
-/// The order kinds that go on until stopped (`GOES_ON_UNTIL_STOPPED`).
-fn goes_on_until_stopped(o: &ResidentOrder) -> bool {
-    matches!(
-        o,
-        ResidentOrder::Haul(_)
-            | ResidentOrder::HaulByWater(_)
-            | ResidentOrder::WorkAt(_)
-            | ResidentOrder::Teach(_)
-            | ResidentOrder::Train(_)
-    )
-}
-
 /// Whether `r` counts as under attack for an order given now (`underAttack`): their defence script
 /// runs, or the last blow is within the calm time Defend waits for.
 pub fn under_attack(world: &WorldState, r: &Resident) -> bool {
@@ -275,7 +264,7 @@ pub fn note_given(
     }
     if r.script.is_some()
         || r.queue.is_some()
-        || r.order.as_ref().is_some_and(goes_on_until_stopped)
+        || r.order.as_ref().is_some_and(|o| running_meta(o).goes_on_until_stopped)
     {
         r.given_under_attack = Some(GivenUnderAttack::UntilCalm);
     } else if r.order.is_some() {

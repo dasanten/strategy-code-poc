@@ -13,6 +13,7 @@ use serde_json::Value;
 use crate::carrying::{CarryAction, CarryKind};
 use crate::driving::{army_start, army_to_supply};
 use crate::goods_deps::{ordered_resident, realm_of, OrderSender};
+use crate::order_meta::OrderMeta;
 use crate::queries::army::army_spot;
 use crate::queries::combat::in_contact;
 use crate::queries::command::{commands, commands_carriage};
@@ -175,6 +176,13 @@ pub fn apply_haul(
     }));
 }
 
+pub(crate) static HAUL_META: OrderMeta = OrderMeta::fns("haul", validate_haul, apply_haul)
+    .queue_step()
+    .never_ends()
+    .gets_off_first()
+    .blocked_carrying_child()
+    .goes_on_until_stopped();
+
 /// Checks a stop order (`stop.validate`): one of the Player's residents stops what they were
 /// ordered to do and stands idle.
 pub fn validate_stop(
@@ -195,6 +203,9 @@ pub fn apply_stop(world: &mut WorldState, _sender: &OrderSender, order: &OrderRe
         r.order = None;
     }
 }
+
+pub(crate) static STOP_META: OrderMeta =
+    OrderMeta::fns("stop", |w, s, o, _| validate_stop(w, s, o), |w, s, o, _| apply_stop(w, s, o));
 
 /// What a haul route moves, by land or by water (`HaulOrder`, `WaterHaulOrder`): the goods to
 /// the second stop, those back, the Food kept on board, and the stop it stands at.

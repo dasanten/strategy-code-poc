@@ -12,7 +12,7 @@ use csp_shared::world::{BuildingKind, ResidentOrder, SkillName, WorldState};
 
 use super::shared::{kind_of, Out};
 use super::{invariant, js_number, violation, Invariant};
-use crate::pairing::carrying_blocks;
+use crate::order_meta::{running_meta, OrderMeta};
 use crate::queries::names::{good_name, placed};
 use crate::queries::residents::can_work;
 
@@ -142,7 +142,7 @@ pub fn carrying_doesnt_work(world: &WorldState, _: &TerrainMap) -> Out {
         let mut problems = Vec::new();
         if let Some(o) = &r.order {
             let kind = kind_of(o);
-            if carrying_blocks(o) {
+            if running_meta(o).blocked_carrying_child {
                 problems.push(format!("holds a {kind} order while carrying a child"));
             }
         }
@@ -162,20 +162,14 @@ pub fn carrying_doesnt_work(world: &WorldState, _: &TerrainMap) -> Out {
     out
 }
 
-/// Orders only a grown resident can hold (`ADULT_ORDERS`).
-const ADULT_ORDERS: [&str; 16] = [
-    "build", "roadLine", "wallLine", "tearDown", "repair", "workAt", "teach", "train", "breed",
-    "drive", "feed", "crew", "push", "ram", "throw", "gather",
-];
-
 /// Children don't work until they are grown (`childrenDontWork`).
 pub fn children_dont_work(world: &WorldState, _: &TerrainMap) -> Out {
     let name = "children-dont-work";
     let mut out = Vec::new();
     for r in &world.residents {
         let Some(o) = &r.order else { continue };
-        let kind = kind_of(o);
-        if ADULT_ORDERS.contains(&kind.as_str()) && !can_work(r.born_at, world.tick as f64) {
+        let OrderMeta { kind, adults_only, .. } = running_meta(o);
+        if *adults_only && !can_work(r.born_at, world.tick as f64) {
             out.push(violation(
                 name,
                 format!("resident {} holds a {kind} order as a child", r.id),

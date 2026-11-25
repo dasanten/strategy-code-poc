@@ -19,6 +19,7 @@ use crate::goods_deps::{
 };
 use crate::holders::{holder_id, move_between, total, Holder};
 use crate::mending::leaving_shares;
+use crate::order_meta::OrderMeta;
 use crate::queries::carriages::caravan_food_for;
 use crate::queries::city::npc_city_refuses;
 use crate::queries::command::{commander_of_resident, commands, commands_carriage};
@@ -92,6 +93,22 @@ pub fn apply_trade(
     }));
 }
 
+pub(crate) static TRADE_META: OrderMeta = OrderMeta::not_requested("trade").npc_city();
+
+pub(crate) static SELL_META: OrderMeta = OrderMeta::fns(
+    "sell",
+    |w, s, o, _| validate_trade(w, s, o, TradeSide::Sell),
+    |w, s, o, _| apply_trade(w, s, o, TradeSide::Sell),
+)
+.gets_off_first();
+
+pub(crate) static BUY_META: OrderMeta = OrderMeta::fns(
+    "buy",
+    |w, s, o, _| validate_trade(w, s, o, TradeSide::Buy),
+    |w, s, o, _| apply_trade(w, s, o, TradeSide::Buy),
+)
+.gets_off_first();
+
 /// Checks a swap order (`swap.validate`).
 pub fn validate_swap(
     world: &WorldState,
@@ -130,6 +147,10 @@ pub fn apply_swap(world: &mut WorldState, _sender: &OrderSender, order: &OrderRe
     }));
 }
 
+pub(crate) static SWAP_META: OrderMeta =
+    OrderMeta::fns("swap", |w, s, o, _| validate_swap(w, s, o), |w, s, o, _| apply_swap(w, s, o))
+        .gets_off_first();
+
 /// Checks a buy horse order (`buyHorse.validate`).
 pub fn validate_buy_horse(
     world: &WorldState,
@@ -165,10 +186,24 @@ pub fn apply_buy_horse(world: &mut WorldState, _sender: &OrderSender, order: &Or
     horse_order(world, order, true);
 }
 
+pub(crate) static BUY_HORSE_META: OrderMeta = OrderMeta::fns(
+    "buyHorse",
+    |w, s, o, _| validate_buy_horse(w, s, o),
+    |w, s, o, _| apply_buy_horse(w, s, o),
+)
+.gets_off_first();
+
 /// Gives a sell horse order (`sellHorse.apply`).
 pub fn apply_sell_horse(world: &mut WorldState, _sender: &OrderSender, order: &OrderRequest) {
     horse_order(world, order, false);
 }
+
+pub(crate) static SELL_HORSE_META: OrderMeta = OrderMeta::fns(
+    "sellHorse",
+    |w, s, o, _| validate_sell_horse(w, s, o),
+    |w, s, o, _| apply_sell_horse(w, s, o),
+)
+.gets_off_first();
 
 fn horse_order(world: &mut WorldState, order: &OrderRequest, buy: bool) {
     let o = &order.fields;

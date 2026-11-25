@@ -9,6 +9,7 @@ use csp_shared::world::{
 use serde_json::Value;
 
 use crate::horses::{horse_eats, horse_full};
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::combat::in_contact;
@@ -144,6 +145,9 @@ impl OrderKind for Feed {
         }));
     }
 }
+
+pub(crate) static FEED_META: OrderMeta =
+    OrderMeta::request("feed", &Feed).queue_step().gets_off_first().adults_only().npc_city();
 
 /// Takes `units` of Food from the feeder's hands (`takeFood`).
 fn take_food(from: &mut Resident, units: f64) {

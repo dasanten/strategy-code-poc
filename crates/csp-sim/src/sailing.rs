@@ -10,6 +10,7 @@ use csp_shared::world::{
     OrderRequest, Resident, ResidentOrder, RowOrder, Tile, Vessel, VesselKind, WorldState,
 };
 
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, realm_of, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::vessels::{crew_short, sail_target, steals_vessel, vessel_by_id};
@@ -125,3 +126,5 @@ impl OrderKind for Sail {
         }));
     }
 }
+
+pub(crate) static SAIL_META: OrderMeta = OrderMeta::request("sail", &Sail).queue_step();

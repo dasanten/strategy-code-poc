@@ -17,6 +17,7 @@ use csp_shared::world::{
 
 use crate::armies::leave_armies;
 use crate::events::record_event;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{realm_of, OrderSender};
 use crate::orders::{str_field, OrderKind};
 use crate::queries::alliance::realm_name;
@@ -126,6 +127,9 @@ pub const FOUND_ALLIANCE: AllianceOrder = AllianceOrder {
     },
 };
 
+pub(crate) static FOUND_ALLIANCE_META: OrderMeta =
+    OrderMeta::request("foundAlliance", &FOUND_ALLIANCE);
+
 /// The alliance leader invites a realm or an NPC city in no alliance (`inviteToAlliance`). An NPC
 /// city answers at once (`answer_as_city`).
 pub const INVITE_TO_ALLIANCE: AllianceOrder = AllianceOrder {
@@ -155,6 +159,9 @@ pub const INVITE_TO_ALLIANCE: AllianceOrder = AllianceOrder {
         invite(world, a, &id);
     },
 };
+
+pub(crate) static INVITE_TO_ALLIANCE_META: OrderMeta =
+    OrderMeta::request("inviteToAlliance", &INVITE_TO_ALLIANCE);
 
 /// The alliance `a` invites the realm or NPC city `id` (`invite`): an NPC city answers at once
 /// (`answer_as_city`); a realm hears of it and answers when it will.
@@ -250,6 +257,9 @@ pub const WITHDRAW_INVITE: AllianceOrder = AllianceOrder {
     },
 };
 
+pub(crate) static WITHDRAW_INVITE_META: OrderMeta =
+    OrderMeta::request("withdrawInvite", &WITHDRAW_INVITE);
+
 /// The invitation the realm holds from the alliance `allianceId`, or why it holds none
 /// (`invitation`).
 fn invitation(world: &WorldState, realm_id: &str, order: &OrderRequest) -> Result<usize, String> {
@@ -290,6 +300,9 @@ pub const ACCEPT_INVITE: AllianceOrder = AllianceOrder {
     },
 };
 
+pub(crate) static ACCEPT_INVITE_META: OrderMeta =
+    OrderMeta::request("acceptInvite", &ACCEPT_INVITE);
+
 /// Declining an invitation (`declineInvite`): it is gone, and the realm stays out.
 pub const DECLINE_INVITE: AllianceOrder = AllianceOrder {
     check: |world, realm_id, order| invitation(world, realm_id, order).err(),
@@ -298,6 +311,9 @@ pub const DECLINE_INVITE: AllianceOrder = AllianceOrder {
         world.alliances[a].invites.retain(|x| x != realm_id);
     },
 };
+
+pub(crate) static DECLINE_INVITE_META: OrderMeta =
+    OrderMeta::request("declineInvite", &DECLINE_INVITE);
 
 /// The realm's own membership, to change.
 fn member_mut<'w>(
@@ -327,6 +343,9 @@ pub const LEAVE_ALLIANCE: AllianceOrder = AllianceOrder {
     },
 };
 
+pub(crate) static LEAVE_ALLIANCE_META: OrderMeta =
+    OrderMeta::request("leaveAlliance", &LEAVE_ALLIANCE);
+
 /// The alliance leader removes a member (`removeFromAlliance`); it goes after the leave delay.
 pub const REMOVE_FROM_ALLIANCE: AllianceOrder = AllianceOrder {
     check: |world, realm_id, order| {
@@ -351,6 +370,9 @@ pub const REMOVE_FROM_ALLIANCE: AllianceOrder = AllianceOrder {
         m.leaving = Some(Leaving { at, removed: true });
     },
 };
+
+pub(crate) static REMOVE_FROM_ALLIANCE_META: OrderMeta =
+    OrderMeta::request("removeFromAlliance", &REMOVE_FROM_ALLIANCE);
 
 /// The realm's alliance, or why it can't hand over or recall (`standingMember`).
 fn standing_member<'w>(world: &'w WorldState, realm_id: &str) -> Result<&'w Alliance, String> {
@@ -448,6 +470,9 @@ pub const HAND_OVER_TO_ALLIANCE: AllianceOrder = AllianceOrder {
     },
 };
 
+pub(crate) static HAND_OVER_TO_ALLIANCE_META: OrderMeta =
+    OrderMeta::request("handOverToAlliance", &HAND_OVER_TO_ALLIANCE);
+
 /// Recalling what the realm handed over (`recallFromAlliance`): theirs to command again after
 /// `ALLIANCE_RECALL_DELAY`.
 pub const RECALL_FROM_ALLIANCE: AllianceOrder = AllianceOrder {
@@ -481,6 +506,9 @@ pub const RECALL_FROM_ALLIANCE: AllianceOrder = AllianceOrder {
         }
     },
 };
+
+pub(crate) static RECALL_FROM_ALLIANCE_META: OrderMeta =
+    OrderMeta::request("recallFromAlliance", &RECALL_FROM_ALLIANCE);
 
 /// The realm the soldier or carriage belongs to (`ownerOfPart`): `None` when it is gone,
 /// `Some(None)` for nobody's.
@@ -539,21 +567,6 @@ fn give_back(world: &mut WorldState, a: usize, ids: Vec<String>) {
     let changed: Vec<String> =
         ids.iter().filter(|id| commander_of_id(world, id) != before[id]).cloned().collect();
     changed_command(world, &changed);
-}
-
-/// The alliance orders that exist (`allianceOrders`).
-pub fn alliance_orders() -> Vec<(&'static str, AllianceOrder)> {
-    vec![
-        ("foundAlliance", FOUND_ALLIANCE),
-        ("inviteToAlliance", INVITE_TO_ALLIANCE),
-        ("withdrawInvite", WITHDRAW_INVITE),
-        ("acceptInvite", ACCEPT_INVITE),
-        ("declineInvite", DECLINE_INVITE),
-        ("leaveAlliance", LEAVE_ALLIANCE),
-        ("removeFromAlliance", REMOVE_FROM_ALLIANCE),
-        ("handOverToAlliance", HAND_OVER_TO_ALLIANCE),
-        ("recallFromAlliance", RECALL_FROM_ALLIANCE),
-    ]
 }
 
 /// Takes back every invitation to the realm (`dropInvitesTo`).

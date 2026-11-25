@@ -12,6 +12,7 @@ use csp_shared::world::{
 
 use crate::events::record_event;
 use crate::horses::{new_horse, NewHorse};
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{realm_of, OrderSender};
 use crate::orders::OrderKind;
 use crate::placing::Ground;
@@ -212,6 +213,9 @@ impl OrderKind for ClaimHorses {
         record_event(world, Some(&realm.id), what);
     }
 }
+
+pub(crate) static CLAIM_HORSES_META: OrderMeta =
+    OrderMeta::request("claimHorses", &ClaimHorses).keeps_script();
 
 /// The invariant `horse-offers-once` (`horseOffersOnce`): no account id is in
 /// `horseOffersClaimed` twice.

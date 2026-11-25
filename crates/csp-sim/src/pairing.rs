@@ -6,12 +6,16 @@
 use std::collections::HashMap;
 
 use csp_shared::balance::{CARRYING_TICKS, PAIRING_WAIT_TICKS};
-use csp_shared::world::{Carrying, Pair, RealmEventWhat, Resident, ResidentOrder, WorldState};
+use csp_shared::world::{
+    Carrying, OrderRequest, Pair, RealmEventWhat, Resident, ResidentOrder, WorldState,
+};
 
 use crate::events::record_event;
 use crate::names::resident_names_taken;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::commands;
 use crate::order_sender::OrderSender;
+use crate::orders::str_field;
 use crate::queries::city_area::{free_housing, has_food_surplus};
 use crate::queries::people::CARRYING_A_CHILD;
 use crate::queries::residents::can_work;
@@ -28,20 +32,7 @@ pub enum BirthAction {
 /// Orders a carrying resident can't hold (`CARRYING_BLOCKS`): working, building, tearing down,
 /// gathering, breeding horses, hauling and relocating.
 pub fn carrying_blocks(o: &ResidentOrder) -> bool {
-    matches!(
-        o,
-        ResidentOrder::WorkAt(_)
-            | ResidentOrder::Gather(_)
-            | ResidentOrder::Breed(_)
-            | ResidentOrder::Build(_)
-            | ResidentOrder::RoadLine(_)
-            | ResidentOrder::WallLine(_)
-            | ResidentOrder::TearDown(_)
-            | ResidentOrder::Repair(_)
-            | ResidentOrder::Haul(_)
-            | ResidentOrder::HaulByWater(_)
-            | ResidentOrder::Relocate(_)
-    )
+    crate::order_meta::running_meta(o).blocked_carrying_child
 }
 
 /// The input of a pairing order (`PairRequest`).
@@ -103,6 +94,17 @@ pub fn apply_pair(world: &mut WorldState, o: &PairRequest) {
     world.residents[a].pair = Some(Pair { partner_id: pid, since });
     world.residents[b].pair = Some(Pair { partner_id: rid, since });
 }
+
+fn pair_request(o: &OrderRequest) -> PairRequest<'_> {
+    PairRequest { resident_id: str_field(o, "residentId"), partner_id: str_field(o, "partnerId") }
+}
+
+pub(crate) static PAIR_META: OrderMeta = OrderMeta::fns(
+    "pair",
+    |w, s, o, _| validate_pair(w, s, &pair_request(o)).map(str::to_string),
+    |w, _, o, _| apply_pair(w, &pair_request(o)),
+)
+.keeps_script();
 
 /// Ends pairs that no longer hold, stops what carrying residents can't do, then requests a carry
 /// for every pair whose wait is over with no child on the way, and a birth for every resident who

@@ -17,6 +17,7 @@ use crate::goods_deps::{
     rob_caravan, rob_trader, update_city_membership, OrderSender,
 };
 use crate::holders::{move_between, stock_of, Holder};
+use crate::order_meta::OrderMeta;
 use crate::queries::building::materials_needed;
 use crate::queries::command::commander_of_resident;
 use crate::queries::goods::{
@@ -172,6 +173,15 @@ pub fn apply_pick_up(world: &mut WorldState, _sender: &OrderSender, order: &Orde
     }
 }
 
+pub(crate) static PICK_UP_META: OrderMeta = OrderMeta::fns(
+    "pickUp",
+    |w, s, o, _| validate_pick_up(w, s, o),
+    |w, s, o, _| apply_pick_up(w, s, o),
+)
+.queue_step()
+.gets_off_first()
+.npc_city();
+
 /// Checks a drop order (`drop.validate`): one of the Player's residents puts down carried goods
 /// on their tile; at a construction site only what it still needs.
 pub fn validate_drop(
@@ -211,6 +221,12 @@ pub fn apply_drop(world: &mut WorldState, _sender: &OrderSender, order: &OrderRe
         r.order = Some(ResidentOrder::Drop(DropOrder { to, goods }));
     }
 }
+
+pub(crate) static DROP_META: OrderMeta =
+    OrderMeta::fns("drop", |w, s, o, _| validate_drop(w, s, o), |w, s, o, _| apply_drop(w, s, o))
+        .queue_step()
+        .gets_off_first()
+        .npc_city();
 
 /// Requests this tick's take and put actions from pick-up and drop orders (`requestCarrying`).
 pub fn request_carrying(world: &WorldState) -> Vec<CarryAction> {

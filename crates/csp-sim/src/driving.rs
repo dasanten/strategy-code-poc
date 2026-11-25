@@ -5,6 +5,7 @@ use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{Army, DriveOrder, OrderRequest, ResidentOrder, Tile, WorldState};
 
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{commands, ordered_resident, realm_of, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::alliance::commander_of;
@@ -225,6 +226,9 @@ impl OrderKind for Drive {
     }
 }
 
+pub(crate) static DRIVE_META: OrderMeta =
+    OrderMeta::request("drive", &Drive).queue_step().gets_off_first().adults_only();
+
 /// The unhitch order (`unhitch`): a grown resident of the carriage's realm on its tile unhitches
 /// its horse, which stands free on the tile. A carriage being driven stops first.
 pub struct Unhitch;
@@ -277,6 +281,9 @@ impl OrderKind for Unhitch {
     }
 }
 
+pub(crate) static UNHITCH_META: OrderMeta =
+    OrderMeta::request("unhitch", &Unhitch).queue_step().gets_off_first();
+
 /// The hitch order (`hitch`): a grown resident of the carriage's realm on its tile hitches the
 /// horse they name, at once. Only the realm's own horses.
 pub struct Hitch;
@@ -324,6 +331,9 @@ impl OrderKind for Hitch {
         world.carriages[k].horse_id = horse_id.map(str::to_string);
     }
 }
+
+pub(crate) static HITCH_META: OrderMeta =
+    OrderMeta::request("hitch", &Hitch).queue_step().gets_off_first();
 
 #[cfg(test)]
 mod mountain_tests;

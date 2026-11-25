@@ -15,6 +15,7 @@ use indexmap::IndexMap;
 use serde_json::Value;
 
 use crate::default_scripts::target_param;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::names::kind_name;
@@ -403,6 +404,8 @@ impl OrderKind for SetScriptParamOrder {
         keep(r, script_id, &name, value);
     }
 }
+
+pub static SET_SCRIPT_PARAM_META: OrderMeta = OrderMeta::by_host("setScriptParam").keeps_script();
 
 /// Invariant (`script-params-sound`, ADR 0004): every resident's picked script param values are
 /// plain ids, words or whole numbers of zero or more, kept by a whole positive script id, with no

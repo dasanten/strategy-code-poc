@@ -16,6 +16,7 @@ use serde_json::Value;
 
 use crate::directive::{directive_soldiers, directive_targets, goals_met};
 use crate::events::record_event;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{realm_of, OrderSender};
 use crate::orders::{str_field, OrderKind};
 use crate::queries::alliance::{allied_realms, commander_of};
@@ -354,6 +355,8 @@ impl OrderKind for BuyOff {
         }
     }
 }
+
+pub(crate) static BUY_OFF_META: OrderMeta = OrderMeta::request("buyOff", &BuyOff).gets_off_first();
 
 /// One buy-off of a tick (`BuyOffRecord`): the coins of payer and coin warehouse before and
 /// after, and the directive.

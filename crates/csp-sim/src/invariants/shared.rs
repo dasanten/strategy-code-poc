@@ -6,17 +6,15 @@ use csp_shared::footprint::is_at;
 use csp_shared::world::{ResidentOrder, WorldState};
 
 use super::InvariantViolation;
+use crate::order_meta::running_meta;
 use crate::queries::names::placed;
 
 /// What a check found.
 pub(super) type Out = Vec<InvariantViolation>;
 
 /// An order's kind as the TypeScript names it (`order.kind`).
-pub(super) fn kind_of(o: &ResidentOrder) -> String {
-    serde_json::to_value(o)
-        .ok()
-        .and_then(|v| v.get("kind").and_then(|k| k.as_str()).map(str::to_owned))
-        .unwrap_or_default()
+pub(super) fn kind_of(o: &ResidentOrder) -> &'static str {
+    running_meta(o).kind
 }
 
 /// At a building, on the whole map (`isAt(r, b)` with its default size).

@@ -15,7 +15,7 @@ use csp_shared::world::{
 use serde_json::{json, Value};
 
 use super::*;
-use crate::contracts::{contract_orders, Pay};
+use crate::contracts::Pay;
 use crate::invariants::check_all;
 use crate::queries::alliance::commander_of;
 use crate::queries::names::placed;
@@ -115,8 +115,8 @@ fn order(s: &mut Setup, o: Value) -> String {
         "pay" => send(&mut s.world, &s.terrain, &Pay, PLAYER, o),
         "walkTo" => crate::movement_test_world::order_from(&mut s.world, &s.terrain, PLAYER, o),
         k => {
-            let kinds = contract_orders();
-            let (_, kind) = kinds.iter().find(|(n, _)| *n == k).expect("a contract order");
+            let kinds = crate::orders::order_kinds();
+            let kind = kinds.get(k).expect("an order kind");
             send(&mut s.world, &s.terrain, kind, PLAYER, o)
         }
     };
