@@ -15,6 +15,8 @@ use crate::queries::driving::{
     carriage_can_go_to, drive_off_problem, drive_problem, hitch_off_problem, hitch_problem,
     horse_to_steal, unhitch_problem,
 };
+use crate::script_actions::{arg, place, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::stealing::{take_over, Taken};
 
 /// The realm's army a carriage goes after, or why it can't (`armyToSupply`).
@@ -226,8 +228,20 @@ impl OrderKind for Drive {
     }
 }
 
-pub(crate) static DRIVE_META: OrderMeta =
-    OrderMeta::request("drive", &Drive).queue_step().gets_off_first().adults_only();
+pub(crate) static DRIVE_META: OrderMeta = OrderMeta::request("drive", &Drive)
+    .queue_step()
+    .gets_off_first()
+    .adults_only()
+    .script(&[DRIVE_ACTION]);
+
+const DRIVE_ACTION: ScriptAction = ScriptAction {
+    name: "drive",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[arg("carriageId"), arg("x"), arg("y"), arg("horseId")]),
+    cost: 10.0,
+    description: "Drive the carriage on my tile to a tile. Another realm’s carriage is stolen by that: it joins my realm at once, which is theft (see Standing). A carriage of mine with no horse of my realm there takes another realm’s only if I name it as `horseId`, which steals it too.",
+    returns: ScriptType::String,
+};
 
 /// The unhitch order (`unhitch`): a grown resident of the carriage's realm on its tile unhitches
 /// its horse, which stands free on the tile. A carriage being driven stops first.
@@ -282,7 +296,16 @@ impl OrderKind for Unhitch {
 }
 
 pub(crate) static UNHITCH_META: OrderMeta =
-    OrderMeta::request("unhitch", &Unhitch).queue_step().gets_off_first();
+    OrderMeta::request("unhitch", &Unhitch).queue_step().gets_off_first().script(&[UNHITCH_ACTION]);
+
+const UNHITCH_ACTION: ScriptAction = ScriptAction {
+    name: "unhitch",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[place("carriage", "carriageId")]),
+    cost: 10.0,
+    description: "Unhitch the horse from a carriage of my realm on my tile, by it or its id; the horse stands free there, and a driver stops.",
+    returns: ScriptType::String,
+};
 
 /// The hitch order (`hitch`): a grown resident of the carriage's realm on its tile hitches the
 /// horse they name, at once. Only the realm's own horses.
@@ -333,7 +356,16 @@ impl OrderKind for Hitch {
 }
 
 pub(crate) static HITCH_META: OrderMeta =
-    OrderMeta::request("hitch", &Hitch).queue_step().gets_off_first();
+    OrderMeta::request("hitch", &Hitch).queue_step().gets_off_first().script(&[HITCH_ACTION]);
+
+const HITCH_ACTION: ScriptAction = ScriptAction {
+    name: "hitch",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[place("carriage", "carriageId"), place("horse", "horseId")]),
+    cost: 10.0,
+    description: "Hitch a horse to a carriage of my realm on my tile, each by it or its id, at once: a horse of my realm on that tile that pulls no carriage, nobody rides and isn’t Down. A horse already hitched stands free there.",
+    returns: ScriptType::String,
+};
 
 #[cfg(test)]
 mod mountain_tests;

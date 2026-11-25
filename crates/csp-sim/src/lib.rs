@@ -131,6 +131,7 @@ pub mod road_line;
 pub mod rowing;
 pub mod ruins;
 pub mod sailing;
+pub mod script_actions;
 pub mod script_api;
 pub mod script_bindings;
 pub mod script_check;

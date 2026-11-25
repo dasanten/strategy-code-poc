@@ -23,6 +23,8 @@ use crate::queries::goods::{
 };
 use crate::queries::names::{good_name, good_of, held};
 use crate::queries::warehouse_trade::is_integer;
+use crate::script_actions::{ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::water_hauling::{apply_water_haul, validate_water_haul, vessel_of_haul};
 
 /// Why a resident carrying a child can't take an order that needs their hands
@@ -181,7 +183,17 @@ pub(crate) static HAUL_META: OrderMeta = OrderMeta::fns("haul", validate_haul, a
     .never_ends()
     .gets_off_first()
     .blocked_carrying_child()
-    .goes_on_until_stopped();
+    .goes_on_until_stopped()
+    .script(&[HAUL_ACTION]);
+
+const HAUL_ACTION: ScriptAction = ScriptAction {
+    name: "haul",
+    group: ActionGroup::Movement,
+    request: Request::ByHand(&["carriageId", "x", "y", "goods", "returnGoods?", "keepFood?"]),
+    cost: 10.0,
+    description: "Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back. Given a boat beside me (its id as `carriageId`), row it instead between my tile and the shore or haven (x, y), loading by hand at each. Given a ship docked at the haven I stand on, I am its captain: I sail it between this haven and the haven at (x, y) with its crew aboard, moving the goods straight between each haven's storage and the ship.",
+    returns: ScriptType::String,
+};
 
 /// Checks a stop order (`stop.validate`): one of the Player's residents stops what they were
 /// ordered to do and stands idle.
@@ -205,7 +217,17 @@ pub fn apply_stop(world: &mut WorldState, _sender: &OrderSender, order: &OrderRe
 }
 
 pub(crate) static STOP_META: OrderMeta =
-    OrderMeta::fns("stop", |w, s, o, _| validate_stop(w, s, o), |w, s, o, _| apply_stop(w, s, o));
+    OrderMeta::fns("stop", |w, s, o, _| validate_stop(w, s, o), |w, s, o, _| apply_stop(w, s, o))
+        .script(&[STOP_ACTION]);
+
+const STOP_ACTION: ScriptAction = ScriptAction {
+    name: "stop",
+    group: ActionGroup::Control,
+    request: Request::Fields(&[]),
+    cost: 10.0,
+    description: "Stop what I was ordered to do and stand idle.",
+    returns: ScriptType::String,
+};
 
 /// What a haul route moves, by land or by water (`HaulOrder`, `WaterHaulOrder`): the goods to
 /// the second stop, those back, the Food kept on board, and the stop it stands at.

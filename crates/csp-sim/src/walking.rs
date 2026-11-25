@@ -23,6 +23,8 @@ use crate::queries::vessels::{
     across_docked_ship, beside_vessel, between_vessels, crew_short, floats_on, row_target,
     vessel_aboard, vessel_crew,
 };
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::water_hauling::stop_tile;
 
 use crate::armies::waiting_for_army;
@@ -132,8 +134,20 @@ impl OrderKind for WalkTo {
     }
 }
 
-pub(crate) static WALK_TO_META: OrderMeta =
-    OrderMeta::request("walkTo", &WalkTo).queue_step().gets_off_first().npc_city();
+pub(crate) static WALK_TO_META: OrderMeta = OrderMeta::request("walkTo", &WalkTo)
+    .queue_step()
+    .gets_off_first()
+    .npc_city()
+    .script(&[WALK_TO_ACTION]);
+
+const WALK_TO_ACTION: ScriptAction = ScriptAction {
+    name: "walkTo",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[arg("x"), arg("y")]),
+    cost: 10.0,
+    description: "Walk to a tile.",
+    returns: ScriptType::String,
+};
 
 /// A number field of an order as the TypeScript `apply` takes it, unchecked.
 fn num_field(order: &OrderRequest, name: &str) -> Option<f64> {

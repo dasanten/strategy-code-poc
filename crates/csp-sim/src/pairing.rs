@@ -21,6 +21,8 @@ use crate::queries::people::CARRYING_A_CHILD;
 use crate::queries::residents::can_work;
 use crate::random::{hash_str, Mulberry32};
 use crate::residents::{base_stats, new_child, NewResident};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 
 /// An action a pair requests (`BirthAction`): one of them starts carrying, or a child is born.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,7 +106,17 @@ pub(crate) static PAIR_META: OrderMeta = OrderMeta::fns(
     |w, s, o, _| validate_pair(w, s, &pair_request(o)).map(str::to_string),
     |w, _, o, _| apply_pair(w, &pair_request(o)),
 )
-.keeps_script();
+.keeps_script()
+.script(&[PAIR_ACTION]);
+
+const PAIR_ACTION: ScriptAction = ScriptAction {
+    name: "pair",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("partnerId")]),
+    cost: 10.0,
+    description: "Pair with an adult of my city to have children.",
+    returns: ScriptType::String,
+};
 
 /// Ends pairs that no longer hold, stops what carrying residents can't do, then requests a carry
 /// for every pair whose wait is over with no child on the way, and a birth for every resident who

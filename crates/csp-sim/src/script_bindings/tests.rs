@@ -145,7 +145,7 @@ fn answers(calls: &[(&str, &str)], prepare: impl FnOnce(&mut WorldState)) -> Map
 }
 
 fn returns_of(name: &str) -> ScriptType {
-    binding(SCRIPT_API, name).unwrap().returns
+    binding(&SCRIPT_API, name).unwrap().returns
 }
 
 #[test]
@@ -407,7 +407,7 @@ fn bench_bindings() {
     time("to_json", &|| drop(std::hint::black_box(to_json(r))));
     let data = Json::Object(as_view(&world, to_json(r)));
     time("as_view", &|| drop(std::hint::black_box(as_view(&world, to_json(r)))));
-    let ty = binding(SCRIPT_API, "me").unwrap().returns;
+    let ty = binding(&SCRIPT_API, "me").unwrap().returns;
     time("view_value", &|| drop(std::hint::black_box(view_value(&data, ty))));
     time("from_json", &|| drop(std::hint::black_box(Value::from_json(&data))));
 }
@@ -535,7 +535,7 @@ fn direct_queries_are_what_their_plain_data_gives() {
             };
             let bound = bind_script(ctx).unwrap();
             let mut ask = |name: &str, args: Vec<Value>| {
-                let ty = binding(SCRIPT_API, name).unwrap().returns;
+                let ty = binding(&SCRIPT_API, name).unwrap().returns;
                 let by_json = bound.query(name, &args).map(|d| view_value(&d, ty));
                 if let Some(direct) = bound.direct_query(name, &args) {
                     assert_eq!(format!("{direct:?}"), format!("{by_json:?}"), "{name} {args:?}");

@@ -23,6 +23,8 @@ use crate::queries::building::{
 use crate::queries::names::{held, kind_name};
 use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
+use crate::script_actions::{ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 
 /// Which line order: a road line or a wall line (`LineOrder['kind']`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -171,7 +173,17 @@ pub(crate) static WALL_LINE_META: OrderMeta = OrderMeta::fns(
 .queue_step()
 .gets_off_first()
 .adults_only()
-.blocked_carrying_child();
+.blocked_carrying_child()
+.script(&[WALL_LINE_ACTION]);
+
+const WALL_LINE_ACTION: ScriptAction = ScriptAction {
+    name: "wallLine",
+    group: ActionGroup::Ruling,
+    request: Request::ByHand(&["x", "y", "material?"]),
+    cost: 10.0,
+    description: "Build wall of \"wood\" (by default) or \"stone\" on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the materials I carry; tiles with a wall or gate already are skipped, but a stone line upgrades the wooden ones on its way, passing only those of stone.",
+    returns: ScriptType::String,
+};
 
 pub(crate) static ROAD_LINE_META: OrderMeta = OrderMeta::fns(
     "roadLine",
@@ -181,7 +193,17 @@ pub(crate) static ROAD_LINE_META: OrderMeta = OrderMeta::fns(
 .queue_step()
 .gets_off_first()
 .adults_only()
-.blocked_carrying_child();
+.blocked_carrying_child()
+.script(&[ROAD_LINE_ACTION]);
+
+const ROAD_LINE_ACTION: ScriptAction = ScriptAction {
+    name: "roadLine",
+    group: ActionGroup::Ruling,
+    request: Request::ByHand(&["x", "y"]),
+    cost: 10.0,
+    description: "Build road on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the stone I carry.",
+    returns: ScriptType::String,
+};
 
 /// This tick's puts of materials from orders along a line (`requestRoadMaterials`): a resident
 /// on the site of their tile puts in what they carry of what it still needs.

@@ -14,6 +14,8 @@ use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::names::{good_name, good_of, held};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 
 /// Why a resident can't put `good` on (`None` when they can): it goes into a slot, they carry it,
 /// and it isn't what that slot holds already.
@@ -87,7 +89,17 @@ impl OrderKind for Equip {
     }
 }
 
-pub(crate) static EQUIP_META: OrderMeta = OrderMeta::request("equip", &Equip).queue_step();
+pub(crate) static EQUIP_META: OrderMeta =
+    OrderMeta::request("equip", &Equip).queue_step().script(&[EQUIP_ACTION]);
+
+const EQUIP_ACTION: ScriptAction = ScriptAction {
+    name: "equip",
+    group: ActionGroup::Fighting,
+    request: Request::Fields(&[arg("good")]),
+    cost: 10.0,
+    description: "Swap a weapon, shield or armour I carry, like \"sword\", into the slot it fits; what was there stays carried. It takes a few ticks, and I strike no blows meanwhile.",
+    returns: ScriptType::String,
+};
 
 /// The take-off order (`takeOff`): a resident of the Player's realm empties `slot`; its item
 /// stays carried.
@@ -131,7 +143,17 @@ impl OrderKind for TakeOff {
     }
 }
 
-pub(crate) static TAKE_OFF_META: OrderMeta = OrderMeta::request("takeOff", &TakeOff).queue_step();
+pub(crate) static TAKE_OFF_META: OrderMeta =
+    OrderMeta::request("takeOff", &TakeOff).queue_step().script(&[TAKE_OFF_ACTION]);
+
+const TAKE_OFF_ACTION: ScriptAction = ScriptAction {
+    name: "takeOff",
+    group: ActionGroup::Fighting,
+    request: Request::Fields(&[arg("slot")]),
+    cost: 10.0,
+    description: "Take off what I have in a slot, \"weapon\", \"shield\" or \"armour\"; it stays carried, and the slot stays empty until I pick up more that fits it. It takes a few ticks, and I strike no blows meanwhile.",
+    returns: ScriptType::String,
+};
 
 /// Whether a resident is in the middle of swapping or taking off gear.
 pub fn is_equipping(r: &Resident) -> bool {
