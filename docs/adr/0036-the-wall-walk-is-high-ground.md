@@ -1,6 +1,7 @@
 # The wall walk is high ground
 
-Status: decided (2026-11-15, with Daniel). Rules in `CONTEXT.md` under **Walls in combat** (Wall
+Status: decided (2026-11-15, with Daniel). Rules in `docs/context/`
+(`military.md`, `organizations-and-territory.md`) under **Walls in combat** (Wall
 walk, High ground, A tile breaks), **Wall / Gate** (Wood or stone) and **Tower**; built in Epics
 105 (Walls that hold), 106 (Stone walls) and 109 (Towers).
 

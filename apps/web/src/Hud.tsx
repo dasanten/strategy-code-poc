@@ -39,7 +39,7 @@ import {
   traderVisitLine,
 } from './notices-view.js'
 import type { ConnectionStatus } from './useWorld.js'
-import { WIKI_PATH } from './wiki-view.js'
+import { WIKI_PATH } from './wiki/wiki-view.js'
 import { Icon } from './Icon.js'
 import { GoodIcon } from './GoodsGrid.js'
 import { TAB_ICONS, type UiIconName } from './ui-icons.js'

@@ -1,0 +1,60 @@
+// Haul (default): drive params.carriage, or while none is picked the carriage
+// on my tile when I start, on a haul route between memory.from and memory.to:
+// memory.goods there, memory.returnGoods back, memory.keepFood Food kept on
+// board for the horse and me. The route comes only from the Haul order; started
+// without one I end. The built-in haul order loads, drives and unloads, again
+// and again; this starts it at memory.from. Given a boat (memory.carriageId),
+// I row it instead, from the shore beside it (a haul route by water).
+param carriage: storage // the carriage to drive; none: the one I stand on
+
+if (memory.to == null) {
+  end("no route given")
+  return
+}
+if (!pickCarriage()) { return }
+if (me.order == null || (me.order.kind != "haul" && me.order.kind != "haulByWater")) {
+  startRoute()
+  return
+}
+logLeg()
+
+// Which carriage I drive: the one picked, else the one I started on. False
+// once I end: neither is a carriage.
+fn pickCarriage() {
+  if (params.carriage != null) {
+    if (params.carriage.kind != null) {
+      end("the " + params.carriage.kind + " is no carriage")
+      return false
+    }
+    memory.carriageId = params.carriage.id
+  }
+  if (memory.carriageId == null) {
+    for (c of carriages()) {
+      if (c.x == me.x && c.y == me.y) { memory.carriageId = c.id }
+    }
+    if (memory.carriageId == null) {
+      end("no carriage on their tile")
+      return false
+    }
+  }
+  return true
+}
+
+// The haul order, once I stand at memory.from.
+fn startRoute() {
+  if (me.x != memory.from.x || me.y != memory.from.y) { return }
+  haul(memory.carriageId, memory.to.x, memory.to.y, memory.goods, memory.returnGoods, memory.keepFood)
+}
+
+// Each leg of the route as it starts, for my log: loading at a stop, or
+// driving (rowing) to one.
+fn logLeg() {
+  let leg = me.order.phase + " " + me.order.stop
+  if (memory.leg == leg) { return }
+  memory.leg = leg
+  let stop = memory.to
+  if (me.order.stop == "from") { stop = memory.from }
+  if (me.order.phase == "loading") { log("loading at " + stop.x + "," + stop.y) }
+  else if (me.order.kind == "haulByWater") { log("rowing to " + stop.x + "," + stop.y) }
+  else { log("driving to " + stop.x + "," + stop.y) }
+}

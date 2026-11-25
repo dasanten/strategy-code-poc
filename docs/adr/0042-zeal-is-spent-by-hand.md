@@ -1,6 +1,6 @@
 # Zeal is spent by hand
 
-Status: decided (2026-11-19, with Daniel). Rules in `CONTEXT.md` under **Zeal** and **Rallying
+Status: decided (2026-11-19, with Daniel). Rules in `docs/context/people.md` under **Zeal** and **Rallying
 the crew**; built in Epic 116.
 
 ## Context
