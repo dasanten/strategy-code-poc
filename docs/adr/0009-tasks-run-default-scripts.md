@@ -3,7 +3,7 @@
 Status: decided (2026-10-22, with Daniel). Changes how ADR 0002's UI orders are built.
 
 Every task the UI can give that repeats or decides (work a workplace, build, haul, tear down) is a
-**default script** written in the game's own language (`CONTEXT.md`: Default script, Order).
+**default script** written in the game's own language (`docs/context/control.md`: Default script, Order).
 Giving a resident such a task runs that script, with the task's target (the workplace, the site,
 the haul stops) written into its memory. One-off steps (walk, pick up, put down, attack, trade)
 stay single actions, and the scripts still call the built-in actions such as `workAt`.

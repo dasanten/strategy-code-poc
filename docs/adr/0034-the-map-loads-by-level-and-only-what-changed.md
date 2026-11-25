@@ -2,7 +2,7 @@
 
 Status: decided (2026-11-12, with Daniel). Changes the Sync decision of ADR 0006 (explored terrain
 "in 32×32 chunks over HTTP", in batches since T84.6); the rest of ADR 0006 stands. The rule is in
-`CONTEXT.md` under **Explored terrain**; built in Epic 99 (Faster map loading).
+`docs/context/sight.md` under **Explored terrain**; built in Epic 99 (Faster map loading).
 
 A Player who has explored much of the map waits a long time for it, and what the server sends them
 grows with everything they have ever seen. With the minimap open, or zoomed all the way out, the

@@ -3,7 +3,7 @@
 Status: decided (2026-10-17, with Daniel). Partly superseded, see below.
 
 > **Precedence (2026-10-18):** where this document conflicts with the game vision captured in
-> `CONTEXT.md` and later ADRs, the vision wins. In particular the map size and shape (decision 9
+> `CONTEXT.md` (the index of `docs/context/`) and later ADRs, the vision wins. In particular the map size and shape (decision 9
 > and the 32×24 grid in code) are replaced by the world-map decisions, and "unit" is replaced by
 > the domain terms in `CONTEXT.md`. Control is hybrid (ADR 0002), not script-only. Storage, map
 > scale and sync follow ADR 0006, login ADR 0005, hosting ADR 0007.

@@ -1,7 +1,7 @@
 # NPC cities yield to a force that stays, and lend only what they can spare
 
 Status: decided (2026-11-12, with Daniel). Changes how ADR 0024's demands are answered by an NPC
-city; rules in `CONTEXT.md` under **Respect**, **Persuading a city**, **Demand** and **Hiring from
+city; rules in `docs/context/` (`crime-and-reputation.md`, `military.md`) under **Respect**, **Persuading a city**, **Demand** and **Hiring from
 an NPC city**; built in Epic 96.
 
 An evaluation of the NPC planner found three cheap ways to take an NPC city. Respect counted every
