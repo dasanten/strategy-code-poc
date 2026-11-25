@@ -5,7 +5,7 @@ Status: decided (2026-10-18, with Daniel). Replaces the storage and map parts of
 ## Decisions
 
 - **Scale:** a tile is about 10 m and takes an unloaded resident ~7.5 s on plains, so the map is
-  5,760 × 5,760 tiles (~33 million tiles), joined at opposite sides (a torus; `CONTEXT.md`: Map).
+  5,760 × 5,760 tiles (~33 million tiles), joined at opposite sides (a torus; `docs/context/world.md`: Map).
   (Until 2026-10-22 a tile was 40 m and the map 1,440 across; see the second reset below.)
 - **Terrain** is generated once from the seed when a world is created and stored as a binary blob
   (one byte per tile) in SQLite. The server keeps it in memory; roads change it in place. Later
@@ -17,7 +17,7 @@ Status: decided (2026-10-18, with Daniel). Replaces the storage and map parts of
 - **Migrations, always:** the snapshot carries a format version. Changing the shape of world state
   ships a migration function from the previous version, with a test. The world is never reset by
   a deploy. Schema changes to tables use Drizzle migrations as before.
-- **Sync:** the server sends each client only what its Player can see (`CONTEXT.md`, Sight). On
+- **Sync:** the server sends each client only what its Player can see (`docs/context/sight.md`, Sight). On
   connect it sends everything in sight; each tick it sends the entities in sight that changed and
   the ids that left sight, as JSON. Explored terrain is loaded in 32×32 chunks over HTTP, many
   at a time (below).
@@ -63,7 +63,7 @@ on their next login. From then on the rule above holds again: no resets, migrati
 
 Walking looked boringly slow: a resident took 30 s to cross one tile. Daniel chose a 4× finer
 grid (10 m tiles, 7.5 s each, 5,760 tiles across) with buildings covering several tiles
-(`CONTEXT.md`: Footprint), so real distances and travel times stay as they were. Migrating every
+(`docs/context/building.md`: Footprint), so real distances and travel times stay as they were. Migrating every
 position, building and distance before anyone played for real was not worth it, so the world was
 reset the same way as the first time: terrain, world saves and explored terrain deleted;
 accounts, sessions, invite codes and scripts kept; a new starting city for every Player on their

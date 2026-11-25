@@ -27,7 +27,9 @@ branches from `origin/dev` instead (ADR 0010).
 
 ## 3. Build
 
-- Read the ticket, its epic, `CONTEXT.md` and the ADRs it touches.
+- Read the ticket, its epic, the index `CONTEXT.md`, then the section files under `docs/context/`
+  the ticket names (and those whose terms it uses), and the ADRs it touches. A new or changed rule
+  goes into its section file, a new term also into the index.
 - A missing **rule** (what happens) is not yours to invent: comment the question on the ticket,
   swap `in progress` for `needs Daniel`, and pick the next ticket.
 - A missing **number** is yours: pick a sensible value in its domain's file
@@ -37,6 +39,7 @@ branches from `origin/dev` instead (ADR 0010).
   bumps `WORLD_FORMAT_VERSION` with a migration in `crates/csp-server/src/world_format.rs` and a
   test (ADR 0006); actions and queries go
   through the game API, orders only request actions (ADR 0002).
+- A ticket that changes a rule also updates its wiki section, `apps/web/src/wiki/<topic>.tsx`.
 - If the next ticket cannot ship without this one (or the reverse), do both in this PR.
 - Tick the ticket's "Done when" boxes as they become true (edit the issue body).
 - While working on the crates, run the tests of the crate you change

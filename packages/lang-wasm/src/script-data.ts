@@ -12,7 +12,7 @@ export type { ScriptBinding, ScriptField, ScriptParamType, ScriptType, ScriptVie
 
 /**
  * The game's script tables, as the Rust build writes them (`script-data.json`, from `csp-sim`'s
- * `script_tables.rs` and `default_scripts.rs` by `pnpm script-data:rust`; a Rust test fails while
+ * `script_tables` and `default_scripts.rs` by `pnpm script-data:rust`; a Rust test fails while
  * the file is stale): the script views, both game APIs, what each param type accepts and each
  * task's default script (`CONTEXT.md`: Script view, Default script). Plain data, so nothing here
  * waits for the WebAssembly checker.

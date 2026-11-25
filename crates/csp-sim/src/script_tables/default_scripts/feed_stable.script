@@ -1,0 +1,171 @@
+// Feed the stable (default): keep Food for 10 game days for the
+// horses standing in params.stable, or while none is picked in the stable I
+// stand in when I start, kept in memory.stableId; with none, or once it is
+// gone, I end. Below that I fetch what is missing from params.source, or
+// the nearest storage of my realm with Food while none is picked, and store
+// it in the stable; otherwise I wait there. With params.once I feed it a
+// single round: once it is full, or with no Food to fetch, I end.
+// memory.spareFood, kept only by an NPC city's feeder, is the most Food I may
+// take now.
+param stable: storage // the stable to feed; none: the one I stand in
+param source: storage // where the Food comes from; a carriage too; none: the nearest storage with Food
+param once: number = 0 // 1: a single round, then end; 0: keep it fed
+let days = 10 // game days of Food to keep
+let perHorse = 0.75 // Food a horse eats a game day
+let side = 3 // tiles along each side of a stable
+
+if (!pickStable()) { return }
+let stable = building(memory.stableId)
+// Kept for when it is out of sight.
+if (stable != null) { memory.at = {x: stable.x, y: stable.y} }
+if (me.order != null) { // on my way
+  wait()
+  return
+}
+if (stable == null) {
+  walkBackOrEnd()
+  return
+}
+if (storeFetched(stable)) { return }
+if (fetchIfLow(stable)) { return }
+// Enough, or none to fetch: wait at the stable.
+if (!inStable(stable, me) && walkTo(stable.x, stable.y) == null) { wait() }
+
+// Out of sight: back to it. There, and it isn't, it is torn down: I end.
+fn walkBackOrEnd() {
+  let at = memory.at
+  if (at != null && (me.x != at.x || me.y != at.y) && walkTo(at.x, at.y) == null) {
+    wait() // until I am there
+    return
+  }
+  end("the stable is gone")
+}
+
+// Back with Food: what I fetched goes into the stable; my own food stays.
+// True once I store it.
+fn storeFetched(stable) {
+  let fetched = memory.fetched
+  if (fetched == null) { return false }
+  memory.fetched = null
+  let food = me.carried.food
+  if (food == null) { return false }
+  let got = floor(food - fetched.before)
+  if (got < 1 || store({food: got}, stable.id) != null) { return false }
+  wait() // until it is stored
+  say("storing " + goodsText({food: got}, ["food"]) + " in the stable")
+  return true
+}
+
+// Below the Food to keep for the horses in it now: fetch what is missing.
+// True once I set off, or once I end (params.once).
+fn fetchIfLow(stable) {
+  let held = 0
+  if (stable.stock != null && stable.stock.food != null) { held = stable.stock.food }
+  let need = horsesIn(stable) * days * perHorse - held
+  if (need <= 0) {
+    if (params.once > 0) {
+      end("the stable is full")
+      return true
+    }
+    say("enough Food in the stable: waiting")
+    return false
+  }
+  let from = foodFrom(stable)
+  if (from != null) {
+    let units = floor(need)
+    if (units < need) { units = units + 1 } // whole units, rounded up
+    if (memory.spareFood != null && units > memory.spareFood) { units = memory.spareFood }
+    let before = me.carried.food
+    if (before == null) { before = 0 }
+    if (units >= 1 && fetch({food: units}, from.id) == null) {
+      wait() // until I have it
+      memory.fetched = {before: before}
+      say("stable low (" + floor(held) + "): fetching " + units + " Food at " + placeName(from))
+      return true
+    }
+  }
+  if (params.once > 0) {
+    end("no Food to fetch")
+    return true
+  }
+  say("stable low (" + floor(held) + "): no Food to fetch, waiting")
+  return false
+}
+
+// Where the Food comes from: params.source, else the nearest storage of my
+// realm with Food; null unless it holds a whole unit, or if it is the stable.
+fn foodFrom(stable) {
+  let from = params.source
+  if (from == null) {
+    let stores = storages(stable, ["food"]) // nearest first, holding some
+    if (stores.length == 0) { return null }
+    from = stores[0]
+  }
+  let held = from.stock
+  if (held == null) { held = from.load } // a carriage
+  if (from.id == stable.id || held == null || held.food == null || held.food < 1) { return null }
+  return from
+}
+
+// The horses standing in the stable.
+fn horsesIn(stable) {
+  let n = 0
+  for (h of horses()) {
+    if (inStable(stable, h)) { n = n + 1 }
+  }
+  return n
+}
+
+// Whether something with x and y stands on the stable's footprint.
+fn inStable(stable, t) {
+  let dx = (t.x - stable.x + mapSize) % mapSize
+  let dy = (t.y - stable.y + mapSize) % mapSize
+  return dx < side && dy < side
+}
+
+// A line for my log, once until I say something else: waiting stays one line.
+fn say(text) {
+  if (memory.said != text) { log(text) }
+  memory.said = text
+}
+
+// Which stable: the one picked, else the one I started in, kept in
+// memory.stableId. False once I end: neither is a stable.
+fn pickStable() {
+  if (params.stable != null) {
+    if (params.stable.kind != "stable") {
+      end("the one picked is no stable")
+      return false
+    }
+    memory.stableId = params.stable.id
+  }
+  if (memory.stableId == null) {
+    let here = buildingAt(me.x, me.y)
+    if (here == null || here.kind != "stable" || here.site != null) {
+      end("no stable here")
+      return false
+    }
+    memory.stableId = here.id
+  }
+  return true
+}
+
+// A building or carriage for my log: "the storage at 12,6".
+fn placeName(b) {
+  let kind = b.kind
+  if (kind == null) { kind = "carriage" }
+  return "the " + kind + " at " + b.x + "," + b.y
+}
+
+// The units of goods in load for my log: "10 stone, 4 wood".
+fn goodsText(load, goods) {
+  let text = ""
+  for (g of goods) {
+    let n = load[g]
+    if (n != null && n >= 1) {
+      if (text != "") { text = text + ", " }
+      text = text + floor(n) + " " + g
+    }
+  }
+  return text
+}

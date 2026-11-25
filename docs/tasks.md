@@ -105,8 +105,8 @@ starting as neighbours, and the reset), then Rich and poor land (101: richness, 
 gold in a heartland), then Veins run dry (102), each waiting for the one before to reach `dev`.
 An heir (Epic 103: a named heir keeps one city at Leader death) runs alongside Epic 100. The three
 of 100 to 102 are released together, and Daniel runs the reset at that release. Whether NPC cities
-fight for nodes they lack: settled 2026-11-16 (Epic 98, `CONTEXT.md`: Taking a node). Agreed with
-Daniel on 2026-11-16: Epics 97 and 98 are ticketed and worked alongside the fighting epics (104 to
+fight for nodes they lack: settled 2026-11-16 (Epic 98, `docs/context/npc-stances.md`: Taking a node). Agreed
+with Daniel on 2026-11-16: Epics 97 and 98 are ticketed and worked alongside the fighting epics (104 to
 110).
 
 **Agreed with Daniel on 2026-11-15,** from his wish to upgrade fighting: Safe start (Epic 104: new
@@ -314,10 +314,13 @@ its tickets or closes.
 - **Release:** when Daniel asks, one PR `dev` → `main` lists the epics and bugs it ships, runs CI
   and is merged once green. Only merges into `main` deploy.
 - **Rules vs numbers:** a missing game rule becomes a `needs Daniel` question and lands in
-  `CONTEXT.md`. Balance numbers are picked in `crates/csp-shared/src/balance/` (one file per
-  domain) and listed in the PR for review.
+  its section file under `docs/context/` (a new term also in `CONTEXT.md`, the
+  index). Balance numbers are picked in `crates/csp-shared/src/balance/` (one file per domain) and listed in
+  the PR for review.
 - **Scope-only epics:** an epic without tickets lists its open rule questions. When the epic
   before it is nearly done, settle those questions with Daniel, then write its tickets.
-- **Every ticket:** use the terms in `CONTEXT.md`; keep scripting cheap (ADR 0002); new
+- **Every ticket:** read the index `CONTEXT.md`, then the section files under `docs/context/` the
+  ticket names, and use their terms; a ticket names the section files it builds on; keep scripting
+  cheap (ADR 0002); new
   simulation rules come with invariants and tests (ADR 0004); each epic ends visible in the
   browser.
