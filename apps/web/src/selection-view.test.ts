@@ -35,7 +35,7 @@ import {
   WORK_OUTPUT_PER_DAY,
   AVERAGE_HORSE_STATS,
 } from './shared/narrowed.js'
-import { NODE_WORKPLACE, type HaulOrder } from './shared/world.js'
+import { NODE_WORKPLACE } from './shared/world.js'
 import { stockWeight } from './shared/stats.js'
 import { Terrain, UNEXPLORED } from './shared/terrain.js'
 import type {
@@ -52,6 +52,7 @@ import type {
   SeenHorse,
   Richness,
   VeinWord,
+  HaulOrder,
 } from '@csp/shared-types'
 import { BUILDING_NAMES } from './map/palette.js'
 import {
@@ -2460,7 +2461,7 @@ describe('Build a … here on a node’s card', () => {
 
 describe('a carriage on the tile card (`CONTEXT.md`: Goods on cards)', () => {
   const storage = building({ id: 'b-store', kind: 'storage', cityId: 'c-me', x: 1, y: 1 })
-  const route = (more: Partial<HaulOrder> = {}): HaulOrder => ({
+  const route = (more: Partial<HaulOrder> = {}): HaulOrder & { kind: 'haul' } => ({
     kind: 'haul',
     carriageId: carriage.id,
     from: { x: 1, y: 1 },
@@ -2478,7 +2479,7 @@ describe('a carriage on the tile card (`CONTEXT.md`: Goods on cards)', () => {
     moving: null,
     ...more,
   })
-  const ana = (order: HaulOrder | null) =>
+  const ana = (order: (HaulOrder & { kind: 'haul' }) | null) =>
     ({ id: 'ana', name: 'Ana', x: 5, y: 5, order }) as SeenResident
 
   it('names its owner on its own card, and only its section otherwise', () => {

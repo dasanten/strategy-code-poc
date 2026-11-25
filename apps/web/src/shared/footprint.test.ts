@@ -12,8 +12,7 @@ import {
   nearFootprint,
 } from './footprint.js'
 import { Terrain, type TerrainMap } from './terrain.js'
-import { type WorldState } from './world.js'
-import type { Building } from '@csp/shared-types'
+import type { Building, WorldState } from '@csp/shared-types'
 const SIZE = 32
 
 /** Plains, with Forest at (10, 10) and Mountain at (20, 20). */

@@ -20,7 +20,6 @@ import {
   transferTiles,
 } from './transfer.js'
 import { deliveryStorage } from './warehouse.js'
-import { type Offer, type WorldState } from './world.js'
 import { DIRECT_OFFERS_TO_ONE_REALM } from '@csp/balance'
 import type {
   CarriedFeeBy,
@@ -30,6 +29,8 @@ import type {
   DirectOfferView,
   Good,
   RealmLabel,
+  Offer,
+  WorldState,
 } from '@csp/shared-types'
 
 /*

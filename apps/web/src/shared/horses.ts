@@ -11,7 +11,7 @@ import {
 import { covers, isAt } from './footprint.js'
 import { pileAt } from './goods.js'
 import { type TerrainMap, wrap } from './terrain.js'
-import { isDown, type WorldState } from './world.js'
+import { isDown } from './world.js'
 import {
   HORSE_REACH,
   OWN_FOOD,
@@ -27,6 +27,7 @@ import type {
   KeptBreeding,
   Resident,
   Stock,
+  WorldState,
 } from '@csp/shared-types'
 
 /** World queries about horses and stables (ADR 0002: the game API orders and scripts share). */
