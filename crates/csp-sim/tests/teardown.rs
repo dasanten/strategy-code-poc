@@ -237,7 +237,7 @@ fn ends_the_order_if_the_building_is_gone_before_work_starts() {
 
 #[test]
 fn tear_down_returns_never_leave_more_than_was_built_in() {
-    for kind in BUILDABLE {
+    for &kind in BUILDABLE {
         let built = build_materials(kind);
         let back = teardown_returns(&building("b", kind, 0.0, 0.0));
         for (good, units) in &back {

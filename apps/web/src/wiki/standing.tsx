@@ -190,6 +190,7 @@ export function StandingSection() {
           Its next army then goes to that city and tears down its workplaces, one after the other,
           the same way anyone can. Each comes off the debt for its worth (
           {(Object.entries(WORKPLACE_WRECK_WORTH) as [BuildingKind, number][])
+            .sort((a, b) => a[1] - b[1])
             .map(([k, n]) => `${BUILDING_NAMES[k].toLowerCase()} ${num(n)} coins`)
             .join(', ')}
           ) until it is covered or none are left, and your realm log reports each one. The

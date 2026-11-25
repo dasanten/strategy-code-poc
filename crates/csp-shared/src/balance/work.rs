@@ -3,6 +3,7 @@
 use serde::Serialize;
 
 use super::*;
+use crate::building_spec::{opt, spec_table};
 
 /// What a workplace that processes goods turns into what, one batch at a time.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -17,43 +18,22 @@ balance! {
 /// Most residents who can work each kind of workplace at a time (`CONTEXT.md`: Workplace). A farm
 /// has room for a whole starting city; the workplaces on nodes for a smaller crew; smelters,
 /// mints and smithies for a few.
-pub const WORKPLACE_MAX_WORKERS: Table<f64> = Table(&[
-    ("farm", 10.0),
-    ("lumberCamp", 6.0),
-    ("quarry", 6.0),
-    ("mine", 8.0),
-    ("smelter", 4.0),
-    ("mint", 4.0),
-    ("smithy", 4.0),
-]);
+pub const WORKPLACE_MAX_WORKERS: Table<f64> =
+    spec_table!(f64, |s| opt!(s.workplace, w => Some(w.max_workers)));
 
 /// What each kind of workplace counts for against a debt when the Trade Organization's army tears it
 /// down (`CONTEXT.md`: Trade Org debt), in Coins: about twice its materials at their warehouse base
 /// price and 20 Coins for each game day of a builder's work (as `CARRIAGE_STOLEN_WORTH` weighs a
 /// carriage), and never less than 200, as a farm or lumber camp is cheap to build but worth more than
 /// that to a city. So a debt for a killing (`TRADE_ORG_LOSS`, twice) takes about two to four workplaces.
-pub const WORKPLACE_WRECK_WORTH: Table<f64> = Table(&[
-    ("farm", 200.0),
-    ("lumberCamp", 200.0),
-    ("quarry", 240.0),
-    ("mine", 400.0),
-    ("smelter", 400.0),
-    ("mint", 560.0),
-    ("smithy", 600.0),
-]);
+pub const WORKPLACE_WRECK_WORTH: Table<f64> =
+    spec_table!(f64, |s| opt!(s.workplace, w => Some(w.wreck_worth)));
 
 /// The skill each kind of workplace uses and teaches (`CONTEXT.md`: Skill): Farming on a farm,
 /// Woodcutting in a lumber camp, Mining in quarries and mines, Smelting in smelters and mints,
 /// Smithing in a smithy.
-pub const WORKPLACE_SKILL: Table<&str> = Table(&[
-    ("farm", "farming"),
-    ("lumberCamp", "woodcutting"),
-    ("quarry", "mining"),
-    ("mine", "mining"),
-    ("smelter", "smelting"),
-    ("mint", "smelting"),
-    ("smithy", "smithing"),
-]);
+pub const WORKPLACE_SKILL: Table<&str> =
+    spec_table!(&'static str, |s| opt!(s.workplace, w => Some(w.skill.name())));
 
 /// The fixed recipes of the workplaces that process goods (`CONTEXT.md`: Smelter, Coins, Smithy).
 /// A smelter turns 2 iron ore into 1 iron, or 1 iron and 1 coal into 1 steel (`CONTEXT.md`: Coal);
@@ -65,70 +45,16 @@ pub const WORKPLACE_SKILL: Table<&str> = Table(&[
 /// and the same Wood; the Spear is iron only. A Bow is all wood, a Crossbow wood with an iron
 /// bow and trigger, and a batch of 40 Arrows mostly wood with a little iron for the heads
 /// (`CONTEXT.md`: Smithy).
-pub const RECIPES: Table<&[Recipe]> = Table(&[
-    (
-        "smelter",
-        &[
-            Recipe { input: Table(&[("ironOre", 2.0)]), output: Table(&[("iron", 1.0)]) },
-            Recipe {
-                input: Table(&[("iron", 1.0), ("coal", 1.0)]),
-                output: Table(&[("steel", 1.0)]),
-            },
-        ],
-    ),
-    ("mint", &[Recipe { input: Table(&[("goldOre", 1.0)]), output: Table(&[("coins", 10.0)]) }]),
-    (
-        "smithy",
-        &[
-            Recipe {
-                input: Table(&[("iron", 1.0), ("wood", 2.0)]),
-                output: Table(&[("spear", 1.0)]),
-            },
-            Recipe {
-                input: Table(&[("iron", 2.0), ("wood", 1.0)]),
-                output: Table(&[("sword", 1.0)]),
-            },
-            Recipe {
-                input: Table(&[("iron", 1.0), ("wood", 3.0)]),
-                output: Table(&[("shield", 1.0)]),
-            },
-            Recipe {
-                input: Table(&[("iron", 7.0), ("wood", 1.0)]),
-                output: Table(&[("armour", 1.0)]),
-            },
-            Recipe {
-                input: Table(&[("steel", 2.0), ("wood", 1.0)]),
-                output: Table(&[("steelSword", 1.0)]),
-            },
-            Recipe {
-                input: Table(&[("steel", 1.0), ("wood", 3.0)]),
-                output: Table(&[("steelShield", 1.0)]),
-            },
-            Recipe {
-                input: Table(&[("steel", 7.0), ("wood", 1.0)]),
-                output: Table(&[("steelArmour", 1.0)]),
-            },
-            Recipe {
-                input: Table(&[("iron", 1.0), ("wood", 1.0)]),
-                output: Table(&[("tools", 1.0)]),
-            },
-            Recipe { input: Table(&[("wood", 2.0)]), output: Table(&[("bow", 1.0)]) },
-            Recipe {
-                input: Table(&[("iron", 1.0), ("wood", 3.0)]),
-                output: Table(&[("crossbow", 1.0)]),
-            },
-            Recipe {
-                input: Table(&[("iron", 1.0), ("wood", 3.0)]),
-                output: Table(&[("arrows", 40.0)]),
-            },
-        ],
-    ),
-]);
+pub const RECIPES: Table<&[Recipe]> = spec_table!(
+    &'static [Recipe],
+    |s| opt!(s.workplace, w => opt!(w.processing, p => Some(p.recipes)))
+);
 
 /// Batches one worker of average Strength and no skill gets through per game day: a smelter worker
 /// smelts what two miners dig (4 iron ore into 2 iron), or 2 iron and 2 coal into 2 steel, a mint worker strikes what two gold miners
 /// dig (2 gold ore into 20 coins), a smithy worker makes two weapons or pieces of armour.
-pub const BATCHES_PER_DAY: Table<f64> = Table(&[("smelter", 2.0), ("mint", 2.0), ("smithy", 2.0)]);
+pub const BATCHES_PER_DAY: Table<f64> =
+    spec_table!(f64, |s| opt!(s.workplace, w => opt!(w.processing, p => Some(p.batches_per_day))));
 
 /// Units of each good one worker of average Strength and no skill makes per game day. Food is four
 /// times the `FOOD_PER_DAY` a resident eats, so about a quarter of a city farms; ore is slow, and
