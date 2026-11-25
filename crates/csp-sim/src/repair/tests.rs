@@ -179,7 +179,7 @@ fn a_resident_who_leaves_the_tile_stops_repairing() {
 
 #[test]
 fn the_invariants_hold_a_condition_in_range_and_a_repairer_at_the_building() {
-    use crate::invariants::checks::{conditions_in_range, repair_orders_on_buildings};
+    use crate::invariants::buildings::{conditions_in_range, repair_orders_on_buildings};
     let terrain = crate::test_support::plains(32);
     let mut world = worn_house();
     repairing(&mut world);

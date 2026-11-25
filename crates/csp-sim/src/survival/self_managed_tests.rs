@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 
 use super::{end_realm, go_down};
 use crate::invariants::check_all;
-use crate::invariants::checks::owners_exist;
+use crate::invariants::realms::owners_exist;
 use crate::npc_behaviour::run_by_npc_city;
 use crate::npc_test_world::Runner;
 use crate::queries::city_area::in_city_area;
