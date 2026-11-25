@@ -52,7 +52,7 @@ impl NpcJobWeights {
         NpcJobWeights { distance: 0.0, danger: 0.0, crew: 0.0, most: 0.0 };
 }
 
-/// What an NPC city's stance does and when it takes one (`CONTEXT.md`: Stance; T98.4).
+/// The shape of `NPC_STANCE`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NpcStance {
@@ -83,7 +83,7 @@ pub struct NpcStance {
     pub temperament_tilt: f64,
 }
 
-/// When an NPC city acts first against a threat (`CONTEXT.md`: Acting first; T98.5).
+/// The shape of `NPC_ACTING_FIRST`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NpcActingFirst {
@@ -97,7 +97,7 @@ pub struct NpcActingFirst {
     pub hire_days: f64,
 }
 
-/// When an NPC city retaliates and marches (`CONTEXT.md`: Retaliating; T98.8).
+/// The shape of `NPC_RETALIATE`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NpcRetaliate {
@@ -362,6 +362,7 @@ pub const NPC_FOUND_STANDING: f64 = 80.0;
 /// is drawn from its id like any NPC city's, so it may still come out the same.
 pub const NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT: f64 = 0.75;
 
+/// What an NPC city's stance does and when it takes one (`CONTEXT.md`: Stance; T98.4).
 pub const NPC_STANCE: NpcStance = NpcStance {
     fortify_threat: 35.0,
     fortify_soldiers: 1.5,
@@ -377,9 +378,11 @@ pub const NPC_STANCE: NpcStance = NpcStance {
     temperament_tilt: 1.5,
 };
 
+/// When an NPC city acts first against a threat (`CONTEXT.md`: Acting first; T98.5).
 pub const NPC_ACTING_FIRST: NpcActingFirst =
     NpcActingFirst { ally_threat: 30.0, hire_threat: 30.0, hire_soldiers: 4.0, hire_days: 7.0 };
 
+/// When an NPC city retaliates and marches (`CONTEXT.md`: Retaliating; T98.8).
 pub const NPC_RETALIATE: NpcRetaliate = NpcRetaliate {
     threat: 60.0,
     ends_below: 15.0,

@@ -57,10 +57,7 @@ pub struct RichnessFactor {
     pub rich: f64,
 }
 
-/// How many game days a full crew of average workers (Strength `WORK_STRENGTH_AVERAGE`, no
-/// skill) takes to empty a normal and a rich vein (`CONTEXT.md`: Running dry): a real week is 420
-/// game days, so three real weeks for a rich vein and two for a normal one. A skilled crew empties
-/// it in down to half that.
+/// The shape of `VEIN_CREW_DAYS`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct VeinCrewDays {
     pub normal: f64,
@@ -235,6 +232,10 @@ pub const RICHER_NODE_REACH: f64 = 0.25;
 /// (`CONTEXT.md`: Rare goods): it has no nodes in a heartland, so the land out there holds more.
 pub const GOLD_NODE_DENSITY: f64 = 2.0;
 
+/// How many game days a full crew of average workers (Strength `WORK_STRENGTH_AVERAGE`, no
+/// skill) takes to empty a normal and a rich vein (`CONTEXT.md`: Running dry): a real week is 420
+/// game days, so three real weeks for a rich vein and two for a normal one. A skilled crew empties
+/// it in down to half that.
 pub const VEIN_CREW_DAYS: VeinCrewDays = VeinCrewDays { normal: 840.0, rich: 1260.0 };
 
 /// `vein_stock` of every ore node kind, normal and rich, as the client reads it (the Wiki).

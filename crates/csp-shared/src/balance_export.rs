@@ -23,8 +23,7 @@ use crate::TICK_MS;
 /// Where the files go, relative to the workspace root.
 pub const OUT_DIR: &str = "packages/balance";
 
-/// The numbers of `balance.rs` (the table `balance.ts` has, checked against it by
-/// `balance::tests`) and the time, terrain and footprint numbers the Wiki reads.
+/// The numbers of `balance/` and the time, terrain and footprint numbers the Wiki reads.
 pub fn export_json() -> Value {
     let Value::Object(mut m) = balance_json() else {
         unreachable!("balance_json is an object");

@@ -30,8 +30,8 @@ branches from `origin/dev` instead (ADR 0010).
 - Read the ticket, its epic, `CONTEXT.md` and the ADRs it touches.
 - A missing **rule** (what happens) is not yours to invent: comment the question on the ticket,
   swap `in progress` for `needs Daniel`, and pick the next ticket.
-- A missing **number** is yours: pick a sensible value in the balance file
-  (`crates/csp-shared/src/balance.rs`, one commented constant each; then `pnpm balance:rust`) and
+- A missing **number** is yours: pick a sensible value in its domain's file
+  (in `crates/csp-shared/src/balance/`, one commented constant each; then `pnpm balance:rust`) and
   list it in the PR.
 - New simulation rules come with invariants and tests (ADR 0004); a change to world state shape
   bumps `WORLD_FORMAT_VERSION` with a migration in `crates/csp-server/src/world_format.rs` and a

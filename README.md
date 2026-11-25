@@ -11,7 +11,7 @@ The server is Rust (ADR 0030), the client TypeScript. One cargo workspace at the
 
 | Path                    | What it is                                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------------ |
-| `crates/csp-shared`     | World types, balance numbers (`src/balance.rs`), the wire protocol and helpers               |
+| `crates/csp-shared`     | World types, balance numbers (`src/balance/`), the wire protocol and helpers              |
 | `crates/csp-lang`       | The script language: lexer, parser, checker, interpreter with the step budget              |
 | `crates/csp-lang-wasm`  | `csp-lang`'s checker built to WebAssembly for the editor                                   |
 | `crates/csp-sim`        | Everything in a tick: terrain, pathfinding, orders, the world step, NPC cities, invariants |
@@ -94,7 +94,7 @@ pnpm test:year     # the year and season runs (about 50 and 15 min): nightly on 
 pnpm test:ignored  # every test ignored for time but the year runs and measurements, ~7 min: nightly
 pnpm nightly:ignored  # test:ignored, appended to .claude/worktrees/nightly-year-report.md
 pnpm types:rust    # the client's types from the crates (commit packages/shared-types/src/generated)
-pnpm balance:rust  # the client's balance numbers from balance.rs
+pnpm balance:rust  # the client's balance numbers from csp-shared/src/balance
 pnpm build         # type-check and bundle the client
 pnpm start         # run the server in release
 pnpm test          # Vitest, the client's full suite

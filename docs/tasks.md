@@ -314,8 +314,8 @@ its tickets or closes.
 - **Release:** when Daniel asks, one PR `dev` → `main` lists the epics and bugs it ships, runs CI
   and is merged once green. Only merges into `main` deploy.
 - **Rules vs numbers:** a missing game rule becomes a `needs Daniel` question and lands in
-  `CONTEXT.md`. Balance numbers are picked in `crates/csp-shared/src/balance.rs` and listed in
-  the PR for review.
+  `CONTEXT.md`. Balance numbers are picked in `crates/csp-shared/src/balance/` (one file per
+  domain) and listed in the PR for review.
 - **Scope-only epics:** an epic without tickets lists its open rule questions. When the epic
   before it is nearly done, settle those questions with Daniel, then write its tickets.
 - **Every ticket:** use the terms in `CONTEXT.md`; keep scripting cheap (ADR 0002); new
