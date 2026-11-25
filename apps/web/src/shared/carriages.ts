@@ -6,7 +6,7 @@ import { storageAt } from './goods.js'
 import { GOOD_WEIGHT } from './narrowed.js'
 import { canWork, isArmed, stockWeight } from './stats.js'
 import { wrapDistance } from './terrain.js'
-import { isDown, type Punishment, type SupplyWagon, type WorldState } from './world.js'
+import { isDown } from './world.js'
 import {
   CARAVAN_ESCORTS,
   CARAVAN_ESCORTS_MAX,
@@ -39,6 +39,9 @@ import type {
   Resident,
   Stock,
   Trader,
+  Punishment,
+  SupplyWagon,
+  WorldState,
 } from '@csp/shared-types'
 
 /** World queries about carriages (ADR 0002: the game API orders and scripts share). */

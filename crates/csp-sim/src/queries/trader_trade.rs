@@ -3,7 +3,8 @@
 
 use csp_shared::balance::{TRADER_FLOOR_SHARE, WAREHOUSE_FLOOR};
 use csp_shared::protocol::{ShownTraderPrice, StandingTrader};
-use csp_shared::world::{Carriage, Good, Stock, Trader, WorldState};
+use csp_shared::world::{Carriage, Good, PricedGood, Stock, Trader, WorldState};
+use ts_rs::TS;
 
 use super::carriages::caravan_food_for;
 use super::names::{good_name, held, PRICED_GOODS};
@@ -74,8 +75,9 @@ pub fn trader_price_for(good: Good, stock: f64) -> Price {
 }
 
 /// One line of what a wandering trader names (`TraderPrice`).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, TS)]
 pub struct TraderPrice {
+    #[ts(as = "PricedGood")]
     pub good: Good,
     pub stock: f64,
     pub buy: f64,

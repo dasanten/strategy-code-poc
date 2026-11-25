@@ -1,14 +1,13 @@
 // Ported from packages/shared/src/names.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { type Realm } from './world.js'
 import {
   CITY_NAME_MAX_LENGTH,
   HORSE_NAME_MAX_LENGTH,
   REALM_NAME_MAX_LENGTH,
   RESIDENT_NAME_MAX_LENGTH,
 } from '@csp/balance'
-import type { City, Horse, Resident } from '@csp/shared-types'
+import type { City, Horse, Resident, Realm } from '@csp/shared-types'
 
 /**
  * What is wrong with a name a Player gives, if anything: it must be text, and trimmed not empty

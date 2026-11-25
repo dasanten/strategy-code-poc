@@ -5,9 +5,8 @@ import { townHallOf } from './city.js'
 import { middleOf, type Placed } from './footprint.js'
 import { isArmed } from './stats.js'
 import { wrapDelta } from './terrain.js'
-import { type WorldState } from './world.js'
 import { TRADE_ORG_ARMY, TRADE_ORG_HQ } from '@csp/balance'
-import type { City, Resident } from '@csp/shared-types'
+import type { City, Resident, WorldState } from '@csp/shared-types'
 
 /**
  * World queries about the Trade Organization as a side (ADR 0002: the game API orders and scripts

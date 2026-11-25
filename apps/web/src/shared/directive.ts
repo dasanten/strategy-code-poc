@@ -2,8 +2,14 @@
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
 import { isArmed } from './stats.js'
-import { type Directive, type WorldState } from './world.js'
-import type { DirectiveGoal, DirectiveGoalView, DirectiveView, Resident } from '@csp/shared-types'
+import type {
+  DirectiveGoal,
+  DirectiveGoalView,
+  DirectiveView,
+  Resident,
+  Directive,
+  WorldState,
+} from '@csp/shared-types'
 
 /**
  * World queries about admin directives (`CONTEXT.md`: Admin directive), for the game API (ADR

@@ -21,7 +21,6 @@ import {
   tradeCoinWarehouse,
   tradingWarehouseAt,
 } from './warehouse.js'
-import { type WorldState } from './world.js'
 import type {
   Building,
   City,
@@ -32,6 +31,7 @@ import type {
   SwapRate,
   TradeHolder,
   TradeLimit,
+  WorldState,
 } from '@csp/shared-types'
 
 /** A swap that moves nothing, and says why when `limit` is given. */

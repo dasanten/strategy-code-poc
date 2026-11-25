@@ -10,7 +10,7 @@ import { freeStock } from './offers.js'
 import { tradeOrgRefuses } from './standing.js'
 import { canWork, stockWeight } from './stats.js'
 import { NO_CARAVANS, tradeOrgHq } from './trade-org.js'
-import { GOODS, type WorldState } from './world.js'
+import { GOODS } from './world.js'
 import {
   BUY_SHARE,
   DELIVERY_FEE_BASE,
@@ -37,6 +37,7 @@ import type {
   TradeQuote,
   TradeSide,
   WarehousePrice,
+  WorldState,
 } from '@csp/shared-types'
 
 /**

@@ -106,7 +106,10 @@ export const STONE_BUILD_MATERIALS = B.STONE_BUILD_MATERIALS as unknown as Recor
 >
 
 /** Work a stone wall or gate takes instead of `BUILD_WORK`. */
-export const STONE_BUILD_WORK = B.STONE_BUILD_WORK as unknown as Record<'wall' | 'gate' | 'tower', number>
+export const STONE_BUILD_WORK = B.STONE_BUILD_WORK as unknown as Record<
+  'wall' | 'gate' | 'tower',
+  number
+>
 
 /**
  * What a warehouse sells a unit of each good for, in coins, when it holds `PRICE_REFERENCE_FLOORS`
