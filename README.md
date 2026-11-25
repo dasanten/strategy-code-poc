@@ -11,7 +11,7 @@ The server is Rust (ADR 0030), the client TypeScript. One cargo workspace at the
 
 | Path                    | What it is                                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------------ |
-| `crates/csp-shared`     | World types, balance numbers (`src/balance.rs`), the wire protocol and helpers             |
+| `crates/csp-shared`     | World types, balance numbers (`src/balance.rs`), the wire protocol and helpers               |
 | `crates/csp-lang`       | The script language: lexer, parser, checker, interpreter with the step budget              |
 | `crates/csp-lang-wasm`  | `csp-lang`'s checker built to WebAssembly for the editor                                   |
 | `crates/csp-sim`        | Everything in a tick: terrain, pathfinding, orders, the world step, NPC cities, invariants |
