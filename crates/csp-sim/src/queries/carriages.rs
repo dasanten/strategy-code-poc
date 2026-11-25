@@ -5,9 +5,10 @@ use csp_shared::balance::{
     CARAVAN_ESCORTS, CARAVAN_FOOD, CARAVAN_FOOD_PER_ESCORT, CARRIAGE_HALF_LOAD, CARRIAGE_LIGHT_LOAD,
 };
 use csp_shared::protocol::LoadLevel;
-use csp_shared::world::{Carriage, Horse, Resident, ResidentOrder, Stock, WorldState};
+use csp_shared::world::{Carriage, Horse, Resident, Stock, WorldState};
 
 use super::residents::{carriage_capacity_with, is_down, stock_weight};
+use crate::running::driven_carriage;
 
 /// Everyone on a caravan or trader, by id (`crewIdsOf`): its driver, if any, and its escort.
 pub fn crew_ids_of(driver_id: Option<&str>, escort_ids: &[String]) -> Vec<String> {
@@ -55,11 +56,7 @@ pub fn horse_for<'w>(world: &'w WorldState, carriage: &Carriage) -> Option<&'w H
 
 /// The carriage a resident drives, by a drive order or on a haul route (`drivenCarriageId`).
 pub fn driven_carriage_id(r: &Resident) -> Option<&str> {
-    match &r.order {
-        Some(ResidentOrder::Drive(o)) => Some(&o.carriage_id),
-        Some(ResidentOrder::Haul(o)) => Some(&o.carriage_id),
-        _ => None,
-    }
+    driven_carriage(r.order.as_ref()?)
 }
 
 /// The resident driving a carriage, if anyone is (`driverOf`).

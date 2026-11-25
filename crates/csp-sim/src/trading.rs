@@ -39,6 +39,7 @@ use crate::queries::warehouse_trade::{
     delivery_storage, hands_of, load_of, owed_by, quote_delivery, quote_pick_up, quote_trade,
     trade_problem, trading_warehouse_at, TradeHolder,
 };
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::script_actions::{arg, arg_as, place, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
@@ -96,6 +97,11 @@ pub fn apply_trade(
 }
 
 pub(crate) static TRADE_META: OrderMeta = OrderMeta::not_requested("trade").npc_city();
+
+impl RunningOrder for TradeOrder {
+    in_place!();
+    no_ties!();
+}
 
 pub(crate) static SELL_META: OrderMeta = OrderMeta::fns(
     "sell",
@@ -183,6 +189,11 @@ const SWAP_ACTION: ScriptAction = ScriptAction {
     returns: ScriptType::String,
 };
 
+impl RunningOrder for SwapOrder {
+    in_place!();
+    no_ties!();
+}
+
 /// Checks a buy horse order (`buyHorse.validate`).
 pub fn validate_buy_horse(
     world: &WorldState,
@@ -256,6 +267,11 @@ const SELL_HORSE_ACTION: ScriptAction = ScriptAction {
     description: "At an NPC city’s finished stable, sell it a horse of my realm standing in it, by it or its id; the coins go into my hands, and it doesn’t go if I can’t carry them. The horse joins the city where it stands. `city.horsesToSell` lists my horses there with what it pays and why it won’t buy one.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for HorseTradeOrder {
+    in_place!();
+    no_ties!();
+}
 
 fn horse_order(world: &mut WorldState, order: &OrderRequest, buy: bool) {
     let o = &order.fields;

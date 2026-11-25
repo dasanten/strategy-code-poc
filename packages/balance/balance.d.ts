@@ -480,13 +480,13 @@ export interface Balance {
     ironOre: number
     iron: number
     goldOre: number
-    coal: number
-    steel: number
     coins: number
     spear: number
     sword: number
     shield: number
     armour: number
+    coal: number
+    steel: number
     steelSword: number
     steelShield: number
     steelArmour: number
@@ -505,12 +505,12 @@ export interface Balance {
     ironOre: number
     iron: number
     goldOre: number
-    coal: number
-    steel: number
     spear: number
     sword: number
     shield: number
     armour: number
+    coal: number
+    steel: number
     steelSword: number
     steelShield: number
     steelArmour: number
@@ -616,10 +616,10 @@ export interface Balance {
   readonly WEAR_BLOWS: {
     spear: number
     sword: number
-    steelSword: number
     shield: number
-    steelShield: number
     armour: number
+    steelSword: number
+    steelShield: number
     steelArmour: number
     [key: string]: number
   }

@@ -14,6 +14,7 @@ use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::names::{good_name, good_of, held};
+use crate::running::{in_place, no_ties_mut, RunningOrder, Ties};
 use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 
@@ -100,6 +101,14 @@ const EQUIP_ACTION: ScriptAction = ScriptAction {
     description: "Swap a weapon, shield or armour I carry, like \"sword\", into the slot it fits; what was there stays carried. It takes a few ticks, and I strike no blows meanwhile.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for EquipOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { kept_when_struck: true, ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
 
 /// The take-off order (`takeOff`): a resident of the Player's realm empties `slot`; its item
 /// stays carried.

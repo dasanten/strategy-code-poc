@@ -28,6 +28,7 @@ use crate::queries::standing::organization_label;
 use crate::queries::standing::{standing_organization, TRADE_ORG};
 use crate::queries::warehouse_trade::{buy_off_coin_warehouse_at, buy_off_problem, js_number};
 use crate::random::new_id;
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::script_actions::{arg, arg_as, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
@@ -369,6 +370,11 @@ const BUY_OFF_ACTION: ScriptAction = ScriptAction {
     description: "On a Trade Org warehouse, pay the price of an admin directive against my realm with the coins in my hands, or on my carriage there, to end it.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for BuyOffOrder {
+    in_place!();
+    no_ties!();
+}
 
 /// One buy-off of a tick (`BuyOffRecord`): the coins of payer and coin warehouse before and
 /// after, and the directive.

@@ -23,6 +23,7 @@ use crate::orders::text_field;
 use crate::queries::alliance::commander_of;
 use crate::queries::army::{army_of, ARMY_NAME_MAX_LENGTH};
 use crate::queries::combat::in_contact;
+use crate::running::RunningOrder;
 use crate::sight::InvariantViolation;
 
 /// The fields an army order may carry (`OrderRequest` as the army kinds read it).
@@ -100,20 +101,12 @@ fn bad_tile(order: &ArmyRequest) -> Option<String> {
 
 /// Whether the order is one the army `army_id` gave (`forArmy`).
 fn for_army(o: Option<&ResidentOrder>, army_id: &str) -> bool {
-    match o {
-        Some(ResidentOrder::WalkTo(w)) => w.army.as_deref() == Some(army_id),
-        Some(ResidentOrder::Attack(a)) => a.army.as_deref() == Some(army_id),
-        _ => false,
-    }
+    tagged(o) == Some(army_id)
 }
 
-/// The army an order is tagged with, for a walk or attack order.
+/// The army an order is tagged with.
 fn tagged(o: Option<&ResidentOrder>) -> Option<&str> {
-    match o {
-        Some(ResidentOrder::WalkTo(w)) => w.army.as_deref(),
-        Some(ResidentOrder::Attack(a)) => a.army.as_deref(),
-        _ => None,
-    }
+    o?.ties().army
 }
 
 /// Ends the army's own orders for its members (`stopMembers`).
@@ -410,14 +403,9 @@ pub fn step_armies(world: &mut WorldState, size: i32) {
         .collect();
     for r in &mut world.residents {
         let mine = army_id_of.get(&r.id);
-        match &mut r.order {
-            Some(ResidentOrder::WalkTo(o)) if o.army.is_some() && mine != o.army.as_ref() => {
-                o.army = None
-            }
-            Some(ResidentOrder::Attack(o)) if o.army.is_some() && mine != o.army.as_ref() => {
-                o.army = None
-            }
-            _ => {}
+        let army = r.order.as_mut().and_then(|o| o.ties_mut().army);
+        if let Some(army) = army.filter(|a| a.is_some() && mine != a.as_ref()) {
+            *army = None;
         }
     }
     let unsupplied: Vec<usize> = (0..world.residents.len())
@@ -438,11 +426,7 @@ pub fn step_armies(world: &mut WorldState, size: i32) {
 /// The army a resident's carriage supplies, following it or on a haul route to it
 /// (`suppliedArmy`).
 fn supplied_army(r: &Resident) -> Option<&str> {
-    match &r.order {
-        Some(ResidentOrder::Drive(o)) => o.army.as_deref(),
-        Some(ResidentOrder::Haul(o)) => o.to_army.as_deref(),
-        _ => None,
-    }
+    r.order.as_ref()?.ties().supplies
 }
 
 /// Whether the army a resident supplies exists and is their commander's, or is the punishment
@@ -575,12 +559,9 @@ pub fn waiting_for_army(world: &WorldState, holding: &HashSet<String>) -> HashSe
     type Group<'w> = (&'w str, Vec<(&'w str, Option<usize>)>);
     let mut groups: Vec<Group> = Vec::new();
     for r in &world.residents {
-        let (army, left) = match &r.order {
-            Some(ResidentOrder::WalkTo(o)) => (o.army.as_deref(), o.path.as_ref().map(Vec::len)),
-            Some(ResidentOrder::Attack(o)) => (o.army.as_deref(), o.path.as_ref().map(Vec::len)),
-            _ => continue,
-        };
-        let Some(army) = army else { continue };
+        let Some(o) = &r.order else { continue };
+        let Some(army) = o.ties().army else { continue };
+        let left = o.going().and_then(|g| g.path.as_ref()).map(Vec::len);
         if holding.contains(&r.id) {
             continue;
         }

@@ -9,6 +9,7 @@ use crate::defence::Alarms;
 use crate::order_meta::OrderMeta;
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::orders::{str_field, OrderKind};
+use crate::running::{in_place, no_ties_mut, RunningOrder, Ties};
 use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::walls::{climb_landing, foreign_wall};
@@ -99,6 +100,14 @@ const CLIMB_ACTION: ScriptAction = ScriptAction {
     description: "Climb over the wall or gate of another realm next to me.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for ClimbOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { strikes: Some(&self.wall_id), kept_when_struck: true, ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
 
 /// Requests this tick's climbing (`requestClimbing`).
 pub fn request_climbing(world: &WorldState) -> Vec<ClimbAction> {

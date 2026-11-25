@@ -15,6 +15,7 @@ use crate::queries::command::commands;
 use crate::queries::goods::take_out;
 use crate::queries::names::{held, placed};
 use crate::queries::trade_quotes::{buy_problem, buyers_at_town_hall, coins_at_town_hall};
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
@@ -62,6 +63,11 @@ const BUY_CITY_ACTION: ScriptAction = ScriptAction {
         "On an NPC city’s town hall, buy it with the coins my realm’s residents there carry.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for BuyCityOrder {
+    in_place!();
+    no_ties!();
+}
 
 /// Carries out buy orders (`resolvePurchases`). Where the city still sells to the realm, the buyer
 /// still stands on its town hall and the realm's residents there carry its price, the coins are

@@ -47,6 +47,9 @@ use crate::queries::walls::{
     wall_strength, wall_strength_left,
 };
 use crate::random::{hash_str, Mulberry32};
+use crate::running::{
+    same_when_equal, Arrival, By, Going, GoingMut, RunningOrder, Ties, TiesMut, To,
+};
 use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::survival::{die_all, drop_goods};
@@ -230,13 +233,9 @@ fn is_aggression(world: &WorldState, a: &Resident, t: &Resident, size: i32) -> b
             .find(|x| x.id == building_id)
             .is_some_and(|b| sides.contains(&building_organization(world, b)))
     };
-    let o = match o {
-        Some(ResidentOrder::Climb(c)) => return !ours(&c.wall_id),
-        Some(ResidentOrder::Attack(o)) if o.defending != Some(true) => o,
-        _ => return true,
-    };
-    match world.residents.iter().find(|x| x.id == o.target_id) {
-        None => !ours(&o.target_id),
+    let Some(target) = o.and_then(|o| o.ties().strikes) else { return true };
+    match world.residents.iter().find(|x| x.id == target) {
+        None => !ours(target),
         Some(their_target) => !sides.contains(&organization_of(their_target).map(str::to_string)),
     }
 }
@@ -426,6 +425,44 @@ const SHOOT_ACTION: ScriptAction = ScriptAction {
     description: "Shoot a resident I see who is in my `reach` now, with my Bow or Crossbow and an Arrow a shot, without a step. The order goes on as an attack: should they get out of reach I go after them, so `stop()` to stay where I am.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for AttackOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: true,
+            by: By::Foot,
+            to: To::Foe(&self.target_id),
+            near: true,
+            after: None,
+            estimated: false,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        GoingMut::new(&mut self.path, &mut self.progress).reset();
+        Arrival::GoesOn
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        GoingMut::new(&mut self.path, &mut self.progress).reset_found();
+        true
+    }
+    same_when_equal!();
+    fn ties(&self) -> Ties<'_> {
+        Ties {
+            army: self.army.as_deref(),
+            strikes: (self.defending != Some(true)).then_some(self.target_id.as_str()),
+            falls_with: Some(&self.target_id),
+            ..Ties::NONE
+        }
+    }
+    fn ties_mut(&mut self) -> TiesMut<'_> {
+        TiesMut { army: Some(&mut self.army), ..TiesMut::none() }
+    }
+}
 
 /// Requests this tick's blows from residents' attack orders (`requestStrikes`), on a map of
 /// `size` tiles. An order whose target is gone or out of the attacker's sight ends. An attacker in
@@ -815,7 +852,7 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
     let t = &world.residents[ti];
     // A climber climbs on, and someone swapping gear finishes the swap first (`CONTEXT.md`:
     // Equipment): they strike no blows meanwhile.
-    if matches!(t.order, Some(ResidentOrder::Climb(_) | ResidentOrder::Equip(_))) {
+    if t.order.as_ref().is_some_and(|o| o.ties().kept_when_struck) {
         return;
     }
     if defends_by_script(world, t) {

@@ -12,8 +12,7 @@ use csp_shared::terrain::{
     is_passable_terrain, is_sea, is_water, terrain_at, wrap, wrap_distance, TerrainMap,
 };
 use csp_shared::world::{
-    Building, BuildingKind, Good, HaulPhase, Resident, ResidentOrder, Vessel, VesselKind,
-    WorldState,
+    Building, BuildingKind, Good, Resident, ResidentOrder, Vessel, VesselKind, WorldState,
 };
 
 use super::building::building_at;
@@ -23,6 +22,7 @@ use super::driving::carriage_of_resident;
 use super::guard::guarded_by;
 use super::names::placed;
 use super::residents::{can_work, good_weight, stock_weight};
+use crate::running::{moving, By, RunningOrder};
 use crate::walls::is_wall_or_gate;
 
 /// The eight tiles around one, the four straight ones first, so the nearest come first.
@@ -132,10 +132,9 @@ pub fn being_rowed(world: &WorldState, v: &Vessel) -> bool {
 /// The vessel a resident rows this moment, if any: by a row order, or on a haul route by water
 /// on its way to a stop (`CONTEXT.md`: Rowing, Haul route by water).
 pub fn rowing_now(r: &Resident) -> Option<&str> {
-    match &r.order {
-        Some(ResidentOrder::Row(o)) => Some(&o.vessel_id),
-        Some(ResidentOrder::HaulByWater(o)) if o.phase == HaulPhase::Driving => Some(&o.vessel_id),
-        _ => None,
+    match moving(r.order.as_ref())?.by {
+        By::Oars(id) => Some(id),
+        By::Sails(_) | By::Foot | By::Carriage { .. } | By::Machine(_) => None,
     }
 }
 
@@ -143,10 +142,9 @@ pub fn rowing_now(r: &Resident) -> Option<&str> {
 /// route by water whatever its phase, as a haul route's driver drives its carriage at a stop too
 /// (`CONTEXT.md`: Rowing, Sailing, Haul route by water).
 pub fn rowed_vessel_id(r: &Resident) -> Option<&str> {
-    match &r.order {
-        Some(ResidentOrder::Row(o) | ResidentOrder::Sail(o)) => Some(&o.vessel_id),
-        Some(ResidentOrder::HaulByWater(o)) => Some(&o.vessel_id),
-        _ => None,
+    match r.order.as_ref()?.going()?.by {
+        By::Oars(id) | By::Sails(id) => Some(id),
+        By::Foot | By::Carriage { .. } | By::Machine(_) => None,
     }
 }
 

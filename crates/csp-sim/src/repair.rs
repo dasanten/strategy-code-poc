@@ -21,6 +21,7 @@ use crate::queries::building::{build_materials, build_work_of, site_work_of, CAR
 use crate::queries::names::{held, held_in, kind_name, placed};
 use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
+use crate::running::{in_place, no_ties_mut, On, RunningOrder, Ties};
 use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::world_index::{building_index, resident_index};
@@ -436,6 +437,14 @@ const REPAIR_ACTION: ScriptAction = ScriptAction {
     description: "Repair the worn building on my tile: what I carry of the materials it lacks goes in, then my work; once it has all of both it is good again. My order is \"repair\" until done.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for RepairOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { on: On::Repairs(&self.building_id), ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
 
 #[cfg(test)]
 #[path = "repair/tests.rs"]

@@ -14,6 +14,7 @@ use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, realm_of, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::vessels::{crew_short, sail_target, steals_vessel, vessel_by_id};
+use crate::running::{no_ties, same_when_equal, Arrival, By, Going, GoingMut, RunningOrder, To};
 use crate::script_actions::{arg, place, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::stealing::{take_over, Taken};
@@ -140,3 +141,30 @@ const SAIL_ACTION: ScriptAction = ScriptAction {
     description: "Sail a ship, by it or its id, to the Sea tile x, y, or to the haven on x, y, docking on the free Sea tile beside it nearest the ship. I must be aboard it as one of its crew, with at least the fewest crew it sails with aboard. A Step at a time over Sea only, never onto a Lake; the crew's Seafaring sets the pace, and sailing teaches it to all of them. My order is \"sail\" until it gets there.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder<Sail> for RowOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: true,
+            by: By::Sails(&self.vessel_id),
+            to: To::tile(&self.target),
+            near: false,
+            after: None,
+            estimated: false,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        Arrival::Done
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        // The path found before the interruption is kept (#1619).
+        true
+    }
+    same_when_equal!();
+    no_ties!();
+}

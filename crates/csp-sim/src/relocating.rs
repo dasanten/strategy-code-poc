@@ -16,6 +16,7 @@ use crate::orders::{ids_field, text_field};
 use crate::queries::city::town_hall_of;
 use crate::queries::city_area::{city_area_tiles, free_housing, in_city_area};
 use crate::queries::people::relocate_problem;
+use crate::running::{no_ties, same_when_equal, Arrival, By, Going, GoingMut, RunningOrder, To};
 use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 
@@ -124,6 +125,34 @@ const RELOCATE_ACTION: ScriptAction = ScriptAction {
     description: "Walk to `cityId`, another city of my realm, and become its resident on stepping into its area, at once if I stand in it already: refused unless it has free housing for me, counting residents already relocating there, or while I carry a child. My order is \"relocate\" until done; then `me.orderEnded` says how it ended: reason null once I moved in, else why not (\"no free housing\", \"it is no longer your realm’s\" or \"the city is gone\"), and I keep my old city.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for RelocateOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: true,
+            by: By::Foot,
+            to: To::tile(&self.target),
+            near: false,
+            after: None,
+            estimated: true,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        GoingMut::new(&mut self.path, &mut self.progress).reset();
+        Arrival::GoesOn
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        GoingMut::new(&mut self.path, &mut self.progress).reset_found();
+        true
+    }
+    same_when_equal!();
+    no_ties!();
+}
 
 /// The tile of a city's area nearest to `from` that a resident can stand on (`nearestAreaTile`):
 /// passable land, as far as `terrain` tells, with no wall or gate. None when its area has none.

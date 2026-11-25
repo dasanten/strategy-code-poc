@@ -3,9 +3,10 @@
 
 use csp_shared::balance::HAUL_HORSE_FOOD;
 use csp_shared::terrain::wrap_distance;
-use csp_shared::world::{Army, Carriage, Good, HaulStop, Resident, ResidentOrder, WorldState};
+use csp_shared::world::{Army, Carriage, Good, Resident, ResidentOrder, WorldState};
 
 use super::names::held;
+use crate::running::{By, RunningOrder};
 
 /// The longest an army's name may be (`ARMY_NAME_MAX_LENGTH`).
 pub const ARMY_NAME_MAX_LENGTH: usize = 30;
@@ -18,11 +19,7 @@ pub fn army_of<'w>(world: &'w WorldState, resident_id: &str) -> Option<&'w Army>
 /// The army a driver's carriage goes after now (`armyDrivenTo`): the one a drive order follows,
 /// or the one a haul route has as its second stop while bound there or standing with it.
 pub fn army_driven_to(driver: &Resident) -> Option<&str> {
-    match &driver.order {
-        Some(ResidentOrder::Drive(o)) => o.army.as_deref(),
-        Some(ResidentOrder::Haul(o)) if o.stop == HaulStop::To => o.to_army.as_deref(),
-        _ => None,
-    }
+    driver.order.as_ref()?.going()?.after
 }
 
 /// Where an army is for a carriage at `from` that goes after it (`armySpot`): the tile of its
@@ -75,11 +72,10 @@ pub fn spare_food(world: &WorldState, carriage: &Carriage) -> f64 {
 /// route), and the Food on it they may take as its driver (`driversFood`): all of it, except the
 /// horse's share of what a haul route keeps on board (`HAUL_HORSE_FOOD`, at most its `keepFood`).
 pub fn drivers_food(world: &WorldState, driver: &Resident) -> Option<(usize, f64)> {
-    let (carriage_id, keep) = match &driver.order {
-        Some(ResidentOrder::Drive(o)) => (&o.carriage_id, 0.0),
-        Some(ResidentOrder::Haul(o)) => (&o.carriage_id, o.keep_food.min(HAUL_HORSE_FOOD)),
-        _ => return None,
+    let (carriage_id, keep) = match driver.order.as_ref()?.going()?.by {
+        By::Carriage { id, keeps_food } => (id, keeps_food.min(HAUL_HORSE_FOOD)),
+        By::Foot | By::Oars(_) | By::Sails(_) | By::Machine(_) => return None,
     };
-    let i = world.carriages.iter().position(|k| &k.id == carriage_id)?;
+    let i = world.carriages.iter().position(|k| k.id == carriage_id)?;
     Some((i, (held(&world.carriages[i].load, Good::Food) - keep).max(0.0)))
 }

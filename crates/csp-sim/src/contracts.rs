@@ -34,6 +34,7 @@ use crate::queries::standing::organization_label;
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::trade_org::{contract_side, trade_org_hq};
 use crate::random::new_id;
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
@@ -505,6 +506,11 @@ const PAY_ACTION: ScriptAction = ScriptAction {
     description: "On a mercenary contract’s storage, put in the coins for some weeks of it.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for PayOrder {
+    in_place!();
+    no_ties!();
+}
 
 /// Puts the coins for `weeks` game weeks into the contract's storage and counts them as paid
 /// (`payInto`); each week raises standing both ways between its sides.

@@ -25,6 +25,7 @@ use crate::queries::standing::{standing_organization, TRADE_ORG};
 use crate::queries::trade_org::trade_org_hq;
 use crate::queries::warehouse_trade::js_number;
 use crate::queries::warehouse_trade::{buy_off_coin_warehouse_at, debt_of, pay_debt_problem};
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::script_actions::{arg, arg_as, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::standing::organization_exists;
@@ -230,6 +231,11 @@ const PAY_DEBT_ACTION: ScriptAction = ScriptAction {
     description: "On a Trade Org warehouse, pay up to `coins` of my realm’s debt to the Trade Organization with the coins in my hands, or on my carriage there: what I hold, up to what is owed.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for PayDebtOrder {
+    in_place!();
+    no_ties!();
+}
 
 /// One payment this tick: the coins of payer and coin warehouse and the debt, before and after
 /// (`DebtPayment`).

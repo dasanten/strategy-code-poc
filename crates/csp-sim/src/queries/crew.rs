@@ -5,9 +5,10 @@ use std::collections::HashMap;
 
 use csp_shared::footprint::{covers, footprint_tiles};
 use csp_shared::terrain::wrap_distance;
-use csp_shared::world::{Building, Resident, ResidentOrder, WorldState};
+use csp_shared::world::{Building, Resident, WorldState};
 
 use super::names::placed;
+use crate::running::RunningOrder;
 
 /// Where a resident stands at a building they are sent to work, build or breed at (`crewTile`,
 /// `CONTEXT.md`: Spreading over the footprint): the footprint tile with the fewest of the crew on
@@ -65,12 +66,7 @@ fn stands_at(r: &Resident, building: &Building, size: i32) -> Option<(i32, i32)>
             }
         }
     }
-    let there = match &r.order {
-        Some(ResidentOrder::WorkAt(o)) => o.building_id == building.id,
-        Some(ResidentOrder::Build(o)) => o.site_id.as_deref() == Some(building.id.as_str()),
-        Some(ResidentOrder::Breed(o)) => o.stable_id == building.id,
-        _ => false,
-    };
+    let there = r.order.as_ref().is_some_and(|o| o.ties().crew_of == Some(building.id.as_str()));
     let (x, y) = (r.x as i32, r.y as i32);
     (there && covers(placed(building), x, y, size)).then_some((x, y))
 }
