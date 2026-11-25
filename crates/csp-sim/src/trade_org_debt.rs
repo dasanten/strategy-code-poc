@@ -17,6 +17,7 @@ use crate::demands::{
 use crate::events::record_event;
 use crate::invariants::InvariantViolation;
 use crate::offers::end_offer;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{commands, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::alliance::commander_of;
@@ -215,6 +216,9 @@ impl OrderKind for PayDebt {
         }));
     }
 }
+
+pub(crate) static PAY_DEBT_META: OrderMeta =
+    OrderMeta::request("payDebt", &PayDebt).gets_off_first();
 
 /// One payment this tick: the coins of payer and coin warehouse and the debt, before and after
 /// (`DebtPayment`).

@@ -9,6 +9,7 @@ use csp_shared::world::{
 use serde_json::Value;
 
 use crate::goods_deps::{join_realm, realm_of, record_event, OrderSender};
+use crate::order_meta::OrderMeta;
 use crate::queries::city::{city_price, for_sale, sells_to, town_hall_of};
 use crate::queries::command::commands;
 use crate::queries::goods::take_out;
@@ -41,6 +42,13 @@ pub fn apply_buy_city(world: &mut WorldState, _sender: &OrderSender, order: &Ord
         r.order = Some(ResidentOrder::BuyCity(BuyCityOrder { city_id }));
     }
 }
+
+pub(crate) static BUY_CITY_META: OrderMeta = OrderMeta::fns(
+    "buyCity",
+    |w, s, o, _| validate_buy_city(w, s, o),
+    |w, s, o, _| apply_buy_city(w, s, o),
+)
+.gets_off_first();
 
 /// Carries out buy orders (`resolvePurchases`). Where the city still sells to the realm, the buyer
 /// still stands on its town hall and the realm's residents there carry its price, the coins are

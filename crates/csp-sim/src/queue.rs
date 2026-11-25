@@ -4,6 +4,7 @@
 //! know.
 
 use crate::conditions::condition_of;
+use crate::order_meta::{meta_of, OrderMeta};
 use csp_lang::js::{json_string, number_to_string, utf16_len};
 use csp_shared::balance::{
     QUEUE_MAX_DEPTH, QUEUE_MAX_REPEAT, QUEUE_MAX_STEPS, QUEUE_STEP_MAX_CHARS,
@@ -14,42 +15,16 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ts_rs::TS;
 
-/// The order kinds a queue step can be (`QUEUE_STEP_KINDS`): the one-off actions and tasks the
-/// UI gives a resident, and running one of the Player's scripts. Never a queue.
-pub const QUEUE_STEP_KINDS: [&str; 28] = [
-    "walkTo",
-    "drive",
-    "row",
-    "sail",
-    "unhitch",
-    "hitch",
-    "board",
-    "getOff",
-    "pickUp",
-    "drop",
-    "store",
-    "fetch",
-    "build",
-    "tearDown",
-    "workAt",
-    "teach",
-    "haul",
-    "roadLine",
-    "wallLine",
-    "mount",
-    "dismount",
-    "relocate",
-    "feed",
-    "equip",
-    "takeOff",
-    "task",
-    "runScript",
-    "waitUntil",
-];
+/// Whether a queue step can be of this kind (`CONTEXT.md`: Queue).
+pub fn can_be_queue_step(kind: &str) -> bool {
+    meta_of(kind).is_some_and(|m| m.queue_step)
+}
 
 /// The step kind of a Wait until (`CONTEXT.md`: Wait until): the queue runner keeps it, no order
 /// kind does. Its order carries only its `condition`.
 pub const WAIT_UNTIL: &str = "waitUntil";
+
+pub(crate) static WAIT_UNTIL_META: OrderMeta = OrderMeta::not_requested(WAIT_UNTIL).queue_step();
 
 /// Steps that run a script (a task's default or the Player's own) rather than a built-in order
 /// (`runsScript`).
@@ -65,7 +40,7 @@ pub(crate) fn field_str<'a>(order: &'a OrderRequest, name: &str) -> Option<&'a s
 /// A step that never ends on its own (`neverEnds`): working a workplace, a haul route, feeding a
 /// stable (but not once: [`feeds_once`]), teaching or training.
 pub fn never_ends(order: &OrderRequest) -> bool {
-    if ["workAt", "haul", "teach"].contains(&order.kind.as_str()) {
+    if meta_of(&order.kind).is_some_and(|m| m.never_ends) {
         return true;
     }
     !feeds_once(order)
@@ -372,7 +347,7 @@ fn walk_if<'a>(
 /// block): steps and repeat blocks, at most `QUEUE_MAX_STEPS` of them as written, blocks nested at
 /// most `QUEUE_MAX_DEPTH` deep, each repeating a whole number of times up to `QUEUE_MAX_REPEAT`,
 /// forever or until a condition holds, never empty. Each step must be an order a step can be
-/// (`QUEUE_STEP_KINDS`), with a duration in whole game minutes if any; one that never ends needs
+/// (`can_be_queue_step`), with a duration in whole game minutes if any; one that never ends needs
 /// a duration unless it is the last step and no block around it repeats it. A Build line step
 /// carries its whole line (`step_line`) and ends on its own once the line is built or laid out.
 /// Steps are numbered top to bottom. Takes the items as the request sent them, any JSON.
@@ -399,8 +374,7 @@ pub fn queue_steps_problem(items: Option<&Value>) -> Option<String> {
             return Some(format!("step {n} must be an order"));
         };
         let kind = fields.get("kind");
-        let Some(kind_str) = kind.and_then(Value::as_str).filter(|k| QUEUE_STEP_KINDS.contains(k))
-        else {
+        let Some(kind_str) = kind.and_then(Value::as_str).filter(|k| can_be_queue_step(k)) else {
             return Some(format!("step {n}: {} can't be a queue step", js_string_of(kind)));
         };
         let mut rest = fields.clone();

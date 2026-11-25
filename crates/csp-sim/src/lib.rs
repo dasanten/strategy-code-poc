@@ -99,7 +99,7 @@ pub mod npc_towers;
 pub mod npc_trader;
 pub mod npc_training;
 pub mod offers;
-pub mod order_kinds;
+pub mod order_meta;
 pub mod order_sender;
 pub mod orders;
 pub mod outsiders;

@@ -25,24 +25,7 @@ pub type Jobs = IndexMap<String, CityJob>;
 /// The orders an NPC city gives its residents (`NPC_ORDER_KINDS`): only kinds a Player's order can
 /// give too (ADR 0002), so the city does nothing a Player's residents couldn't.
 pub fn is_npc_order(o: &ResidentOrder) -> bool {
-    matches!(
-        o,
-        ResidentOrder::WalkTo(_)
-            | ResidentOrder::PickUp(_)
-            | ResidentOrder::Drop(_)
-            | ResidentOrder::Store(_)
-            | ResidentOrder::Fetch(_)
-            | ResidentOrder::WorkAt(_)
-            | ResidentOrder::Build(_)
-            | ResidentOrder::TearDown(_)
-            | ResidentOrder::Repair(_)
-            | ResidentOrder::Breed(_)
-            | ResidentOrder::Attack(_)
-            | ResidentOrder::Trade(_)
-            | ResidentOrder::Feed(_)
-            | ResidentOrder::Teach(_)
-            | ResidentOrder::Train(_)
-    )
+    crate::order_meta::running_meta(o).npc_city
 }
 
 /// Whether a resident is run by an NPC city (`runByNpcCity`): they live in one and belong to no

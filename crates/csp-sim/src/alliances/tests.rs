@@ -31,8 +31,8 @@ fn setup() -> WorldState {
 /// Sends an order and applies it as the next tick would; "ok" or the reason.
 fn order(world: &mut WorldState, from: u64, o: Value) -> String {
     let kind = o["kind"].as_str().expect("a kind").to_string();
-    let orders = alliance_orders();
-    let (_, k) = orders.iter().find(|(n, _)| *n == kind).expect("an alliance order");
+    let kinds = crate::orders::order_kinds();
+    let k = kinds.get(&kind).expect("an order kind");
     match send(world, &plains(64), k, from, o) {
         Ok(()) => "ok".into(),
         Err(e) => e,

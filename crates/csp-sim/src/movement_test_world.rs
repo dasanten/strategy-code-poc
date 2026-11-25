@@ -123,24 +123,9 @@ pub fn events_for(world: &WorldState, user_id: u64) -> Vec<&RealmEvent> {
     world.events.iter().filter(|e| e.user_id == user_id).collect()
 }
 
-/// Movement's order kinds by name, the ones in `GETS_OFF_FIRST` getting a passenger off first, as
-/// `orderKinds` registers them (T86.2 keeps the real registry).
-fn order_kind(name: &str) -> Box<dyn crate::orders::OrderKind> {
-    use crate::passengers::GetsOffFirst;
-    match name {
-        "walkTo" => Box::new(GetsOffFirst(crate::walking::WalkTo)),
-        "drive" => Box::new(GetsOffFirst(crate::driving::Drive)),
-        "hitch" => Box::new(GetsOffFirst(crate::driving::Hitch)),
-        "unhitch" => Box::new(GetsOffFirst(crate::driving::Unhitch)),
-        "mount" => Box::new(GetsOffFirst(crate::riding::Mount)),
-        "dismount" => Box::new(crate::riding::Dismount),
-        "climb" => Box::new(GetsOffFirst(crate::climbing::Climb)),
-        "setGate" => Box::new(crate::gates::SetGate),
-        "board" => Box::new(crate::passengers::Board),
-        "getOff" => Box::new(crate::passengers::GetOff),
-        "claimHorses" => Box::new(crate::horse_grant::ClaimHorses),
-        other => panic!("no order kind {other:?} in movement's tests"),
-    }
+/// An order kind by name.
+fn order_kind(name: &str) -> std::sync::Arc<dyn crate::orders::OrderKind> {
+    crate::orders::order_kinds().get(name).expect("an order kind").clone()
 }
 
 /// Sends an order of Player 7's and applies it as the next tick would (`OrderQueue.receive`, then

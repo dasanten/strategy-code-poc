@@ -8,13 +8,15 @@ use csp_shared::balance::{
 use csp_shared::footprint::is_at;
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    BreedOrder, Building, Horse, HorseStats, KeptBreeding, RealmEventWhat, ResidentOrder, Tile,
-    WorldState,
+    BreedOrder, Building, Horse, HorseStats, KeptBreeding, OrderRequest, RealmEventWhat,
+    ResidentOrder, Tile, WorldState,
 };
 
 use crate::events::record_event;
 use crate::horses::horse_name;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
+use crate::orders::{ids_field, text_field};
 use crate::queries::breeding::{breed_problem, kept_breeding};
 use crate::queries::horses::{horses_in, HorseOwner};
 use crate::queries::js_round;
@@ -101,6 +103,24 @@ pub fn apply_breed(world: &mut WorldState, o: &BreedRequest) {
         progress,
     }));
 }
+
+fn breed_request(o: &OrderRequest) -> BreedRequest {
+    BreedRequest {
+        resident_id: text_field(o, "residentId"),
+        stable_id: text_field(o, "stableId"),
+        horse_ids: ids_field(o, "horseIds"),
+    }
+}
+
+pub(crate) static BREED_META: OrderMeta = OrderMeta::fns(
+    "breed",
+    |w, s, o, _| validate_breed(w, s, &breed_request(o)).map(str::to_string),
+    |w, _, o, _| apply_breed(w, &breed_request(o)),
+)
+.gets_off_first()
+.adults_only()
+.npc_city()
+.blocked_carrying_child();
 
 /// Requests this tick's tending from residents' breed orders (`requestBreeding`).
 pub fn request_breeding(world: &WorldState) -> Vec<BreedAction> {

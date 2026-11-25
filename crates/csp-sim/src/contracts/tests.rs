@@ -81,8 +81,8 @@ fn order(world: &mut WorldState, from: u64, o: Value) -> String {
         "pay" => send(world, &terrain(), &Pay, from, o),
         "handOverToAlliance" => send(world, &terrain(), &HAND_OVER_TO_ALLIANCE, from, o),
         _ => {
-            let orders = contract_orders();
-            let (_, k) = orders.iter().find(|(n, _)| *n == kind).expect("a contract order");
+            let kinds = crate::orders::order_kinds();
+            let k = kinds.get(&kind).expect("an order kind");
             send(world, &terrain(), k, from, o)
         }
     };

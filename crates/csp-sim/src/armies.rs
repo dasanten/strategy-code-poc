@@ -9,11 +9,17 @@
 use std::collections::{HashMap, HashSet};
 
 use csp_shared::balance::{ARMY_SPREAD, SIGHT_RANGE};
-use csp_shared::terrain::wrap_distance;
-use csp_shared::world::{Army, ArmyOrder, Resident, ResidentOrder, Tile, WalkOrder, WorldState};
+use csp_shared::terrain::{wrap_distance, TerrainMap};
+use csp_shared::world::{
+    Army, ArmyOrder, OrderRequest, Resident, ResidentOrder, Tile, WalkOrder, WorldState,
+};
+
+use serde_json::Value;
 
 use crate::combat::attack_order;
-use crate::order_sender::commands;
+use crate::order_meta::OrderMeta;
+use crate::order_sender::{commands, OrderSender};
+use crate::orders::text_field;
 use crate::queries::alliance::commander_of;
 use crate::queries::army::{army_of, ARMY_NAME_MAX_LENGTH};
 use crate::queries::combat::in_contact;
@@ -41,22 +47,6 @@ pub enum ArmyOrderKind {
     ArmyAttack,
     ArmyFollow,
     ArmyStop,
-}
-
-impl ArmyOrderKind {
-    /// The kind an order names, if it is an army order.
-    pub fn of(kind: &str) -> Option<Self> {
-        Some(match kind {
-            "formArmy" => Self::FormArmy,
-            "disbandArmy" => Self::DisbandArmy,
-            "armyWalkTo" => Self::ArmyWalkTo,
-            "armyGuard" => Self::ArmyGuard,
-            "armyAttack" => Self::ArmyAttack,
-            "armyFollow" => Self::ArmyFollow,
-            "armyStop" => Self::ArmyStop,
-            _ => return None,
-        })
-    }
 }
 
 fn realm_of(world: &WorldState, user_id: u64) -> Option<String> {
@@ -275,6 +265,79 @@ pub fn apply_army_order(
     };
     world.armies[a].order = new;
 }
+
+fn army_request(order: &OrderRequest) -> ArmyRequest {
+    let f = &order.fields;
+    ArmyRequest {
+        army_id: text_field(order, "armyId"),
+        name: text_field(order, "name"),
+        resident_ids: f.get("residentIds").and_then(Value::as_array).map(|ids| {
+            ids.iter().map(|v| v.as_str().map_or_else(|| v.to_string(), str::to_string)).collect()
+        }),
+        target_id: text_field(order, "targetId"),
+        x: f.get("x").and_then(Value::as_f64),
+        y: f.get("y").and_then(Value::as_f64),
+    }
+}
+
+fn check_army(
+    kind: ArmyOrderKind,
+    world: &WorldState,
+    sender: &OrderSender,
+    order: &OrderRequest,
+    terrain: Option<&TerrainMap>,
+) -> Option<String> {
+    validate_army_order(world, kind, sender.user_id, &army_request(order), terrain.map(|t| t.size))
+}
+
+pub(crate) static ARMY_STOP_META: OrderMeta = OrderMeta::fns(
+    "armyStop",
+    |w, s, o, t| check_army(ArmyOrderKind::ArmyStop, w, s, o, t),
+    |w, s, o, _| apply_army_order(w, ArmyOrderKind::ArmyStop, s.user_id, &army_request(o)),
+)
+.to_army();
+
+pub(crate) static ARMY_FOLLOW_META: OrderMeta = OrderMeta::fns(
+    "armyFollow",
+    |w, s, o, t| check_army(ArmyOrderKind::ArmyFollow, w, s, o, t),
+    |w, s, o, _| apply_army_order(w, ArmyOrderKind::ArmyFollow, s.user_id, &army_request(o)),
+)
+.to_army();
+
+pub(crate) static ARMY_ATTACK_META: OrderMeta = OrderMeta::fns(
+    "armyAttack",
+    |w, s, o, t| check_army(ArmyOrderKind::ArmyAttack, w, s, o, t),
+    |w, s, o, _| apply_army_order(w, ArmyOrderKind::ArmyAttack, s.user_id, &army_request(o)),
+)
+.to_army();
+
+pub(crate) static ARMY_GUARD_META: OrderMeta = OrderMeta::fns(
+    "armyGuard",
+    |w, s, o, t| check_army(ArmyOrderKind::ArmyGuard, w, s, o, t),
+    |w, s, o, _| apply_army_order(w, ArmyOrderKind::ArmyGuard, s.user_id, &army_request(o)),
+)
+.to_army();
+
+pub(crate) static ARMY_WALK_TO_META: OrderMeta = OrderMeta::fns(
+    "armyWalkTo",
+    |w, s, o, t| check_army(ArmyOrderKind::ArmyWalkTo, w, s, o, t),
+    |w, s, o, _| apply_army_order(w, ArmyOrderKind::ArmyWalkTo, s.user_id, &army_request(o)),
+)
+.to_army();
+
+pub(crate) static DISBAND_ARMY_META: OrderMeta = OrderMeta::fns(
+    "disbandArmy",
+    |w, s, o, t| check_army(ArmyOrderKind::DisbandArmy, w, s, o, t),
+    |w, s, o, _| apply_army_order(w, ArmyOrderKind::DisbandArmy, s.user_id, &army_request(o)),
+)
+.to_army();
+
+pub(crate) static FORM_ARMY_META: OrderMeta = OrderMeta::fns(
+    "formArmy",
+    |w, s, o, t| check_army(ArmyOrderKind::FormArmy, w, s, o, t),
+    |w, s, o, _| apply_army_order(w, ArmyOrderKind::FormArmy, s.user_id, &army_request(o)),
+)
+.to_army();
 
 /// Each army member's order as it is now (`memberOrders`), to tell later whether they got one
 /// of their own.

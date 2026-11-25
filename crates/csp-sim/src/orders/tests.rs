@@ -89,7 +89,8 @@ fn an_order_that_keeps_scripts_running_leaves_the_queue_alone() {
     s.give(json!({ "kind": "rename", "name": "Ada" }));
     s.orders.apply_all(&mut s.world);
     assert!(s.world.residents[0].queue.is_some());
-    assert!(keeps_script("editQueue") && keeps_script("removeWaypoint") && !keeps_script("walkTo"));
+    let keeps = |k| crate::order_meta::meta_of(k).is_some_and(|m| m.keeps_script);
+    assert!(keeps("editQueue") && keeps("removeWaypoint") && !keeps("walkTo"));
 }
 
 #[test]

@@ -23,6 +23,7 @@ use crate::goods_deps::new_id;
 use crate::invariants::InvariantViolation;
 use crate::npc_plan::plan_due;
 use crate::offers::{sees_storage_of, set_aside_for_demand};
+use crate::order_meta::OrderMeta;
 use crate::order_sender::OrderSender;
 use crate::orders::OrderKind;
 use crate::queries::alliance_rules::is_alliance_city;
@@ -316,6 +317,9 @@ impl OrderKind for SendDemand {
         tell_both(world, &demand, DemandWhat::Sent, DemandWhat::Received, Extra::default());
     }
 }
+
+pub(crate) static SEND_DEMAND_META: OrderMeta =
+    OrderMeta::request("sendDemand", &SendDemand).keeps_script();
 
 /// The demand `demandId` sent to the Player's realm, or a reason it can't be answered
 /// (`demandToAnswer`).
@@ -638,6 +642,9 @@ impl OrderKind for AcceptDemand {
     }
 }
 
+pub(crate) static ACCEPT_DEMAND_META: OrderMeta =
+    OrderMeta::request("acceptDemand", &AcceptDemand).keeps_script();
+
 /// Declining a demand (`declineDemand`): that is all that happens.
 pub struct DeclineDemand;
 
@@ -664,6 +671,9 @@ impl OrderKind for DeclineDemand {
         }
     }
 }
+
+pub(crate) static DECLINE_DEMAND_META: OrderMeta =
+    OrderMeta::request("declineDemand", &DeclineDemand).keeps_script();
 
 /// A realm's Leader died (`lapseDemandsOnLeaderDeath`, `CONTEXT.md`: Self-managed city): its
 /// demands, sent or received, lapse at once. Call it before the realm ends.

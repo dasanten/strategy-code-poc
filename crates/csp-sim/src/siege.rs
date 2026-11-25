@@ -23,6 +23,7 @@ use csp_shared::world::{
 use crate::crimes::{building_organization, commit_crime, CrimeAgainst};
 use crate::defence::Alarms;
 use crate::goods_made::GoodsMade;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::building::{build_materials_of, build_work_for};
@@ -217,6 +218,9 @@ impl OrderKind for Crew {
     }
 }
 
+pub(crate) static CREW_META: OrderMeta =
+    OrderMeta::request("crew", &Crew).gets_off_first().adults_only();
+
 /// The push order (`push`): one of a machine's crew pushes it to (x, y), a tile a carriage could
 /// go to, with at least its crew size on its tile (`CONTEXT.md`: Siege machine). Another of the
 /// crew pushing it stops.
@@ -284,6 +288,8 @@ impl OrderKind for Push {
         }));
     }
 }
+
+pub(crate) static PUSH_META: OrderMeta = OrderMeta::request("push", &Push).adults_only();
 
 /// A crew order got onto its machine's tile (`walking.rs`): the resident joins its crew, if the
 /// machine still stands there and is still of their realm. The order is done either way.
@@ -442,6 +448,8 @@ impl OrderKind for RamAt {
             Some(ResidentOrder::Ram(RamOrder { machine_id, target_id, progress: 0.0 }));
     }
 }
+
+pub(crate) static RAM_META: OrderMeta = OrderMeta::request("ram", &RamAt).adults_only();
 
 /// Resolves this tick's ram strikes (`CONTEXT.md`: Ram, ADR 0002): each ram order that still holds
 /// gets `1 / RAM_STRIKE_TICKS` closer to its next strike; a strike raises the alarm as a blow at
@@ -663,6 +671,8 @@ impl OrderKind for ThrowAt {
             Some(ResidentOrder::Throw(ThrowOrder { machine_id, target_id, progress: 0.0 }));
     }
 }
+
+pub(crate) static THROW_META: OrderMeta = OrderMeta::request("throw", &ThrowAt).adults_only();
 
 /// Resolves this tick's catapult shots (`CONTEXT.md`: Catapult, ADR 0002): each throw order that
 /// still holds gets `1 / CATAPULT_SHOT_TICKS` closer to its next shot; a shot takes one Stone and

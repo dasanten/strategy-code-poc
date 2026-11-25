@@ -16,6 +16,7 @@ use serde_json::{Map, Value};
 use crate::events::record_event;
 use crate::goods_deps::new_id;
 use crate::invariants::InvariantViolation;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::alliance::{carriage_commander_of, commander_of};
@@ -187,6 +188,9 @@ impl OrderKind for PostOffer {
     }
 }
 
+pub(crate) static POST_OFFER_META: OrderMeta =
+    OrderMeta::request("postOffer", &PostOffer).keeps_script();
+
 /// Whether the realm has anyone of `other_id`'s in sight (`seesResidentsOf`).
 fn sees_residents_of(world: &WorldState, realm_id: &str, other_id: &str, size: i32) -> bool {
     let index = WorldIndex::new(world, size);
@@ -301,6 +305,9 @@ impl OrderKind for SendDirectOffer {
         );
     }
 }
+
+pub(crate) static SEND_DIRECT_OFFER_META: OrderMeta =
+    OrderMeta::request("sendDirectOffer", &SendDirectOffer).keeps_script();
 
 fn direct_offer_event(
     what: DirectOfferWhat,
@@ -417,6 +424,9 @@ impl OrderKind for SendCarriedOffer {
     }
 }
 
+pub(crate) static SEND_CARRIED_OFFER_META: OrderMeta =
+    OrderMeta::request("sendCarriedOffer", &SendCarriedOffer).keeps_script();
+
 /// One of a carried offer's two Transfers, waiting for a caravan of the warehouse nearest its
 /// pick-up (`carriedTransfer`).
 #[allow(clippy::too_many_arguments)]
@@ -511,6 +521,9 @@ impl OrderKind for AcceptCarriedOffer {
     }
 }
 
+pub(crate) static ACCEPT_CARRIED_OFFER_META: OrderMeta =
+    OrderMeta::request("acceptCarriedOffer", &AcceptCarriedOffer).keeps_script();
+
 /// The decline order (`declineOffer`, `CONTEXT.md`: Direct offer): the realm it was sent to turns
 /// it down.
 pub struct DeclineOffer;
@@ -544,6 +557,9 @@ impl OrderKind for DeclineOffer {
         end_offer(world, offer_id.expect("checked"), OfferEnd::Declined);
     }
 }
+
+pub(crate) static DECLINE_OFFER_META: OrderMeta =
+    OrderMeta::request("declineOffer", &DeclineOffer).keeps_script();
 
 /// The offer `offer_id` if it is the sender's realm's (`ownOffer`).
 fn own_offer<'w>(
@@ -584,6 +600,9 @@ impl OrderKind for TakeDownOffer {
         }
     }
 }
+
+pub(crate) static TAKE_DOWN_OFFER_META: OrderMeta =
+    OrderMeta::request("takeDownOffer", &TakeDownOffer).keeps_script();
 
 /// The accept order (`acceptOffer`, `CONTEXT.md`: Offer): one of the side's residents, on the
 /// storage's tile, gets the order to take an offer up to `times` over, which happens this tick
@@ -628,6 +647,9 @@ impl OrderKind for AcceptOffer {
         }));
     }
 }
+
+pub(crate) static ACCEPT_OFFER_META: OrderMeta =
+    OrderMeta::request("acceptOffer", &AcceptOffer).gets_off_first();
 
 /// One offer accepted this tick, with the goods of everyone in it before and after (`Accepted`).
 #[derive(Debug, Clone, PartialEq)]

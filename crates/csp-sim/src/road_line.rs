@@ -13,6 +13,7 @@ use csp_shared::world::{
 
 use crate::building::{material_field, material_problem};
 use crate::carrying::{CarryAction, CarryKind};
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::queries::building::materials_needed;
 use crate::queries::building::{
@@ -161,6 +162,26 @@ pub fn apply_line(
         LineKind::WallLine => ResidentOrder::WallLine(line),
     });
 }
+
+pub(crate) static WALL_LINE_META: OrderMeta = OrderMeta::fns(
+    "wallLine",
+    |w, s, o, t| validate_line(LineKind::WallLine, w, s, o, t),
+    |w, _, o, t| apply_line(LineKind::WallLine, w, o, t),
+)
+.queue_step()
+.gets_off_first()
+.adults_only()
+.blocked_carrying_child();
+
+pub(crate) static ROAD_LINE_META: OrderMeta = OrderMeta::fns(
+    "roadLine",
+    |w, s, o, t| validate_line(LineKind::RoadLine, w, s, o, t),
+    |w, _, o, t| apply_line(LineKind::RoadLine, w, o, t),
+)
+.queue_step()
+.gets_off_first()
+.adults_only()
+.blocked_carrying_child();
 
 /// This tick's puts of materials from orders along a line (`requestRoadMaterials`): a resident
 /// on the site of their tile puts in what they carry of what it still needs.

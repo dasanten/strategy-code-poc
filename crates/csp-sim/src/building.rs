@@ -11,6 +11,7 @@ use csp_shared::world::{
 };
 
 use crate::cities::update_city_membership;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::balance::{build_work, construction_learned, skill_of};
 use crate::queries::building::build_at_problem_of;
@@ -509,66 +510,10 @@ pub fn apply_build(world: &mut WorldState, order: &OrderRequest) {
     }
 }
 
-type Validate = fn(&WorldState, &OrderSender, &OrderRequest, Option<&TerrainMap>) -> Option<String>;
-type Apply = fn(&mut WorldState, &OrderRequest, Option<&TerrainMap>);
-
-/// One of T86.6's order kinds for the order registry (`OrderKind`): its checks and what it sets.
-struct Kind {
-    validate: Validate,
-    apply: Apply,
-}
-
-impl crate::orders::OrderKind for Kind {
-    fn validate(
-        &self,
-        world: &WorldState,
-        sender: &OrderSender,
-        order: &OrderRequest,
-        terrain: Option<&TerrainMap>,
-    ) -> Option<String> {
-        (self.validate)(world, sender, order, terrain)
-    }
-
-    fn apply(
-        &self,
-        world: &mut WorldState,
-        _sender: &OrderSender,
-        order: &OrderRequest,
-        terrain: Option<&TerrainMap>,
-    ) {
-        (self.apply)(world, order, terrain)
-    }
-}
-
-/// Adds the order kinds of building, tearing down, lines, work, teaching and training to the
-/// registry (`orderKinds`' `build`, `tearDown`, `roadLine`, `wallLine`, `workAt`, `teach`,
-/// `train`).
-pub fn add_building_orders(kinds: &mut crate::orders::OrderKinds) {
-    use crate::repair::{apply_repair, validate_repair};
-    use crate::road_line::{apply_line, validate_line, LineKind};
-    use crate::teaching::{apply_teach, validate_teach};
-    use crate::teardown::{apply_tear_down, validate_tear_down};
-    use crate::training::{apply_train, validate_train};
-    use crate::work::{apply_work_at, validate_work_at};
-    let kinds_of: [(&str, Validate, Apply); 8] = [
-        ("build", validate_build, |w, o, _| apply_build(w, o)),
-        ("tearDown", validate_tear_down, |w, o, _| apply_tear_down(w, o)),
-        ("repair", |w, s, o, _| validate_repair(w, s, o), |w, o, _| apply_repair(w, o)),
-        (
-            "roadLine",
-            |w, s, o, t| validate_line(LineKind::RoadLine, w, s, o, t),
-            |w, o, t| apply_line(LineKind::RoadLine, w, o, t),
-        ),
-        (
-            "wallLine",
-            |w, s, o, t| validate_line(LineKind::WallLine, w, s, o, t),
-            |w, o, t| apply_line(LineKind::WallLine, w, o, t),
-        ),
-        ("workAt", |w, s, o, _| validate_work_at(w, s, o), |w, o, _| apply_work_at(w, o)),
-        ("teach", |w, s, o, _| validate_teach(w, s, o), |w, o, _| apply_teach(w, o)),
-        ("train", |w, s, o, _| validate_train(w, s, o), |w, o, _| apply_train(w, o)),
-    ];
-    for (name, validate, apply) in kinds_of {
-        kinds.insert(name, Kind { validate, apply });
-    }
-}
+pub(crate) static BUILD_META: OrderMeta =
+    OrderMeta::fns("build", validate_build, |w, _, o, _| apply_build(w, o))
+        .queue_step()
+        .gets_off_first()
+        .adults_only()
+        .npc_city()
+        .blocked_carrying_child();

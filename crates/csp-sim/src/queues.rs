@@ -24,12 +24,13 @@ use serde_json::Value;
 
 use crate::conditions::{condition_holds, condition_of, condition_place_problem, Holds};
 use crate::events::record_event;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::orders::{leave_armies, OrderKind, OrderKinds};
 use crate::queries::residents::is_down;
 use crate::queue::{
-    field_str, queue_steps_problem, request_conditions, request_steps, runs_script,
-    QueueItemRequest, QueueStepRequest, QUEUE_STEP_KINDS, WAIT_UNTIL,
+    can_be_queue_step, field_str, queue_steps_problem, request_conditions, request_steps,
+    runs_script, QueueItemRequest, QueueStepRequest, WAIT_UNTIL,
 };
 use crate::queue_tree::{
     advance, begin, block_ids, depth_of, ids_of, kept_items, mark_started, rounds_of,
@@ -272,6 +273,8 @@ impl OrderKind for QueueOrder {
     }
 }
 
+pub(crate) static QUEUE_META: OrderMeta = OrderMeta::request("queue", &QueueOrder);
+
 /// Gives the resident at `i` a queue of the realm `realm_id` with these items, named or not, as
 /// the queue order does: it ends whatever they were doing and the first step starts on the next
 /// run of the queues. Steps and items must already be checked (`queue_steps_problem`).
@@ -407,6 +410,9 @@ impl OrderKind for EditQueueOrder {
     }
 }
 
+pub(crate) static EDIT_QUEUE_META: OrderMeta =
+    OrderMeta::request("editQueue", &EditQueueOrder).keeps_script();
+
 /// The ids a request's items carry, with whether each is a block's, top to bottom.
 fn sent_ids<'a>(items: &'a [Value], out: &mut Vec<(&'a Value, bool)>) {
     for item in items {
@@ -420,12 +426,6 @@ fn sent_ids<'a>(items: &'a [Value], out: &mut Vec<(&'a Value, bool)>) {
             }
         }
     }
-}
-
-/// Adds the queue order kinds (`queueOrders`).
-pub fn add_queue_orders(kinds: &mut OrderKinds) {
-    kinds.insert("queue", QueueOrder);
-    kinds.insert("editQueue", EditQueueOrder);
 }
 
 /// Stops what the resident's current step had them do (`stopStep`); while their defence script
@@ -777,7 +777,7 @@ pub fn queues_sound(world: &WorldState, _terrain: &TerrainMap) -> Vec<InvariantV
             fail(format!("has step ids {} with {} next", list.join(", "), q.next_step_id));
         }
         for s in steps {
-            if !QUEUE_STEP_KINDS.contains(&s.order.kind.as_str()) {
+            if !can_be_queue_step(&s.order.kind) {
                 fail(format!("holds a {} step", s.order.kind));
             }
         }
