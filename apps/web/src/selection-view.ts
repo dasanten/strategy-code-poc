@@ -44,10 +44,8 @@ import {
   TERRAIN_FOOD,
   TERRAIN_SPEED,
   hungerFactor,
-  RAM_CREW,
-  RAM_STRENGTH,
-  CATAPULT_CREW,
-  CATAPULT_STRENGTH,
+  MACHINE_SPECS,
+  VESSEL_SPECS,
   RALLY_PACE,
   PATCH_SIZE,
 } from '@csp/balance'
@@ -2166,22 +2164,28 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
 }
 
 /** What each kind of siege machine is called (`CONTEXT.md`: Siege machine). */
-export const MACHINE_NAMES: Record<SiegeMachineKind, string> = {
-  ram: 'ram',
-  catapult: 'catapult',
-}
+export const MACHINE_NAMES: Record<SiegeMachineKind, string> = Object.fromEntries(
+  (Object.keys(MACHINE_SPECS) as SiegeMachineKind[]).map((kind) => [
+    kind,
+    MACHINE_SPECS[kind].name,
+  ]),
+) as Record<SiegeMachineKind, string>
 
 /** The fewest crew on each kind of machine for it to be pushed or used (`CONTEXT.md`: Siege machine). */
-export const MACHINE_CREW: Record<SiegeMachineKind, number> = {
-  ram: RAM_CREW,
-  catapult: CATAPULT_CREW,
-}
+export const MACHINE_CREW: Record<SiegeMachineKind, number> = Object.fromEntries(
+  (Object.keys(MACHINE_SPECS) as SiegeMachineKind[]).map((kind) => [
+    kind,
+    MACHINE_SPECS[kind].crew,
+  ]),
+) as Record<SiegeMachineKind, number>
 
 /** Damage each kind of machine takes before it breaks (`CONTEXT.md`: Siege machine). */
-const MACHINE_STRENGTH: Record<SiegeMachineKind, number> = {
-  ram: RAM_STRENGTH,
-  catapult: CATAPULT_STRENGTH,
-}
+const MACHINE_STRENGTH: Record<SiegeMachineKind, number> = Object.fromEntries(
+  (Object.keys(MACHINE_SPECS) as SiegeMachineKind[]).map((kind) => [
+    kind,
+    MACHINE_SPECS[kind].strength,
+  ]),
+) as Record<SiegeMachineKind, number>
 
 /**
  * A siege machine's lines (`CONTEXT.md`: Siege machine): its owner, its crew against what it
@@ -2203,7 +2207,9 @@ export function describeMachine(m: SeenMachine, rel: Relationship | undefined): 
 }
 
 /** What each kind of vessel is called on its card (`CONTEXT.md`: Vessel). */
-export const VESSEL_NAMES: Record<VesselKind, string> = { boat: 'Boat', ship: 'Ship' }
+export const VESSEL_NAMES: Record<VesselKind, string> = Object.fromEntries(
+  (Object.keys(VESSEL_SPECS) as VesselKind[]).map((kind) => [kind, VESSEL_SPECS[kind].label]),
+) as Record<VesselKind, string>
 
 /**
  * A boat or ship as rows and meters (`CONTEXT.md`: Vessel, Goods on cards): its load against what

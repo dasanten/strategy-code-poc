@@ -8,6 +8,8 @@ use crate::world::{BuildingKind, SkillName};
 /// Everything fixed about a kind of building. A fact that does not apply to a kind is `None`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BuildingSpec {
+    /// What the game calls it: the Build menu, cards and the map.
+    pub label: &'static str,
     /// What the kind is for, in words: the Build menu and the ⓘ on a building's card show it.
     /// `{housing}` stands for `housing_room`; no number is typed into it.
     pub purpose: &'static str,

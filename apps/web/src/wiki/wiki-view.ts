@@ -67,7 +67,7 @@ import {
   walkSpeed,
   workOutput,
 } from '@csp/balance'
-import { BUILDABLE } from '../shared/building.js'
+import { BUILDABLE, SITES_OF_MOVERS } from '../shared/building.js'
 import { STAT_NAMES, SKILL_NAMES } from '../shared/world.js'
 import type {
   TrainingSubject,
@@ -335,8 +335,7 @@ export interface BuildCost {
  */
 export function buildCosts(): BuildCost[] {
   const pace = buildWork(AVERAGE, AT)
-  const vehicles: readonly BuildingKind[] = ['carriage', 'boat', 'ship', 'ram', 'catapult']
-  return BUILDABLE.filter((kind) => !vehicles.includes(kind)).map((kind) => {
+  return BUILDABLE.filter((kind) => !SITES_OF_MOVERS.includes(kind)).map((kind) => {
     const materials = BUILD_MATERIALS[kind] ?? {}
     const work = BUILD_WORK[kind] ?? 0
     const returned: Stock = {}

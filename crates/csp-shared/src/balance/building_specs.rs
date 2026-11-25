@@ -42,8 +42,8 @@ impl BuildingKind {
 }
 
 const TOWN_HALL: BuildingSpec = BuildingSpec {
-    purpose: "A town hall founds a new city of your realm; tearing it down dissolves the \
-              city.",
+    label: "Town hall",
+    purpose: "A town hall founds a new city of your realm; tearing it down dissolves the city.",
     footprint: 3,
     stands: Stands::OffNodes { city_area: false, shore: false },
     shares_a_tile: false,
@@ -61,8 +61,9 @@ const TOWN_HALL: BuildingSpec = BuildingSpec {
 };
 
 const HOUSE: BuildingSpec = BuildingSpec {
-    purpose: "A house is room for {housing} residents; only in a city’s area, and it grows \
-              the city.",
+    label: "House",
+    purpose: "A house is room for {housing} residents; only in a city’s area, and it grows the \
+              city.",
     footprint: 2,
     stands: Stands::OffNodes { city_area: true, shore: false },
     shares_a_tile: false,
@@ -81,8 +82,9 @@ const HOUSE: BuildingSpec = BuildingSpec {
 };
 
 const STORAGE: BuildingSpec = BuildingSpec {
-    purpose: "A storage keeps a city’s goods: workers carry their output here, and builders \
-              fetch materials from it.",
+    label: "Storage",
+    purpose: "A storage keeps a city’s goods: workers carry their output here, and builders fetch \
+              materials from it.",
     footprint: 2,
     stands: Stands::OffNodes { city_area: false, shore: false },
     shares_a_tile: false,
@@ -102,8 +104,9 @@ const STORAGE: BuildingSpec = BuildingSpec {
 };
 
 const WAREHOUSE: BuildingSpec = BuildingSpec {
-    purpose: "A warehouse keeps the Trade Organization’s goods; a resident or carriage on it \
-              can sell goods for its coins or buy with them.",
+    label: "Warehouse",
+    purpose: "A warehouse keeps the Trade Organization’s goods; a resident or carriage on it can \
+              sell goods for its coins or buy with them.",
     footprint: 3,
     stands: Stands::OwnRule,
     shares_a_tile: false,
@@ -115,6 +118,7 @@ const WAREHOUSE: BuildingSpec = BuildingSpec {
 };
 
 const WALL: BuildingSpec = BuildingSpec {
+    label: "Wall",
     purpose: "A stretch of wall; walls grow the city they stand by, like houses.",
     footprint: 1,
     stands: Stands::OffNodes { city_area: false, shore: false },
@@ -137,8 +141,9 @@ const WALL: BuildingSpec = BuildingSpec {
 };
 
 const GATE: BuildingSpec = BuildingSpec {
-    purpose: "A gate in a wall, which its city’s realm opens and closes; it grows the city \
-              like a wall does.",
+    label: "Gate",
+    purpose: "A gate in a wall, which its city’s realm opens and closes; it grows the city like a \
+              wall does.",
     footprint: 1,
     stands: Stands::OffNodes { city_area: false, shore: false },
     shares_a_tile: false,
@@ -160,10 +165,12 @@ const GATE: BuildingSpec = BuildingSpec {
 };
 
 const TOWER: BuildingSpec = BuildingSpec {
-    purpose: "A tower is a square building of wood or stone, two tiles a side, in a wall’s \
-              line or alone; it closes the way like a wall, its top is part of the wall walk \
-              where a wall touches it, and it holds a few residents up at once. It is broken \
-              like a wall but holds out longer.",
+    label: "Tower",
+    purpose:
+        "A tower is a square building of wood or stone, two tiles a side, in a wall’s line or \
+              alone; it closes the way like a wall, its top is part of the wall walk where a wall \
+              touches it, and it holds a few residents up at once. It is broken like a wall but \
+              holds out longer.",
     footprint: 2,
     stands: Stands::OffNodes { city_area: false, shore: false },
     shares_a_tile: false,
@@ -187,6 +194,7 @@ const TOWER: BuildingSpec = BuildingSpec {
 };
 
 const FARM: BuildingSpec = BuildingSpec {
+    label: "Farm",
     purpose: "A farm is fields that make Food; on Plains only.",
     footprint: 4,
     stands: Stands::OnPlains,
@@ -211,6 +219,7 @@ const FARM: BuildingSpec = BuildingSpec {
 };
 
 const STABLE: BuildingSpec = BuildingSpec {
+    label: "Stable",
     purpose: "A stable keeps horses and their Food, and breeds them; on Plains only.",
     footprint: 3,
     stands: Stands::OnPlains,
@@ -229,7 +238,8 @@ const STABLE: BuildingSpec = BuildingSpec {
 };
 
 const MINE: BuildingSpec = BuildingSpec {
-    purpose: "A mine digs the ore of the iron ore or gold ore node it stands on.",
+    label: "Mine",
+    purpose: "A mine digs what the iron ore, gold ore or coal node it stands on yields.",
     footprint: 2,
     stands: Stands::OnNode,
     shares_a_tile: false,
@@ -252,6 +262,7 @@ const MINE: BuildingSpec = BuildingSpec {
 };
 
 const QUARRY: BuildingSpec = BuildingSpec {
+    label: "Quarry",
     purpose: "A quarry cuts stone from the stone node it stands on.",
     footprint: 2,
     stands: Stands::OnNode,
@@ -275,6 +286,7 @@ const QUARRY: BuildingSpec = BuildingSpec {
 };
 
 const LUMBER_CAMP: BuildingSpec = BuildingSpec {
+    label: "Lumber camp",
     purpose: "A lumber camp fells wood in the forest node it stands on.",
     footprint: 2,
     stands: Stands::OnNode,
@@ -298,7 +310,8 @@ const LUMBER_CAMP: BuildingSpec = BuildingSpec {
 };
 
 const SMELTER: BuildingSpec = BuildingSpec {
-    purpose: "A smelter turns iron ore into iron; not on Mountain.",
+    label: "Smelter",
+    purpose: "A smelter turns iron ore into iron, or iron and coal into steel; not on Mountain.",
     footprint: 2,
     stands: Stands::OffNodes { city_area: false, shore: false },
     shares_a_tile: false,
@@ -330,6 +343,7 @@ const SMELTER: BuildingSpec = BuildingSpec {
 };
 
 const MINT: BuildingSpec = BuildingSpec {
+    label: "Mint",
     purpose: "A mint turns gold ore into coins; not on Mountain.",
     footprint: 2,
     stands: Stands::OffNodes { city_area: false, shore: false },
@@ -359,8 +373,9 @@ const MINT: BuildingSpec = BuildingSpec {
 };
 
 const SMITHY: BuildingSpec = BuildingSpec {
-    purpose: "A smithy turns iron and wood into spears, swords, shields and armour; not on \
-              Mountain.",
+    label: "Smithy",
+    purpose: "A smithy turns iron and wood into spears, swords, shields and armour, and steel and \
+              wood into steel swords, shields and armour; not on Mountain.",
     footprint: 2,
     stands: Stands::OffNodes { city_area: false, shore: false },
     shares_a_tile: false,
@@ -428,8 +443,10 @@ const SMITHY: BuildingSpec = BuildingSpec {
 };
 
 const TRAINING_GROUND: BuildingSpec = BuildingSpec {
-    purpose: "A training ground is where residents train a stat or a skill under a teacher; \
-              not on Mountain. Like a workplace, nobody owns it.",
+    label: "Training ground",
+    purpose:
+        "A training ground is where residents train a stat or a skill under a teacher; not on \
+              Mountain. Like a workplace, nobody owns it.",
     footprint: 3,
     stands: Stands::OffNodes { city_area: false, shore: false },
     shares_a_tile: false,
@@ -450,6 +467,7 @@ const TRAINING_GROUND: BuildingSpec = BuildingSpec {
 };
 
 const ROAD: BuildingSpec = BuildingSpec {
+    label: "Road",
     purpose: "A road: residents walk and carriages drive faster on it, on any land (slower to \
               build on Mountain), and it can run through a gate. Nobody owns it.",
     footprint: 1,
@@ -471,6 +489,7 @@ const ROAD: BuildingSpec = BuildingSpec {
 };
 
 const CARRIAGE: BuildingSpec = BuildingSpec {
+    label: "Carriage",
     purpose: "A carriage carries far more than any resident, pulled by a horse; built at a \
               finished stable, on its tiles or right by them, and it belongs to the realm of \
               whoever finishes it.",
@@ -493,9 +512,10 @@ const CARRIAGE: BuildingSpec = BuildingSpec {
 };
 
 const HAVEN: BuildingSpec = BuildingSpec {
-    purpose: "A haven is where boats and ships are built, with a storage anyone at it loads \
-              and unloads; on the shore, touching Lake or Sea, and not on Mountain. Like a \
-              stable, nobody owns it.",
+    label: "Haven",
+    purpose: "A haven is where boats and ships are built, with a storage anyone at it loads and \
+              unloads; on the shore, touching Lake or Sea, and not on Mountain. Like a stable, \
+              nobody owns it.",
     footprint: 3,
     stands: Stands::OffNodes { city_area: false, shore: true },
     shares_a_tile: false,
@@ -516,10 +536,10 @@ const HAVEN: BuildingSpec = BuildingSpec {
 };
 
 const BOAT: BuildingSpec = BuildingSpec {
-    purpose: "A boat is rowed over Lake and Sea with a few residents and a little cargo \
-              aboard; built on a tile of a finished haven that touches the water, it floats on \
-              the nearest free water tile next to it and belongs to the realm of whoever \
-              finishes it.",
+    label: "Boat",
+    purpose: "A boat is rowed over Lake and Sea with a few residents and a little cargo aboard; \
+              built on a tile of a finished haven that touches the water, it floats on the nearest \
+              free water tile next to it and belongs to the realm of whoever finishes it.",
     footprint: 1,
     stands: Stands::OwnRule,
     shares_a_tile: true,
@@ -540,10 +560,11 @@ const BOAT: BuildingSpec = BuildingSpec {
 };
 
 const SHIP: BuildingSpec = BuildingSpec {
-    purpose: "A ship is sailed over the Sea by a crew, carrying far more than a carriage; \
-              built on a tile of a finished haven that touches the Sea, it floats on the \
-              nearest free Sea tile next to it and belongs to the realm of whoever finishes \
-              it.",
+    label: "Ship",
+    purpose:
+        "A ship is sailed over the Sea by a crew, carrying far more than a carriage; built on \
+              a tile of a finished haven that touches the Sea, it floats on the nearest free Sea \
+              tile next to it and belongs to the realm of whoever finishes it.",
     footprint: 1,
     stands: Stands::OwnRule,
     shares_a_tile: true,
@@ -563,10 +584,11 @@ const SHIP: BuildingSpec = BuildingSpec {
 };
 
 const RAM: BuildingSpec = BuildingSpec {
+    label: "Ram",
     purpose: "A ram is a siege machine built in the field, anywhere a carriage could stand; \
               finished, it belongs to the realm of whoever finishes it, and a crew of its \
-              residents pushes it slowly where a carriage could go. Blows break it, and its \
-              realm can tear it down.",
+              residents pushes it slowly where a carriage could go. Blows break it, and its realm \
+              can tear it down.",
     footprint: 1,
     stands: Stands::OwnRule,
     shares_a_tile: true,
@@ -587,9 +609,10 @@ const RAM: BuildingSpec = BuildingSpec {
 };
 
 const CATAPULT: BuildingSpec = BuildingSpec {
-    purpose: "A catapult is a siege machine built in the field like a ram; its crew throws \
-              Stone they or its tile hold at a wall, gate or tower far out of any archer's \
-              reach. It hits buildings only, and its crew stands in the open.",
+    label: "Catapult",
+    purpose: "A catapult is a siege machine built in the field like a ram; its crew throws Stone \
+              they or its tile hold at a wall, gate or tower far out of any archer's reach. It \
+              hits buildings only, and its crew stands in the open.",
     footprint: 1,
     stands: Stands::OwnRule,
     shares_a_tile: true,

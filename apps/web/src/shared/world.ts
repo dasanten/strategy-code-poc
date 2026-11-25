@@ -1,6 +1,7 @@
 // Ported from packages/shared/src/world.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
+import { GOOD_KINDS, GOOD_SPECS } from '@csp/balance'
 import type {
   Alliance,
   Army,
@@ -29,6 +30,7 @@ import type {
   TrainingSubject,
   Waypoint,
   WorkplaceSettings,
+  Weapon,
 } from '@csp/shared-types'
 
 /** A resident's stats (`CONTEXT.md`: Stats). */
@@ -702,51 +704,25 @@ export interface Crime {
 }
 
 /**
- * PoC goods (`CONTEXT.md`: Good, Weapons and armour). Amounts are counted in units;
- * `GOOD_WEIGHT` weighs them.
+ * PoC goods (`CONTEXT.md`: Good, Weapons and armour), in the order of their specs. Amounts are
+ * counted in units; `GOOD_WEIGHT` weighs them.
  */
-export const GOODS = [
-  'food',
-  'wood',
-  'stone',
-  'ironOre',
-  'iron',
-  'goldOre',
-  'coins',
-  'spear',
-  'sword',
-  'shield',
-  'armour',
-  'coal',
-  'steel',
-  'steelSword',
-  'steelShield',
-  'steelArmour',
-  'tools',
-  'bow',
-  'crossbow',
-  'arrows',
-] as const
+export const GOODS = GOOD_KINDS
 
 /** Goods that make a resident armed (`CONTEXT.md`: Soldier, Weapons and armour). */
-export const WEAPONS = ['spear', 'sword', 'steelSword', 'bow', 'crossbow'] as const satisfies readonly Good[]
+// The Rust specs check that these are the goods of `Weapon`.
+export const WEAPONS = GOODS.filter((g) => GOOD_SPECS[g].weapon !== null) as readonly Weapon[]
 
 /** Goods that take off damage (`CONTEXT.md`: Weapons and armour): shields and armour, of iron or steel. */
-export const PROTECTION = [
-  'shield',
-  'armour',
-  'steelShield',
-  'steelArmour',
-] as const satisfies readonly Good[]
+export const PROTECTION: readonly Good[] = GOODS.filter((g) => GOOD_SPECS[g].protection !== null)
 
 /**
  * The kinds of protection (`CONTEXT.md`: Weapons and armour): a shield and armour, each of iron or
  * steel. Only the best of each kind a resident carries counts.
  */
-export const PROTECTION_KINDS = [
-  ['shield', 'steelShield'],
-  ['armour', 'steelArmour'],
-] as const satisfies readonly (readonly Good[])[]
+export const PROTECTION_KINDS: readonly (readonly Good[])[] = (['shield', 'armour'] as const).map(
+  (kind) => GOODS.filter((g) => GOOD_SPECS[g].protection === kind),
+)
 
 /** Everything one Player controls through their Leader (`CONTEXT.md`: Realm). */
 export interface Realm {

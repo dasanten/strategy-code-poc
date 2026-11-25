@@ -5,16 +5,13 @@ import { MAX_HEALTH } from '@csp/balance'
 import type {
   AdminPlaces,
   Building,
-  BuildingKind,
   Carriage,
   City,
   CreativeDone,
   Resident,
 } from '@csp/shared-types'
+import { KEEPS_GOODS } from './shared/building.js'
 import { canWork } from './shared/stats.js'
-
-/** Kinds of building that keep goods (`KEEPS_GOODS` on the server). */
-const KEEPS_GOODS: readonly BuildingKind[] = ['storage', 'warehouse', 'stable', 'haven']
 
 /** Something goods can be given to or taken from, as the section lists it. */
 export interface CreativeHolder {
