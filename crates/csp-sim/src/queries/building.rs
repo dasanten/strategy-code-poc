@@ -19,7 +19,7 @@ use csp_shared::terrain::{
 };
 use csp_shared::world::{
     Building, BuildingKind, Good, LineOrder, LinePhase, Pile, Resident, ResidentOrder,
-    ResourceKind, ResourceNode, Stock, TrainingSubject, WallMaterial, WorldState,
+    ResourceKind, ResourceNode, SiegeMachineKind, Stock, TrainingSubject, WallMaterial, WorldState,
 };
 
 use super::balance::{build_work, carry_capacity};
@@ -267,12 +267,8 @@ pub fn construction_index_at(
     kind: BuildingKind,
 ) -> Option<usize> {
     match kind {
-        BuildingKind::Road => road_index_at(world, x, y),
-        BuildingKind::Carriage
-        | BuildingKind::Boat
-        | BuildingKind::Ship
-        | BuildingKind::Ram
-        | BuildingKind::Catapult => first_of_kind_at(world, x, y, kind),
+        // A road, or the site of what moves off.
+        _ if kind.spec().shares_a_tile => first_of_kind_at(world, x, y, kind),
         // A wall or gate site first: one may stand over the wooden wall it upgrades.
         BuildingKind::Wall | BuildingKind::Gate => {
             wall_site_index_at(world, x, y).or_else(|| building_index_at(world, x, y, MAP_SIZE))
@@ -490,7 +486,7 @@ pub fn build_problem_for(
         }
         return None;
     }
-    if matches!(kind, BuildingKind::Ram | BuildingKind::Catapult) {
+    if SiegeMachineKind::built_as(kind).is_some() {
         // `CONTEXT.md`: Siege machine: laid out in the field, anywhere a carriage could stand.
         let name = kind_name(kind);
         if at(x, y).is_some_and(|t| !carriage_can_enter(t)) {
@@ -502,8 +498,9 @@ pub fn build_problem_for(
         if building_at(world, x, y, size).is_some() {
             return Some("there is already a building there".into());
         }
-        if first_of_kind_at(world, x, y, BuildingKind::Ram).is_some()
-            || first_of_kind_at(world, x, y, BuildingKind::Catapult).is_some()
+        if SiegeMachineKind::ALL
+            .iter()
+            .any(|m| first_of_kind_at(world, x, y, m.spec().built_as).is_some())
         {
             return Some("there is already a siege machine site on this tile".into());
         }

@@ -249,8 +249,11 @@ fn is_a_buildable_site_of_wood_iron_and_stone_that_becomes_a_catapult() {
     for good in ["wood", "iron", "stone"] {
         assert!(materials.get(good).is_some_and(|n| n > 0.0), "{good}");
     }
-    assert_eq!(machine_kind(BuildingKind::Catapult), Some(SiegeMachineKind::Catapult));
-    assert_eq!(site_kind(SiegeMachineKind::Catapult), BuildingKind::Catapult);
+    assert_eq!(
+        SiegeMachineKind::built_as(BuildingKind::Catapult),
+        Some(SiegeMachineKind::Catapult)
+    );
+    assert_eq!(SiegeMachineKind::Catapult.spec().built_as, BuildingKind::Catapult);
     let built: Stock = machine_materials(SiegeMachineKind::Catapult);
     assert!(built.get(&Good::Stone).is_some_and(|n| *n > 0.0));
 }

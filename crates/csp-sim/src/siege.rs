@@ -8,16 +8,15 @@
 //! (`teardown.rs`).
 
 use csp_shared::balance::{
-    carriage_can_enter, BROKEN_MATERIALS_RETURNED, CARRIAGE_SPEED, CATAPULT_BLOW, CATAPULT_CREW,
-    CATAPULT_REACH, CATAPULT_SHOT_TICKS, CATAPULT_STRENGTH, MAP_SIZE, RAM_BLOW, RAM_CREW,
-    RAM_STRENGTH, RAM_STRIKE_TICKS, SIEGE_PUSH_SHARE, TEARDOWN_MATERIALS_RETURNED,
-    TEARDOWN_WORK_SHARE, WALK_TICKS_PER_TILE,
+    carriage_can_enter, BROKEN_MATERIALS_RETURNED, CARRIAGE_SPEED, CATAPULT_BLOW, CATAPULT_REACH,
+    CATAPULT_SHOT_TICKS, MAP_SIZE, RAM_BLOW, RAM_STRIKE_TICKS, SIEGE_PUSH_SHARE,
+    TEARDOWN_MATERIALS_RETURNED, TEARDOWN_WORK_SHARE, WALK_TICKS_PER_TILE,
 };
 use csp_shared::footprint::near_footprint;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
-    Building, BuildingKind, CrewOrder, CrimeKind, Good, OrderRequest, PushOrder, RamOrder,
-    Resident, ResidentOrder, SiegeMachine, SiegeMachineKind, Stock, ThrowOrder, Tile, WorldState,
+    Building, CrewOrder, CrimeKind, Good, OrderRequest, PushOrder, RamOrder, Resident,
+    ResidentOrder, SiegeMachine, SiegeMachineKind, Stock, ThrowOrder, Tile, WorldState,
 };
 
 use crate::crimes::{building_organization, commit_crime, CrimeAgainst};
@@ -40,50 +39,24 @@ use crate::queries::residents::{can_work, is_down};
 use crate::queries::walls::{broken_returns, foreign_wall, wall_strength, wall_strength_left};
 use crate::survival::drop_goods;
 
-/// The site kind a machine of `kind` is built from.
-pub fn site_kind(kind: SiegeMachineKind) -> BuildingKind {
-    match kind {
-        SiegeMachineKind::Ram => BuildingKind::Ram,
-        SiegeMachineKind::Catapult => BuildingKind::Catapult,
-    }
-}
-
-/// The machine a finished site of `kind` becomes, if it is a siege machine's.
-pub fn machine_kind(kind: BuildingKind) -> Option<SiegeMachineKind> {
-    match kind {
-        BuildingKind::Ram => Some(SiegeMachineKind::Ram),
-        BuildingKind::Catapult => Some(SiegeMachineKind::Catapult),
-        _ => None,
-    }
-}
-
 /// The machine's name, as the Player reads it.
 pub fn machine_name(kind: SiegeMachineKind) -> &'static str {
-    match kind {
-        SiegeMachineKind::Ram => "ram",
-        SiegeMachineKind::Catapult => "catapult",
-    }
+    kind.spec().name
 }
 
 /// The fewest crew on its tile for a machine to be pushed (`RAM_CREW`).
 pub fn crew_needed(kind: SiegeMachineKind) -> usize {
-    match kind {
-        SiegeMachineKind::Ram => RAM_CREW as usize,
-        SiegeMachineKind::Catapult => CATAPULT_CREW as usize,
-    }
+    kind.spec().crew as usize
 }
 
 /// Damage a machine takes before it breaks (`RAM_STRENGTH`).
 pub fn machine_strength(kind: SiegeMachineKind) -> f64 {
-    match kind {
-        SiegeMachineKind::Ram => RAM_STRENGTH,
-        SiegeMachineKind::Catapult => CATAPULT_STRENGTH,
-    }
+    kind.spec().strength
 }
 
 /// What a machine is built of: its site's materials.
 pub fn machine_materials(kind: SiegeMachineKind) -> Stock {
-    build_materials_of(site_kind(kind), None)
+    build_materials_of(kind.spec().built_as, None)
 }
 
 /// What a broken machine leaves on its tile (`BROKEN_MATERIALS_RETURNED` of its materials).
@@ -98,7 +71,7 @@ pub fn torn_down_machine_returns(kind: SiegeMachineKind) -> Stock {
 
 /// Work it takes to tear a machine down, as a finished building of its site's kind takes.
 pub fn machine_teardown_work(kind: SiegeMachineKind) -> f64 {
-    build_work_for(site_kind(kind), None) * TEARDOWN_WORK_SHARE
+    build_work_for(kind.spec().built_as, None) * TEARDOWN_WORK_SHARE
 }
 
 fn share_of(materials: Stock, share: f64) -> Stock {
@@ -460,7 +433,7 @@ pub fn ram_problem(
     };
     let size = csp_shared::balance::MAP_SIZE;
     // Next to any tile of it: a tower is 2×2 (`CONTEXT.md`: Tower).
-    if !near_footprint(placed(wall), (m.x as i32, m.y as i32), 1, size) {
+    if !near_footprint(placed(wall), (m.x as i32, m.y as i32), m.kind.spec().reach as i32, size) {
         return Some("push the ram next to it first".into());
     }
     None
