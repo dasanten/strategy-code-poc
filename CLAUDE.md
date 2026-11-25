@@ -12,9 +12,9 @@
   are checked locally; only one PR per epic (and bug fixes) goes into `dev` and runs CI.
 - **Releases** (ADR 0010): `main` is the live game and every merge into it deploys. Epics and bugs
   collect on `dev`; a release is one PR `dev` → `main`, opened only when Daniel asks.
-- **Balance numbers** live in `crates/csp-shared/src/balance.rs`; pick sensible values and list
-  them in the PR, then run `pnpm balance:rust` and commit `packages/balance/` (the client's copy).
-  Rules (what happens) are Daniel's call.
+- **Balance numbers** live in `crates/csp-shared/src/balance/`, one declaration each in the
+  file of its domain; pick sensible values and list them in the PR, then run `pnpm balance:rust`
+  and commit `packages/balance/` (the client's copy). Rules (what happens) are Daniel's call.
 - **Generated files** (`packages/balance`, `script-data.json`, `packages/shared-types/src/generated`;
   marked in `.gitattributes`): `pnpm generate` writes them all. On a conflict, merge the sources,
   run `pnpm generate` and commit; never merge a generated file by hand. `pnpm check` and

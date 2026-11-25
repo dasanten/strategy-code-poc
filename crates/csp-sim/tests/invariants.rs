@@ -14,6 +14,7 @@ use csp_shared::terrain::{Terrain, TerrainMap};
 use csp_shared::world::{BuildingKind, Good, ResourceKind, SkillName, Stat, Stock, WorldState};
 use csp_sim::invariants::{
     check_all, invariants_for_tick, should_check_invariants, world_invariants, InvariantViolation,
+    DOMAINS,
 };
 use csp_sim::queries::balance::carry_capacity;
 use csp_sim::queries::building::building_at;
@@ -451,26 +452,36 @@ fn invariants_for_tick_runs_all_of_them_when_every_tick_is_sampled_none_at_a_rat
     let names = |v: &[csp_sim::invariants::Invariant]| v.iter().map(|i| i.name).collect::<Vec<_>>();
     assert_eq!(names(&invariants_for_tick(7, 1.0, &all)), names(&all));
     assert!(invariants_for_tick(7, 0.0, &all).is_empty());
-    // The TypeScript's list, by name and in order, 151 invariants, `vessels-in-place` (T90.2),
-    // `water-haul-routes-sound` (T91.5), `ship-crew` (T91.2), `respect-sound` (T96.1),
-    // `outweighed-sound` (T96.2), `lent-never-turn` (T96.4), `npc-lending-keeps-reserve` (T96.3)
-    // `heirs-qualify` (T103.1), `heirs-took-over` (T103.2), `founding-site-clear` (T100.5),
-    // `starting-sites-sound` (T100.4), `steel-only-with-coal` (T101.6), `veins-sound` (T102.1),
-    // `veins-counted` (T102.2), `npc-leaves-dry-workplaces` (T102.4), `equipment-sound` (T107.1),
-    // `up-only-on-walls` and `up-only-on-own-walls` (T105.2), `none-attack-up-from-below` (T105.3),
-    // `conditions-in-range` and `repair-orders-on-buildings` (T97.5), `npc-escorts-sound` (T97.8),
-    // `ruins-ruined` (T97.6), `wear-sound` (T97.1), `trade-org-kept-up` (T97.7),
-    // `shots-within-reach` (T108.2), `wall-materials-sound` (T106.1), `npc-soldiers-stand-down`
-    // (T97.9), `tower-room` (T109.1), `siege-machines-in-place` (T110.1), `threat-sound` (T98.2),
-    // `trading-posts-have-no-temperament` (T98.1), `npc-hunts-sound` (T98.6),
-    // `stances-sound` (T98.4), `npc-demands-sound` (T98.7),
-    // `npc-takings-sound` (T98.10), `marches-sound` (T98.8), `npc-founding-stone-kept` (#1379),
-    // `npc-far-workers-go-home-fed` (#1379), `patches-sound` and `gather-orders-sound` (T114.1),
-    // `drifters-sound` and `drifters-join-with-room` (T115.1), `zeal-within-cap` (T116.1),
-    // `rallies-sound` (T116.2), `npc-called-home-sound` (#1379), `founding-party-sets-out-loaded`
-    // and `founding-wave-sound` (#1438), `npc-wall-stone-set-aside` (Epic 113),
-    // `npc-founding-materials-kept` and `mother-fetch-sound` (#1379).
-    assert_eq!(all.len(), 203);
+}
+
+#[test]
+fn every_invariant_has_a_name_of_its_own() {
+    let mut seen = std::collections::HashSet::new();
+    for inv in world_invariants() {
+        assert!(!inv.name.trim().is_empty(), "an invariant has no name");
+        assert!(seen.insert(inv.name), "two invariants are named {}", inv.name);
+    }
+}
+
+/// Every domain file's list is joined into `world_invariants`, so adding an invariant edits its
+/// domain's file and nothing else.
+#[test]
+fn every_domain_file_is_joined_into_the_list() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/invariants");
+    let mut files: Vec<String> = std::fs::read_dir(dir)
+        .expect("the invariants folder")
+        .map(|f| f.unwrap().path().file_stem().unwrap().to_string_lossy().into_owned())
+        .filter(|name| name != "mod" && name != "shared")
+        .collect();
+    files.sort();
+    let mut domains: Vec<String> = DOMAINS.iter().map(|(name, _)| name.to_string()).collect();
+    domains.sort();
+    assert_eq!(domains, files);
+    let joined: Vec<&str> = world_invariants().iter().map(|i| i.name).collect();
+    for (domain, list) in DOMAINS {
+        assert!(!list.is_empty(), "{domain} lists no invariant");
+        assert!(list.iter().all(|i| joined.contains(&i.name)), "{domain} is not joined in");
+    }
 }
 
 /// A starting city with everyone idle on the storage's tile, carrying nothing (`atHome` of

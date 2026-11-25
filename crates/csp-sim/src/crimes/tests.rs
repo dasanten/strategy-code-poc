@@ -224,7 +224,7 @@ fn run_checked(world: &mut WorldState, ticks: usize) {
     let terrain = crate::test_support::plains(SIZE);
     for _ in 0..ticks {
         run(world, SIZE, 1);
-        assert_eq!(crate::invariants::checks::crimes_sound(world, &terrain), vec![]);
+        assert_eq!(crate::invariants::realms::crimes_sound(world, &terrain), vec![]);
     }
 }
 

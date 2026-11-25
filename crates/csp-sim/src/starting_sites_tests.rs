@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use super::*;
-use crate::invariants::checks::nodes_on_fitting_terrain;
+use crate::invariants::map::nodes_on_fitting_terrain;
 use crate::terrain_gen::generate_terrain;
 use crate::world::{create_world, generate_world};
 use csp_shared::balance::HEARTLAND_COUNT;

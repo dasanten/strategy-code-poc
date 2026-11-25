@@ -26,7 +26,7 @@ use csp_shared::terrain::{
 use csp_shared::world::{BuildingKind, ResourceKind, ResourceNode, StartingSite, WorldState};
 use csp_shared::TICK_MS;
 
-use crate::invariants::checks::node_terrains;
+use crate::invariants::map::node_terrains;
 use crate::node_gen::{assign_richness, place_resource_nodes_by_region};
 use crate::placing::Ground;
 use crate::random::hash;

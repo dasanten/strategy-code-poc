@@ -82,7 +82,7 @@ impl Place {
             .expect("a node")
         };
         // On the terrain its kind lies on.
-        let fits = crate::invariants::checks::node_terrains(kind)[0];
+        let fits = crate::invariants::map::node_terrains(kind)[0];
         terrain.tiles[(40 * terrain.size + 90) as usize] = fits as u8;
         world.nodes.push(node.clone());
         Place { world, terrain, city, node }
