@@ -5,13 +5,27 @@ use ts_rs::TS;
 
 use super::Stock;
 
-/// The kinds of vessel (`CONTEXT.md`: Vessel): a rowed boat, on Lake and Sea, or a sailed ship, on
-/// Sea only (`CONTEXT.md`: Ship).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-pub enum VesselKind {
-    Boat,
-    Ship,
+/// Declares an enum of kinds of craft and its `ALL`, so that the list cannot miss a kind.
+macro_rules! craft_kinds {
+    ($(#[$attr:meta])* $name:ident { $($kind:ident),* $(,)? }) => {
+        $(#[$attr])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+        #[serde(rename_all = "camelCase")]
+        pub enum $name {
+            $($kind,)*
+        }
+
+        impl $name {
+            /// Every kind, in the order they are declared.
+            pub const ALL: &'static [$name] = &[$($name::$kind),*];
+        }
+    };
+}
+
+craft_kinds! {
+    /// The kinds of vessel (`CONTEXT.md`: Vessel): a rowed boat, on Lake and Sea, or a sailed ship, on
+    /// Sea only (`CONTEXT.md`: Ship).
+    VesselKind { Boat, Ship }
 }
 
 /// A boat or ship (`CONTEXT.md`: Vessel): always on a water tile, one vessel per tile, with the
@@ -37,12 +51,9 @@ pub struct Vessel {
     pub crew_ids: Vec<String>,
 }
 
-/// The kinds of siege machine (`CONTEXT.md`: Siege machine): a ram and a catapult.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-pub enum SiegeMachineKind {
-    Ram,
-    Catapult,
+craft_kinds! {
+    /// The kinds of siege machine (`CONTEXT.md`: Siege machine): a ram and a catapult.
+    SiegeMachineKind { Ram, Catapult }
 }
 
 /// A siege machine (`CONTEXT.md`: Siege machine, ADR 0037): a machine of a realm, built in the

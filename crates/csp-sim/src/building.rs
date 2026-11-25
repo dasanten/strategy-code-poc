@@ -6,8 +6,8 @@ use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::{terrain_at, TerrainMap};
 use csp_shared::world::{
     BuildOrder, Building, BuildingKind, Carriage, ConstructionSite, LinePhase, OrderRequest,
-    Resident, ResidentOrder, SiegeMachine, SkillName, Stock, Tile, Vessel, VesselKind,
-    WallMaterial, WorldState,
+    Resident, ResidentOrder, SiegeMachine, SiegeMachineKind, SkillName, Stock, Tile, Vessel,
+    VesselKind, WallMaterial, WorldState,
 };
 
 use crate::cities::update_city_membership;
@@ -186,12 +186,7 @@ pub fn finish_site_by(
     if b.site.is_none() || work_needed(b) > 0.0 || !materials_needed(b).is_empty() {
         return false;
     }
-    let vessel = match b.kind {
-        BuildingKind::Boat => Some(VesselKind::Boat),
-        BuildingKind::Ship => Some(VesselKind::Ship),
-        _ => None,
-    };
-    if let Some(kind) = vessel {
+    if let Some(kind) = VesselKind::built_as(b.kind) {
         // `CONTEXT.md`: Building a boat, Building a ship: the site is gone, and an empty vessel of
         // the finisher's realm floats on the nearest free water tile next to it (Sea for a ship).
         let Some((x, y)) =
@@ -200,8 +195,7 @@ pub fn finish_site_by(
             return false;
         };
         world.buildings.remove(site);
-        let prefix = if kind == VesselKind::Ship { "ship" } else { "boat" };
-        let id = new_id(prefix, &mut world.next_id);
+        let id = new_id(kind.spec().name, &mut world.next_id);
         world.vessels.push(Vessel {
             id,
             kind,
@@ -214,7 +208,7 @@ pub fn finish_site_by(
         });
         return true;
     }
-    if let Some(kind) = crate::siege::machine_kind(b.kind) {
+    if let Some(kind) = SiegeMachineKind::built_as(b.kind) {
         // `CONTEXT.md`: Siege machine: the site is gone, and the machine of the finisher's realm
         // stands where it was, with no crew yet.
         let (x, y) = (b.x, b.y);

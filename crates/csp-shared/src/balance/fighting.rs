@@ -11,6 +11,8 @@ pub struct WallStrength {
     pub tower: f64,
 }
 
+use super::craft_specs::{CATAPULT, RAM};
+
 balance! {
 /// Ticks between two blows of a resident in a fight (`CONTEXT.md`: Combat): a blow every two
 /// seconds, so a fight between two unarmed residents lasts about a minute.
@@ -66,49 +68,38 @@ pub const TOWER_SIGHT_RANGE: f64 = 72.0;
 /// (`CONTEXT.md`: Tower, Ranged combat): beyond a wall archer's `WALL_SHOT_REACH_BONUS`.
 pub const TOWER_SHOT_REACH_BONUS: f64 = 7.0;
 
-/// The fewest crew on a ram's tile for it to be pushed (`CONTEXT.md`: Siege machine): a few
-/// residents, as many as a ship's, so a ram takes a realm's hands from other work.
-pub const RAM_CREW: f64 = 4.0;
+/// The fewest crew on a ram's tile for it to be pushed (`CONTEXT.md`: Siege machine).
+pub const RAM_CREW: f64 = RAM.crew;
 
 /// How fast a crewed siege machine is pushed, as a share of a carriage's pace on the same ground
 /// (`CONTEXT.md`: Siege machine: slowly, like a carriage with no horse): half of walking on Plains,
 /// a crawl in Forest and Hills, a little faster on a road, and onto Mountain only by road.
 pub const SIEGE_PUSH_SHARE: f64 = 0.25;
 
-/// Damage a ram takes from blows before it breaks (`CONTEXT.md`: Siege machine): twice a tile of
-/// wooden wall, so defenders who come out need a while at it, but less than a stone wall tile.
-pub const RAM_STRENGTH: f64 = 6000.0;
+/// Damage a ram takes from blows before it breaks (`CONTEXT.md`: Siege machine).
+pub const RAM_STRENGTH: f64 = RAM.strength;
 
-/// Ticks between a crewed ram's strikes at the wall, gate or tower next to it (`CONTEXT.md`: Ram):
-/// a heavy beam swung back and forth by its crew, slower than a resident's blows.
-pub const RAM_STRIKE_TICKS: f64 = 10.0;
+/// Ticks between a crewed ram's strikes (`CONTEXT.md`: Ram).
+pub const RAM_STRIKE_TICKS: f64 = RAM.attack_ticks;
 
-/// Damage each strike of a ram does to the wall, gate or tower it is at (`CONTEXT.md`: Ram: many
-/// times harder than a blow): it breaks a tile of wooden wall in 20 strikes, a little over three
-/// minutes, and one of stone in about thirteen, where a Spear alone takes 12 and 50.
-pub const RAM_BLOW: f64 = 150.0;
+/// Damage each strike of a ram does to the wall, gate or tower it is at (`CONTEXT.md`: Ram).
+pub const RAM_BLOW: f64 = RAM.blow;
 
-/// The fewest crew on a catapult's tile for it to be pushed or to shoot (`CONTEXT.md`: Catapult): one
-/// fewer than a ram's, a lighter frame to push and an arm to wind and load.
-pub const CATAPULT_CREW: f64 = 3.0;
+/// The fewest crew on a catapult's tile for it to be pushed or to shoot (`CONTEXT.md`: Catapult).
+pub const CATAPULT_CREW: f64 = CATAPULT.crew;
 
-/// Damage a catapult takes from blows before it breaks (`CONTEXT.md`: Siege machine): a tile of
-/// wooden wall's, half a ram's, having no roof of planks over it.
-pub const CATAPULT_STRENGTH: f64 = 3000.0;
+/// Damage a catapult takes from blows before it breaks (`CONTEXT.md`: Siege machine).
+pub const CATAPULT_STRENGTH: f64 = CATAPULT.strength;
 
-/// How far a catapult throws, in tiles (`CONTEXT.md`: Catapult: beyond a bow's from a wall): a Bow
-/// reaches 8, 12 from up on a wall, so a catapult shoots from well out of any archer's reach.
-pub const CATAPULT_REACH: f64 = 20.0;
+/// How far a catapult throws, in tiles (`CONTEXT.md`: Catapult).
+pub const CATAPULT_REACH: f64 = CATAPULT.reach;
 
-/// Ticks between a crewed catapult's shots (`CONTEXT.md`: Catapult): its arm wound down and a
-/// Stone loaded each time, six times a ram's strikes, so it does less to a wall a minute than a
-/// ram at it.
-pub const CATAPULT_SHOT_TICKS: f64 = 60.0;
+/// Ticks between a crewed catapult's shots (`CONTEXT.md`: Catapult).
+pub const CATAPULT_SHOT_TICKS: f64 = CATAPULT.attack_ticks;
 
 /// Damage each Stone a catapult throws does to the wall, gate or tower it hits (`CONTEXT.md`:
-/// Catapult): a tile of wooden wall falls to 5 in five minutes, one of stone to 20 in twenty,
-/// slower than a ram at the wall but from out of reach.
-pub const CATAPULT_BLOW: f64 = 600.0;
+/// Catapult).
+pub const CATAPULT_BLOW: f64 = CATAPULT.blow;
 
 /// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): six
 /// minutes, all the while unable to dodge or strike back, so a starting city's defenders get up
