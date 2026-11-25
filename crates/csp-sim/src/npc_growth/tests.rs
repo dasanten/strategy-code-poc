@@ -716,6 +716,27 @@ fn a_full_city_keeps_the_farmers_who_win_the_food_its_founding_waits_on() {
 }
 
 #[test]
+fn saving_for_its_founding_party_it_builds_the_lumber_camp_for_the_wood_its_wall_waits_for() {
+    // #1559: holding its party's Wood but not a trip's of its new wall's on top, and lacking only
+    // Stone for its party, which no node gives it, the village stood with its wall unfinished and
+    // no project for the rest of the run.
+    use crate::npc_founding::{kept_from_walls, waits_for_party};
+    use crate::queries::names::held;
+    let mut v = village(None);
+    // No wall yet, so it wants its first.
+    v.world.buildings.retain(|b| !matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate));
+    set_stock(&mut v, &[(Good::Food, 400.0), (Good::Wood, 600.0)]);
+    plan(&mut v);
+    v.world.city_plans.get_mut(&v.city).unwrap().full_since = Some(0.0);
+    build_at(&project(&v), BuildingKind::Wall);
+    let kept = held(&kept_from_walls(&v.world, v.city()), Good::Wood);
+    set_stock(&mut v, &[(Good::Food, 400.0), (Good::Wood, kept + 1.0)]);
+    let p = project(&v);
+    build_at(&p, BuildingKind::LumberCamp);
+    assert!(!waits_for_party(&v.world, v.city(), p.as_ref().unwrap()));
+}
+
+#[test]
 fn saving_for_its_founding_party_a_begun_smithy_waits_until_it_holds_the_partys_stone_too() {
     // #1379 (Daniel, 2026-11-19): Larkspur's quarry brought its Stone home load by load, and a
     // begun smelter, mine, smithy and mint took each one, so it never held its party's and founded
