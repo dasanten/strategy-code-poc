@@ -15,6 +15,7 @@ use crate::order_sender::{npc_training_problem, ordered_resident, OrderSender};
 use crate::queries::building::{building_at, teach_problem, teacher_at};
 use crate::queries::names::placed;
 use crate::queue::field_str as str_field;
+use crate::running::{in_place, no_ties_mut, RunningOrder, Ties};
 
 /// The training subject an order's input names, if it names one (`isTrainingSubject`).
 pub fn subject_of(order: &OrderRequest) -> Option<TrainingSubject> {
@@ -75,6 +76,14 @@ pub(crate) static TEACH_META: OrderMeta =
         .adults_only()
         .npc_city()
         .goes_on_until_stopped();
+
+impl RunningOrder for TeachOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { refills_at: Some((&self.building_id, None)), ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
 
 /// Ends the teaching that no longer holds (`stepTeaching`): a teacher who has left the ground's
 /// footprint, whose ground is gone, or who is one teacher too many there stops.

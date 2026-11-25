@@ -27,6 +27,10 @@ use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::building::{build_materials_of, build_work_for};
+use crate::running::{
+    in_place, no_ties, no_ties_mut, same_when_equal, Arrival, By, Going, GoingMut, RunningOrder,
+    Ties, To,
+};
 
 use crate::queries::driving::carriage_can_go_to;
 use crate::queries::names::{held, placed};
@@ -221,6 +225,33 @@ impl OrderKind for Crew {
 pub(crate) static CREW_META: OrderMeta =
     OrderMeta::request("crew", &Crew).gets_off_first().adults_only();
 
+impl RunningOrder for CrewOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: true,
+            by: By::Foot,
+            to: To::Machine(&self.machine_id),
+            near: false,
+            after: None,
+            estimated: false,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        Arrival::JoinsCrew
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        // The path found before the interruption is kept (#1619).
+        true
+    }
+    same_when_equal!();
+    no_ties!();
+}
+
 /// The push order (`push`): one of a machine's crew pushes it to (x, y), a tile a carriage could
 /// go to, with at least its crew size on its tile (`CONTEXT.md`: Siege machine). Another of the
 /// crew pushing it stops.
@@ -290,6 +321,33 @@ impl OrderKind for Push {
 }
 
 pub(crate) static PUSH_META: OrderMeta = OrderMeta::request("push", &Push).adults_only();
+
+impl RunningOrder for PushOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: true,
+            by: By::Machine(&self.machine_id),
+            to: To::tile(&self.target),
+            near: false,
+            after: None,
+            estimated: false,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        Arrival::Done
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        // The path found before the interruption is kept (#1619).
+        true
+    }
+    same_when_equal!();
+    no_ties!();
+}
 
 /// A crew order got onto its machine's tile (`walking.rs`): the resident joins its crew, if the
 /// machine still stands there and is still of their realm. The order is done either way.
@@ -451,6 +509,15 @@ impl OrderKind for RamAt {
 
 pub(crate) static RAM_META: OrderMeta = OrderMeta::request("ram", &RamAt).adults_only();
 
+impl RunningOrder for RamOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        // Not counted as striking at it (#1620).
+        Ties { falls_with: Some(&self.target_id), ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
+
 /// Resolves this tick's ram strikes (`CONTEXT.md`: Ram, ADR 0002): each ram order that still holds
 /// gets `1 / RAM_STRIKE_TICKS` closer to its next strike; a strike raises the alarm as a blow at
 /// the wall does and does `RAM_BLOW` to it. A wall or gate that has taken its strength falls,
@@ -523,12 +590,8 @@ fn hit_wall(
 fn end_orders_on(world: &mut WorldState, broken: &[Building]) {
     let gone: Vec<&str> = broken.iter().map(|b| b.id.as_str()).collect();
     for r in &mut world.residents {
-        let on_gone = match &r.order {
-            Some(ResidentOrder::Ram(o)) => gone.contains(&o.target_id.as_str()),
-            Some(ResidentOrder::Throw(o)) => gone.contains(&o.target_id.as_str()),
-            Some(ResidentOrder::Attack(o)) => gone.contains(&o.target_id.as_str()),
-            _ => false,
-        };
+        let on_gone =
+            r.order.as_ref().and_then(|o| o.ties().falls_with).is_some_and(|id| gone.contains(&id));
         if on_gone {
             r.order = None;
         }
@@ -673,6 +736,15 @@ impl OrderKind for ThrowAt {
 }
 
 pub(crate) static THROW_META: OrderMeta = OrderMeta::request("throw", &ThrowAt).adults_only();
+
+impl RunningOrder for ThrowOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        // Not counted as striking at it (#1620).
+        Ties { falls_with: Some(&self.target_id), ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
 
 /// Resolves this tick's catapult shots (`CONTEXT.md`: Catapult, ADR 0002): each throw order that
 /// still holds gets `1 / CATAPULT_SHOT_TICKS` closer to its next shot; a shot takes one Stone and

@@ -39,6 +39,7 @@ use crate::queries::warehouse_trade::{
     delivery_storage, hands_of, load_of, owed_by, quote_delivery, quote_pick_up, quote_trade,
     trade_problem, trading_warehouse_at, TradeHolder,
 };
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::sight::InvariantViolation;
 
 fn resident_named(world: &WorldState, id: Option<&Value>) -> Option<usize> {
@@ -94,6 +95,11 @@ pub fn apply_trade(
 }
 
 pub(crate) static TRADE_META: OrderMeta = OrderMeta::not_requested("trade").npc_city();
+
+impl RunningOrder for TradeOrder {
+    in_place!();
+    no_ties!();
+}
 
 pub(crate) static SELL_META: OrderMeta = OrderMeta::fns(
     "sell",
@@ -151,6 +157,11 @@ pub(crate) static SWAP_META: OrderMeta =
     OrderMeta::fns("swap", |w, s, o, _| validate_swap(w, s, o), |w, s, o, _| apply_swap(w, s, o))
         .gets_off_first();
 
+impl RunningOrder for SwapOrder {
+    in_place!();
+    no_ties!();
+}
+
 /// Checks a buy horse order (`buyHorse.validate`).
 pub fn validate_buy_horse(
     world: &WorldState,
@@ -204,6 +215,11 @@ pub(crate) static SELL_HORSE_META: OrderMeta = OrderMeta::fns(
     |w, s, o, _| apply_sell_horse(w, s, o),
 )
 .gets_off_first();
+
+impl RunningOrder for HorseTradeOrder {
+    in_place!();
+    no_ties!();
+}
 
 fn horse_order(world: &mut WorldState, order: &OrderRequest, buy: bool) {
     let o = &order.fields;

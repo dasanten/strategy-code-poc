@@ -30,6 +30,7 @@ use crate::queries::building::CARRYING_A_CHILD;
 use crate::queries::names::{good_of, kind_name, placed};
 use crate::queries::residents::{can_work, carry_capacity, good_weight, stock_weight};
 use crate::queue::field_str as str_field;
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::sight::InvariantViolation;
 use crate::world_index::resident_index;
 use csp_shared::footprint::covers;
@@ -284,6 +285,11 @@ pub(crate) static GATHER_META: OrderMeta =
         .gets_off_first()
         .adults_only()
         .blocked_carrying_child();
+
+impl RunningOrder for GatherOrder {
+    in_place!();
+    no_ties!();
+}
 
 /// Ends the resident's gather order, saying why (`me.orderEnded`); `None` when they left the tile
 /// or something now stands on it.

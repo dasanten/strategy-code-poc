@@ -5,14 +5,13 @@
 use csp_shared::balance::{FOOD_PER_DAY, HORSE_FOOD_PER_DAY};
 use csp_shared::terrain::{step_length, Terrain};
 use csp_shared::time::TICKS_PER_GAME_DAY;
-use csp_shared::world::{
-    FetchPhase, HaulPhase, HorseStats, Resident, ResidentOrder, StorePhase, TilePath, WorldState,
-};
+use csp_shared::world::{HorseStats, Resident, WorldState};
 
 use super::carriages::horse_for;
 use super::pace::{drive_speed, horse_food_factor, ride_speed, walk_speed};
 use super::residents::food_use;
 use super::riding::horse_ridden;
+use crate::running::{moving, By};
 
 /// Ticks a way of `path` from `from` takes (`wayTicks`): each step its length at the pace onto
 /// the tile it goes to, less the `progress` already made into the first. A step at no pace counts
@@ -51,21 +50,13 @@ pub fn arrival_ticks(
     ground: &dyn Fn(f64, f64) -> u8,
     r: &Resident,
 ) -> Option<f64> {
-    let (path, progress): (&TilePath, f64) = match r.order.as_ref()? {
-        ResidentOrder::WalkTo(o) => (o.path.as_ref()?, o.progress),
-        ResidentOrder::Relocate(o) => (o.path.as_ref()?, o.progress),
-        ResidentOrder::Drive(o) => (o.path.as_ref()?, o.progress),
-        ResidentOrder::Haul(o) if o.phase == HaulPhase::Driving => (o.path.as_ref()?, o.progress),
-        ResidentOrder::Store(o) if o.phase == StorePhase::Walking => (o.path.as_ref()?, o.progress),
-        ResidentOrder::Fetch(o) if o.phase == FetchPhase::Walking => (o.path.as_ref()?, o.progress),
-        _ => return None,
-    };
+    let going = moving(r.order.as_ref()).filter(|g| g.estimated)?;
+    let (path, progress) = (going.path.as_ref()?, going.progress);
     let tick = world.tick as f64;
     let slowest = walk_speed(r, Terrain::Mountain as u8, tick);
-    let carriage_id = match r.order.as_ref()? {
-        ResidentOrder::Drive(o) => Some(&o.carriage_id),
-        ResidentOrder::Haul(o) => Some(&o.carriage_id),
-        _ => None,
+    let carriage_id = match going.by {
+        By::Carriage { id, .. } => Some(id),
+        By::Foot | By::Oars(_) | By::Sails(_) | By::Machine(_) => None,
     };
     let pace: Box<dyn Fn(u8) -> f64> = match carriage_id {
         None => match horse_ridden(world, r) {
@@ -73,7 +64,7 @@ pub fn arrival_ticks(
             None => Box::new(move |g| walk_speed(r, g, tick)),
         },
         Some(id) => {
-            let carriage = world.carriages.iter().find(|k| k.id == *id);
+            let carriage = world.carriages.iter().find(|k| k.id == id);
             match carriage.and_then(|k| horse_for(world, k)) {
                 Some(h) => Box::new(move |g| drive_speed(r, &h.stats, g)),
                 // Without a horse each step goes at once, a tile a tick.
@@ -103,7 +94,8 @@ mod tests {
     };
     use csp_shared::terrain::DIAGONAL_STEP;
     use csp_shared::world::{
-        DriveOrder, FetchOrder, GoodsPlace, ResidentOrder, SkillName, StoreOrder, Tile, WalkOrder,
+        DriveOrder, FetchOrder, GoodsPlace, ResidentOrder, SkillName, StoreOrder, StorePhase, Tile,
+        TilePath, WalkOrder,
     };
 
     use super::*;

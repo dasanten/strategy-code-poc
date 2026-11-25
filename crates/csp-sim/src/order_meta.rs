@@ -4,7 +4,7 @@
 //! give, the invariants.
 //!
 //! A new kind: declare its `OrderMeta` in its module, and name it in [`ORDER_METAS`]; one a
-//! resident holds (a [`ResidentOrder`]) is also named in `running_orders!`.
+//! resident holds (a [`ResidentOrder`]) is also named in `running_orders!` here and in `running.rs`.
 
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};

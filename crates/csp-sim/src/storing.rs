@@ -24,6 +24,9 @@ use crate::queries::goods::{can_handle, free_stock, put_away_units};
 use crate::queries::names::{good_of, held, placed};
 use crate::queries::vessels::{docked_at, resident_beside_vessel, vessel_by_id};
 use crate::ruins::is_ruin;
+use crate::running::{
+    no_ties_mut, same_when_equal, Arrival, By, Going, GoingMut, Handles, RunningOrder, Ties, To,
+};
 use csp_shared::balance::MAP_SIZE;
 
 /// `Number.MAX_SAFE_INTEGER`: a fetch of as many as there are.
@@ -334,6 +337,38 @@ pub(crate) static STORE_META: OrderMeta = OrderMeta::fns(
 .gets_off_first()
 .npc_city();
 
+impl RunningOrder for StoreOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: self.phase == StorePhase::Walking,
+            by: By::Foot,
+            to: To::Place(&self.to),
+            near: false,
+            after: None,
+            estimated: true,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        self.phase = StorePhase::Putting;
+        GoingMut::new(&mut self.path, &mut self.progress).reset();
+        Arrival::GoesOn
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        GoingMut::new(&mut self.path, &mut self.progress).reset_found();
+        true
+    }
+    same_when_equal!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { handles: Handles::Wanted(&self.goods), ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
+
 /// Checks a fetch order (`fetch.validate`): one of the Player's residents walks to `from` (by
 /// default the nearest storage or carriage of their realm holding the goods) and takes them.
 pub fn validate_fetch(
@@ -376,6 +411,38 @@ pub(crate) static FETCH_META: OrderMeta = OrderMeta::fns(
 .queue_step()
 .gets_off_first()
 .npc_city();
+
+impl RunningOrder for FetchOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: self.phase == FetchPhase::Walking,
+            by: By::Foot,
+            to: To::Place(&self.from),
+            near: false,
+            after: None,
+            estimated: true,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        self.phase = FetchPhase::Taking;
+        GoingMut::new(&mut self.path, &mut self.progress).reset();
+        Arrival::GoesOn
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        GoingMut::new(&mut self.path, &mut self.progress).reset_found();
+        true
+    }
+    same_when_equal!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { handles: Handles::Wanted(&self.goods), ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
 
 /// A store or fetch order's place (`placeOf`).
 pub fn place_of(o: &ResidentOrder) -> Option<&GoodsPlace> {

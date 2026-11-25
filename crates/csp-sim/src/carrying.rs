@@ -27,6 +27,7 @@ use crate::queries::goods::{
 use crate::queries::guard::outpost_storage_guarded;
 use crate::queries::names::{good_of, held};
 use crate::queries::vessels::{beside_vessel, units_that_fit_vessel};
+use crate::running::{in_place, no_ties_mut, Handles, RunningOrder, Ties};
 use crate::storing::carried_for_order;
 
 /// Whether an action takes goods from a spot or puts carried goods there.
@@ -182,6 +183,14 @@ pub(crate) static PICK_UP_META: OrderMeta = OrderMeta::fns(
 .gets_off_first()
 .npc_city();
 
+impl RunningOrder for PickUpOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { handles: Handles::Stock(&self.goods), ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
+
 /// Checks a drop order (`drop.validate`): one of the Player's residents puts down carried goods
 /// on their tile; at a construction site only what it still needs.
 pub fn validate_drop(
@@ -227,6 +236,14 @@ pub(crate) static DROP_META: OrderMeta =
         .queue_step()
         .gets_off_first()
         .npc_city();
+
+impl RunningOrder for DropOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { handles: Handles::Stock(&self.goods), ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
 
 /// Requests this tick's take and put actions from pick-up and drop orders (`requestCarrying`).
 pub fn request_carrying(world: &WorldState) -> Vec<CarryAction> {

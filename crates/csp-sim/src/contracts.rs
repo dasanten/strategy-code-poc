@@ -34,6 +34,7 @@ use crate::queries::standing::organization_label;
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::trade_org::{contract_side, trade_org_hq};
 use crate::random::new_id;
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::sight::InvariantViolation;
 use crate::standing::{change_standing, raise_standing_both_ways};
 use crate::trade_org_army::spare_soldiers;
@@ -494,6 +495,11 @@ impl OrderKind for Pay {
 }
 
 pub(crate) static PAY_META: OrderMeta = OrderMeta::request("pay", &Pay);
+
+impl RunningOrder for PayOrder {
+    in_place!();
+    no_ties!();
+}
 
 /// Puts the coins for `weeks` game weeks into the contract's storage and counts them as paid
 /// (`payInto`); each week raises standing both ways between its sides.

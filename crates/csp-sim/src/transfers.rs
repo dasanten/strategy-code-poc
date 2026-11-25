@@ -33,6 +33,7 @@ use crate::queries::transfer::{
 };
 use crate::queries::warehouse::trade_coin_warehouse;
 use crate::queries::warehouse_trade::{debt_of, delivery_storage};
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::sight::InvariantViolation;
 
 fn realm_of(world: &WorldState, user_id: u64) -> Option<&csp_shared::world::Realm> {
@@ -230,6 +231,11 @@ pub(crate) static HAND_IN_META: OrderMeta = OrderMeta::fns(
     |w, s, o, _| apply_hand_in(w, s, o),
 )
 .gets_off_first();
+
+impl RunningOrder for HandInOrder {
+    in_place!();
+    no_ties!();
+}
 
 fn holder_stock(world: &WorldState, h: Holder) -> Stock {
     crate::holders::stock_of(world, h)

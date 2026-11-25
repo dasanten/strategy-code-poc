@@ -15,6 +15,7 @@ use crate::orders::OrderKind;
 use crate::queries::combat::in_contact;
 use crate::queries::goods::units_that_fit;
 use crate::queries::residents::{can_work, is_down};
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::survival::wake;
 use crate::tick::Scratch;
 
@@ -148,6 +149,11 @@ impl OrderKind for Feed {
 
 pub(crate) static FEED_META: OrderMeta =
     OrderMeta::request("feed", &Feed).queue_step().gets_off_first().adults_only().npc_city();
+
+impl RunningOrder for FeedOrder {
+    in_place!();
+    no_ties!();
+}
 
 /// Takes `units` of Food from the feeder's hands (`takeFood`).
 fn take_food(from: &mut Resident, units: f64) {

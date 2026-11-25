@@ -16,6 +16,7 @@ use crate::orders::{ids_field, text_field};
 use crate::queries::city::town_hall_of;
 use crate::queries::city_area::{city_area_tiles, free_housing, in_city_area};
 use crate::queries::people::relocate_problem;
+use crate::running::{no_ties, same_when_equal, Arrival, By, Going, GoingMut, RunningOrder, To};
 
 /// The input of a relocate order (`RelocateRequest`): which resident, the realm's city they move
 /// to, and the group they relocate with, their own id among them, when given to a group.
@@ -112,6 +113,34 @@ pub(crate) static RELOCATE_META: OrderMeta = OrderMeta::fns(
 .queue_step()
 .gets_off_first()
 .blocked_carrying_child();
+
+impl RunningOrder for RelocateOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: true,
+            by: By::Foot,
+            to: To::tile(&self.target),
+            near: false,
+            after: None,
+            estimated: true,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        GoingMut::new(&mut self.path, &mut self.progress).reset();
+        Arrival::GoesOn
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        GoingMut::new(&mut self.path, &mut self.progress).reset_found();
+        true
+    }
+    same_when_equal!();
+    no_ties!();
+}
 
 /// The tile of a city's area nearest to `from` that a resident can stand on (`nearestAreaTile`):
 /// passable land, as far as `terrain` tells, with no wall or gate. None when its area has none.

@@ -24,6 +24,7 @@ use crate::queries::names::placed;
 use crate::queries::people::CARRYING_A_CHILD;
 use crate::queries::residents::can_work;
 use crate::random::{hash_str, Mulberry32};
+use crate::running::{in_place, no_ties_mut, RunningOrder, Ties};
 
 /// Ticks of tending a foal takes (`STABLE_BREED_TICKS` of shared `horses.ts`).
 pub const STABLE_BREED_TICKS: f64 = STABLE_BREED_DAYS * TICKS_PER_GAME_DAY;
@@ -121,6 +122,14 @@ pub(crate) static BREED_META: OrderMeta = OrderMeta::fns(
 .adults_only()
 .npc_city()
 .blocked_carrying_child();
+
+impl RunningOrder for BreedOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { crew_of: Some(&self.stable_id), ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
 
 /// Requests this tick's tending from residents' breed orders (`requestBreeding`).
 pub fn request_breeding(world: &WorldState) -> Vec<BreedAction> {

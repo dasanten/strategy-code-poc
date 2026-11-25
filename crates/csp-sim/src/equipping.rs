@@ -14,6 +14,7 @@ use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::names::{good_name, good_of, held};
+use crate::running::{in_place, no_ties_mut, RunningOrder, Ties};
 
 /// Why a resident can't put `good` on (`None` when they can): it goes into a slot, they carry it,
 /// and it isn't what that slot holds already.
@@ -88,6 +89,14 @@ impl OrderKind for Equip {
 }
 
 pub(crate) static EQUIP_META: OrderMeta = OrderMeta::request("equip", &Equip).queue_step();
+
+impl RunningOrder for EquipOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { kept_when_struck: true, ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
 
 /// The take-off order (`takeOff`): a resident of the Player's realm empties `slot`; its item
 /// stays carried.

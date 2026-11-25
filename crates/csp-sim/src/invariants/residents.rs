@@ -15,6 +15,7 @@ use super::{invariant, js_number, violation, Invariant};
 use crate::order_meta::{running_meta, OrderMeta};
 use crate::queries::names::{good_name, placed};
 use crate::queries::residents::can_work;
+use crate::running::RunningOrder;
 
 pub(super) const INVARIANTS: &[Invariant] = &[
     invariant("trained-within-cap", trained_within_cap),
@@ -190,12 +191,8 @@ pub fn children_carry_only_food(world: &WorldState, _: &TerrainMap) -> Out {
         }
         let mut goods: Vec<&str> =
             r.carried.iter().filter(|(_, n)| **n > 0.0).map(|(g, _)| good_name(*g)).collect();
-        match &r.order {
-            Some(ResidentOrder::PickUp(o)) => goods.extend(o.goods.keys().map(|g| good_name(*g))),
-            Some(ResidentOrder::Drop(o)) => goods.extend(o.goods.keys().map(|g| good_name(*g))),
-            Some(ResidentOrder::Store(o)) => goods.extend(o.goods.keys().map(|g| good_name(*g))),
-            Some(ResidentOrder::Fetch(o)) => goods.extend(o.goods.keys().map(|g| good_name(*g))),
-            _ => {}
+        if let Some(o) = &r.order {
+            goods.extend(o.ties().handles.goods().into_iter().map(good_name));
         }
         if goods.iter().all(|g| *g == "food") {
             continue;

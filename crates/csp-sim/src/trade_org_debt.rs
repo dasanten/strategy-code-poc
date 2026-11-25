@@ -25,6 +25,7 @@ use crate::queries::standing::{standing_organization, TRADE_ORG};
 use crate::queries::trade_org::trade_org_hq;
 use crate::queries::warehouse_trade::js_number;
 use crate::queries::warehouse_trade::{buy_off_coin_warehouse_at, debt_of, pay_debt_problem};
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::standing::organization_exists;
 
 /// How a debt first reads in the log (`first` of `oweTradeOrg`).
@@ -219,6 +220,11 @@ impl OrderKind for PayDebt {
 
 pub(crate) static PAY_DEBT_META: OrderMeta =
     OrderMeta::request("payDebt", &PayDebt).gets_off_first();
+
+impl RunningOrder for PayDebtOrder {
+    in_place!();
+    no_ties!();
+}
 
 /// One payment this tick: the coins of payer and coin warehouse and the debt, before and after
 /// (`DebtPayment`).

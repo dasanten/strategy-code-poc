@@ -14,6 +14,7 @@ use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, realm_of, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::vessels::{crew_short, sail_target, steals_vessel, vessel_by_id};
+use crate::running::{no_ties, same_when_equal, Arrival, By, Going, GoingMut, RunningOrder, To};
 use crate::stealing::{take_over, Taken};
 
 /// Why a resident can't sail a ship now (`CONTEXT.md`: Sailing): a ship, which they are aboard as
@@ -128,3 +129,30 @@ impl OrderKind for Sail {
 }
 
 pub(crate) static SAIL_META: OrderMeta = OrderMeta::request("sail", &Sail).queue_step();
+
+impl RunningOrder<Sail> for RowOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: true,
+            by: By::Sails(&self.vessel_id),
+            to: To::tile(&self.target),
+            near: false,
+            after: None,
+            estimated: false,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        Arrival::Done
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        // The path found before the interruption is kept (#1619).
+        true
+    }
+    same_when_equal!();
+    no_ties!();
+}

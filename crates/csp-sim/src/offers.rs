@@ -35,6 +35,7 @@ use crate::queries::standing::{organization_label, TRADE_ORG};
 use crate::queries::trade_org::trade_org_hq;
 use crate::queries::transfer::{nearest_warehouse, transfer_load};
 use crate::queries::warehouse_trade::{delivery_storage, hands_of, load_of};
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::sight::{sight_of, Spot};
 use crate::standing::raise_standing_by_trade;
 use crate::world_index::WorldIndex;
@@ -650,6 +651,11 @@ impl OrderKind for AcceptOffer {
 
 pub(crate) static ACCEPT_OFFER_META: OrderMeta =
     OrderMeta::request("acceptOffer", &AcceptOffer).gets_off_first();
+
+impl RunningOrder for AcceptOfferOrder {
+    in_place!();
+    no_ties!();
+}
 
 /// One offer accepted this tick, with the goods of everyone in it before and after (`Accepted`).
 #[derive(Debug, Clone, PartialEq)]

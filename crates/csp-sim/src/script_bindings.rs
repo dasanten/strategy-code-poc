@@ -270,8 +270,8 @@ fn order_value(
 ) -> Value {
     let Some(order) = order else { return Value::Null };
     let mut order = order.clone();
-    if let Some((path, _)) = crate::walking::order_path_mut(&mut order) {
-        *path = None;
+    if let Some(going) = crate::running::RunningOrder::going_mut(&mut order) {
+        *going.path = None;
     }
     view_value_in(&serde_json::to_value(&order).unwrap_or(Json::Null), ty, land)
 }

@@ -23,6 +23,7 @@ use crate::queries::building::{
 use crate::queries::names::{good_name, good_of, held, kind_name, placed};
 use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
+use crate::running::{in_place, RunningOrder, Ties, TiesMut};
 use crate::survival::drop_goods;
 use crate::tick::Scratch;
 use crate::veins::{take_from_vein, Take};
@@ -108,6 +109,20 @@ pub(crate) static WORK_AT_META: OrderMeta = OrderMeta::fns(
 .npc_city()
 .blocked_carrying_child()
 .goes_on_until_stopped();
+
+impl RunningOrder for WorkOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties {
+            crew_of: Some(&self.building_id),
+            refills_at: Some((&self.building_id, Some(&self.at))),
+            ..Ties::NONE
+        }
+    }
+    fn ties_mut(&mut self) -> TiesMut<'_> {
+        TiesMut { place: Some(&mut self.building_id), ..TiesMut::none() }
+    }
+}
 
 /// An action a resident with a work-at order requests (`WorkAction`).
 #[derive(Debug, Clone, PartialEq, Eq)]

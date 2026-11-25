@@ -21,6 +21,7 @@ use crate::queries::building::{build_materials, build_work_of, site_work_of, CAR
 use crate::queries::names::{held, held_in, kind_name, placed};
 use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
+use crate::running::{in_place, no_ties_mut, On, RunningOrder, Ties};
 use crate::world_index::{building_index, resident_index};
 
 /// How a building's condition reads (`CONTEXT.md`: Decay): good, worn, nearly a ruin.
@@ -424,6 +425,14 @@ pub(crate) static REPAIR_META: OrderMeta = OrderMeta::fns(
 .adults_only()
 .npc_city()
 .blocked_carrying_child();
+
+impl RunningOrder for RepairOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { on: On::Repairs(&self.building_id), ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
 
 #[cfg(test)]
 #[path = "repair/tests.rs"]

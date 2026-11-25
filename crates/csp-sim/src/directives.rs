@@ -28,6 +28,7 @@ use crate::queries::standing::organization_label;
 use crate::queries::standing::{standing_organization, TRADE_ORG};
 use crate::queries::warehouse_trade::{buy_off_coin_warehouse_at, buy_off_problem, js_number};
 use crate::random::new_id;
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::sight::InvariantViolation;
 
 /// The longest reason an admin can give, in characters (`MAX_DIRECTIVE_REASON`).
@@ -357,6 +358,11 @@ impl OrderKind for BuyOff {
 }
 
 pub(crate) static BUY_OFF_META: OrderMeta = OrderMeta::request("buyOff", &BuyOff).gets_off_first();
+
+impl RunningOrder for BuyOffOrder {
+    in_place!();
+    no_ties!();
+}
 
 /// One buy-off of a tick (`BuyOffRecord`): the coins of payer and coin warehouse before and
 /// after, and the directive.

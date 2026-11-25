@@ -6,10 +6,11 @@
 //! someone of their own city, they still fight back. Whatever slips past (the city's side changing
 //! under an order already held) ends before it acts, in [`drop_orders_against_lender`].
 
-use csp_shared::world::{Resident, ResidentOrder, WorldState};
+use csp_shared::world::{Resident, WorldState};
 
 use crate::crimes::{building_organization, organization_of};
 use crate::queries::contract::lending_city;
+use crate::running::{On, RunningOrder};
 use crate::sight::InvariantViolation;
 
 /// Why a lent resident refuses an order against the city that lent them.
@@ -39,13 +40,13 @@ pub fn refusal(world: &WorldState, r: &Resident, target_id: &str) -> Option<&'st
 /// What `r`'s order goes against, if it turns them on their lending city: an attack not fought
 /// back at whoever struck them, a climb or a tear-down.
 fn order_against_lender<'r>(world: &WorldState, r: &'r Resident) -> Option<&'r str> {
-    let target = match r.order.as_ref()? {
-        ResidentOrder::Attack(o) if o.defending != Some(true) => &o.target_id,
-        ResidentOrder::Climb(o) => &o.wall_id,
-        ResidentOrder::TearDown(o) => &o.building_id,
-        _ => return None,
+    let ties = r.order.as_ref()?.ties();
+    let torn_down = match ties.on {
+        On::TearsDown(id) => Some(id),
+        On::Nothing | On::Site(_) | On::Repairs(_) => None,
     };
-    against_lender(world, r, target).then_some(target.as_str())
+    let target = ties.strikes.or(torn_down)?;
+    against_lender(world, r, target).then_some(target)
 }
 
 /// Ends every order a lent resident holds against the city that lent them, before anyone acts

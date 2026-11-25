@@ -9,6 +9,7 @@ use crate::defence::Alarms;
 use crate::order_meta::OrderMeta;
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::orders::{str_field, OrderKind};
+use crate::running::{in_place, no_ties_mut, RunningOrder, Ties};
 use crate::walls::{climb_landing, foreign_wall};
 
 /// An action a resident with a climb order requests: climb a tick further up the wall.
@@ -87,6 +88,14 @@ impl OrderKind for Climb {
 }
 
 pub(crate) static CLIMB_META: OrderMeta = OrderMeta::request("climb", &Climb).gets_off_first();
+
+impl RunningOrder for ClimbOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { strikes: Some(&self.wall_id), kept_when_struck: true, ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
 
 /// Requests this tick's climbing (`requestClimbing`).
 pub fn request_climbing(world: &WorldState) -> Vec<ClimbAction> {

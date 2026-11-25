@@ -17,6 +17,7 @@ use crate::queries::vessels::{
     beside_vessel, row_off_problem, row_target, steals_vessel, vessel_by_id, vessel_of_resident,
     vessel_room,
 };
+use crate::running::{no_ties, same_when_equal, Arrival, By, Going, GoingMut, RunningOrder, To};
 use crate::stealing::{take_over, Taken};
 
 /// Why a resident can't take a vessel's oars now (`CONTEXT.md`: Rowing): grown, of its realm,
@@ -153,6 +154,33 @@ impl OrderKind for Row {
 }
 
 pub(crate) static ROW_META: OrderMeta = OrderMeta::request("row", &Row).queue_step();
+
+impl RunningOrder<Row> for RowOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: true,
+            by: By::Oars(&self.vessel_id),
+            to: To::tile(&self.target),
+            near: false,
+            after: None,
+            estimated: false,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        Arrival::Done
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        // The path found before the interruption is kept (#1619).
+        true
+    }
+    same_when_equal!();
+    no_ties!();
+}
 
 #[cfg(test)]
 pub(crate) mod tests;
