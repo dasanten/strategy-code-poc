@@ -7,7 +7,7 @@ use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{OrderRequest, WorldState};
 
-use crate::order_meta::OrderMeta;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{str_field, OrderKind};
 use crate::queries::alliance::commander_of;
@@ -90,8 +90,10 @@ impl OrderKind for Mount {
     }
 }
 
-pub(crate) static MOUNT_META: OrderMeta =
-    OrderMeta::request("mount", &Mount).queue_step().gets_off_first().script(&[MOUNT_ACTION]);
+pub(crate) static MOUNT_META: OrderMeta = OrderMeta::request("mount", &Mount)
+    .queue_step(StepGroup::Move)
+    .gets_off_first()
+    .script(&[MOUNT_ACTION]);
 
 const MOUNT_ACTION: ScriptAction = ScriptAction {
     name: "mount",
@@ -137,8 +139,9 @@ impl OrderKind for Dismount {
     }
 }
 
-pub(crate) static DISMOUNT_META: OrderMeta =
-    OrderMeta::request("dismount", &Dismount).queue_step().script(&[DISMOUNT_ACTION]);
+pub(crate) static DISMOUNT_META: OrderMeta = OrderMeta::request("dismount", &Dismount)
+    .queue_step(StepGroup::Move)
+    .script(&[DISMOUNT_ACTION]);
 
 const DISMOUNT_ACTION: ScriptAction = ScriptAction {
     name: "dismount",

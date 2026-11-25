@@ -10,7 +10,7 @@ use csp_shared::world::{
     BuildingKind, OrderRequest, ResidentOrder, TeachOrder, TrainingSubject, WorldState,
 };
 
-use crate::order_meta::OrderMeta;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{npc_training_problem, ordered_resident, OrderSender};
 use crate::queries::building::{building_at, teach_problem, teacher_at};
 use crate::queries::names::placed;
@@ -72,7 +72,7 @@ pub fn apply_teach(world: &mut WorldState, order: &OrderRequest) {
 
 pub(crate) static TEACH_META: OrderMeta =
     OrderMeta::fns("teach", |w, s, o, _| validate_teach(w, s, o), |w, _, o, _| apply_teach(w, o))
-        .queue_step()
+        .queue_step(StepGroup::Work)
         .never_ends()
         .gets_off_first()
         .adults_only()

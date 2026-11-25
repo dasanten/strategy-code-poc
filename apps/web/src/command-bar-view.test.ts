@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { ORDER_LINES, orderColumns } from './command-bar-view.js'
 
-const kind = (name: string, n: number) => ({ name, actions: Array.from({ length: n }, (_, i) => i) })
+const kind = (name: string, n: number) => ({
+  name,
+  actions: Array.from({ length: n }, (_, i) => i),
+})
 const names = (cols: ReturnType<typeof orderColumns<ReturnType<typeof kind>>>) =>
   cols.map((c) => `${c.wide ? 'wide:' : ''}${c.groups.map((g) => g.name).join('+')}`)
 
@@ -30,10 +33,7 @@ describe('orderColumns', () => {
   })
 
   it('stacks nothing under a wide kind', () => {
-    expect(names(orderColumns([kind('move', 9), kind('goods', 1)]))).toEqual([
-      'wide:move',
-      'goods',
-    ])
+    expect(names(orderColumns([kind('move', 9), kind('goods', 1)]))).toEqual(['wide:move', 'goods'])
   })
 
   it('keeps the kinds in their order and leaves none out', () => {

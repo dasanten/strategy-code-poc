@@ -13,7 +13,7 @@ use serde_json::Value;
 use crate::carrying::{CarryAction, CarryKind};
 use crate::driving::{army_start, army_to_supply};
 use crate::goods_deps::{ordered_resident, realm_of, OrderSender};
-use crate::order_meta::OrderMeta;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::queries::army::army_spot;
 use crate::queries::combat::in_contact;
 use crate::queries::command::{commands, commands_carriage};
@@ -183,7 +183,7 @@ pub fn apply_haul(
 }
 
 pub(crate) static HAUL_META: OrderMeta = OrderMeta::fns("haul", validate_haul, apply_haul)
-    .queue_step()
+    .queue_step(StepGroup::Move)
     .never_ends()
     .gets_off_first()
     .blocked_carrying_child()

@@ -10,7 +10,7 @@ use csp_shared::world::{EquipOrder, Good, OrderRequest, Resident, ResidentOrder,
 use serde_json::Value;
 
 use crate::equipment::{equipped, hands_full, set_slot, slot_name, slot_named, slot_of, Slot};
-use crate::order_meta::OrderMeta;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::names::{good_name, good_of, held};
@@ -91,7 +91,7 @@ impl OrderKind for Equip {
 }
 
 pub(crate) static EQUIP_META: OrderMeta =
-    OrderMeta::request("equip", &Equip).queue_step().script(&[EQUIP_ACTION]);
+    OrderMeta::request("equip", &Equip).queue_step(StepGroup::Goods).script(&[EQUIP_ACTION]);
 
 const EQUIP_ACTION: ScriptAction = ScriptAction {
     name: "equip",
@@ -153,7 +153,7 @@ impl OrderKind for TakeOff {
 }
 
 pub(crate) static TAKE_OFF_META: OrderMeta =
-    OrderMeta::request("takeOff", &TakeOff).queue_step().script(&[TAKE_OFF_ACTION]);
+    OrderMeta::request("takeOff", &TakeOff).queue_step(StepGroup::Goods).script(&[TAKE_OFF_ACTION]);
 
 const TAKE_OFF_ACTION: ScriptAction = ScriptAction {
     name: "takeOff",

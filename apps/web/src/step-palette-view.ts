@@ -1,7 +1,8 @@
 import { createContext } from 'react'
 import { ORDER_GROUP_LABELS } from './selection-view.js'
-import type { Condition } from '@csp/shared-types'
-import type { Plan, PlanStepId } from './plan-step.js'
+import type { Condition, OrderRequest } from '@csp/shared-types'
+import { PLAN_STEPS, type Plan, type PlanKind, type PlanStepId } from './plan-step.js'
+import { stepGroup, type StepGroup } from './queue-view.js'
 
 /**
  * The queue planner's Add step palette (`CONTEXT.md`: Planner blocks): every kind of step grouped
@@ -18,98 +19,29 @@ export interface PaletteGroup {
   steps: readonly PlanStepId[]
 }
 
-/** Every Add step kind in the group the Orders tab shows its order under. */
-export const PALETTE_GROUPS: readonly PaletteGroup[] = [
-  {
-    id: 'move',
-    label: ORDER_GROUP_LABELS.move,
-    steps: [
-      'walk',
-      'explore',
-      'relocate',
-      'mount',
-      'dismount',
-      'drive',
-      'board',
-      'boardBoat',
-      'boardCrew',
-      'row',
-      'sail',
-      'getOff',
-      'hitch',
-      'unhitch',
-      'haul',
-      'haulBoat',
-    ],
-  },
-  {
-    id: 'work',
-    label: ORDER_GROUP_LABELS.work,
-    steps: [
-      'work',
-      'gather',
-      'build',
-      'road',
-      'wall',
-      'tearDown',
-      'feedStable',
-      'feedStableOnce',
-      'breed',
-      'teach',
-      'train',
-    ],
-  },
-  {
-    id: 'goods',
-    label: ORDER_GROUP_LABELS.goods,
-    steps: ['store', 'fetch', 'pickUp', 'drop', 'feed', 'equip', 'takeOff'],
-  },
-  { id: 'scripts', label: ORDER_GROUP_LABELS.scripts, steps: ['runScript'] },
-]
+/** The group a kind of step is under: that of the order it becomes, by its kind's facts. */
+function groupOf(k: PlanKind): StepGroup {
+  return k.makes ? stepGroup(k.makes as OrderRequest) : 'flow'
+}
+
+/** Every Add step kind in the group the Orders tab shows its order under, in `PLAN_STEPS` order. */
+export const PALETTE_GROUPS: readonly PaletteGroup[] = (
+  ['move', 'work', 'goods', 'scripts'] as const
+).map((id) => ({
+  id,
+  label: ORDER_GROUP_LABELS[id],
+  steps: PLAN_STEPS.filter((k) => groupOf(k) === id).map((k) => k.id),
+}))
 
 /** The step kinds in Flow, beside Repeat: shaping the queue rather than an order (`CONTEXT.md`: Wait until). */
-export const FLOW_STEPS: readonly PlanStepId[] = ['waitUntil', 'if']
+export const FLOW_STEPS: readonly PlanStepId[] = PLAN_STEPS.filter(
+  (k) => groupOf(k) === 'flow',
+).map((k) => k.id)
 
 /** Each step kind's icon in the palette. */
-export const PLAN_STEP_ICONS: Record<PlanStepId, string> = {
-  walk: '🚶',
-  explore: '🧭',
-  gather: '🧺',
-  relocate: '🏠',
-  mount: '🐎',
-  dismount: '⏬',
-  drive: '🛞',
-  board: '🚪',
-  boardBoat: '⛵',
-  boardCrew: '⚓',
-  row: '🚣',
-  sail: '🚢',
-  getOff: '⏏',
-  hitch: '🔗',
-  unhitch: '✂',
-  haul: '🚚',
-  haulBoat: '🛶',
-  work: '⚒',
-  build: '🏗',
-  road: '🛤',
-  wall: '🧱',
-  tearDown: '🪓',
-  feedStable: '🌾',
-  feedStableOnce: '🌾',
-  breed: '🐴',
-  teach: '📖',
-  train: '🎯',
-  store: '📦',
-  fetch: '📥',
-  pickUp: '✋',
-  drop: '📤',
-  feed: '🍞',
-  equip: '🛡',
-  takeOff: '🎒',
-  runScript: '📜',
-  waitUntil: '⏳',
-  if: '🔀',
-}
+export const PLAN_STEP_ICONS = Object.fromEntries(
+  PLAN_STEPS.map((k) => [k.id, k.icon]),
+) as Readonly<Record<PlanStepId, string>>
 
 /** The Flow group's Repeat's icon. */
 export const REPEAT_ICON = '🔁'

@@ -107,33 +107,75 @@ export type PlanStepId =
 export interface PlanKind {
   id: PlanStepId
   label: string
+  /** Its icon in the Add step palette. */
+  icon: string
+  /**
+   * The kind of order it becomes (`planOrder`), and the task of a task step: the palette groups it
+   * by its kind's facts (`stepGroup`). None for an If block, which is no step.
+   */
+  makes: { kind: Exclude<OrderRequest['kind'], 'task'> | 'task'; task?: Task } | null
   /** The places picked on the map, in order, each with what the banner asks for. */
   picks: readonly { pick: PlanPick; prompt: string }[]
   /** What the card asks for after the picks, if anything. */
   ask?: PlanAsk
 }
 
-/** Every kind of step Add step offers, grouped as the Orders tab groups them. */
+/**
+ * Every kind of step Add step offers, in the order the palette lists them: grouped as the Orders tab
+ * groups their orders (`PALETTE_GROUPS`), then Flow.
+ */
 export const PLAN_STEPS: readonly PlanKind[] = [
-  { id: 'walk', label: 'Walk to', picks: [{ pick: 'tile', prompt: 'where to walk' }] },
+  {
+    id: 'walk',
+    label: 'Walk to',
+    icon: '🚶',
+    makes: { kind: 'walkTo' },
+    picks: [{ pick: 'tile', prompt: 'where to walk' }],
+  },
+  {
+    id: 'explore',
+    label: 'Explore',
+    icon: '🧭',
+    makes: { kind: 'task', task: 'explore' },
+    picks: [],
+  },
+  {
+    id: 'relocate',
+    label: 'Relocate',
+    icon: '🏠',
+    makes: { kind: 'relocate' },
+    picks: [{ pick: 'city', prompt: 'the city of yours to relocate to' }],
+  },
+  {
+    id: 'mount',
+    label: 'Mount a horse',
+    icon: '🐎',
+    makes: { kind: 'mount' },
+    picks: [{ pick: 'horse', prompt: 'the horse to mount' }],
+  },
+  { id: 'dismount', label: 'Dismount', icon: '⏬', makes: { kind: 'dismount' }, picks: [] },
   {
     id: 'drive',
     label: 'Drive the carriage',
+    icon: '🛞',
+    makes: { kind: 'drive' },
     picks: [
       { pick: 'carriage', prompt: 'the carriage to drive' },
       { pick: 'tile', prompt: 'where to drive it' },
     ],
   },
-  { id: 'mount', label: 'Mount a horse', picks: [{ pick: 'horse', prompt: 'the horse to mount' }] },
-  { id: 'dismount', label: 'Dismount', picks: [] },
   {
     id: 'board',
     label: 'Board a carriage',
+    icon: '🚪',
+    makes: { kind: 'board' },
     picks: [{ pick: 'carriage', prompt: 'the carriage to board' }],
   },
   {
     id: 'boardBoat',
     label: 'Board a boat',
+    icon: '⛵',
+    makes: { kind: 'board' },
     picks: [
       { pick: 'vessel', prompt: 'the boat to board' },
       { pick: 'shore', prompt: 'the shore to board it from, beside where the boat will be' },
@@ -142,6 +184,8 @@ export const PLAN_STEPS: readonly PlanKind[] = [
   {
     id: 'boardCrew',
     label: 'Board a ship as crew',
+    icon: '⚓',
+    makes: { kind: 'board' },
     picks: [
       { pick: 'vessel', prompt: 'the ship to crew' },
       { pick: 'shore', prompt: 'the tile of the haven it is docked at to board it from' },
@@ -150,6 +194,8 @@ export const PLAN_STEPS: readonly PlanKind[] = [
   {
     id: 'row',
     label: 'Row the boat',
+    icon: '🚣',
+    makes: { kind: 'row' },
     picks: [
       { pick: 'vessel', prompt: 'the boat to row' },
       { pick: 'tile', prompt: 'where to row it: water, or the shore to land at' },
@@ -158,119 +204,34 @@ export const PLAN_STEPS: readonly PlanKind[] = [
   {
     id: 'sail',
     label: 'Sail the ship',
+    icon: '🚢',
+    makes: { kind: 'sail' },
     picks: [
       { pick: 'vessel', prompt: 'the ship to sail' },
       { pick: 'tile', prompt: 'where to sail it: the Sea, or a haven to dock at' },
     ],
   },
-  { id: 'getOff', label: 'Get off', picks: [] },
-  {
-    id: 'unhitch',
-    label: 'Unhitch a horse',
-    picks: [{ pick: 'carriage', prompt: 'the carriage to unhitch the horse from' }],
-  },
+  { id: 'getOff', label: 'Get off', icon: '⏏', makes: { kind: 'getOff' }, picks: [] },
   {
     id: 'hitch',
     label: 'Hitch a horse',
+    icon: '🔗',
+    makes: { kind: 'hitch' },
     picks: [{ pick: 'carriage', prompt: 'the carriage to hitch a horse to' }],
     ask: 'horse',
   },
-  { id: 'work', label: 'Work', picks: [{ pick: 'workplace', prompt: 'the workplace to work' }] },
   {
-    id: 'build',
-    label: 'Build',
-    picks: [{ pick: 'tile', prompt: 'where to build, or a site to join' }],
-    ask: 'buildingKind',
+    id: 'unhitch',
+    label: 'Unhitch a horse',
+    icon: '✂',
+    makes: { kind: 'unhitch' },
+    picks: [{ pick: 'carriage', prompt: 'the carriage to unhitch the horse from' }],
   },
-  {
-    id: 'tearDown',
-    label: 'Tear down',
-    picks: [{ pick: 'building', prompt: 'the building or site to tear down' }],
-  },
-  {
-    id: 'road',
-    label: 'Build line: road',
-    picks: [
-      { pick: 'tile', prompt: 'where the road starts' },
-      { pick: 'tile', prompt: 'where the road ends' },
-    ],
-  },
-  {
-    id: 'wall',
-    label: 'Build line: wall',
-    picks: [
-      { pick: 'tile', prompt: 'where the wall starts' },
-      { pick: 'tile', prompt: 'where the wall ends' },
-    ],
-  },
-  {
-    id: 'feedStable',
-    label: 'Feed the stable',
-    picks: [{ pick: 'stable', prompt: 'the stable to feed' }],
-  },
-  {
-    // A single round (`CONTEXT.md`: Feeding the stable, Once): it ends once the stable is full.
-    id: 'feedStableOnce',
-    label: 'Feed the stable once',
-    picks: [{ pick: 'stable', prompt: 'the stable to feed' }],
-  },
-  {
-    id: 'breed',
-    label: 'Breed horses',
-    picks: [{ pick: 'stable', prompt: 'the stable to breed in' }],
-    ask: 'horses',
-  },
-  {
-    id: 'teach',
-    label: 'Teach',
-    picks: [{ pick: 'ground', prompt: 'the training ground to teach at' }],
-    ask: 'subject',
-  },
-  {
-    id: 'train',
-    label: 'Train',
-    picks: [{ pick: 'ground', prompt: 'the training ground to train at' }],
-  },
-  {
-    id: 'store',
-    label: 'Store what they carry',
-    picks: [{ pick: 'storage', prompt: 'the storage, stable, carriage or boat to store at' }],
-  },
-  {
-    id: 'fetch',
-    label: 'Fetch',
-    picks: [{ pick: 'storage', prompt: 'the storage, stable, carriage or boat to fetch from' }],
-    ask: 'goods',
-  },
-  {
-    id: 'pickUp',
-    label: 'Pick up',
-    picks: [{ pick: 'spot', prompt: 'where to pick goods up' }],
-    ask: 'goods',
-  },
-  {
-    id: 'drop',
-    label: 'Put down',
-    picks: [{ pick: 'spot', prompt: 'where to put goods down' }],
-    ask: 'goods',
-  },
-  {
-    id: 'feed',
-    label: 'Feed someone Down or a horse',
-    picks: [{ pick: 'toFeed', prompt: 'the resident lying Down or the horse to feed' }],
-    ask: 'units',
-  },
-  {
-    // `CONTEXT.md`: Equipment: wherever they are when its turn comes.
-    id: 'equip',
-    label: 'Put on gear',
-    picks: [],
-    ask: 'gear',
-  },
-  { id: 'takeOff', label: 'Take off gear', picks: [], ask: 'slot' },
   {
     id: 'haul',
     label: 'Haul route',
+    icon: '🚚',
+    makes: { kind: 'task', task: 'haul' },
     picks: [
       { pick: 'carriage', prompt: 'the carriage to haul with' },
       { pick: 'tile', prompt: 'where the haul route’s other stop is' },
@@ -282,6 +243,8 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     // haven it is docked at, and a ship's stops are havens.
     id: 'haulBoat',
     label: 'Haul route by boat or ship',
+    icon: '🛶',
+    makes: { kind: 'task', task: 'haul' },
     picks: [
       { pick: 'vessel', prompt: 'the boat or ship to haul with' },
       {
@@ -297,36 +260,168 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     ask: 'haul',
   },
   {
-    id: 'relocate',
-    label: 'Relocate',
-    picks: [{ pick: 'city', prompt: 'the city of yours to relocate to' }],
+    id: 'work',
+    label: 'Work',
+    icon: '⚒',
+    makes: { kind: 'task', task: 'work' },
+    picks: [{ pick: 'workplace', prompt: 'the workplace to work' }],
   },
-  { id: 'explore', label: 'Explore', picks: [] },
   // Gathers by hand from where the step starts; the good is its Customise (`CONTEXT.md`: Gather).
-  { id: 'gather', label: 'Gather', picks: [] },
-  { id: 'runScript', label: 'Run script', picks: [], ask: 'script' },
+  { id: 'gather', label: 'Gather', icon: '🧺', makes: { kind: 'task', task: 'gather' }, picks: [] },
+  {
+    id: 'build',
+    label: 'Build',
+    icon: '🏗',
+    makes: { kind: 'task', task: 'build' },
+    picks: [{ pick: 'tile', prompt: 'where to build, or a site to join' }],
+    ask: 'buildingKind',
+  },
+  {
+    id: 'road',
+    label: 'Build line: road',
+    icon: '🛤',
+    makes: { kind: 'task', task: 'buildLine' },
+    picks: [
+      { pick: 'tile', prompt: 'where the road starts' },
+      { pick: 'tile', prompt: 'where the road ends' },
+    ],
+  },
+  {
+    id: 'wall',
+    label: 'Build line: wall',
+    icon: '🧱',
+    makes: { kind: 'task', task: 'buildLine' },
+    picks: [
+      { pick: 'tile', prompt: 'where the wall starts' },
+      { pick: 'tile', prompt: 'where the wall ends' },
+    ],
+  },
+  {
+    id: 'tearDown',
+    label: 'Tear down',
+    icon: '🪓',
+    makes: { kind: 'task', task: 'tearDown' },
+    picks: [{ pick: 'building', prompt: 'the building or site to tear down' }],
+  },
+  {
+    id: 'feedStable',
+    label: 'Feed the stable',
+    icon: '🌾',
+    makes: { kind: 'task', task: 'feedStable' },
+    picks: [{ pick: 'stable', prompt: 'the stable to feed' }],
+  },
+  {
+    // A single round (`CONTEXT.md`: Feeding the stable, Once): it ends once the stable is full.
+    id: 'feedStableOnce',
+    label: 'Feed the stable once',
+    icon: '🌾',
+    makes: { kind: 'task', task: 'feedStable' },
+    picks: [{ pick: 'stable', prompt: 'the stable to feed' }],
+  },
+  {
+    id: 'breed',
+    label: 'Breed horses',
+    icon: '🐴',
+    makes: { kind: 'task', task: 'breed' },
+    picks: [{ pick: 'stable', prompt: 'the stable to breed in' }],
+    ask: 'horses',
+  },
+  {
+    id: 'teach',
+    label: 'Teach',
+    icon: '📖',
+    makes: { kind: 'teach' },
+    picks: [{ pick: 'ground', prompt: 'the training ground to teach at' }],
+    ask: 'subject',
+  },
+  {
+    id: 'train',
+    label: 'Train',
+    icon: '🎯',
+    makes: { kind: 'task', task: 'train' },
+    picks: [{ pick: 'ground', prompt: 'the training ground to train at' }],
+  },
+  {
+    id: 'store',
+    label: 'Store what they carry',
+    icon: '📦',
+    makes: { kind: 'store' },
+    picks: [{ pick: 'storage', prompt: 'the storage, stable, carriage or boat to store at' }],
+  },
+  {
+    id: 'fetch',
+    label: 'Fetch',
+    icon: '📥',
+    makes: { kind: 'fetch' },
+    picks: [{ pick: 'storage', prompt: 'the storage, stable, carriage or boat to fetch from' }],
+    ask: 'goods',
+  },
+  {
+    id: 'pickUp',
+    label: 'Pick up',
+    icon: '✋',
+    makes: { kind: 'pickUp' },
+    picks: [{ pick: 'spot', prompt: 'where to pick goods up' }],
+    ask: 'goods',
+  },
+  {
+    id: 'drop',
+    label: 'Put down',
+    icon: '📤',
+    makes: { kind: 'drop' },
+    picks: [{ pick: 'spot', prompt: 'where to put goods down' }],
+    ask: 'goods',
+  },
+  {
+    id: 'feed',
+    label: 'Feed someone Down or a horse',
+    icon: '🍞',
+    makes: { kind: 'feed' },
+    picks: [{ pick: 'toFeed', prompt: 'the resident lying Down or the horse to feed' }],
+    ask: 'units',
+  },
+  {
+    // `CONTEXT.md`: Equipment: wherever they are when its turn comes.
+    id: 'equip',
+    label: 'Put on gear',
+    icon: '🛡',
+    makes: { kind: 'equip' },
+    picks: [],
+    ask: 'gear',
+  },
+  {
+    id: 'takeOff',
+    label: 'Take off gear',
+    icon: '🎒',
+    makes: { kind: 'takeOff' },
+    picks: [],
+    ask: 'slot',
+  },
+  {
+    id: 'runScript',
+    label: 'Run script',
+    icon: '📜',
+    makes: { kind: 'runScript' },
+    picks: [],
+    ask: 'script',
+  },
   // Flow: its condition is set on the card, a place it asks about picked on the map (`nextPick`).
-  { id: 'waitUntil', label: 'Wait until', picks: [], ask: 'condition' },
+  {
+    id: 'waitUntil',
+    label: 'Wait until',
+    icon: '⏳',
+    makes: { kind: 'waitUntil' },
+    picks: [],
+    ask: 'condition',
+  },
   // Flow: an If block around the picked steps (`Plan.wrap`), or a block's condition (`blockId`).
-  { id: 'if', label: 'If', picks: [], ask: 'condition' },
+  { id: 'if', label: 'If', icon: '🔀', makes: null, picks: [], ask: 'condition' },
 ]
 
 /** The task a kind of step gives, whose Customise (`CONTEXT.md`: Before it starts) it offers. */
-export const PLAN_TASKS: Partial<Readonly<Record<PlanStepId, Task>>> = {
-  work: 'work',
-  build: 'build',
-  tearDown: 'tearDown',
-  road: 'buildLine',
-  wall: 'buildLine',
-  feedStable: 'feedStable',
-  feedStableOnce: 'feedStable',
-  breed: 'breed',
-  train: 'train',
-  haul: 'haul',
-  haulBoat: 'haul',
-  explore: 'explore',
-  gather: 'gather',
-}
+export const PLAN_TASKS: Partial<Readonly<Record<PlanStepId, Task>>> = Object.fromEntries(
+  PLAN_STEPS.flatMap((k) => (k.makes?.kind === 'task' ? [[k.id, k.makes.task]] : [])),
+)
 
 export function planKind(id: PlanStepId): PlanKind {
   return PLAN_STEPS.find((k) => k.id === id)!
@@ -721,6 +816,11 @@ export function planOrder(
     case 'if':
       // No step: the planner puts the block in (`PlannerFlow.ifDone`).
       return undefined
+    default: {
+      // Every kind of step is planned above: a new one fails typecheck until it is.
+      const unplanned: never = plan.kind
+      return unplanned
+    }
   }
 }
 

@@ -13,7 +13,7 @@ use csp_shared::world::{
 
 use crate::building::{material_field, material_problem};
 use crate::carrying::{CarryAction, CarryKind};
-use crate::order_meta::OrderMeta;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::queries::building::materials_needed;
 use crate::queries::building::{
@@ -174,7 +174,7 @@ pub(crate) static WALL_LINE_META: OrderMeta = OrderMeta::fns(
     |w, s, o, t| validate_line(LineKind::WallLine, w, s, o, t),
     |w, _, o, t| apply_line(LineKind::WallLine, w, o, t),
 )
-.queue_step()
+.queue_step(StepGroup::Work)
 .gets_off_first()
 .adults_only()
 .blocked_carrying_child()
@@ -194,7 +194,7 @@ pub(crate) static ROAD_LINE_META: OrderMeta = OrderMeta::fns(
     |w, s, o, t| validate_line(LineKind::RoadLine, w, s, o, t),
     |w, _, o, t| apply_line(LineKind::RoadLine, w, o, t),
 )
-.queue_step()
+.queue_step(StepGroup::Work)
 .gets_off_first()
 .adults_only()
 .blocked_carrying_child()

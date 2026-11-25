@@ -15,6 +15,7 @@ import type {
   QueueStep,
   QueueStepRequest,
 } from '@csp/shared-types'
+import { ORDER_KINDS, orderKind } from '@csp/lang-wasm'
 import { conditionProblem } from './condition.js'
 
 /**
@@ -24,38 +25,11 @@ import { conditionProblem } from './condition.js'
 
 /**
  * The order kinds a queue step can be: the one-off actions and tasks the UI gives a resident, and
- * running one of the Player's scripts. Never a queue.
+ * running one of the Player's scripts. Never a queue. Read from each kind's facts (`ORDER_KINDS`).
  */
-export const QUEUE_STEP_KINDS: readonly string[] = [
-  'walkTo',
-  'drive',
-  'row',
-  'sail',
-  'unhitch',
-  'hitch',
-  'board',
-  'getOff',
-  'pickUp',
-  'drop',
-  'store',
-  'fetch',
-  'build',
-  'tearDown',
-  'workAt',
-  'teach',
-  'haul',
-  'roadLine',
-  'wallLine',
-  'mount',
-  'dismount',
-  'relocate',
-  'feed',
-  'equip',
-  'takeOff',
-  'task',
-  'runScript',
-  'waitUntil',
-]
+export const QUEUE_STEP_KINDS: readonly string[] = ORDER_KINDS.filter((k) => k.queueStep).map(
+  (k) => k.kind,
+)
 
 /** Steps that run a script (a task's default or the Player's own) rather than a built-in order. */
 export function runsScript(order: Pick<OrderRequest, 'kind'>): boolean {
@@ -67,7 +41,7 @@ export function runsScript(order: Pick<OrderRequest, 'kind'>): boolean {
  * teaching or training. Feeding the stable once ends (`feedsOnce`).
  */
 export function neverEnds(order: OrderRequest): boolean {
-  if (['workAt', 'haul', 'teach'].includes(order.kind)) return true
+  if (orderKind(order.kind)?.neverEnds) return true
   return (
     !feedsOnce(order) &&
     order.kind === 'task' &&

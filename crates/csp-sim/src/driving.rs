@@ -5,7 +5,7 @@ use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{Army, DriveOrder, OrderRequest, ResidentOrder, Tile, WorldState};
 
-use crate::order_meta::OrderMeta;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{commands, ordered_resident, realm_of, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::alliance::commander_of;
@@ -233,7 +233,7 @@ impl OrderKind for Drive {
 }
 
 pub(crate) static DRIVE_META: OrderMeta = OrderMeta::request("drive", &Drive)
-    .queue_step()
+    .queue_step(StepGroup::Move)
     .gets_off_first()
     .adults_only()
     .script(&[DRIVE_ACTION]);
@@ -342,8 +342,10 @@ impl OrderKind for Unhitch {
     }
 }
 
-pub(crate) static UNHITCH_META: OrderMeta =
-    OrderMeta::request("unhitch", &Unhitch).queue_step().gets_off_first().script(&[UNHITCH_ACTION]);
+pub(crate) static UNHITCH_META: OrderMeta = OrderMeta::request("unhitch", &Unhitch)
+    .queue_step(StepGroup::Move)
+    .gets_off_first()
+    .script(&[UNHITCH_ACTION]);
 
 const UNHITCH_ACTION: ScriptAction = ScriptAction {
     name: "unhitch",
@@ -402,8 +404,10 @@ impl OrderKind for Hitch {
     }
 }
 
-pub(crate) static HITCH_META: OrderMeta =
-    OrderMeta::request("hitch", &Hitch).queue_step().gets_off_first().script(&[HITCH_ACTION]);
+pub(crate) static HITCH_META: OrderMeta = OrderMeta::request("hitch", &Hitch)
+    .queue_step(StepGroup::Move)
+    .gets_off_first()
+    .script(&[HITCH_ACTION]);
 
 const HITCH_ACTION: ScriptAction = ScriptAction {
     name: "hitch",

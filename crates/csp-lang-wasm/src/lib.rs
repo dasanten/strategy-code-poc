@@ -213,10 +213,28 @@ pub fn script_data() -> String {
         "scriptApi": SCRIPT_API.iter().map(binding_json).collect::<Vec<_>>(),
         "armyScriptApi": ARMY_SCRIPT_API.iter().map(binding_json).collect::<Vec<_>>(),
         "defaultScripts": default_scripts,
+        "orderKinds": order_kinds(),
     });
     let mut text = serde_json::to_string_pretty(&data).expect("plain data serialises");
     text.push('\n');
     text
+}
+
+/// Each order kind's facts the client reads (T121.8): whether it can be a queue step and the
+/// group it is shown under, whether it never ends as one, whether it goes on until stopped.
+fn order_kinds() -> Vec<Value> {
+    csp_sim::order_meta::ORDER_METAS
+        .iter()
+        .map(|m| {
+            json!({
+                "kind": m.kind,
+                "queueStep": m.queue_step,
+                "stepGroup": m.step_group,
+                "neverEnds": m.never_ends,
+                "goesOnUntilStopped": m.goes_on_until_stopped,
+            })
+        })
+        .collect()
 }
 
 /// Script names are at most this many characters (`SCRIPT_NAME_MAX_LENGTH`, the server's in

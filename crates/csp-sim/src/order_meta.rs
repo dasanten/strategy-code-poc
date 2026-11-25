@@ -58,6 +58,18 @@ enum Requests {
     Never,
 }
 
+/// The Orders tab heading a queue step is shown under (`CONTEXT.md`: Planner blocks).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum StepGroup {
+    Move,
+    Work,
+    Goods,
+    Scripts,
+    /// What shapes the queue rather than being an order (Wait until).
+    Flow,
+}
+
 /// The facts about one order kind. The flags about a request are read by the kind of an
 /// `OrderRequest`, those about a running order by that of a [`ResidentOrder`]; where a resident
 /// holds an order under the kind it was requested by, both are here.
@@ -68,6 +80,9 @@ pub struct OrderMeta {
     /// Request: it can be a step of a queue (`CONTEXT.md`: Queue): a one-off action or task the UI
     /// gives a resident, or running one of the Player's scripts. Never a queue.
     pub queue_step: bool,
+    /// Request: the Orders tab heading a queue step is shown under, in the planner's palette and
+    /// its rows; every queue step has one.
+    pub step_group: Option<StepGroup>,
     /// Request: as a queue step it never ends on its own.
     pub never_ends: bool,
     /// Request: it acts on a tile, and so gets a passenger off their carriage first
@@ -96,6 +111,7 @@ impl OrderMeta {
             kind,
             requests,
             queue_step: false,
+            step_group: None,
             never_ends: false,
             gets_off_first: false,
             keeps_script: false,
@@ -128,8 +144,9 @@ impl OrderMeta {
         Self::new(kind, Requests::Never)
     }
 
-    pub const fn queue_step(self) -> Self {
-        OrderMeta { queue_step: true, ..self }
+    /// It can be a step of a queue, shown under `group`.
+    pub const fn queue_step(self, group: StepGroup) -> Self {
+        OrderMeta { queue_step: true, step_group: Some(group), ..self }
     }
     pub const fn never_ends(self) -> Self {
         OrderMeta { never_ends: true, ..self }
