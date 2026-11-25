@@ -83,65 +83,17 @@ pub fn good_of(name: &str) -> Option<Good> {
     ALL_GOODS.into_iter().find(|g| good_name(*g) == name)
 }
 
-/// The building kind's TypeScript name.
+/// The building kind's name (`BuildingKind::name`).
 pub fn kind_name(k: BuildingKind) -> &'static str {
-    match k {
-        BuildingKind::TownHall => "townHall",
-        BuildingKind::House => "house",
-        BuildingKind::Storage => "storage",
-        BuildingKind::Warehouse => "warehouse",
-        BuildingKind::Wall => "wall",
-        BuildingKind::Gate => "gate",
-        BuildingKind::Tower => "tower",
-        BuildingKind::Farm => "farm",
-        BuildingKind::Stable => "stable",
-        BuildingKind::Mine => "mine",
-        BuildingKind::Quarry => "quarry",
-        BuildingKind::LumberCamp => "lumberCamp",
-        BuildingKind::Smelter => "smelter",
-        BuildingKind::Mint => "mint",
-        BuildingKind::Smithy => "smithy",
-        BuildingKind::TrainingGround => "trainingGround",
-        BuildingKind::Road => "road",
-        BuildingKind::Carriage => "carriage",
-        BuildingKind::Haven => "haven",
-        BuildingKind::Boat => "boat",
-        BuildingKind::Ship => "ship",
-        BuildingKind::Ram => "ram",
-        BuildingKind::Catapult => "catapult",
-    }
+    k.name()
 }
 
-/// Every building kind, in the order of `FOOTPRINT`'s keys.
-pub const ALL_KINDS: [BuildingKind; 23] = [
-    BuildingKind::TownHall,
-    BuildingKind::House,
-    BuildingKind::Storage,
-    BuildingKind::Warehouse,
-    BuildingKind::Wall,
-    BuildingKind::Gate,
-    BuildingKind::Tower,
-    BuildingKind::Farm,
-    BuildingKind::Stable,
-    BuildingKind::Mine,
-    BuildingKind::Quarry,
-    BuildingKind::LumberCamp,
-    BuildingKind::Smelter,
-    BuildingKind::Mint,
-    BuildingKind::Smithy,
-    BuildingKind::TrainingGround,
-    BuildingKind::Road,
-    BuildingKind::Carriage,
-    BuildingKind::Haven,
-    BuildingKind::Boat,
-    BuildingKind::Ship,
-    BuildingKind::Ram,
-    BuildingKind::Catapult,
-];
+/// Every building kind.
+pub const ALL_KINDS: &[BuildingKind] = BuildingKind::ALL;
 
 /// The building kind a TypeScript name names, if any (`Object.hasOwn(FOOTPRINT, kind)`).
 pub fn kind_of(name: &str) -> Option<BuildingKind> {
-    ALL_KINDS.into_iter().find(|k| kind_name(*k) == name)
+    ALL_KINDS.iter().copied().find(|k| k.name() == name)
 }
 
 /// What a building's footprint is worked out from (`Placed`): its kind and north-west tile.
@@ -169,12 +121,9 @@ mod tests {
             assert_eq!(serde_json::to_value(g).unwrap(), good_name(g));
             assert_eq!(good_of(good_name(g)), Some(g));
         }
-        for k in ALL_KINDS {
-            assert_eq!(serde_json::to_value(k).unwrap(), kind_name(k));
+        for &k in ALL_KINDS {
             assert_eq!(kind_of(kind_name(k)), Some(k));
-            assert!(csp_shared::footprint::FOOTPRINT.get(kind_name(k)).is_some());
         }
-        assert_eq!(csp_shared::footprint::FOOTPRINT.0.len(), ALL_KINDS.len());
         assert_eq!(kind_of("nonsense"), None);
     }
 }

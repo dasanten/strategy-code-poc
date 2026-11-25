@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use csp_shared::balance::{TRADE_ORG_ARMY, WORKPLACE_MAX_WORKERS};
+use csp_shared::balance::{TRADE_ORG_ARMY, WORKPLACE_MAX_WORKERS, WORKPLACE_WRECK_WORTH};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
     CrimeKind, Debt, DebtStep, Good, PunishedWhat, PunishedWhere, PunishmentEnd, PunishmentHeading,

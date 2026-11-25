@@ -3,6 +3,7 @@
 
 pub mod balance;
 pub mod balance_export;
+pub mod building_spec;
 pub mod chunks;
 pub mod footprint;
 pub mod goods;

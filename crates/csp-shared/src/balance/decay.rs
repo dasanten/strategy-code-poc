@@ -1,6 +1,7 @@
 //! Teardown, decay, repair and ruins.
 
 use super::*;
+use crate::building_spec::spec_table;
 
 balance! {
 /// Tearing down takes less work than building (`CONTEXT.md`: Tearing down): this share of the
@@ -18,26 +19,8 @@ pub const TEARDOWN_MATERIALS_RETURNED: f64 = 0.5;
 /// Player's own scripts. Roads and the wooden walls and gates go fastest, in
 /// 45 real days; farms in 60; timber buildings in 75; storages, workplaces on a node, training
 /// grounds and havens in 90; the town hall in 120; those mostly of stone (warehouse, smelter, mint,
-/// smithy) in 180. A kind not listed (a carriage, boat or ship site) never decays.
-pub const DECAY_DAYS: Table<f64> = Table(&[
-    ("road", 2700.0),
-    ("wall", 2700.0),
-    ("gate", 2700.0),
-    ("farm", 3600.0),
-    ("house", 4500.0),
-    ("stable", 4500.0),
-    ("lumberCamp", 4500.0),
-    ("storage", 5400.0),
-    ("trainingGround", 5400.0),
-    ("haven", 5400.0),
-    ("quarry", 5400.0),
-    ("mine", 5400.0),
-    ("townHall", 7200.0),
-    ("warehouse", 10800.0),
-    ("smelter", 10800.0),
-    ("mint", 10800.0),
-    ("smithy", 10800.0),
-]);
+/// smithy) in 180. A kind not listed (a carriage, boat or ship site, a tower) never decays.
+pub const DECAY_DAYS: Table<f64> = spec_table!(f64, |s| s.decay_days);
 
 /// Share of its condition lost from which a building reads worn, rather than good
 /// (`CONTEXT.md`: Decay), and can be repaired: a road after about eleven real days.

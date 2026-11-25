@@ -7,34 +7,11 @@
 //! passed, where TypeScript defaults it to `MAP_SIZE`.
 
 use crate::balance::Table;
+use crate::building_spec::spec_table;
 use crate::terrain::{wrap, wrap_delta};
 
 /// Tiles along each side of each kind's footprint (`CONTEXT.md`: Footprint).
-pub const FOOTPRINT: Table<i32> = Table(&[
-    ("wall", 1),
-    ("gate", 1),
-    ("tower", 2),
-    ("road", 1),
-    ("carriage", 1),
-    ("boat", 1),
-    ("ship", 1),
-    ("ram", 1),
-    ("catapult", 1),
-    ("house", 2),
-    ("storage", 2),
-    ("smelter", 2),
-    ("mint", 2),
-    ("smithy", 2),
-    ("mine", 2),
-    ("quarry", 2),
-    ("lumberCamp", 2),
-    ("townHall", 3),
-    ("warehouse", 3),
-    ("stable", 3),
-    ("trainingGround", 3),
-    ("haven", 3),
-    ("farm", 4),
-]);
+pub const FOOTPRINT: Table<i32> = spec_table!(i32, |s| Some(s.footprint));
 
 /// What a footprint is worked out from: a building's kind and its north-west tile.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

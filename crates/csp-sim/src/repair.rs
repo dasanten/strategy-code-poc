@@ -4,7 +4,7 @@
 //! Blows from attackers are apart from this (`Building::damage`).
 
 use csp_shared::balance::{
-    DECAY_DAYS, DECAY_NEARLY_RUIN, DECAY_WORN, MAP_SIZE, REPAIR_MATERIALS_SHARE, REPAIR_WORK_SHARE,
+    DECAY_NEARLY_RUIN, DECAY_WORN, MAP_SIZE, REPAIR_MATERIALS_SHARE, REPAIR_WORK_SHARE,
 };
 use csp_shared::footprint::{covers, is_at};
 use csp_shared::terrain::{terrain_at, TerrainMap};
@@ -47,7 +47,7 @@ impl Condition {
 /// Game days a building of `kind` takes to lose all its condition (`DECAY_DAYS`); `None` for a
 /// kind that never decays.
 pub fn decay_days(kind: BuildingKind) -> Option<f64> {
-    DECAY_DAYS.get(kind_name(kind))
+    kind.spec().decay_days
 }
 
 /// Whether `b` decays: a finished building of a kind that does.
