@@ -360,21 +360,6 @@ fn stats_view(stats: &StatRecord<Stat>) -> Value {
     }))
 }
 
-/// A skill's TypeScript name.
-fn skill_name(s: SkillName) -> &'static str {
-    match s {
-        SkillName::Mining => "mining",
-        SkillName::Woodcutting => "woodcutting",
-        SkillName::Smelting => "smelting",
-        SkillName::Smithing => "smithing",
-        SkillName::Construction => "construction",
-        SkillName::Farming => "farming",
-        SkillName::Combat => "combat",
-        SkillName::Driving => "driving",
-        SkillName::Seafaring => "seafaring",
-    }
-}
-
 /// A resident as `me` or an army's member sees itself (`asView` of its plain data, less its
 /// `script`, with its `age`), built field by field from the struct rather than through the whole
 /// resident as JSON: the same value, for a fraction of the cost (#1092). Its defence and Alarm
@@ -421,7 +406,7 @@ fn resident_view(
             "age" => number(age_in_years(r.born_at, world.tick as f64)),
             "lifespan" => number(r.lifespan),
             "stats" => stats_view(&r.stats),
-            "skills" => numbers_view("skills", &r.skills, skill_name),
+            "skills" => numbers_view("skills", &r.skills, SkillName::name),
             "carried" => numbers_view("goods", &r.carried, good_name),
             "equipped" => equipment_view(r),
             "condition" if carries_gear_of(r, side) => condition_view(world, r),

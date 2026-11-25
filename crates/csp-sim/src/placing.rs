@@ -5,56 +5,18 @@
 
 use std::collections::{HashMap, HashSet};
 
-use csp_shared::balance::RECIPES;
 use csp_shared::footprint::{footprint_tiles, Placed};
 use csp_shared::terrain::{is_passable_terrain, terrain_at, touches_water, Terrain, TerrainMap};
-use csp_shared::world::{BuildingKind, ResourceKind, ResourceNode, WorldState};
+use csp_shared::world::{BuildingKind, ResourceNode, WorldState};
 
-use crate::queries::names::{kind_name, kind_of, placed};
-
-/// The workplace that goes on each kind of resource node (`NODE_WORKPLACE`).
-pub fn node_workplace(kind: ResourceKind) -> BuildingKind {
-    match kind {
-        ResourceKind::Forest => BuildingKind::LumberCamp,
-        ResourceKind::Stone => BuildingKind::Quarry,
-        ResourceKind::IronOre | ResourceKind::GoldOre | ResourceKind::Coal => BuildingKind::Mine,
-    }
-}
-
-/// Workplaces that process goods (`PROCESSING`): the kinds with recipes, in `RECIPES`' order.
-pub fn processing() -> Vec<BuildingKind> {
-    RECIPES.0.iter().filter_map(|(k, _)| kind_of(k)).collect()
-}
-
-/// Buildable kinds that go off any resource node and off mountains (`OFF_NODES`), havens on the shore
-/// besides.
-pub fn off_nodes() -> Vec<BuildingKind> {
-    let mut kinds = processing();
-    kinds.extend([
-        BuildingKind::TownHall,
-        BuildingKind::House,
-        BuildingKind::Storage,
-        BuildingKind::Wall,
-        BuildingKind::Gate,
-        BuildingKind::TrainingGround,
-        BuildingKind::Haven,
-    ]);
-    kinds
-}
-
-/// Buildable kinds that go on Plains, off any resource node (`ON_PLAINS`).
-pub const ON_PLAINS: [BuildingKind; 2] = [BuildingKind::Stable, BuildingKind::Farm];
-
-/// Whether a kind of building goes on a resource node: mines, quarries and lumber camps.
-fn on_node(kind: BuildingKind) -> bool {
-    matches!(kind, BuildingKind::LumberCamp | BuildingKind::Quarry | BuildingKind::Mine)
-}
+pub use crate::queries::building::node_workplace;
+use crate::queries::building::{OFF_NODES, ON_NODE, ON_PLAINS};
+use crate::queries::names::{kind_name, placed};
 
 /// The ground as the game lays out buildings on it (`Ground`).
 pub struct Ground<'t> {
     taken: HashSet<(i32, i32)>,
     nodes: HashMap<(i32, i32), ResourceNode>,
-    off_nodes: Vec<BuildingKind>,
     pub terrain: &'t TerrainMap,
 }
 
@@ -74,7 +36,7 @@ impl<'t> Ground<'t> {
         }
         let nodes = world.nodes.iter().map(|n| ((n.x as i32, n.y as i32), n.clone())).collect();
         taken.extend(more);
-        Ground { taken, nodes, off_nodes: off_nodes(), terrain }
+        Ground { taken, nodes, terrain }
     }
 
     /// Whether no footprint covers the tile.
@@ -114,7 +76,7 @@ impl<'t> Ground<'t> {
             if ON_PLAINS.contains(&kind) && t != Terrain::Plains as u8 {
                 return false;
             }
-            if self.off_nodes.contains(&kind) && t == Terrain::Mountain as u8 {
+            if OFF_NODES.contains(&kind) && t == Terrain::Mountain as u8 {
                 return false;
             }
             if let Some(node) = self.nodes.get(&(tx, ty)) {
@@ -130,7 +92,7 @@ impl<'t> Ground<'t> {
             }
         }
         // Only a node's workplace covers a node, and one of them.
-        !on_node(kind) || nodes == 1
+        !ON_NODE.contains(&kind) || nodes == 1
     }
 
     /// Marks a footprint as covered.
@@ -143,11 +105,11 @@ impl<'t> Ground<'t> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use csp_shared::world::ResourceKind;
 
     #[test]
     fn workplaces_go_on_their_nodes() {
         assert_eq!(node_workplace(ResourceKind::GoldOre), BuildingKind::Mine);
-        assert!(processing().contains(&BuildingKind::Smithy));
-        assert!(off_nodes().contains(&BuildingKind::Storage));
+        assert_eq!(ON_NODE, [BuildingKind::Mine, BuildingKind::Quarry, BuildingKind::LumberCamp]);
     }
 }

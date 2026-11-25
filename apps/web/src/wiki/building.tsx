@@ -33,9 +33,11 @@ import { Table } from './parts.js'
 import { kindName, goods } from './names.js'
 import { buildCosts, stoneWallCosts, duration, num, pct, realTimeOf } from './wiki-view.js'
 
-/** Each kind that decays, with the game days it takes to lose all its condition. */
+/** Each kind that decays, with the game days it takes to lose all its condition: fastest first. */
 const decayRows = () =>
-  (Object.entries(DECAY_DAYS) as [BuildingKind, number][]).map(([kind, days]) => ({ kind, days }))
+  (Object.entries(DECAY_DAYS) as [BuildingKind, number][])
+    .map(([kind, days]) => ({ kind, days }))
+    .sort((a, b) => a.days - b.days)
 
 export function BuildingSection() {
   return (

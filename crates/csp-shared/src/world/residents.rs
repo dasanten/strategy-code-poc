@@ -53,6 +53,23 @@ pub enum SkillName {
     Seafaring,
 }
 
+impl SkillName {
+    /// The skill's name, as serde writes it.
+    pub const fn name(self) -> &'static str {
+        match self {
+            SkillName::Mining => "mining",
+            SkillName::Woodcutting => "woodcutting",
+            SkillName::Smelting => "smelting",
+            SkillName::Smithing => "smithing",
+            SkillName::Construction => "construction",
+            SkillName::Farming => "farming",
+            SkillName::Combat => "combat",
+            SkillName::Driving => "driving",
+            SkillName::Seafaring => "seafaring",
+        }
+    }
+}
+
 /// What a training ground teaches (`TrainingSubject`): a stat or a skill.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]

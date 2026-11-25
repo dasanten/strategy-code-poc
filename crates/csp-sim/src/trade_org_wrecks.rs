@@ -7,7 +7,7 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
-use csp_shared::balance::{WORKPLACE_MAX_WORKERS, WORKPLACE_WRECK_WORTH};
+use csp_shared::balance::WORKPLACE_MAX_WORKERS;
 use csp_shared::footprint::is_at;
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::{
@@ -45,7 +45,7 @@ fn is_workplace(b: &Building) -> bool {
 
 /// The worth of tearing down a workplace of `kind` (`WORKPLACE_WRECK_WORTH[kind] ?? 0`).
 fn wreck_worth(kind: BuildingKind) -> f64 {
-    WORKPLACE_WRECK_WORTH.get(kind_name(kind)).unwrap_or(0.0)
+    kind.spec().workplace.map_or(0.0, |w| w.wreck_worth)
 }
 
 fn tile(x: f64, y: f64) -> (i32, i32) {

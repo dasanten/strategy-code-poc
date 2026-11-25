@@ -2,93 +2,34 @@
 //! about its kind (`packages/shared/src/building-info.ts`). No numbers typed into the text: they
 //! come from the balance.
 
-use csp_shared::balance::{Recipe, BUILD_WORK, HOUSING_ROOM, RECIPES, WORKPLACE_MAX_WORKERS};
-use csp_shared::footprint::FOOTPRINT;
+use csp_shared::balance::Recipe;
+use csp_shared::building_spec::BuildMenu;
 use csp_shared::world::{BuildingKind, Good, ResourceKind, SkillName, Stock};
 
 use super::balance::workplace_skill;
-use super::building::{build_materials, node_good, node_workplace};
-use super::names::kind_name;
+use super::building::{
+    build_materials, build_work_of, max_workers, node_good, node_workplace, recipes_of,
+};
 
 /// What each kind of building is for (`BUILDING_PURPOSE`): the one description the Build menu and
 /// the building card's ⓘ share.
 pub fn building_purpose(kind: BuildingKind) -> String {
-    match kind {
-        BuildingKind::TownHall => {
-            "A town hall founds a new city of your realm; tearing it down dissolves the city.".into()
-        }
-        BuildingKind::House => format!(
-            "A house is room for {} residents; only in a city’s area, and it grows the city.",
-            HOUSING_ROOM.get("house").unwrap_or(0.0)
-        ),
-        BuildingKind::Storage => "A storage keeps a city’s goods: workers carry their output here, and builders fetch materials from it.".into(),
-        BuildingKind::Warehouse => "A warehouse keeps the Trade Organization’s goods; a resident or carriage on it can sell goods for its coins or buy with them.".into(),
-        BuildingKind::Wall => "A stretch of wall; walls grow the city they stand by, like houses.".into(),
-        BuildingKind::Gate => "A gate in a wall, which its city’s realm opens and closes; it grows the city like a wall does.".into(),
-        BuildingKind::Tower => "A tower is a square building of wood or stone, two tiles a side, in a wall’s line or alone; it closes the way like a wall, its top is part of the wall walk where a wall touches it, and it holds a few residents up at once. It is broken like a wall but holds out longer.".into(),
-        BuildingKind::Farm => "A farm is fields that make Food; on Plains only.".into(),
-        BuildingKind::Stable => "A stable keeps horses and their Food, and breeds them; on Plains only.".into(),
-        BuildingKind::Mine => "A mine digs the ore of the iron ore or gold ore node it stands on.".into(),
-        BuildingKind::Quarry => "A quarry cuts stone from the stone node it stands on.".into(),
-        BuildingKind::LumberCamp => "A lumber camp fells wood in the forest node it stands on.".into(),
-        BuildingKind::Smelter => "A smelter turns iron ore into iron; not on Mountain.".into(),
-        BuildingKind::Mint => "A mint turns gold ore into coins; not on Mountain.".into(),
-        BuildingKind::Smithy => "A smithy turns iron and wood into spears, swords, shields and armour; not on Mountain.".into(),
-        BuildingKind::TrainingGround => "A training ground is where residents train a stat or a skill under a teacher; not on Mountain. Like a workplace, nobody owns it.".into(),
-        BuildingKind::Road => "A road: residents walk and carriages drive faster on it, on any land (slower to build on Mountain), and it can run through a gate. Nobody owns it.".into(),
-        BuildingKind::Carriage => "A carriage carries far more than any resident, pulled by a horse; built at a finished stable, on its tiles or right by them, and it belongs to the realm of whoever finishes it.".into(),
-        BuildingKind::Haven => "A haven is where boats and ships are built, with a storage anyone at it loads and unloads; on the shore, touching Lake or Sea, and not on Mountain. Like a stable, nobody owns it.".into(),
-        BuildingKind::Boat => "A boat is rowed over Lake and Sea with a few residents and a little cargo aboard; built on a tile of a finished haven that touches the water, it floats on the nearest free water tile next to it and belongs to the realm of whoever finishes it.".into(),
-        BuildingKind::Ship => "A ship is sailed over the Sea by a crew, carrying far more than a carriage; built on a tile of a finished haven that touches the Sea, it floats on the nearest free Sea tile next to it and belongs to the realm of whoever finishes it.".into(),
-        BuildingKind::Ram => "A ram is a siege machine built in the field, anywhere a carriage could stand; finished, it belongs to the realm of whoever finishes it, and a crew of its residents pushes it slowly where a carriage could go. Blows break it, and its realm can tear it down.".into(),
-        BuildingKind::Catapult => "A catapult is a siege machine built in the field like a ram; its crew throws Stone they or its tile hold at a wall, gate or tower far out of any archer's reach. It hits buildings only, and its crew stands in the open.".into(),
-    }
+    let spec = kind.spec();
+    spec.purpose.replace("{housing}", &spec.housing_room.unwrap_or(0.0).to_string())
 }
 
 /// A group of the Build menu and the kinds in it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BuildGroup {
     pub name: &'static str,
-    pub kinds: &'static [BuildingKind],
+    pub kinds: Vec<BuildingKind>,
 }
 
 /// The groups of the Build menu and the kinds in each, in the order it shows them
 /// (`BUILD_GROUPS`).
-pub const BUILD_GROUPS: [BuildGroup; 7] = [
-    BuildGroup {
-        name: "Resources",
-        kinds: &[BuildingKind::LumberCamp, BuildingKind::Quarry, BuildingKind::Mine],
-    },
-    BuildGroup { name: "Food and animals", kinds: &[BuildingKind::Farm, BuildingKind::Stable] },
-    BuildGroup {
-        name: "Industry",
-        kinds: &[BuildingKind::Smelter, BuildingKind::Mint, BuildingKind::Smithy],
-    },
-    BuildGroup {
-        name: "City",
-        kinds: &[
-            BuildingKind::TownHall,
-            BuildingKind::House,
-            BuildingKind::Storage,
-            BuildingKind::TrainingGround,
-        ],
-    },
-    BuildGroup {
-        name: "Defence",
-        kinds: &[BuildingKind::Wall, BuildingKind::Gate, BuildingKind::Tower],
-    },
-    BuildGroup {
-        name: "Transport",
-        kinds: &[
-            BuildingKind::Road,
-            BuildingKind::Carriage,
-            BuildingKind::Haven,
-            BuildingKind::Boat,
-            BuildingKind::Ship,
-        ],
-    },
-    BuildGroup { name: "Siege", kinds: &[BuildingKind::Ram, BuildingKind::Catapult] },
-];
+pub fn build_groups() -> Vec<BuildGroup> {
+    BuildMenu::ALL.iter().map(|m| BuildGroup { name: m.name(), kinds: m.kinds() }).collect()
+}
 
 /// Everything the ⓘ on a building's card says about its kind (`BuildingInfo`).
 #[derive(Debug, Clone, PartialEq)]
@@ -136,29 +77,31 @@ pub fn building_info(kind: BuildingKind, node: Option<ResourceKind>) -> Building
             }
         }
     }
-    let name = kind_name(kind);
     BuildingInfo {
         kind,
         purpose: building_purpose(kind),
-        recipes: RECIPES.get(name).unwrap_or(&[]),
+        recipes: recipes_of(kind),
         yields,
         skill: workplace_skill(kind),
-        max_workers: WORKPLACE_MAX_WORKERS.get(name),
-        footprint: FOOTPRINT.get(name).unwrap_or(0),
+        max_workers: max_workers(kind),
+        footprint: kind.spec().footprint,
         materials: build_materials(kind),
-        work: BUILD_WORK.get(name).unwrap_or(0.0),
+        work: build_work_of(kind),
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use csp_shared::balance::{HOUSING_ROOM, RECIPES, WORKPLACE_MAX_WORKERS};
+    use csp_shared::footprint::FOOTPRINT;
+
     use super::*;
     use crate::queries::building::BUILDABLE;
-    use crate::queries::names::{good_name, ALL_KINDS};
+    use crate::queries::names::{good_name, kind_name, ALL_KINDS};
 
     #[test]
     fn gives_every_kind_of_building_a_description() {
-        for kind in ALL_KINDS {
+        for &kind in ALL_KINDS {
             assert!(!building_purpose(kind).trim().is_empty(), "{kind:?}");
         }
     }
@@ -166,7 +109,7 @@ mod tests {
     #[test]
     fn writes_no_numbers_into_the_text_which_come_from_the_balance() {
         let room = format!("room for {} residents", HOUSING_ROOM.get("house").unwrap());
-        for kind in ALL_KINDS {
+        for &kind in ALL_KINDS {
             let text = building_purpose(kind).replace(&room, "");
             assert!(!text.chars().any(|c| c.is_ascii_digit()), "{kind:?}");
         }
@@ -181,7 +124,7 @@ mod tests {
     #[test]
     fn puts_every_buildable_kind_in_exactly_one_group_and_nothing_else() {
         let mut grouped: Vec<&str> =
-            BUILD_GROUPS.iter().flat_map(|g| g.kinds).map(|k| kind_name(*k)).collect();
+            build_groups().iter().flat_map(|g| &g.kinds).map(|k| kind_name(*k)).collect();
         let mut buildable: Vec<&str> = BUILDABLE.iter().map(|k| kind_name(*k)).collect();
         grouped.sort();
         buildable.sort();

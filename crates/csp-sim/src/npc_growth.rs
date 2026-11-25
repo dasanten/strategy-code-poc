@@ -1152,7 +1152,7 @@ fn second_workplace(
 
 /// Whether a kind of workplace stands on a resource node (`onNode`).
 pub fn on_node(kind: BuildingKind) -> bool {
-    matches!(kind, BuildingKind::LumberCamp | BuildingKind::Quarry | BuildingKind::Mine)
+    crate::queries::building::ON_NODE.contains(&kind)
 }
 
 /// Whether a workplace has no room for another worker, coming or there (`crewFull`).
