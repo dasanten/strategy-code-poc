@@ -1,3 +1,4 @@
+import { BUILDING_KINDS, BUILDING_SPECS } from '@csp/balance'
 import { Terrain, UNEXPLORED } from '../shared/terrain.js'
 import type { BuildingKind, ResourceKind } from '@csp/shared-types'
 import { THEME, hex, type Relationship } from '../theme.js'
@@ -96,31 +97,10 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   haven: 0x5f8fa8,
 }
 
-export const BUILDING_NAMES: Record<BuildingKind, string> = {
-  townHall: 'Town hall',
-  wall: 'Wall',
-  gate: 'Gate',
-  tower: 'Tower',
-  house: 'House',
-  storage: 'Storage',
-  warehouse: 'Warehouse',
-  farm: 'Farm',
-  stable: 'Stable',
-  mine: 'Mine',
-  quarry: 'Quarry',
-  lumberCamp: 'Lumber camp',
-  smelter: 'Smelter',
-  mint: 'Mint',
-  smithy: 'Smithy',
-  trainingGround: 'Training ground',
-  road: 'Road',
-  carriage: 'Carriage',
-  boat: 'Boat',
-  ship: 'Ship',
-  ram: 'Ram',
-  catapult: 'Catapult',
-  haven: 'Haven',
-}
+/** What the game calls each kind of building (its spec's label). */
+export const BUILDING_NAMES: Record<BuildingKind, string> = Object.fromEntries(
+  BUILDING_KINDS.map((kind) => [kind, BUILDING_SPECS[kind].label]),
+) as Record<BuildingKind, string>
 /** A Trade Org caravan's carriage and crew (`CONTEXT.md`: Caravan). */
 export const CARAVAN_COLOR = RELATIONSHIP_COLORS.tradeOrg
 /** Goods lying on the ground. */

@@ -2,7 +2,7 @@
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
 import { wrap, wrapDelta } from './terrain.js'
-import { MAP_SIZE } from '@csp/balance'
+import { BUILDING_KINDS, BUILDING_SPECS, MAP_SIZE } from '@csp/balance'
 import type { Building, BuildingKind } from '@csp/shared-types'
 
 /**
@@ -12,31 +12,9 @@ import type { Building, BuildingKind } from '@csp/shared-types'
  */
 
 /** Tiles along each side of each kind's footprint (`CONTEXT.md`: Footprint). */
-export const FOOTPRINT: Record<BuildingKind, number> = {
-  wall: 1,
-  gate: 1,
-  tower: 2,
-  road: 1,
-  carriage: 1,
-  boat: 1,
-  ship: 1,
-  ram: 1,
-  catapult: 1,
-  house: 2,
-  storage: 2,
-  smelter: 2,
-  mint: 2,
-  smithy: 2,
-  mine: 2,
-  quarry: 2,
-  lumberCamp: 2,
-  townHall: 3,
-  warehouse: 3,
-  stable: 3,
-  trainingGround: 3,
-  haven: 3,
-  farm: 4,
-}
+export const FOOTPRINT: Record<BuildingKind, number> = Object.fromEntries(
+  BUILDING_KINDS.map((kind) => [kind, BUILDING_SPECS[kind].footprint]),
+) as Record<BuildingKind, number>
 
 /** What a footprint is worked out from: a building's kind and its north-west tile. */
 export type Placed = Pick<Building, 'kind' | 'x' | 'y'>

@@ -3,6 +3,7 @@
 
 import { citiesAt } from './city.js'
 import { FOOTPRINT, covers, footprintTiles, isAt } from './footprint.js'
+import { BUILD_MENU_GROUPS, BUILDING_KINDS, BUILDING_SPECS, type BuildingSpec } from '@csp/balance'
 import {
   BUILD_MATERIALS,
   BUILD_WORK,
@@ -56,54 +57,36 @@ import type {
 
 /** World queries about buildings and construction sites (ADR 0002: the game API orders and scripts share). */
 
+/** The kinds whose spec passes, in the order of the specs. */
+function kindsWhere(passes: (spec: BuildingSpec, kind: BuildingKind) => boolean): BuildingKind[] {
+  return BUILDING_KINDS.filter((kind) => passes(BUILDING_SPECS[kind], kind))
+}
+
 /**
- * Kinds of building that can be built so far: the workplaces on resource nodes, stables, smelters,
- * mints and smithies, town halls, storages, walls and gates (`CONTEXT.md`: Town hall, Storage,
- * Wall / Gate), houses and farms (`CONTEXT.md`: House, Farm), training grounds (`CONTEXT.md`:
- * Training ground), roads (`CONTEXT.md`: Road), and carriages, whose site becomes a carriage
- * (`CONTEXT.md`: Carriage).
+ * Kinds of building that can be built (`CONTEXT.md`: Build menu), in the order of the Build menu:
+ * its groups, and the kinds in each.
  */
-export const BUILDABLE: readonly BuildingKind[] = [
-  'lumberCamp',
-  'quarry',
-  'mine',
-  'stable',
-  'farm',
-  'house',
-  'smelter',
-  'mint',
-  'smithy',
-  'townHall',
-  'storage',
-  'trainingGround',
-  'wall',
-  'gate',
-  'tower',
-  'road',
-  'carriage',
-  'haven',
-  'boat',
-  'ship',
-  'ram',
-  'catapult',
-]
+export const BUILDABLE: readonly BuildingKind[] = BUILD_MENU_GROUPS.flatMap((group) =>
+  kindsWhere((spec) => spec.buildMenu?.group === group).sort(
+    (a, b) => BUILDING_SPECS[a].buildMenu!.place - BUILDING_SPECS[b].buildMenu!.place,
+  ),
+)
 
 /**
  * Kinds that share a tile with a building rather than taking it (`CONTEXT.md`: Road, Carriage,
  * Building a boat, Building a ship, Siege machine): roads, carriage, boat, ship, ram and
  * catapult sites, one of each per tile at most.
  */
-export const SHARES_A_TILE: readonly BuildingKind[] = [
-  'road',
-  'carriage',
-  'boat',
-  'ship',
-  'ram',
-  'catapult',
-]
+export const SHARES_A_TILE: readonly BuildingKind[] = kindsWhere((spec) => spec.sharesATile)
+
+/**
+ * Sites of what is no building once finished but moves off: carriages, boats, ships and siege
+ * machines. Every kind that shares a tile but the road.
+ */
+export const SITES_OF_MOVERS: readonly BuildingKind[] = SHARES_A_TILE.filter((k) => k !== 'road')
 
 /** Workplaces that turn goods into other goods (`RECIPES`): smelters, mints and smithies. */
-export const PROCESSING = Object.keys(RECIPES) as readonly BuildingKind[]
+export const PROCESSING: readonly BuildingKind[] = kindsWhere((spec) => spec.processes)
 
 /** The good a recipe makes. */
 export function recipeGood(recipe: Recipe): Good {
@@ -132,33 +115,23 @@ export function hasChoice(kind: BuildingKind): boolean {
  * (`CONTEXT.md`: Where buildings go): the processing workplaces, the city buildings, training
  * grounds (`CONTEXT.md`: Training ground) and havens, which go on the shore besides (`ON_SHORE`).
  */
-export const OFF_NODES: readonly BuildingKind[] = [
-  ...PROCESSING,
-  'townHall',
-  'house',
-  'storage',
-  'wall',
-  'gate',
-  'tower',
-  'trainingGround',
-  'haven',
-]
+export const OFF_NODES: readonly BuildingKind[] = kindsWhere((spec) => spec.stands === 'offNodes')
 
 /**
  * Buildable kinds that go on the shore, with a tile of their footprint touching Lake or Sea
  * straight or diagonally (`CONTEXT.md`: Haven): havens.
  */
-export const ON_SHORE: readonly BuildingKind[] = ['haven']
+export const ON_SHORE: readonly BuildingKind[] = kindsWhere((spec) => spec.onShore)
 
 /** Buildable kinds that go on Plains, off any resource node: stables and farms. */
-export const ON_PLAINS: readonly BuildingKind[] = ['stable', 'farm']
+export const ON_PLAINS: readonly BuildingKind[] = kindsWhere((spec) => spec.stands === 'onPlains')
 
 /**
  * Buildable kinds that go only in a city's area, every tile of their footprint: houses
  * (`CONTEXT.md`: House). A storage goes anywhere, outside a city as an outpost storage
  * (`CONTEXT.md`: Outpost storage).
  */
-export const IN_CITY_AREA: readonly BuildingKind[] = ['house']
+export const IN_CITY_AREA: readonly BuildingKind[] = kindsWhere((spec) => spec.inCityArea)
 
 /**
  * What a build menu offers off any resource node, in its order: every buildable kind but the
@@ -183,7 +156,7 @@ export function buildMenu(node: Pick<ResourceNode, 'kind'> | undefined): Buildin
  * Organization's warehouses (`CONTEXT.md`: Warehouse), stables' Food, and havens (`CONTEXT.md`:
  * Haven).
  */
-export const KEEPS_GOODS: readonly BuildingKind[] = ['storage', 'warehouse', 'stable', 'haven']
+export const KEEPS_GOODS: readonly BuildingKind[] = kindsWhere((spec) => spec.keepsGoods)
 
 /**
  * The building or construction site whose footprint covers a tile, if there is one (one per

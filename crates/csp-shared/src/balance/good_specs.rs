@@ -35,6 +35,7 @@ impl Good {
 }
 
 const FOOD: GoodSpec = GoodSpec {
+    label: "Food",
     script_text: "Units of food.",
     weight: 1.0,
     warehouse_floor: 20.0,
@@ -44,6 +45,7 @@ const FOOD: GoodSpec = GoodSpec {
 };
 
 const WOOD: GoodSpec = GoodSpec {
+    label: "Wood",
     script_text: "Units of wood.",
     weight: 1.0,
     warehouse_floor: 25.0,
@@ -53,6 +55,7 @@ const WOOD: GoodSpec = GoodSpec {
 };
 
 const STONE: GoodSpec = GoodSpec {
+    label: "Stone",
     script_text: "Units of stone.",
     weight: 1.0,
     warehouse_floor: 25.0,
@@ -62,6 +65,7 @@ const STONE: GoodSpec = GoodSpec {
 };
 
 const IRON_ORE: GoodSpec = GoodSpec {
+    label: "Iron ore",
     script_text: "Units of ironOre.",
     weight: 1.0,
     warehouse_floor: 10.0,
@@ -71,6 +75,7 @@ const IRON_ORE: GoodSpec = GoodSpec {
 };
 
 const IRON: GoodSpec = GoodSpec {
+    label: "Iron",
     script_text: "Units of iron.",
     weight: 1.0,
     warehouse_floor: 5.0,
@@ -80,6 +85,7 @@ const IRON: GoodSpec = GoodSpec {
 };
 
 const GOLD_ORE: GoodSpec = GoodSpec {
+    label: "Gold ore",
     script_text: "Units of goldOre.",
     weight: 1.0,
     warehouse_floor: 5.0,
@@ -89,6 +95,7 @@ const GOLD_ORE: GoodSpec = GoodSpec {
 };
 
 const COINS: GoodSpec = GoodSpec {
+    label: "Coins",
     script_text: "Units of coins.",
     weight: 0.02,
     warehouse_floor: 1_000.0,
@@ -98,6 +105,7 @@ const COINS: GoodSpec = GoodSpec {
 };
 
 const SPEAR: GoodSpec = GoodSpec {
+    label: "Spear",
     script_text: "Units of spear.",
     weight: 3.0,
     warehouse_floor: 2.0,
@@ -107,6 +115,7 @@ const SPEAR: GoodSpec = GoodSpec {
 };
 
 const SWORD: GoodSpec = GoodSpec {
+    label: "Sword",
     script_text: "Units of sword.",
     weight: 3.0,
     warehouse_floor: 1.0,
@@ -116,6 +125,7 @@ const SWORD: GoodSpec = GoodSpec {
 };
 
 const SHIELD: GoodSpec = GoodSpec {
+    label: "Shield",
     script_text: "Units of shield.",
     weight: 4.0,
     warehouse_floor: 2.0,
@@ -125,6 +135,7 @@ const SHIELD: GoodSpec = GoodSpec {
 };
 
 const ARMOUR: GoodSpec = GoodSpec {
+    label: "Armour",
     script_text: "Units of armour.",
     weight: 8.0,
     warehouse_floor: 1.0,
@@ -134,6 +145,7 @@ const ARMOUR: GoodSpec = GoodSpec {
 };
 
 const COAL: GoodSpec = GoodSpec {
+    label: "Coal",
     script_text: "Units of coal.",
     weight: 1.0,
     warehouse_floor: 10.0,
@@ -143,6 +155,7 @@ const COAL: GoodSpec = GoodSpec {
 };
 
 const STEEL: GoodSpec = GoodSpec {
+    label: "Steel",
     script_text: "Units of steel.",
     weight: 1.0,
     warehouse_floor: 5.0,
@@ -152,6 +165,7 @@ const STEEL: GoodSpec = GoodSpec {
 };
 
 const STEEL_SWORD: GoodSpec = GoodSpec {
+    label: "Steel sword",
     script_text: "Units of steel sword.",
     weight: 3.0,
     warehouse_floor: 1.0,
@@ -161,6 +175,7 @@ const STEEL_SWORD: GoodSpec = GoodSpec {
 };
 
 const STEEL_SHIELD: GoodSpec = GoodSpec {
+    label: "Steel shield",
     script_text: "Units of steel shield.",
     weight: 4.0,
     warehouse_floor: 1.0,
@@ -170,6 +185,7 @@ const STEEL_SHIELD: GoodSpec = GoodSpec {
 };
 
 const STEEL_ARMOUR: GoodSpec = GoodSpec {
+    label: "Steel armour",
     script_text: "Units of steel armour.",
     weight: 8.0,
     warehouse_floor: 1.0,
@@ -179,6 +195,7 @@ const STEEL_ARMOUR: GoodSpec = GoodSpec {
 };
 
 const TOOLS: GoodSpec = GoodSpec {
+    label: "Tools",
     script_text: "Units of Tools.",
     weight: 2.0,
     warehouse_floor: 2.0,
@@ -188,6 +205,7 @@ const TOOLS: GoodSpec = GoodSpec {
 };
 
 const BOW: GoodSpec = GoodSpec {
+    label: "Bow",
     script_text: "Units of bow.",
     weight: 2.0,
     warehouse_floor: 1.0,
@@ -201,6 +219,7 @@ const BOW: GoodSpec = GoodSpec {
 };
 
 const CROSSBOW: GoodSpec = GoodSpec {
+    label: "Crossbow",
     script_text: "Units of crossbow.",
     weight: 4.0,
     warehouse_floor: 1.0,
@@ -214,6 +233,7 @@ const CROSSBOW: GoodSpec = GoodSpec {
 };
 
 const ARROWS: GoodSpec = GoodSpec {
+    label: "Arrows",
     script_text: "Units of arrows.",
     weight: 0.1,
     warehouse_floor: 40.0,

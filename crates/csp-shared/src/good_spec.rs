@@ -4,6 +4,8 @@
 /// Everything fixed about a good. A fact that does not apply to a good is `None`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GoodSpec {
+    /// What the game calls it on cards and in the Wiki.
+    pub label: &'static str,
     /// What the script view of a stock says of it.
     pub script_text: &'static str,
     /// What a unit weighs, in kg (`GOOD_WEIGHT`).

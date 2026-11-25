@@ -1,31 +1,12 @@
 import { GOODS } from './shared/world.js'
-import { OWN_FOOD } from '@csp/balance'
+import { GOOD_SPECS, OWN_FOOD } from '@csp/balance'
 import { putAwayUnits } from './shared/goods.js'
 import type { Good, Stock } from '@csp/shared-types'
 
-/** Good names as the UI shows them. */
-export const GOOD_LABELS: Record<Good, string> = {
-  food: 'Food',
-  wood: 'Wood',
-  stone: 'Stone',
-  ironOre: 'Iron ore',
-  iron: 'Iron',
-  goldOre: 'Gold ore',
-  coins: 'Coins',
-  spear: 'Spear',
-  sword: 'Sword',
-  shield: 'Shield',
-  armour: 'Armour',
-  coal: 'Coal',
-  steel: 'Steel',
-  steelSword: 'Steel sword',
-  steelShield: 'Steel shield',
-  steelArmour: 'Steel armour',
-  tools: 'Tools',
-  bow: 'Bow',
-  crossbow: 'Crossbow',
-  arrows: 'Arrows',
-}
+/** Good names as the UI shows them (each good's label). */
+export const GOOD_LABELS: Record<Good, string> = Object.fromEntries(
+  GOODS.map((g) => [g, GOOD_SPECS[g].label]),
+) as Record<Good, string>
 
 /**
  * Which file in `assets/goods/` draws each good (`CONTEXT.md`: Goods on cards): white line art in

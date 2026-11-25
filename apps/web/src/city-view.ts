@@ -1,3 +1,5 @@
+import { BUILDING_KINDS, BUILDING_SPECS } from '@csp/balance'
+import { SITES_OF_MOVERS } from './shared/building.js'
 import { offerStoragesOf } from './offers-view.js'
 import {
   deliveryStorage,
@@ -64,32 +66,16 @@ export interface CityView {
   buildings: [BuildingKind, number][]
 }
 
-/** Building names as the city inspector shows them. */
-export const BUILDING_NAMES: Record<BuildingKind, string> = {
-  townHall: 'town hall',
-  house: 'house',
-  storage: 'storage',
-  warehouse: 'warehouse',
-  wall: 'wall',
-  gate: 'gate',
-  tower: 'tower',
-  farm: 'farm',
-  stable: 'stable',
-  mine: 'mine',
-  quarry: 'quarry',
-  lumberCamp: 'lumber camp',
-  smelter: 'smelter',
-  mint: 'mint',
-  smithy: 'smithy',
-  trainingGround: 'training ground',
-  road: 'road',
-  carriage: 'carriage site',
-  boat: 'boat site',
-  ship: 'ship site',
-  ram: 'ram site',
-  catapult: 'catapult site',
-  haven: 'haven',
-}
+/**
+ * Building names as the city inspector shows them: in lower case, and a site of what moves off
+ * once finished as that site ("carriage site").
+ */
+export const BUILDING_NAMES: Record<BuildingKind, string> = Object.fromEntries(
+  BUILDING_KINDS.map((kind) => {
+    const name = BUILDING_SPECS[kind].label.toLowerCase()
+    return [kind, SITES_OF_MOVERS.includes(kind) ? `${name} site` : name]
+  }),
+) as Record<BuildingKind, string>
 
 /** "3 houses", "1 storage". */
 export function buildingCount(kind: BuildingKind, n: number): string {
