@@ -94,12 +94,13 @@ pnpm test:slow     # the slow NPC runs (npc_slow without the year runs): an epic
 pnpm test:year     # the year and season runs (about 50 and 15 min): nightly on dev
 pnpm test:ignored  # every test ignored for time but the year runs and measurements, ~7 min: nightly
 pnpm nightly:ignored  # test:ignored, appended to .claude/worktrees/nightly-year-report.md
+pnpm generate      # all generated files (the two below and script-data.json); run it after a merge
 pnpm types:rust    # the client's types from the crates (commit packages/shared-types/src/generated)
 pnpm balance:rust  # the client's balance numbers from csp-shared/src/balance
 pnpm build         # type-check and bundle the client
 pnpm start         # run the server in release
 pnpm test          # Vitest, the client's full suite
-pnpm check [base]  # lint, typecheck and the client tests affected by changes against base
+pnpm check [base]  # regenerate, lint, typecheck and the client tests affected by changes against base
 pnpm lint          # ESLint
 pnpm format        # Prettier
 ```

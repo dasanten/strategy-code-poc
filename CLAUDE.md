@@ -15,6 +15,10 @@
 - **Balance numbers** live in `crates/csp-shared/src/balance/`, one declaration each in the
   file of its domain; pick sensible values and list them in the PR, then run `pnpm balance:rust`
   and commit `packages/balance/` (the client's copy). Rules (what happens) are Daniel's call.
+- **Generated files** (`packages/balance`, `script-data.json`, `packages/shared-types/src/generated`;
+  marked in `.gitattributes`): `pnpm generate` writes them all. On a conflict, merge the sources,
+  run `pnpm generate` and commit; never merge a generated file by hand. `pnpm check` and
+  `pnpm check:rust` fail on a stale one.
 - **Wiki** (`/wiki`, one file per section: `apps/web/src/wiki/<topic>.tsx`): a ticket that changes
   a rule also updates its wiki section. Numbers come from `@csp/balance`, never typed into its text.
 - **Keep scripting cheap to add** (ADR 0002): everything goes through the game API
@@ -46,6 +50,6 @@
   `eval "$(fnm env --shell bash)" && fnm use` first (from the repo root), and call pnpm as
   `corepack pnpm`. `gh` is at `C:\Program Files\GitHub CLI\gh.exe`.
 - Before finishing: `pnpm check <base>` (ADR 0013), with `<base>` the branch the change goes into
-  (`origin/epic/<n>-<slug>`, or `origin/dev` for a bug). It runs lint, typecheck and only the
-  client tests the change affects, and says what it ran. `pnpm test` is the client's full suite;
-  CI runs it and `pnpm check:rust`'s steps.
+  (`origin/epic/<n>-<slug>`, or `origin/dev` for a bug). It regenerates (when the
+  change touches the crates), runs lint, typecheck and only the client tests the change affects,
+  and says what it ran. `pnpm test` is the client's full suite; CI runs it and `pnpm check:rust`'s steps.

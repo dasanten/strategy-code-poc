@@ -1,3 +1,12 @@
 crates/csp-server/migrations/** text eol=lf
 packages/balance/** text eol=lf
 crates/csp-sim/src/script_tables/default_scripts/*.script text eol=lf
+
+# Generated from crates/ by `pnpm generate`; never merged by hand. `union` keeps both sides instead
+# of stopping on a conflict, and the result is thrown away: regenerate after every merge.
+# `pnpm check` and `pnpm check:rust` fail while one is stale. Hand-written files stay out of here.
+packages/balance/balance.json linguist-generated text eol=lf merge=union
+packages/balance/balance.d.ts linguist-generated text eol=lf merge=union
+packages/balance/src/constants.ts linguist-generated text eol=lf merge=union
+packages/lang-wasm/script-data.json linguist-generated text eol=lf merge=union
+packages/shared-types/src/generated/** linguist-generated text eol=lf merge=union

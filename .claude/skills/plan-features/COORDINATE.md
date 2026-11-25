@@ -26,6 +26,7 @@ For every workable ticket at once, without asking Daniel first:
 Check the PR itself, not just the note.
 
 1. **Ticket PR into the epic branch:** check it out, merge `origin/epic/<n>-<slug>` into it,
+   run `pnpm generate` and commit what it changed (never merge a generated file by hand),
    run `pnpm check origin/epic/<n>-<slug>` (lint, typecheck and the affected client tests, ADR 0013)
    and, when it touches `crates/`, `pnpm check:rust`. Green: merge the PR, close its tickets
    by hand and remove `in progress`. Red: send the failure to that session with `SendMessage`.
