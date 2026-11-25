@@ -1,6 +1,6 @@
 ---
 name: plan-features
-description: Runs a feature prioritisation and planning session for this game, then coordinates the work. Ranks candidate features with Daniel, settles their rules against the rules (CONTEXT.md, docs/context/) and the ADRs, writes each one as an epic with ordered tickets on GitHub, and then stays as the coordinating session, starting one linked session per workable ticket, merging green PRs and starting tickets as they unblock. Use when Daniel wants to plan or prioritise features, decide what to build next, turn an idea into an epic, or run ticket sessions in parallel.
+description: Runs a feature prioritisation and planning session for this game, then coordinates the work. Ranks candidate features with Daniel, settles their rules against docs/context/ (indexed by CONTEXT.md) and the ADRs, writes each one as an epic with ordered tickets on GitHub, and then stays as the coordinating session, starting one linked session per workable ticket, merging green PRs and starting tickets as they unblock. Use when Daniel wants to plan or prioritise features, decide what to build next, turn an idea into an epic, or run ticket sessions in parallel.
 ---
 
 # Plan features, then coordinate
@@ -37,7 +37,8 @@ Run `git fetch origin`, then show Daniel a short state, no more than a screen:
    end and how it shows in the browser.
 3. **Tickets:** thin vertical slices (as in the `to-issues` skill), added as sub-issues in work
    order. Each has a `Depends on #n` line (left out when it has none), `Done when` checkboxes, and
-   the rules it builds on, naming their section files (`docs/context/<file>.md`). A rule still open becomes a ticket labelled `needs Daniel`.
+   the rules it builds on, naming their section files (`docs/context/<file>.md`). A rule still open
+   becomes a ticket labelled `needs Daniel`.
 4. **Branch:** cut `epic/<n>-<slug>` from `origin/dev`, commit the `CONTEXT.md`, `docs/context/`,
    ADR and `docs/tasks.md` changes onto it ("Rules: …"), and push. This keeps the doc change off CI.
 5. Show Daniel the ticket list with its dependencies and wait for an OK before step 4.
