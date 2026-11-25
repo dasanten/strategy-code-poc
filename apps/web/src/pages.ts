@@ -1,5 +1,5 @@
 import type { Account } from '@csp/shared-types'
-import { WIKI_PATH } from './wiki-view.js'
+import { WIKI_PATH } from './wiki/wiki-view.js'
 
 /** Where the admin panel lives, apart from the game (`CONTEXT.md`: Admin). */
 export const ADMIN_PATH = '/admin'

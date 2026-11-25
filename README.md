@@ -3,7 +3,8 @@
 A persistent, real-time strategy world. Players run their realm through UI orders and scripts in
 our own small language (ADR 0002). The server runs the world at 1 tick per second.
 
-Design decisions live in `docs/adr/`; the domain glossary is `CONTEXT.md`.
+Design decisions live in `docs/adr/`; the domain glossary is
+`docs/context/`, with `CONTEXT.md` as its index.
 
 ## Layout
 
@@ -11,7 +12,7 @@ The server is Rust (ADR 0030), the client TypeScript. One cargo workspace at the
 
 | Path                    | What it is                                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------------ |
-| `crates/csp-shared`     | World types, balance numbers (`src/balance.rs`), the wire protocol and helpers             |
+| `crates/csp-shared`     | World types, balance numbers (`src/balance/`), the wire protocol and helpers               |
 | `crates/csp-lang`       | The script language: lexer, parser, checker, interpreter with the step budget              |
 | `crates/csp-lang-wasm`  | `csp-lang`'s checker built to WebAssembly for the editor                                   |
 | `crates/csp-sim`        | Everything in a tick: terrain, pathfinding, orders, the world step, NPC cities, invariants |
@@ -62,7 +63,7 @@ Admins can also create invite codes and reset passwords in the client.
 
 The full map takes half an hour to generate. For testing on your own machine, make a small world
 in seconds with the same generator (terrain, NPC cities, the Trade Organization and a trading
-post, fewer of each), into a database of its own (`CONTEXT.md`: Creative mode, Test worlds):
+post, fewer of each), into a database of its own (`docs/context/people.md`: Creative mode, Test worlds):
 
 ```sh
 cargo run --release -p csp-server --bin csp-admin -- new-world --db data/test-world.db
@@ -93,12 +94,13 @@ pnpm test:slow     # the slow NPC runs (npc_slow without the year runs): an epic
 pnpm test:year     # the year and season runs (about 50 and 15 min): nightly on dev
 pnpm test:ignored  # every test ignored for time but the year runs and measurements, ~7 min: nightly
 pnpm nightly:ignored  # test:ignored, appended to .claude/worktrees/nightly-year-report.md
+pnpm generate      # all generated files (the two below and script-data.json); run it after a merge
 pnpm types:rust    # the client's types from the crates (commit packages/shared-types/src/generated)
-pnpm balance:rust  # the client's balance numbers from balance.rs
+pnpm balance:rust  # the client's balance numbers from csp-shared/src/balance
 pnpm build         # type-check and bundle the client
 pnpm start         # run the server in release
 pnpm test          # Vitest, the client's full suite
-pnpm check [base]  # lint, typecheck and the client tests affected by changes against base
+pnpm check [base]  # regenerate, lint, typecheck and the client tests affected by changes against base
 pnpm lint          # ESLint
 pnpm format        # Prettier
 ```
@@ -129,7 +131,7 @@ nightly report. An ignore reason says how long the test takes alone in the dev p
 
 ### Testing locally with creative mode
 
-Creative mode (`CONTEXT.md`: Creative mode, ADR 0043) lets an admin test without waiting. It exists
+Creative mode (`docs/context/people.md`: Creative mode, ADR 0043) lets an admin test without waiting. It exists
 only on a server started with `CREATIVE=1` (in `.env` or the environment); never set it on the
 live server. Without it every creative route answers 404, admin or not.
 

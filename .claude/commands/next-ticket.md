@@ -27,16 +27,19 @@ branches from `origin/dev` instead (ADR 0010).
 
 ## 3. Build
 
-- Read the ticket, its epic, `CONTEXT.md` and the ADRs it touches.
+- Read the ticket, its epic, the index `CONTEXT.md`, then the section files under `docs/context/`
+  the ticket names (and those whose terms it uses), and the ADRs it touches. A new or changed rule
+  goes into its section file, a new term also into the index.
 - A missing **rule** (what happens) is not yours to invent: comment the question on the ticket,
   swap `in progress` for `needs Daniel`, and pick the next ticket.
-- A missing **number** is yours: pick a sensible value in the balance file
-  (`crates/csp-shared/src/balance.rs`, one commented constant each; then `pnpm balance:rust`) and
+- A missing **number** is yours: pick a sensible value in its domain's file
+  (in `crates/csp-shared/src/balance/`, one commented constant each; then `pnpm balance:rust`) and
   list it in the PR.
 - New simulation rules come with invariants and tests (ADR 0004); a change to world state shape
   bumps `WORLD_FORMAT_VERSION` with a migration in `crates/csp-server/src/world_format.rs` and a
   test (ADR 0006); actions and queries go
   through the game API, orders only request actions (ADR 0002).
+- A ticket that changes a rule also updates its wiki section, `apps/web/src/wiki/<topic>.tsx`.
 - If the next ticket cannot ship without this one (or the reverse), do both in this PR.
 - Tick the ticket's "Done when" boxes as they become true (edit the issue body).
 - While working on the crates, run the tests of the crate you change
@@ -47,7 +50,8 @@ branches from `origin/dev` instead (ADR 0010).
 
 ## 4. Pull request
 
-- Merge the latest epic branch into yours and run `pnpm check origin/epic/<n>-<slug>` again:
+- Merge the latest epic branch into yours, run `pnpm generate` and commit what it changed (on a
+  conflict in a generated file, merge only its sources by hand), and run `pnpm check origin/epic/<n>-<slug>` again:
   ticket PRs get no CI, so this run is what lets the PR merge. Say in the PR body "Checked:
   `pnpm check` against `<base>`" (and `pnpm check:rust`), that it passed, and the test files it
   ran (its last line).

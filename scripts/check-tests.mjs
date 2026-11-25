@@ -3,7 +3,8 @@
 // `forceRerunTriggers` runs the whole suite. Tests tagged `slow` are skipped even when affected.
 // `pnpm test` stays the full suite; CI runs that.
 //
-// Usage: node scripts/check-tests.mjs [base]   (base defaults to origin/dev)
+// Usage: node scripts/check-tests.mjs [base]   (base defaults to origin/dev); `pnpm check` is
+// scripts/check.mjs, which runs this last.
 import { execFileSync } from 'node:child_process'
 import console from 'node:console'
 import process from 'node:process'

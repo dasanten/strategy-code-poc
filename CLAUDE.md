@@ -1,8 +1,10 @@
 # Working on this repo
 
-- **Game rules and terms:** `CONTEXT.md`. Use its words in code, UI and docs. If a rule you need
-  is missing, ask Daniel and add it there before building on it.
-- **Decisions:** `docs/adr/`. The game vision in `CONTEXT.md` wins over ADR 0001 where they
+- **Game rules and terms:** `CONTEXT.md` is the index of `docs/context/`, one file per section.
+  Read the index, then only the section files your ticket names and those whose terms it uses. Use
+  their words in code, UI and docs. If a rule you need is missing, ask Daniel and add it to its
+  section file (a new term also to the index) before building on it.
+- **Decisions:** `docs/adr/`. The game vision in `CONTEXT.md` and `docs/context/` wins over ADR 0001 where they
   conflict.
 - **What to do next:** GitHub tickets, how they work in `docs/tasks.md`. `/next-ticket` picks the
   next one and works it into a PR. PRs reference their tickets (`Closes #n`, `Part of #epic`).
@@ -10,13 +12,18 @@
   are checked locally; only one PR per epic (and bug fixes) goes into `dev` and runs CI.
 - **Releases** (ADR 0010): `main` is the live game and every merge into it deploys. Epics and bugs
   collect on `dev`; a release is one PR `dev` → `main`, opened only when Daniel asks.
-- **Balance numbers** live in `crates/csp-shared/src/balance.rs`; pick sensible values and list
-  them in the PR, then run `pnpm balance:rust` and commit `packages/balance/` (the client's copy).
-  Rules (what happens) are Daniel's call.
-- **Wiki** (`/wiki`, `apps/web/src/Wiki.tsx`): a ticket that changes a rule also updates its wiki
-  section. Numbers come from `@csp/balance`, never typed into its text.
+- **Balance numbers** live in `crates/csp-shared/src/balance/`, one declaration each in the
+  file of its domain; pick sensible values and list them in the PR, then run `pnpm balance:rust`
+  and commit `packages/balance/` (the client's copy). Rules (what happens) are Daniel's call.
+- **Generated files** (`packages/balance`, `script-data.json`, `packages/shared-types/src/generated`;
+  marked in `.gitattributes`): `pnpm generate` writes them all. On a conflict, merge the sources,
+  run `pnpm generate` and commit; never merge a generated file by hand. `pnpm check` and
+  `pnpm check:rust` fail on a stale one.
+- **Wiki** (`/wiki`, one file per section: `apps/web/src/wiki/<topic>.tsx`): a ticket that changes
+  a rule also updates its wiki section. Numbers come from `@csp/balance`, never typed into its text.
 - **Keep scripting cheap to add** (ADR 0002): everything goes through the game API
-  (`crates/csp-sim/src/script_api.rs`, `script_tables.rs`); orders only request actions; order
+  (`crates/csp-sim/src/script_api.rs`; the tables in `script_tables/`, one module per table, each
+  default script its own `default_scripts/*.script`); orders only request actions; order
   state is plain serialisable data. After changing the script tables, run `pnpm script-data:rust`.
 - **World state is never reset** (ADR 0006): a change to its shape bumps `WORLD_FORMAT_VERSION`
   (`crates/csp-shared/src/world/world_format.rs`) and ships a migration step in
@@ -43,6 +50,6 @@
   `eval "$(fnm env --shell bash)" && fnm use` first (from the repo root), and call pnpm as
   `corepack pnpm`. `gh` is at `C:\Program Files\GitHub CLI\gh.exe`.
 - Before finishing: `pnpm check <base>` (ADR 0013), with `<base>` the branch the change goes into
-  (`origin/epic/<n>-<slug>`, or `origin/dev` for a bug). It runs lint, typecheck and only the
-  client tests the change affects, and says what it ran. `pnpm test` is the client's full suite;
-  CI runs it and `pnpm check:rust`'s steps.
+  (`origin/epic/<n>-<slug>`, or `origin/dev` for a bug). It regenerates (when the
+  change touches the crates), runs lint, typecheck and only the client tests the change affects,
+  and says what it ran. `pnpm test` is the client's full suite; CI runs it and `pnpm check:rust`'s steps.

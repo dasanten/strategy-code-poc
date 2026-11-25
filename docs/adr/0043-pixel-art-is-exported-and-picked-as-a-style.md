@@ -1,6 +1,6 @@
 # Pixel art is exported from Aseprite and picked as an art style
 
-Status: decided (2026-11-21, with Daniel). Terms in `CONTEXT.md` under **Art style**; how to draw
+Status: decided (2026-11-21, with Daniel). Terms in `docs/context/screen.md` under **Art style**; how to draw
 and export in `docs/art.md` under **Pixel art**; built in Epic 118.
 
 ## Context

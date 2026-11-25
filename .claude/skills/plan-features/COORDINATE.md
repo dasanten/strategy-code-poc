@@ -26,6 +26,7 @@ For every workable ticket at once, without asking Daniel first:
 Check the PR itself, not just the note.
 
 1. **Ticket PR into the epic branch:** check it out, merge `origin/epic/<n>-<slug>` into it,
+   run `pnpm generate` and commit what it changed (never merge a generated file by hand),
    run `pnpm check origin/epic/<n>-<slug>` (lint, typecheck and the affected client tests, ADR 0013)
    and, when it touches `crates/`, `pnpm check:rust`. Green: merge the PR, close its tickets
    by hand and remove `in progress`. Red: send the failure to that session with `SendMessage`.
@@ -35,7 +36,8 @@ Check the PR itself, not just the note.
 2. **`WORLD_FORMAT_VERSION`:** several open PRs that bump it merge one at a time. After each,
    tell the next one which number to take.
 3. **Questions:** a session asking about a rule goes to Daniel. Quote Daniel word for word when you
-   forward the answer. Write the rule into `CONTEXT.md` on the epic branch.
+   forward the answer. Write the rule into its section file under `docs/context/` (a new
+   term also into the index `CONTEXT.md`) on the epic branch.
 4. **Next tickets:** after each merge, look for tickets that just became workable and start them.
 5. **Epic done:** when an epic's last ticket is merged, merge `origin/dev` into the epic branch
    locally and run `pnpm test:slow` (the slow NPC runs without the year runs, about 8 min; ADR
