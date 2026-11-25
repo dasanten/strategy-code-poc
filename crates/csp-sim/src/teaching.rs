@@ -15,6 +15,7 @@ use crate::order_sender::{npc_training_problem, ordered_resident, OrderSender};
 use crate::queries::building::{building_at, teach_problem, teacher_at};
 use crate::queries::names::placed;
 use crate::queue::field_str as str_field;
+use crate::running::{in_place, no_ties_mut, RunningOrder, Ties};
 use crate::script_actions::{ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 
@@ -87,6 +88,14 @@ const TEACH_ACTION: ScriptAction = ScriptAction {
     description: "Teach a stat (\"strength\", \"endurance\", \"agility\", \"intellect\") or a skill (\"combat\", …) at the training ground on my tile, while I stand there. One teacher per ground.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for TeachOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { refills_at: Some((&self.building_id, None)), ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
 
 /// Ends the teaching that no longer holds (`stepTeaching`): a teacher who has left the ground's
 /// footprint, whose ground is gone, or who is one teacher too many there stops.

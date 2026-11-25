@@ -14,18 +14,17 @@ use crate::queries::alliance::commander_of;
 use crate::queries::carriages::carriage_pulled_by;
 use crate::queries::residents::is_down;
 use crate::queries::riding::{horse_of_resident, horse_ridden, mount_problem};
+use crate::running::RunningOrder;
 use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::stealing::{take_over, Taken};
-use crate::walking::order_path_mut;
 
 /// A path found before mounting or dismounting kept to the ground and walls of the other way of
 /// going, so the walk finds a new one (`freshPath`).
 fn fresh_path(world: &mut WorldState, i: usize) {
     if let Some(o) = world.residents[i].order.as_mut() {
-        if let Some((path, progress)) = order_path_mut(o) {
-            *path = None;
-            *progress = 0.0;
+        if let Some(going) = o.going_mut() {
+            going.reset();
         }
     }
 }

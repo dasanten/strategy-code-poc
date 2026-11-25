@@ -37,6 +37,7 @@ use crate::queries::residents::{can_work, food_use};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::trade_org::trade_org_hq;
 use crate::queries::vessels::vessel_aboard;
+use crate::running::RunningOrder;
 use crate::sight::InvariantViolation;
 use crate::tick::Scratch;
 
@@ -722,13 +723,13 @@ pub fn refill_source(world: &WorldState, r: &Resident, size: i32) -> Option<Refi
     }
     // Teaching and training refill at the training ground as at a workplace (`CONTEXT.md`:
     // Training).
-    let place_id = match &r.order {
-        Some(ResidentOrder::WorkAt(o)) if r.x == o.at.x && r.y == o.at.y => Some(&o.building_id),
-        Some(ResidentOrder::Teach(o)) => Some(&o.building_id),
-        Some(ResidentOrder::Train(o)) => Some(&o.building_id),
-        _ => None,
-    };
-    let place = place_id.and_then(|id| world.buildings.iter().find(|b| &b.id == id));
+    let place_id = r
+        .order
+        .as_ref()
+        .and_then(|o| o.ties().refills_at)
+        .filter(|(_, at)| at.is_none_or(|at| r.x == at.x && r.y == at.y))
+        .map(|(id, _)| id);
+    let place = place_id.and_then(|id| world.buildings.iter().find(|b| b.id == id));
     if let Some(place) = place {
         if place.site.is_none() && is_at(tile_of(r), placed(place), size) {
             if let Some(i) = building_pile_index(world, place) {

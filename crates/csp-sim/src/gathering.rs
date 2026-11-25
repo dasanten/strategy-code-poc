@@ -30,6 +30,7 @@ use crate::queries::building::CARRYING_A_CHILD;
 use crate::queries::names::{good_of, kind_name, placed};
 use crate::queries::residents::{can_work, carry_capacity, good_weight, stock_weight};
 use crate::queue::field_str as str_field;
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
@@ -296,6 +297,11 @@ const GATHER_ACTION: ScriptAction = ScriptAction {
     description: "Gather \"wood\" or \"food\" by hand on the Forest tile I stand on, or \"stone\" on a Hills tile, with nothing built on it and no node: a little slower than working a node, and it teaches the skill. Each tile's patch holds about one load for everyone and grows back over some game days once picked over. My order is \"gather\" until my hands are full or the patch is gone; then `me.orderEnded` says which (\"hands full\" or \"picked over\"). Children can't.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for GatherOrder {
+    in_place!();
+    no_ties!();
+}
 
 /// Ends the resident's gather order, saying why (`me.orderEnded`); `None` when they left the tile
 /// or something now stands on it.

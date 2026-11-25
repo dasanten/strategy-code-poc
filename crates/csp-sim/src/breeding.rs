@@ -24,6 +24,7 @@ use crate::queries::names::placed;
 use crate::queries::people::CARRYING_A_CHILD;
 use crate::queries::residents::can_work;
 use crate::random::{hash_str, Mulberry32};
+use crate::running::{in_place, no_ties_mut, RunningOrder, Ties};
 use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 
@@ -133,6 +134,14 @@ const BREED_ACTION: ScriptAction = ScriptAction {
     description: "At the stable I stand at, tend two fed horses of mine in it, like [\"h1\", \"h2\"], until their foal is born.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for BreedOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { crew_of: Some(&self.stable_id), ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
 
 /// Requests this tick's tending from residents' breed orders (`requestBreeding`).
 pub fn request_breeding(world: &WorldState) -> Vec<BreedAction> {

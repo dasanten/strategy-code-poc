@@ -33,6 +33,7 @@ use crate::queries::transfer::{
 };
 use crate::queries::warehouse::trade_coin_warehouse;
 use crate::queries::warehouse_trade::{debt_of, delivery_storage};
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::script_actions::{arg, arg_as, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
@@ -242,6 +243,11 @@ const HAND_IN_ACTION: ScriptAction = ScriptAction {
     description: "On a Trade Org warehouse, hand in up to `units` of a good (coins too) from my hands, or from my carriage there, with the fee, for a caravan to bring to the storage of `toCityId`, a city of another realm.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for HandInOrder {
+    in_place!();
+    no_ties!();
+}
 
 fn holder_stock(world: &WorldState, h: Holder) -> Stock {
     crate::holders::stock_of(world, h)

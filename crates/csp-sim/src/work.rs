@@ -23,6 +23,7 @@ use crate::queries::building::{
 use crate::queries::names::{good_name, good_of, held, kind_name, placed};
 use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
+use crate::running::{in_place, RunningOrder, Ties, TiesMut};
 use crate::script_actions::{arg_as, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::survival::drop_goods;
@@ -120,6 +121,20 @@ const WORK_AT_ACTION: ScriptAction = ScriptAction {
     description: "Work the workplace on my tile; at a smithy, say what to make, or \"mend\" to mend the most worn weapon, piece of armour or set of Tools there (carried by its workers or on its pile) back to good, for a share of its recipe.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for WorkOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties {
+            crew_of: Some(&self.building_id),
+            refills_at: Some((&self.building_id, Some(&self.at))),
+            ..Ties::NONE
+        }
+    }
+    fn ties_mut(&mut self) -> TiesMut<'_> {
+        TiesMut { place: Some(&mut self.building_id), ..TiesMut::none() }
+    }
+}
 
 /// An action a resident with a work-at order requests (`WorkAction`).
 #[derive(Debug, Clone, PartialEq, Eq)]

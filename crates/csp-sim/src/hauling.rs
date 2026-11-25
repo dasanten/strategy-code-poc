@@ -23,9 +23,13 @@ use crate::queries::goods::{
 };
 use crate::queries::names::{good_name, good_of, held};
 use crate::queries::warehouse_trade::is_integer;
+use crate::running::{
+    driver_goes_on, no_ties_mut, Arrival, By, Going, GoingMut, RunningOrder, Ties, To,
+};
 use crate::script_actions::{ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::water_hauling::{apply_water_haul, validate_water_haul, vessel_of_haul};
+use csp_shared::world::Resident;
 
 /// Why a resident carrying a child can't take an order that needs their hands
 /// (`CARRYING_A_CHILD`).
@@ -194,6 +198,49 @@ const HAUL_ACTION: ScriptAction = ScriptAction {
     description: "Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back. Given a boat beside me (its id as `carriageId`), row it instead between my tile and the shore or haven (x, y), loading by hand at each. Given a ship docked at the haven I stand on, I am its captain: I sail it between this haven and the haven at (x, y) with its crew aboard, moving the goods straight between each haven's storage and the ship.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for HaulOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: self.phase == HaulPhase::Driving,
+            by: By::Carriage { id: &self.carriage_id, keeps_food: self.keep_food },
+            to: To::tile(if self.stop == HaulStop::From { &self.from } else { &self.to }),
+            near: false,
+            after: self.to_army.as_deref().filter(|_| self.stop == HaulStop::To),
+            estimated: true,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut {
+            after: Some(&mut self.to),
+            ..GoingMut::new(&mut self.path, &mut self.progress)
+        })
+    }
+    fn arrive(&mut self) -> Arrival {
+        self.phase = HaulPhase::Loading;
+        GoingMut::new(&mut self.path, &mut self.progress).reset();
+        Arrival::GoesOn
+    }
+    fn resume(&mut self, world: &WorldState, r: &Resident) -> bool {
+        GoingMut::new(&mut self.path, &mut self.progress).reset_found();
+        driver_goes_on(world, r, &self.carriage_id)
+    }
+    fn same(&self, kept: &Self) -> bool {
+        self.carriage_id == kept.carriage_id
+            && self.from == kept.from
+            && self.to == kept.to
+            && self.to_army == kept.to_army
+            && self.goods == kept.goods
+            && self.return_goods == kept.return_goods
+            && self.keep_food == kept.keep_food
+    }
+    fn ties(&self) -> Ties<'_> {
+        Ties { supplies: self.to_army.as_deref(), ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
 
 /// Checks a stop order (`stop.validate`): one of the Player's residents stops what they were
 /// ordered to do and stands idle.

@@ -27,6 +27,7 @@ use crate::queries::building::building_at;
 use crate::queries::names::placed;
 use crate::queries::residents::is_down;
 use crate::queue::field_str as str_field;
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::sight::InvariantViolation;
 use crate::world_index::{building_index, resident_index};
 use crate::zeal::{set_zeal, zeal_of};
@@ -101,6 +102,11 @@ pub fn apply_rally(world: &mut WorldState, order: &OrderRequest) {
 
 pub(crate) static RALLY_META: OrderMeta =
     OrderMeta::fns(RALLY, |w, s, o, _| validate_rally(w, s, o), |w, _, o, _| apply_rally(w, o));
+
+impl RunningOrder for RallyOrder {
+    in_place!();
+    no_ties!();
+}
 
 /// The account of the Player whose Leader `r` is, if `r` is a realm's Leader.
 fn leader_of(world: &WorldState, r: &Resident) -> Option<u64> {

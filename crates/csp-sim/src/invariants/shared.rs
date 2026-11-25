@@ -35,14 +35,7 @@ pub(super) fn of_resident(
     }
 }
 
-/// The carriage a resident drives, by a drive or haul order (`drivenCarriageId`).
-pub(super) fn driven_carriage_id(r: &csp_shared::world::Resident) -> Option<&str> {
-    match &r.order {
-        Some(ResidentOrder::Drive(o)) => Some(&o.carriage_id),
-        Some(ResidentOrder::Haul(o)) => Some(&o.carriage_id),
-        _ => None,
-    }
-}
+pub(super) use crate::queries::carriages::driven_carriage_id;
 
 /// The NPC cities' ids: cities of no realm.
 pub(super) fn npc_cities(world: &WorldState) -> HashSet<&str> {

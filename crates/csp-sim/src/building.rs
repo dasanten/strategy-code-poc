@@ -24,6 +24,7 @@ use crate::queries::names::{kind_of, placed};
 use crate::queries::vessels::launch_tile;
 use crate::queue::field_str as str_field;
 use crate::random::new_id;
+use crate::running::{in_place, On, RunningOrder, Ties, TiesMut};
 use crate::script_actions::{arg, arg_as, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::survival::gather_pile;
@@ -150,19 +151,10 @@ fn upgraded_by(world: &WorldState, site: usize) -> Option<usize> {
 /// a line goes on to its next tile and a builder's order is done as on any finished site.
 fn point_orders_at(world: &mut WorldState, from: &str, to: &str) {
     for r in &mut world.residents {
-        match r.order.as_mut() {
-            Some(ResidentOrder::Build(b)) if b.site_id.as_deref() == Some(from) => {
-                b.site_id = Some(to.to_string());
+        if let Some(place) = r.order.as_mut().and_then(|o| o.ties_mut().place) {
+            if *place == from {
+                *place = to.to_string();
             }
-            Some(ResidentOrder::RoadLine(l) | ResidentOrder::WallLine(l))
-                if l.site_id.as_deref() == Some(from) =>
-            {
-                l.site_id = Some(to.to_string());
-            }
-            Some(ResidentOrder::WorkAt(w)) if w.building_id == from => {
-                w.building_id = to.to_string();
-            }
-            _ => {}
         }
     }
 }
@@ -529,3 +521,14 @@ const BUILD_ACTION: ScriptAction = ScriptAction {
     description: "Lay out or join a construction site of that kind on my tile. A wall or gate is of \"wood\" (by default) or \"stone\"; a stone one may be laid out on a wooden one of its kind, which stands until the stone one is finished.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for BuildOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        let site = self.site_id.as_deref();
+        Ties { on: site.map_or(On::Nothing, On::Site), crew_of: site, ..Ties::NONE }
+    }
+    fn ties_mut(&mut self) -> TiesMut<'_> {
+        TiesMut { place: self.site_id.as_mut(), ..TiesMut::none() }
+    }
+}

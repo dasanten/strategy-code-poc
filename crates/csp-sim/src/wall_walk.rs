@@ -15,8 +15,8 @@ use crate::queries::city::town_hall_of;
 use crate::queries::combat::{in_contact, ranged_weapon};
 use crate::queries::names::placed;
 use crate::queries::walls::is_up;
+use crate::running::RunningOrder;
 use crate::survival::die_all;
-use crate::walking::order_path_mut;
 use crate::walls::{is_wall_or_gate, neighbours, of_wall_side, plain_ground, side_of, wall_map};
 
 /// The finished walls, gates and towers by tile, a tower on every tile of its footprint.
@@ -124,9 +124,8 @@ pub fn fall_from_broken(
         r.x = f64::from(lx);
         r.y = f64::from(ly);
         r.up = None;
-        if let Some((path, progress)) = r.order.as_mut().and_then(order_path_mut) {
-            *path = None;
-            *progress = 0.0;
+        if let Some(going) = r.order.as_mut().and_then(|o| o.going_mut()) {
+            going.reset();
         }
         r.health = (r.health - FALL_DAMAGE).max(0.0);
         if r.health <= 0.0 {

@@ -130,6 +130,7 @@ pub mod riding;
 pub mod road_line;
 pub mod rowing;
 pub mod ruins;
+pub mod running;
 pub mod sailing;
 pub mod script_actions;
 pub mod script_api;

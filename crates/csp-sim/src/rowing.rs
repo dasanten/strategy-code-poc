@@ -17,6 +17,7 @@ use crate::queries::vessels::{
     beside_vessel, row_off_problem, row_target, steals_vessel, vessel_by_id, vessel_of_resident,
     vessel_room,
 };
+use crate::running::{no_ties, same_when_equal, Arrival, By, Going, GoingMut, RunningOrder, To};
 use crate::script_actions::{arg, place, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::stealing::{take_over, Taken};
@@ -165,6 +166,33 @@ const ROW_ACTION: ScriptAction = ScriptAction {
     description: "Row a boat of my realm, by it or its id, to the water tile x, y, or to the nearest free water tile beside it when x, y is land. I must be aboard it or beside it (I board first), and grown. A Step at a time over water; my Strength and Seafaring set the pace, and rowing teaches Seafaring. My order is \"row\" until it gets there.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder<Row> for RowOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: true,
+            by: By::Oars(&self.vessel_id),
+            to: To::tile(&self.target),
+            near: false,
+            after: None,
+            estimated: false,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        Arrival::Done
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        // The path found before the interruption is kept (#1619).
+        true
+    }
+    same_when_equal!();
+    no_ties!();
+}
 
 #[cfg(test)]
 pub(crate) mod tests;

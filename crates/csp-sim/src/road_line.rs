@@ -23,8 +23,12 @@ use crate::queries::building::{
 use crate::queries::names::{held, kind_name};
 use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
+use crate::running::{
+    same_when_equal, Arrival, By, Going, GoingMut, RunningOrder, Ties, TiesMut, To,
+};
 use crate::script_actions::{ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
+use csp_shared::world::Resident;
 
 /// Which line order: a road line or a wall line (`LineOrder['kind']`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -204,6 +208,40 @@ const ROAD_LINE_ACTION: ScriptAction = ScriptAction {
     description: "Build road on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the stone I carry.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for LineOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: self.phase == LinePhase::Walking,
+            by: By::Foot,
+            to: self.tiles.first().map_or(To::Nowhere, |&t| To::At(t)),
+            near: false,
+            after: None,
+            estimated: false,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        self.phase = LinePhase::Building;
+        GoingMut::new(&mut self.path, &mut self.progress).reset();
+        Arrival::GoesOn
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        GoingMut::new(&mut self.path, &mut self.progress).reset_found();
+        true
+    }
+    same_when_equal!();
+    fn ties(&self) -> Ties<'_> {
+        Ties::NONE
+    }
+    fn ties_mut(&mut self) -> TiesMut<'_> {
+        TiesMut { place: self.site_id.as_mut(), ..TiesMut::none() }
+    }
+}
 
 /// This tick's puts of materials from orders along a line (`requestRoadMaterials`): a resident
 /// on the site of their tile puts in what they carry of what it still needs.

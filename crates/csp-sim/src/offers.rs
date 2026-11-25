@@ -35,6 +35,7 @@ use crate::queries::standing::{organization_label, TRADE_ORG};
 use crate::queries::trade_org::trade_org_hq;
 use crate::queries::transfer::{nearest_warehouse, transfer_load};
 use crate::queries::warehouse_trade::{delivery_storage, hands_of, load_of};
+use crate::running::{in_place, no_ties, RunningOrder};
 use crate::script_actions::{arg, arg_as, ActionGroup, Request, ScriptAction};
 use crate::script_views::ScriptType;
 use crate::sight::{sight_of, Spot};
@@ -724,6 +725,11 @@ const ACCEPT_OFFER_ACTION: ScriptAction = ScriptAction {
     description: "On the storage of another’s offer, accept it up to `times` times over, paying from and taking into my hands, or my carriage there, as many times as I can pay and carry. A direct offer only the realm it was sent to can accept.",
     returns: ScriptType::String,
 };
+
+impl RunningOrder for AcceptOfferOrder {
+    in_place!();
+    no_ties!();
+}
 
 /// One offer accepted this tick, with the goods of everyone in it before and after (`Accepted`).
 #[derive(Debug, Clone, PartialEq)]
