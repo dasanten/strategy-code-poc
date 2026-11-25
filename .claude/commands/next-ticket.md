@@ -47,7 +47,8 @@ branches from `origin/dev` instead (ADR 0010).
 
 ## 4. Pull request
 
-- Merge the latest epic branch into yours and run `pnpm check origin/epic/<n>-<slug>` again:
+- Merge the latest epic branch into yours, run `pnpm generate` and commit what it changed (on a
+  conflict in a generated file, merge only its sources by hand), and run `pnpm check origin/epic/<n>-<slug>` again:
   ticket PRs get no CI, so this run is what lets the PR merge. Say in the PR body "Checked:
   `pnpm check` against `<base>`" (and `pnpm check:rust`), that it passed, and the test files it
   ran (its last line).
