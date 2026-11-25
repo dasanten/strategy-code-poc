@@ -1,6 +1,6 @@
 # Vessels cross water only on purpose
 
-Status: decided (2026-11-11, with Daniel). Rules in `CONTEXT.md` under **Water**; built in Epics
+Status: decided (2026-11-11, with Daniel). Rules in `docs/context/water.md` under **Water**; built in Epics
 90 (Havens and boats) and 91 (Ships).
 
 Lake and Sea have been impassable walls in the world since the start, and all land is joined, so

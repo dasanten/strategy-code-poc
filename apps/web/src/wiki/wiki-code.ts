@@ -1,5 +1,5 @@
 import { StringStream } from '@codemirror/language'
-import { scriptHighlighting } from './script-editor.js'
+import { scriptHighlighting } from '../script-editor.js'
 
 /**
  * A piece of a script example as the Wiki shows it, in the script workshop's colours (the kit's

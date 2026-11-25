@@ -1,2 +1,3 @@
 crates/csp-server/migrations/** text eol=lf
 packages/balance/** text eol=lf
+crates/csp-sim/src/script_tables/default_scripts/*.script text eol=lf

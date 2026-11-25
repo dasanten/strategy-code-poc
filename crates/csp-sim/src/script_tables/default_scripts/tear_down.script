@@ -1,0 +1,142 @@
+// Tear down (default): tear down params.building, or while none is picked
+// the building or site on my tile when I start, kept in memory.buildingId,
+// until it is gone; then end. With none I end. Away from it, I walk there
+// first. Below params.foodAt units of Food on me I get Food up to
+// params.foodTake at params.food, else params.source, else the nearest
+// storage of my realm with Food, and come back. foodAt 0 turns it off.
+param building: building // the building or site to tear down; none: the one I stand on
+param source: storage // my main storage, for Food; a carriage too; none: the nearest storage with Food
+param food: storage // where Food comes from; a carriage too; none: my source, else the nearest storage with Food
+param foodAt: number = 1 // get Food below this many units on me; 0 never
+param foodTake: number = 3 // units of Food to take along
+
+if (memory.stuck) { return }
+if (!pickBuilding()) { return }
+if (memory.walked && me.order != null && me.order.kind == "walkTo") { // on my way
+  wait()
+  return
+}
+if (walkBack()) { return }
+// With no Food anywhere, I tear down on.
+let x = me.x
+let y = me.y
+if (getFoodIfLow(params.food || params.source, me)) {
+  memory.food = {walked: false, x: x, y: y}
+  return
+}
+if (me.order == null || me.order.kind != "tearDown") { startTearingDown() }
+
+// What I tear down: the one picked, else the one I started on, kept in
+// memory.buildingId. False once I end: there is none.
+fn pickBuilding() {
+  if (params.building != null) { memory.buildingId = params.building.id }
+  if (memory.buildingId == null) {
+    let here = buildingAt(me.x, me.y)
+    if (here == null) {
+      end("no building on their tile")
+      return false
+    }
+    memory.buildingId = here.id
+  }
+  return true
+}
+
+// Away getting food: walk back to the tile I tear down from, once; with no
+// way back I stay put. True until I am there.
+fn walkBack() {
+  let away = memory.food
+  if (away == null) { return false }
+  if (me.order != null && me.order.kind != "tearDown") { // on my way
+    wait()
+    return true
+  }
+  if (me.x == away.x && me.y == away.y) {
+    memory.food = null
+    return false
+  }
+  if (away.walked) {
+    memory.stuck = true
+    log("no way back to where I tear down")
+  } else {
+    if (walkTo(away.x, away.y) == null) { wait() } // until I am there
+    away.walked = true
+  }
+  return true
+}
+
+// Tearing it down; picked somewhere else, I walk there once first. Turned
+// down, such as with the building gone, tearDown says why: done.
+fn startTearingDown() {
+  let problem = tearDown(memory.buildingId)
+  let target = building(memory.buildingId)
+  if (target == null) { target = params.building } // picked out of sight: as last seen
+  if (problem == "the resident is not at that building" && target != null && !memory.walked) {
+    memory.walked = true
+    if (walkTo(target.x, target.y) == null) { wait() } // until I am there
+    log("walking to " + placeName(target) + " to tear it down")
+    return
+  }
+  if (problem != null) {
+    log(problem)
+    end()
+  } else if (target != null) { log("tearing down " + placeName(target)) }
+}
+
+// Getting food: below params.foodAt units of Food on me, fetch Food up to
+// params.foodTake at from while it holds Food, else at the nearest storage of
+// my realm with Food from near. True once I set off, which I log; I wait
+// until I have it.
+fn getFoodIfLow(from, near) {
+  let food = me.carried.food
+  if (food == null) { food = 0 }
+  if (food >= params.foodAt) { return false }
+  let units = floor(params.foodTake - food) // fetch takes whole units
+  if (units < 1) { return false }
+  let at = from
+  if (at == null || !holdsFood(at)) {
+    at = null
+    let stores = storages(near, ["food"]) // nearest first, holding some
+    if (stores.length > 0) { at = stores[0] }
+  }
+  if (at == null || fetch({food: units}, at.id) != null) { return false }
+  wait() // until I have it
+  log("low on Food (" + floor(food) + "): fetching " + units + " at " + placeName(at))
+  return true
+}
+
+// Whether a storage, or a carriage, holds a whole unit of Food to fetch.
+fn holdsFood(at) {
+  let held = at.stock
+  if (held == null) { held = at.load } // a carriage
+  return held != null && held.food != null && held.food >= 1
+}
+
+// The Food that tops me up to params.foodTake, in whole units.
+fn foodToTake() {
+  let food = me.carried.food
+  if (food == null) { food = 0 }
+  let units = floor(params.foodTake - food)
+  if (units < 1) { return 0 }
+  return units
+}
+
+
+// A building or carriage for my log: "the storage at 12,6".
+fn placeName(b) {
+  let kind = b.kind
+  if (kind == null) { kind = "carriage" }
+  return "the " + kind + " at " + b.x + "," + b.y
+}
+
+// The units of goods in load for my log: "10 stone, 4 wood".
+fn goodsText(load, goods) {
+  let text = ""
+  for (g of goods) {
+    let n = load[g]
+    if (n != null && n >= 1) {
+      if (text != "") { text = text + ", " }
+      text = text + floor(n) + " " + g
+    }
+  }
+  return text
+}

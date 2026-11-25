@@ -3,7 +3,7 @@ import type { PickedParamType, ScriptParam, ScriptParamValue, Waypoint } from '@
 import { useId, useRef, useState, type ReactNode } from 'react'
 import { choiceLabel, effectiveParam, paramNote, waypointLabel } from './script-params-view.js'
 import { useKeyboardInset } from './sheet-view.js'
-import { foodEatenPerDay, num } from './wiki-view.js'
+import { foodEatenPerDay, num } from './wiki/wiki-view.js'
 
 /**
  * The hint under number fields counting Food, like the defaults' `foodAt` and `foodTake`

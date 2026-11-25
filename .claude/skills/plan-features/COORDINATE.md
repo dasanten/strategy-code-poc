@@ -35,7 +35,8 @@ Check the PR itself, not just the note.
 2. **`WORLD_FORMAT_VERSION`:** several open PRs that bump it merge one at a time. After each,
    tell the next one which number to take.
 3. **Questions:** a session asking about a rule goes to Daniel. Quote Daniel word for word when you
-   forward the answer. Write the rule into `CONTEXT.md` on the epic branch.
+   forward the answer. Write the rule into its section file under `docs/context/` (a new
+   term also into the index `CONTEXT.md`) on the epic branch.
 4. **Next tickets:** after each merge, look for tickets that just became workable and start them.
 5. **Epic done:** when an epic's last ticket is merged, merge `origin/dev` into the epic branch
    locally and run `pnpm test:slow` (the slow NPC runs without the year runs, about 8 min; ADR

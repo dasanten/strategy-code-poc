@@ -9,7 +9,7 @@ import {
   KIT_PATH,
   pageFor,
 } from './pages.js'
-import { WIKI_PATH } from './wiki-view.js'
+import { WIKI_PATH } from './wiki/wiki-view.js'
 
 const player = { name: 'Mara', isAdmin: false }
 const admin = { name: 'Daniel', isAdmin: true }

@@ -2,7 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { MIN_PASSWORD_LENGTH } from './shared/api.js'
 import type { Account } from '@csp/shared-types'
 import { api, ApiFailure } from './api.js'
-import { WIKI_PATH } from './wiki-view.js'
+import { WIKI_PATH } from './wiki/wiki-view.js'
 
 /**
  * The game's title over the dimmed board, above the panel of the screens outside the game (log

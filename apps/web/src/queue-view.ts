@@ -38,7 +38,7 @@ import {
   type Block,
   type PlanItem,
 } from './plan-blocks.js'
-import { realTimeOf } from './wiki-view.js'
+import { realTimeOf } from './wiki/wiki-view.js'
 import { conditionLabel } from './condition-view.js'
 import { conditionProblem } from './shared/condition.js'
 
