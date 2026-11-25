@@ -242,6 +242,26 @@ pub enum Condition {
     Hour { side: HourSide, hour: f64 },
 }
 
+/// Every kind of condition (`Condition`'s `kind`), in the order the condition editor offers them
+/// (`CONDITION_KINDS`).
+pub const CONDITION_KINDS: [&str; 7] =
+    ["carries", "load", "stock", "need", "mounted", "aboard", "hour"];
+
+impl Condition {
+    /// Its kind, as serde tags it (`CONDITION_KINDS`).
+    pub const fn kind(&self) -> &'static str {
+        match self {
+            Condition::Carries { .. } => "carries",
+            Condition::Load { .. } => "load",
+            Condition::Stock { .. } => "stock",
+            Condition::Need { .. } => "need",
+            Condition::Mounted { .. } => "mounted",
+            Condition::Aboard { .. } => "aboard",
+            Condition::Hour { .. } => "hour",
+        }
+    }
+}
+
 /// At least or less than an amount (`Condition`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]

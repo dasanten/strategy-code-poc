@@ -4,6 +4,8 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::named_enum::named_enum;
+
 /// What a Forest or Hills tile that isn't full still holds for gathering (`CONTEXT.md`: Patch):
 /// `left` units at tick `at`, growing back steadily from then on.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -15,15 +17,16 @@ pub struct Patch {
     pub at: u64,
 }
 
+named_enum! {
 /// What a resource node yields once worked (`ResourceKind`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
 pub enum ResourceKind {
-    Forest,
-    Stone,
-    IronOre,
-    GoldOre,
-    Coal,
+    Forest = "forest",
+    Stone = "stone",
+    IronOre = "ironOre",
+    GoldOre = "goldOre",
+    Coal = "coal",
+}
 }
 
 /// How much a resource node gives per worker (`CONTEXT.md`: Richness), fixed when it comes into

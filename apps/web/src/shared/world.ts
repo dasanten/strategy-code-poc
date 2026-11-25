@@ -32,24 +32,15 @@ import type {
   WorkplaceSettings,
   Weapon,
 } from '@csp/shared-types'
+import { STAT_NAMES, SKILL_NAMES as ALL_SKILL_NAMES } from '@csp/shared-types'
 
-/** A resident's stats (`CONTEXT.md`: Stats). */
-export const STAT_NAMES = ['strength', 'endurance', 'agility', 'intellect'] as const
+export { STAT_NAMES, HORSE_STAT_NAMES, CARRYING_A_CHILD, NODE_WORKPLACE } from '@csp/shared-types'
 
-/** A horse's stats (`CONTEXT.md`: Horse stats). */
-export const HORSE_STAT_NAMES = ['speed', 'strength', 'endurance'] as const
-
-/** Every skill, in the order the UI lists them. */
-export const SKILL_NAMES: readonly SkillName[] = [
-  'mining',
-  'woodcutting',
-  'smelting',
-  'smithing',
-  'construction',
-  'farming',
-  'combat',
-  'driving',
-]
+/**
+ * Every skill the client lists, in the order the UI lists them. Seafaring is left out for now, as
+ * it was before the list came from Rust (decided overnight, Daniel to confirm: bug #1629).
+ */
+export const SKILL_NAMES: readonly SkillName[] = ALL_SKILL_NAMES.filter((s) => s !== 'seafaring')
 
 /** Whether `x` names a stat or a skill, something a training ground can teach. */
 export function isTrainingSubject(x: unknown): x is TrainingSubject {
@@ -66,9 +57,6 @@ export function isTrainingSubject(x: unknown): x is TrainingSubject {
 export function isDown(r: { downUntil?: number; down?: true }): boolean {
   return r.downUntil !== undefined || r.down === true
 }
-
-/** Why a resident carrying a child is turned down for work, building, tearing down or hauling. */
-export const CARRYING_A_CHILD = 'carrying a child'
 
 /**
  * A haul route (`CONTEXT.md`: Haul route): the resident drives the carriage `carriageId` between
@@ -765,13 +753,4 @@ export interface Demand {
   sentAt: number
   /** The tick it lapses at, unanswered. */
   deadline: number
-}
-
-/** The workplace built on each kind of node (`CONTEXT.md`: Workplace, Where buildings go). */
-export const NODE_WORKPLACE: Record<ResourceKind, BuildingKind> = {
-  forest: 'lumberCamp',
-  stone: 'quarry',
-  ironOre: 'mine',
-  goldOre: 'mine',
-  coal: 'mine',
 }

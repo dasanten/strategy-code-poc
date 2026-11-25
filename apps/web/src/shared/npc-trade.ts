@@ -43,6 +43,9 @@ import type {
   TradeSide,
   Weapon,
 } from '@csp/shared-types'
+import { NPC_SMITHY_WEAPON } from '@csp/shared-types'
+
+export { NPC_SMITHY_WEAPON } from '@csp/shared-types'
 
 /*
  * Trading with and hiring from an NPC city (`CONTEXT.md`: Trading with an NPC city, Hiring from
@@ -80,9 +83,6 @@ export function npcCityStock(world: Pick<WorldState, 'buildings'>, city: City): 
   }
   return sum
 }
-
-/** What an NPC city's smithy makes for its soldiers: the cheapest weapon (`RECIPES`). */
-export const NPC_SMITHY_WEAPON: Weapon = 'spear'
 
 /**
  * How many soldiers an NPC city keeps (`CONTEXT.md`: NPC city): `NPC_SOLDIER_SHARE` of its

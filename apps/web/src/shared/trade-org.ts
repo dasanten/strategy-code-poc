@@ -8,23 +8,14 @@ import { wrapDelta } from './terrain.js'
 import { type WorldState } from './world.js'
 import { TRADE_ORG_ARMY, TRADE_ORG_HQ } from '@csp/balance'
 import type { City, Resident } from '@csp/shared-types'
+import { TRADE_ORG } from '@csp/shared-types'
+
+export { TRADE_ORG, TRADE_ORG_NAME, NO_CARAVANS } from '@csp/shared-types'
 
 /**
  * World queries about the Trade Organization as a side (ADR 0002: the game API orders and scripts
  * share).
  */
-
-/**
- * The Trade Organization where a realm's id would go (`CONTEXT.md`: Trade Org army): in mercenary
- * contracts it is a side like a realm, lending its army or hiring mercenaries.
- */
-export const TRADE_ORG = 'trade-org'
-
-/** What Players call the Trade Organization where they would see a realm's name. */
-export const TRADE_ORG_NAME = 'the Trade Organization'
-
-/** Why no caravan will carry anything: the HQ has fallen (`CONTEXT.md`: Fall of the HQ). */
-export const NO_CARAVANS = 'no caravans run since the Trade Org HQ fell'
 
 /** The Trade Org HQ, if the world has one. */
 export function tradeOrgHq(world: Pick<WorldState, 'cities'>): City | undefined {
