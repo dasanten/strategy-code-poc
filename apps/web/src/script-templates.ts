@@ -1,6 +1,6 @@
 import { DEFAULT_SCRIPTS } from '@csp/lang-wasm'
 import type { ScriptSummary, Task } from '@csp/shared-types'
-import { WIKI_PATH } from './wiki-view.js'
+import { WIKI_PATH } from './wiki/wiki-view.js'
 
 /**
  * What a new script starts from in the Library (`CONTEXT.md`: Script, Default script): empty, a

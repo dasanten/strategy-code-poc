@@ -1,0 +1,136 @@
+// Breed horses (default): in params.stable, or while none is picked the
+// stable I stand in when I start, kept in memory.stableId, tend the two
+// horses memory.horseIds until their foal is born; then end. Without a pair
+// given, I pick one in the stable: a pair whose breeding it keeps first,
+// else two fed horses of my realm in it; with none, or no stable, I end.
+// Away from the stable, walk there first; at it we stand spread over its
+// footprint. Before starting, take Food for the days of tending from the
+// stable, if it has some.
+param stable: storage // the stable to breed in; none: the one I stand in
+let needFood = 5 // Food I take along for my meals while tending
+
+if (memory.done == true) { end() }
+if (me.order != null && me.order.kind == "breed") {
+  memory.started = true
+  wait() // until the foal is born or the breeding stops
+  return
+}
+if (memory.started == true) {
+  // The foal was born, or the breeding stopped: done.
+  log("the breeding is over")
+  end()
+  return
+}
+if (me.order != null && (me.order.kind == "walkTo" || me.order.kind == "pickUp")) {
+  wait()
+  return
+}
+if (!pickStable()) { return }
+let stable = building(memory.stableId)
+if (stable == null) {
+  end("the stable is gone")
+  return
+}
+if (!pickPair(stable)) { return }
+if (takeFood()) { return }
+if (walkToStable(stable)) { return }
+startBreeding(stable)
+
+// Which two: those given, else picked once I stand in the stable. False while
+// I walk there, or once I end: there are no two to pick.
+fn pickPair(stable) {
+  if (memory.horseIds != null) { return true }
+  let here = buildingAt(me.x, me.y)
+  if ((here == null || here.id != stable.id) && walkToStable(stable)) { return false }
+  let pair = breedingPair(stable)
+  if (pair == null) {
+    end("no two fed horses here")
+    return false
+  }
+  memory.horseIds = pair
+  return true
+}
+
+// Food for the days of tending, taken from the stable once, if it has some.
+// True once I take it.
+fn takeFood() {
+  if (memory.fed == true) { return false }
+  let food = me.carried.food
+  if (food == null) { food = 0 }
+  if (food >= needFood) { return false }
+  let units = needFood - food
+  let spot = {kind: "storage", storageId: memory.stableId}
+  if (pickUp(spot, {food: units}) != null) { return false }
+  memory.fed = true
+  log("taking " + goodsText({food: units}, ["food"]) + " from the stable")
+  return true
+}
+
+// Breeding the two; away from the stable, I walk there once first. Turned
+// down, breed says why: done.
+fn startBreeding(stable) {
+  let problem = breed(memory.stableId, memory.horseIds)
+  if (problem == null) {
+    log("breeding two horses in " + placeName(stable))
+    return
+  }
+  if (problem == "not standing at that stable" && walkToStable(stable)) { return }
+  log(problem)
+  end()
+}
+
+// Where I stand at it: the footprint tile with the fewest of us (Spreading
+// over the footprint), the nearest on ties. I walk there once, kept as
+// memory.at; still away from it after that, breed says why. True while I
+// set out.
+fn walkToStable(stable) {
+  if (memory.walked == true) { return false }
+  let at = crewTile(stable)
+  if (me.x == at.x && me.y == at.y) { return false }
+  memory.walked = true
+  memory.at = at
+  if (walkTo(at.x, at.y) == null) { wait() } // until I am there
+  log("walking to " + placeName(stable))
+  return true
+}
+
+// Which stable: the one picked, else the one I started in, kept in
+// memory.stableId. False once I end: neither is a stable.
+fn pickStable() {
+  if (params.stable != null) {
+    if (params.stable.kind != "stable") {
+      end("the one picked is no stable")
+      return false
+    }
+    memory.stableId = params.stable.id
+  }
+  if (memory.stableId == null) {
+    let here = buildingAt(me.x, me.y)
+    if (here == null || here.kind != "stable" || here.site != null) {
+      end("no stable here")
+      return false
+    }
+    memory.stableId = here.id
+  }
+  return true
+}
+
+// A building or carriage for my log: "the storage at 12,6".
+fn placeName(b) {
+  let kind = b.kind
+  if (kind == null) { kind = "carriage" }
+  return "the " + kind + " at " + b.x + "," + b.y
+}
+
+// The units of goods in load for my log: "10 stone, 4 wood".
+fn goodsText(load, goods) {
+  let text = ""
+  for (g of goods) {
+    let n = load[g]
+    if (n != null && n >= 1) {
+      if (text != "") { text = text + ", " }
+      text = text + floor(n) + " " + g
+    }
+  }
+  return text
+}

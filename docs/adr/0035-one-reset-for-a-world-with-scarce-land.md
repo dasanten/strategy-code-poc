@@ -1,6 +1,7 @@
 # One reset for a world with scarce land
 
-Status: decided (2026-11-14, with Daniel). Sets ADR 0006 aside once. Rules in `CONTEXT.md` under
+Status: decided (2026-11-14, with Daniel). Sets ADR 0006 aside once. Rules in `docs/context/`
+(`world.md`, `resources-and-goods.md`, `starting-city.md`) under
 **The land**, **Region**, **Heartland**, **Frontier**, **Island**, **Richness**, **Rare goods**,
 **Running dry** and **Starting site**; built in Epics 100 (A new world), 101 (Rich and poor land)
 and 102 (Veins run dry).

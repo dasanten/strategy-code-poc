@@ -1,6 +1,6 @@
 # Queues hold blocks
 
-Status: decided (2026-11-12, with Daniel). Rules in `CONTEXT.md` under **Repeat block**, **If
+Status: decided (2026-11-12, with Daniel). Rules in `docs/context/queues.md` under **Repeat block**, **If
 block**, **Wait until** and **Condition**; built in Epic 95 (Queue conditions).
 
 A queue has been a flat list of steps since Epic 37. Repeat blocks (Epic 51) were a planner thing

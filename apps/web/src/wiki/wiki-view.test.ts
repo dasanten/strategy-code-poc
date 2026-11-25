@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import * as balance from '@csp/balance'
 import {
@@ -56,7 +57,7 @@ import {
   HOW_TO_TRADE_PATH,
   WIKI_PATH,
 } from './wiki-view.js'
-import { WIKI_TOPICS, Wiki } from './Wiki.js'
+import { WIKI_TOPICS, Wiki } from '../Wiki.js'
 
 const render = () => renderToStaticMarkup(createElement(Wiki))
 
@@ -200,6 +201,18 @@ describe('wiki figures', () => {
 })
 
 describe('wiki page', () => {
+  const folder = new URL('./', import.meta.url)
+  const files = fs
+    .readdirSync(folder)
+    .filter((name) => !name.includes('.test.'))
+    .map((name) => new URL(name, folder))
+  /** The page shell, every topic and the pieces they share. */
+  const pageFiles = [
+    new URL('../Wiki.tsx', import.meta.url),
+    ...files.filter((f) => f.pathname.endsWith('.tsx')),
+  ]
+  const helperFiles = files.filter((f) => f.pathname.endsWith('.ts'))
+
   it('explains Zeal and rallying the crew with the balance numbers', () => {
     const html = render()
     expect(html).toContain('id="zeal"')
@@ -217,21 +230,49 @@ describe('wiki page', () => {
   })
 
   it('types no number itself: every figure comes from the balance', () => {
-    let source = fs.readFileSync(new URL('./Wiki.tsx', import.meta.url), 'utf8')
-    source = source.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
-    // Drop every {…} expression, innermost first, then the tags: what is left is the page's text.
-    let before
-    do {
-      before = source
-      source = source.replace(/\{[^{}]*\}/g, '')
-    } while (source !== before)
-    const text = source.replace(/<[^>]*>/g, ' ')
-    expect(text.match(/[^\n]*\d[^\n]*/g) ?? []).toEqual([])
+    // Fine to type: quoted examples of what the game shows, a param's values for off and on, and
+    // the 45° either side of a compass direction (geometry, not balance).
+    const allowed = [/“[^”]*”/g, /"[^"]*"/g, /\b0\b/g, /\bset to 1\b/g, /\b45°/g]
+    const typed: string[] = []
+    let read = 0
+    for (const file of pageFiles) {
+      const source = fs.readFileSync(file, 'utf8')
+      const tree = ts.createSourceFile(
+        file.pathname,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      )
+      // The text between the tags, with a gap where a tag or an expression stood.
+      let text = ''
+      const visit = (node: ts.Node): void => {
+        if (ts.isJsxText(node)) text += node.text
+        else {
+          const child =
+            ts.isJsxExpression(node) && !ts.isJsxAttribute(node.parent)
+              ? node.expression
+              : undefined
+          if (child && (ts.isNumericLiteral(child) || ts.isStringLiteral(child))) text += child.text
+          ts.forEachChild(node, visit)
+        }
+        text += ' '
+      }
+      visit(tree)
+      read += text.trim().length
+      for (const pattern of allowed) text = text.replace(pattern, ' ')
+      typed.push(
+        ...(text.match(/[^\n]*\d[^\n]*/g) ?? []).map((l) => `${file.pathname}: ${l.trim()}`),
+      )
+    }
+    // The text really was read: a test that finds nothing to check must not pass.
+    expect(read).toBeGreaterThan(render().length / 10)
+    expect(typed).toEqual([])
   })
 
   it('imports no number from @csp/shared: they come from the JSON Rust writes (@csp/balance)', () => {
-    for (const file of ['Wiki.tsx', 'wiki-view.ts', 'wiki-scripting.ts']) {
-      const source = fs.readFileSync(new URL(`./${file}`, import.meta.url), 'utf8')
+    for (const file of [...pageFiles, ...helperFiles]) {
+      const source = fs.readFileSync(file, 'utf8')
       const shared = [...source.matchAll(/import\s*\{([^}]*)\}\s*from\s*'@csp\/shared'/g)]
         .flatMap((m) => m[1]!.split(','))
         .map((name) => name.trim())

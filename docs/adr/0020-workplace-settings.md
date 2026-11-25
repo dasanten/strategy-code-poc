@@ -2,7 +2,7 @@
 
 Status: decided (2026-11-02, with Daniel). Builds on ADR 0014 (default script targets are params).
 
-Script params are kept per resident and per script (`CONTEXT.md`: Script parameter). A crew of
+Script params are kept per resident and per script (`docs/context/control.md`: Script parameter). A crew of
 six at one farm means picking the same `storage`, `foodAt` and `foodTake` six times, and a new
 worker sent there starts with whatever they last used somewhere else. Players think of "how this
 farm is worked", not "how Ana works".

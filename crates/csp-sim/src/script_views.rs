@@ -1,7 +1,7 @@
 //! Script views (`packages/shared/src/script-views.ts`, `CONTEXT.md`: Script view; ADR 0011):
 //! what a script gets of each kind of thing, as plain data beside the game API. Each view lists
 //! its fields, each with the kind of value it holds, a description and, for one that can be
-//! `null`, when it is. The tables themselves are generated into [`crate::script_tables`].
+//! `null`, when it is. The tables themselves are in [`crate::script_tables`].
 
 use serde_json::Value;
 use ts_rs::TS;

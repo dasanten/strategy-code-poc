@@ -81,7 +81,7 @@ import { GoodIcon, GoodsGrid } from './GoodsGrid.js'
 import { carriedShort } from './residents-view.js'
 import { lastSeenText, type LastSeen } from './last-seen.js'
 import { horseStatsText } from './selection-view.js'
-import { HOW_TO_TRADE_PATH } from './wiki-view.js'
+import { HOW_TO_TRADE_PATH } from './wiki/wiki-view.js'
 import { PanelHead } from './panel-head.js'
 import {
   cityLists,

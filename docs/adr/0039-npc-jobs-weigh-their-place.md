@@ -5,7 +5,7 @@ Status: decided overnight (2026-11-17, T98.3), Daniel to confirm. Amends ADR 002
 ADR 0029 gave each of an NPC city's jobs a score from a fixed band: farming, then the project, then a
 good that is short (by how much it lacks), then the road crew, scouting, going back and surplus work.
 Within a good, the first workplace with room took the worker, however far away it stood. Epic 98
-gives a city a mind (`CONTEXT.md`: Stance, Threat): it remembers danger places where it lost people,
+gives a city a mind (`docs/context/npc-stances.md`: Stance, Threat): it remembers danger places where it lost people,
 and a stance and temperament that should change what it does first. A fixed band per job can't say
 "a far mine past where our traders died is worth less than the near one".
 

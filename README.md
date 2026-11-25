@@ -3,7 +3,8 @@
 A persistent, real-time strategy world. Players run their realm through UI orders and scripts in
 our own small language (ADR 0002). The server runs the world at 1 tick per second.
 
-Design decisions live in `docs/adr/`; the domain glossary is `CONTEXT.md`.
+Design decisions live in `docs/adr/`; the domain glossary is
+`docs/context/`, with `CONTEXT.md` as its index.
 
 ## Layout
 
@@ -62,7 +63,7 @@ Admins can also create invite codes and reset passwords in the client.
 
 The full map takes half an hour to generate. For testing on your own machine, make a small world
 in seconds with the same generator (terrain, NPC cities, the Trade Organization and a trading
-post, fewer of each), into a database of its own (`CONTEXT.md`: Creative mode, Test worlds):
+post, fewer of each), into a database of its own (`docs/context/people.md`: Creative mode, Test worlds):
 
 ```sh
 cargo run --release -p csp-server --bin csp-admin -- new-world --db data/test-world.db
@@ -129,7 +130,7 @@ nightly report. An ignore reason says how long the test takes alone in the dev p
 
 ### Testing locally with creative mode
 
-Creative mode (`CONTEXT.md`: Creative mode, ADR 0043) lets an admin test without waiting. It exists
+Creative mode (`docs/context/people.md`: Creative mode, ADR 0043) lets an admin test without waiting. It exists
 only on a server started with `CREATIVE=1` (in `.env` or the environment); never set it on the
 live server. Without it every creative route answers 404, admin or not.
 

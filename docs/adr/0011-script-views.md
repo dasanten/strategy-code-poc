@@ -4,7 +4,7 @@ Status: decided (2026-10-24, with Daniel). Extends ADR 0002's plain-data game AP
 return.
 
 Every kind of thing a script can get (`me`, a resident from `residents()`, a building, a city, a
-pile, a node, a last-seen entry, …) has a declared **script view** (`CONTEXT.md`: Script view): a
+pile, a node, a last-seen entry, …) has a declared **script view** (`docs/context/control.md`: Script view): a
 fixed list of fields with a description each, kept as plain data in `packages/shared` beside
 `SCRIPT_API`. The server builds every object a script gets _from_ its view, so a script sees
 exactly those fields and nothing more. A field the Player isn't allowed to see is always there and
