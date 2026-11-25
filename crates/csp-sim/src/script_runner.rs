@@ -31,7 +31,7 @@ use crate::alarms::{back_to_outsider_alarm, on_to_next_attacker, runs_npc_alarm}
 use crate::default_scripts::{default_script, task_of};
 use crate::defence::resume_interrupted;
 use crate::events::record_event;
-use crate::order_meta::OrderMeta;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{commands, npc_sender, ordered_resident, realm_of, OrderSender};
 use crate::orders::{order_kinds, OrderKind, OrderKinds};
 use crate::queries::building::{
@@ -198,7 +198,8 @@ impl OrderKind for RunScriptOrder {
     }
 }
 
-pub static RUN_SCRIPT_META: OrderMeta = OrderMeta::by_host("runScript").queue_step().keeps_script();
+pub static RUN_SCRIPT_META: OrderMeta =
+    OrderMeta::by_host("runScript").queue_step(StepGroup::Scripts).keeps_script();
 
 /// The set-defence-script order (`setDefenceScriptOrder`, `CONTEXT.md`: Defence script).
 pub struct SetDefenceScriptOrder {
@@ -787,7 +788,7 @@ impl OrderKind for TaskOrder {
     }
 }
 
-pub static TASK_META: OrderMeta = OrderMeta::by_host("task").queue_step();
+pub static TASK_META: OrderMeta = OrderMeta::by_host("task").queue_step(StepGroup::Work);
 
 /// The run-script order for an army (`armyRunScriptOrder`): one of the Player's armies runs one of
 /// the Player's scripts, from a fresh memory. It ends the army's order, as any army order does.

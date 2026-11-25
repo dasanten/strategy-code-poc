@@ -10,7 +10,7 @@ use csp_shared::world::{
 };
 
 use crate::events::record_event;
-use crate::order_meta::OrderMeta;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{ids_field, text_field};
 use crate::queries::city::town_hall_of;
@@ -112,7 +112,7 @@ pub(crate) static RELOCATE_META: OrderMeta = OrderMeta::fns(
     |w, s, o, _| validate_relocate(w, s, &relocate_request(o)),
     |w, _, o, t| apply_relocate(w, &relocate_request(o), t),
 )
-.queue_step()
+.queue_step(StepGroup::Move)
 .gets_off_first()
 .blocked_carrying_child()
 .script(&[RELOCATE_ACTION]);

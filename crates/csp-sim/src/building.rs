@@ -11,7 +11,7 @@ use csp_shared::world::{
 };
 
 use crate::cities::update_city_membership;
-use crate::order_meta::OrderMeta;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::balance::{build_work, construction_learned, skill_of};
 use crate::queries::building::build_at_problem_of;
@@ -500,7 +500,7 @@ pub fn apply_build(world: &mut WorldState, order: &OrderRequest) {
 
 pub(crate) static BUILD_META: OrderMeta =
     OrderMeta::fns("build", validate_build, |w, _, o, _| apply_build(w, o))
-        .queue_step()
+        .queue_step(StepGroup::Work)
         .gets_off_first()
         .adults_only()
         .npc_city()

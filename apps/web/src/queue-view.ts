@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { CHILD_GOODS } from './shared/narrowed.js'
 import { GOODS } from './shared/world.js'
+import { orderKind, type StepGroup } from '@csp/lang-wasm'
 import { QUEUE_STEP_KINDS, feedsOnce, neverEnds, queueSteps, stepLine } from './shared/queue.js'
 import { TICKS_PER_GAME_HOUR } from './shared/time.js'
 import { canWork } from './shared/stats.js'
@@ -393,38 +394,14 @@ export interface QueueRow {
 }
 
 /** The Orders tab's kinds of order a step's icon shows (`CONTEXT.md`: Planner blocks). */
-export type StepGroup = 'move' | 'work' | 'goods' | 'scripts' | 'flow'
-
-/** Which kind each order is; one not listed is work. */
-const STEP_GROUP: Partial<Record<OrderRequest['kind'], StepGroup>> = {
-  walkTo: 'move',
-  drive: 'move',
-  board: 'move',
-  row: 'move',
-  sail: 'move',
-  unhitch: 'move',
-  hitch: 'move',
-  getOff: 'move',
-  mount: 'move',
-  dismount: 'move',
-  relocate: 'move',
-  pickUp: 'goods',
-  drop: 'goods',
-  store: 'goods',
-  fetch: 'goods',
-  feed: 'goods',
-  equip: 'goods',
-  takeOff: 'goods',
-  haul: 'move',
-  runScript: 'scripts',
-  waitUntil: 'flow',
-}
+export type { StepGroup }
 
 /** The kind of order a step is, for its icon: as the Orders tab groups it: Explore and Haul move. */
 export function stepGroup(order: OrderRequest): StepGroup {
   if (order.kind === 'task' && order.task === 'explore') return 'move'
   if (order.kind === 'task' && order.task === 'haul') return 'move'
-  return STEP_GROUP[order.kind] ?? 'work'
+  // A kind that is no queue step (one an old saved queue may hold) is work.
+  return orderKind(order.kind)?.stepGroup ?? 'work'
 }
 
 /**

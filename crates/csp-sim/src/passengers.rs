@@ -7,7 +7,7 @@ use csp_shared::terrain::{is_passable_terrain, terrain_at, TerrainMap};
 use csp_shared::world::{OrderRequest, Resident, Vessel, VesselKind, WorldState};
 
 use crate::combat::{attack_target, Target};
-use crate::order_meta::OrderMeta;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{bool_field, int_field, str_field, OrderKind};
 use crate::queries::building::building_at;
@@ -113,7 +113,7 @@ impl OrderKind for Board {
 }
 
 pub(crate) static BOARD_META: OrderMeta =
-    OrderMeta::request("board", &Board).queue_step().script(&[BOARD_ACTION]);
+    OrderMeta::request("board", &Board).queue_step(StepGroup::Move).script(&[BOARD_ACTION]);
 
 const BOARD_ACTION: ScriptAction = ScriptAction {
     name: "board",
@@ -229,7 +229,7 @@ impl OrderKind for GetOff {
 }
 
 pub(crate) static GET_OFF_META: OrderMeta =
-    OrderMeta::request("getOff", &GetOff).queue_step().script(&[GET_OFF_ACTION]);
+    OrderMeta::request("getOff", &GetOff).queue_step(StepGroup::Move).script(&[GET_OFF_ACTION]);
 
 const GET_OFF_ACTION: ScriptAction = ScriptAction {
     name: "getOff",

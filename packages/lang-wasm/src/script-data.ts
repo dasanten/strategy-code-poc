@@ -56,3 +56,27 @@ export const ARMY_SCRIPT_API = data.armyScriptApi as readonly ScriptBinding[]
 
 /** Each task's default script, in the order of the tasks. */
 export const DEFAULT_SCRIPTS: Readonly<Record<Task, DefaultScript>> = data.defaultScripts
+
+/** The Orders tab heading a queue step is shown under (`CONTEXT.md`: Planner blocks). */
+export type StepGroup = 'move' | 'work' | 'goods' | 'scripts' | 'flow'
+
+/** What an order kind says about itself (`OrderMeta` in `csp-sim`), as far as the client reads it. */
+export interface OrderKindFacts {
+  kind: string
+  /** It can be a step of a queue: a one-off action or task the UI gives, or running a script. */
+  queueStep: boolean
+  /** The group a queue step is shown under; null for a kind that is no queue step. */
+  stepGroup: StepGroup | null
+  /** As a queue step it never ends on its own. */
+  neverEnds: boolean
+  /** Running, it goes on until stopped. */
+  goesOnUntilStopped: boolean
+}
+
+/** Every order kind's facts, as the server declares them. */
+export const ORDER_KINDS = data.orderKinds as readonly OrderKindFacts[]
+
+/** An order kind's facts, by its name; none for a kind the server doesn't know. */
+export function orderKind(kind: string): OrderKindFacts | undefined {
+  return ORDER_KINDS.find((k) => k.kind === kind)
+}

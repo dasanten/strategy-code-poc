@@ -16,7 +16,7 @@ use csp_shared::world::{
     VesselKind, WalkOrder, WorldState,
 };
 
-use crate::order_meta::{running_meta, OrderMeta};
+use crate::order_meta::{running_meta, OrderMeta, StepGroup};
 use crate::passengers::get_off_vessel;
 use crate::queries::vessels::{
     across_docked_ship, beside_vessel, between_vessels, crew_short, floats_on, row_target,
@@ -137,7 +137,7 @@ impl OrderKind for WalkTo {
 }
 
 pub(crate) static WALK_TO_META: OrderMeta = OrderMeta::request("walkTo", &WalkTo)
-    .queue_step()
+    .queue_step(StepGroup::Move)
     .gets_off_first()
     .npc_city()
     .script(&[WALK_TO_ACTION]);

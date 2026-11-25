@@ -17,7 +17,7 @@ use crate::goods_deps::{
     rob_caravan, rob_trader, update_city_membership, OrderSender,
 };
 use crate::holders::{move_between, stock_of, Holder};
-use crate::order_meta::OrderMeta;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::queries::building::materials_needed;
 use crate::queries::command::commander_of_resident;
 use crate::queries::goods::{
@@ -181,7 +181,7 @@ pub(crate) static PICK_UP_META: OrderMeta = OrderMeta::fns(
     |w, s, o, _| validate_pick_up(w, s, o),
     |w, s, o, _| apply_pick_up(w, s, o),
 )
-.queue_step()
+.queue_step(StepGroup::Goods)
 .gets_off_first()
 .npc_city()
 .script(&[PICK_UP_ACTION]);
@@ -245,7 +245,7 @@ pub fn apply_drop(world: &mut WorldState, _sender: &OrderSender, order: &OrderRe
 
 pub(crate) static DROP_META: OrderMeta =
     OrderMeta::fns("drop", |w, s, o, _| validate_drop(w, s, o), |w, s, o, _| apply_drop(w, s, o))
-        .queue_step()
+        .queue_step(StepGroup::Goods)
         .gets_off_first()
         .npc_city()
         .script(&[DROP_ACTION]);
