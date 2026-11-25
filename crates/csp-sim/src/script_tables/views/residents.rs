@@ -1,6 +1,28 @@
 //! The views of a resident, an army and what belongs to them.
 
+use csp_shared::goods::{PROTECTION_KINDS, WEAPONS};
+use csp_shared::world::Good;
+
+use crate::script_tables::names_text;
 use crate::script_views::{ScriptField, ScriptType, ScriptView};
+
+/// A field for each good: how many units of it there are.
+const GOODS_FIELDS: [ScriptField; Good::ALL.len()] = {
+    const BLANK: ScriptField = ScriptField {
+        name: "",
+        r#type: ScriptType::Number,
+        description: "",
+        null_when: Some("when there are none"),
+    };
+    let mut fields = [BLANK; Good::ALL.len()];
+    let mut i = 0;
+    while i < fields.len() {
+        fields[i].name = Good::ALL[i].name();
+        fields[i].description = Good::ALL[i].spec().script_text;
+        i += 1;
+    }
+    fields
+};
 
 pub(super) const RESIDENTS: &[ScriptView] = &[
     ScriptView {
@@ -322,19 +344,19 @@ pub(super) const RESIDENTS: &[ScriptView] = &[
             ScriptField {
                 name: "weapon",
                 r#type: ScriptType::String,
-                description: "The weapon equipped: \"spear\", \"sword\", \"steelSword\", \"bow\" or \"crossbow\". A bow or crossbow takes both hands, so the shield slot stays empty.",
+                description: names_text!("The weapon equipped: ", WEAPONS, ". A bow or crossbow takes both hands, so the shield slot stays empty."),
                 null_when: Some("when unarmed"),
             },
             ScriptField {
                 name: "shield",
                 r#type: ScriptType::String,
-                description: "The shield equipped: \"shield\" or \"steelShield\".",
+                description: names_text!("The shield equipped: ", PROTECTION_KINDS[0], "."),
                 null_when: Some("when they have none equipped"),
             },
             ScriptField {
                 name: "armour",
                 r#type: ScriptType::String,
-                description: "The armour equipped: \"armour\" or \"steelArmour\".",
+                description: names_text!("The armour equipped: ", PROTECTION_KINDS[1], "."),
                 null_when: Some("when they have none equipped"),
             },
         ],
@@ -432,128 +454,7 @@ pub(super) const RESIDENTS: &[ScriptView] = &[
     ScriptView {
         name: "goods",
         description: "Goods by kind, in units, like {food: 3, wood: 10}.",
-        fields: &[
-            ScriptField {
-                name: "food",
-                r#type: ScriptType::Number,
-                description: "Units of food.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "wood",
-                r#type: ScriptType::Number,
-                description: "Units of wood.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "stone",
-                r#type: ScriptType::Number,
-                description: "Units of stone.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "ironOre",
-                r#type: ScriptType::Number,
-                description: "Units of ironOre.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "iron",
-                r#type: ScriptType::Number,
-                description: "Units of iron.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "goldOre",
-                r#type: ScriptType::Number,
-                description: "Units of goldOre.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "coins",
-                r#type: ScriptType::Number,
-                description: "Units of coins.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "spear",
-                r#type: ScriptType::Number,
-                description: "Units of spear.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "sword",
-                r#type: ScriptType::Number,
-                description: "Units of sword.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "shield",
-                r#type: ScriptType::Number,
-                description: "Units of shield.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "armour",
-                r#type: ScriptType::Number,
-                description: "Units of armour.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "coal",
-                r#type: ScriptType::Number,
-                description: "Units of coal.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "steel",
-                r#type: ScriptType::Number,
-                description: "Units of steel.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "steelSword",
-                r#type: ScriptType::Number,
-                description: "Units of steel sword.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "steelShield",
-                r#type: ScriptType::Number,
-                description: "Units of steel shield.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "steelArmour",
-                r#type: ScriptType::Number,
-                description: "Units of steel armour.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "tools",
-                r#type: ScriptType::Number,
-                description: "Units of Tools.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "bow",
-                r#type: ScriptType::Number,
-                description: "Units of bow.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "crossbow",
-                r#type: ScriptType::Number,
-                description: "Units of crossbow.",
-                null_when: Some("when there are none"),
-            },
-            ScriptField {
-                name: "arrows",
-                r#type: ScriptType::Number,
-                description: "Units of arrows.",
-                null_when: Some("when there are none"),
-            },
-        ],
+        fields: &GOODS_FIELDS,
     },
     ScriptView {
         name: "queue",

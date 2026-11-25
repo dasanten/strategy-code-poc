@@ -11,6 +11,8 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::named_enum::named_enum;
+
 use crate::world::{ScriptMemory, ScriptRunError, ScriptRunSteps};
 
 /// A resident or army's run-script state the Player watching it sees (`ScriptRunSeen`).
@@ -145,15 +147,16 @@ pub struct TraderVisit {
 
 // ---- world.ts and carriages.ts ----
 
+named_enum! {
 /// A weapon (`Weapon`: `WEAPONS`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
 pub enum Weapon {
-    Spear,
-    Sword,
-    SteelSword,
-    Bow,
-    Crossbow,
+    Spear = "spear",
+    Sword = "sword",
+    SteelSword = "steelSword",
+    Bow = "bow",
+    Crossbow = "crossbow",
+}
 }
 
 ts_type!(

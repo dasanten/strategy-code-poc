@@ -5,6 +5,8 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::named_enum::named_enum;
+
 /// Goods by kind, as unit counts; a missing good is 0 (`Stock`).
 pub type Stock = IndexMap<Good, f64>;
 
@@ -17,56 +19,58 @@ pub type Wear = IndexMap<Good, Vec<f64>>;
 /// there are.
 pub type GoodsWanted = IndexMap<Good, Option<f64>>;
 
+named_enum! {
 /// The PoC goods (`GOODS`, `CONTEXT.md`: Good). `Exclude<Good, 'coins'>` in the TypeScript is
 /// this type too; the rules check it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
 pub enum Good {
-    Food,
-    Wood,
-    Stone,
-    IronOre,
-    Iron,
-    GoldOre,
-    Coins,
-    Spear,
-    Sword,
-    Shield,
-    Armour,
-    Coal,
-    Steel,
-    SteelSword,
-    SteelShield,
-    SteelArmour,
-    Tools,
-    Bow,
-    Crossbow,
-    Arrows,
+    Food = "food",
+    Wood = "wood",
+    Stone = "stone",
+    IronOre = "ironOre",
+    Iron = "iron",
+    GoldOre = "goldOre",
+    Coins = "coins",
+    Spear = "spear",
+    Sword = "sword",
+    Shield = "shield",
+    Armour = "armour",
+    Coal = "coal",
+    Steel = "steel",
+    SteelSword = "steelSword",
+    SteelShield = "steelShield",
+    SteelArmour = "steelArmour",
+    Tools = "tools",
+    Bow = "bow",
+    Crossbow = "crossbow",
+    Arrows = "arrows",
+}
 }
 
+named_enum! {
 /// `PricedGood`: every good but Coins (`Exclude<Good, 'coins'>`), the goods with a price.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
 pub enum PricedGood {
-    Food,
-    Wood,
-    Stone,
-    IronOre,
-    Iron,
-    GoldOre,
-    Spear,
-    Sword,
-    Shield,
-    Armour,
-    Coal,
-    Steel,
-    SteelSword,
-    SteelShield,
-    SteelArmour,
-    Tools,
-    Bow,
-    Crossbow,
-    Arrows,
+    Food = "food",
+    Wood = "wood",
+    Stone = "stone",
+    IronOre = "ironOre",
+    Iron = "iron",
+    GoldOre = "goldOre",
+    Spear = "spear",
+    Sword = "sword",
+    Shield = "shield",
+    Armour = "armour",
+    Coal = "coal",
+    Steel = "steel",
+    SteelSword = "steelSword",
+    SteelShield = "steelShield",
+    SteelArmour = "steelArmour",
+    Tools = "tools",
+    Bow = "bow",
+    Crossbow = "crossbow",
+    Arrows = "arrows",
+}
 }
 
 /// A place on the resident's own tile that goods are taken from or put (`GoodsSpot`), or a vessel

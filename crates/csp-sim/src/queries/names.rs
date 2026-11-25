@@ -2,80 +2,12 @@
 //! (`FOOTPRINT`, `GOOD_WEIGHT`, `RECIPES`, …), and small conveniences over `Stock`.
 
 use csp_shared::footprint::Placed;
+pub use csp_shared::goods::{ALL_GOODS, PRICED_GOODS};
 use csp_shared::world::{Building, BuildingKind, Good, Stock};
 
-/// Every good, in the order of `GOODS`.
-pub const ALL_GOODS: [Good; 20] = [
-    Good::Food,
-    Good::Wood,
-    Good::Stone,
-    Good::IronOre,
-    Good::Iron,
-    Good::GoldOre,
-    Good::Coins,
-    Good::Spear,
-    Good::Sword,
-    Good::Shield,
-    Good::Armour,
-    Good::Coal,
-    Good::Steel,
-    Good::SteelSword,
-    Good::SteelShield,
-    Good::SteelArmour,
-    Good::Tools,
-    Good::Bow,
-    Good::Crossbow,
-    Good::Arrows,
-];
-
-/// Goods other than coins, in the order of `GOODS`: what a warehouse puts a price on
-/// (`PRICED_GOODS`).
-pub const PRICED_GOODS: [Good; 19] = [
-    Good::Food,
-    Good::Wood,
-    Good::Stone,
-    Good::IronOre,
-    Good::Iron,
-    Good::GoldOre,
-    Good::Spear,
-    Good::Sword,
-    Good::Shield,
-    Good::Armour,
-    Good::Coal,
-    Good::Steel,
-    Good::SteelSword,
-    Good::SteelShield,
-    Good::SteelArmour,
-    Good::Tools,
-    Good::Bow,
-    Good::Crossbow,
-    Good::Arrows,
-];
-
-/// The good's TypeScript name.
+/// The good's name (`Good::name`).
 pub fn good_name(g: Good) -> &'static str {
-    match g {
-        Good::Food => "food",
-        Good::Wood => "wood",
-        Good::Stone => "stone",
-        Good::IronOre => "ironOre",
-        Good::Iron => "iron",
-        Good::GoldOre => "goldOre",
-        Good::Coins => "coins",
-        Good::Spear => "spear",
-        Good::Sword => "sword",
-        Good::Shield => "shield",
-        Good::Armour => "armour",
-        Good::Coal => "coal",
-        Good::Steel => "steel",
-        Good::SteelSword => "steelSword",
-        Good::SteelShield => "steelShield",
-        Good::SteelArmour => "steelArmour",
-        Good::Tools => "tools",
-        Good::Bow => "bow",
-        Good::Crossbow => "crossbow",
-        Good::Arrows => "arrows",
-    }
+    g.name()
 }
 
 /// The good a TypeScript name names, if any.

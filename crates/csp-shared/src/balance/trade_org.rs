@@ -3,6 +3,7 @@
 use serde::Serialize;
 
 use super::*;
+use crate::building_spec::spec_table;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -127,28 +128,7 @@ pub const TRADING_POST: TradingPost = TradingPost {
 /// nothing at a post; the HQ's warehouses top up to `HQ_FLOOR_FACTOR` times this each game day. Half
 /// of what a post starts with, so a fresh post is well above it. A floor of 0 would mean warehouses
 /// don't trade the good.
-pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
-    ("food", 20.0),
-    ("wood", 25.0),
-    ("stone", 25.0),
-    ("ironOre", 10.0),
-    ("iron", 5.0),
-    ("goldOre", 5.0),
-    ("coal", 10.0),
-    ("steel", 5.0),
-    ("coins", 1_000.0),
-    ("spear", 2.0),
-    ("sword", 1.0),
-    ("shield", 2.0),
-    ("armour", 1.0),
-    ("steelSword", 1.0),
-    ("steelShield", 1.0),
-    ("steelArmour", 1.0),
-    ("tools", 2.0),
-    ("bow", 1.0),
-    ("crossbow", 1.0),
-    ("arrows", 40.0),
-]);
+pub const WAREHOUSE_FLOOR: Table<f64> = spec_table!(Good: f64, |s| Some(s.warehouse_floor));
 
 /// How many times a trading post's floor (`WAREHOUSE_FLOOR`) the Trade Org HQ's warehouses keep.
 pub const HQ_FLOOR_FACTOR: f64 = 5.0;
@@ -164,27 +144,7 @@ pub const HQ_FOOD_FLOOR_FACTOR: f64 = 15.0;
 /// iron is two iron ore and the work, a sword two iron and a wood; gold ore stays below the 10
 /// coins the mint strikes from it; coal, found only beyond the heartlands, a little above iron ore;
 /// steel an iron and a coal and the work; steel weapons and armour their steel, wood and the work.
-pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
-    ("food", 2.0),
-    ("wood", 2.0),
-    ("stone", 2.0),
-    ("ironOre", 4.0),
-    ("iron", 10.0),
-    ("goldOre", 8.0),
-    ("coal", 5.0),
-    ("steel", 20.0),
-    ("spear", 20.0),
-    ("sword", 30.0),
-    ("shield", 22.0),
-    ("armour", 90.0),
-    ("steelSword", 50.0),
-    ("steelShield", 30.0),
-    ("steelArmour", 160.0),
-    ("tools", 25.0),
-    ("bow", 12.0),
-    ("crossbow", 30.0),
-    ("arrows", 1.0),
-]);
+pub const WAREHOUSE_BASE_PRICE: Table<f64> = spec_table!(Good: f64, |s| s.base_price);
 
 /// Stock, in floors, at which a warehouse sells at its base price; less stock costs more.
 pub const PRICE_REFERENCE_FLOORS: f64 = 4.0;
