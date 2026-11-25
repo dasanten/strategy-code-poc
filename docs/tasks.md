@@ -150,6 +150,16 @@ whole epic merges; a feature epic that reaches `dev` meanwhile is merged into it
 the design sketches beyond the game (Find, idle and hungry buttons, list and log filters, a saved
 groups strip) wait for an epic after it.
 
+**Agreed with Daniel on 2026-11-25,** from a survey of what makes the codebase slow to change and
+hard for parallel sessions to share: the bug #1559 first, then Fewer collisions (Epic 120: the
+files every ticket edits are split along their seams, and `CONTEXT.md` becomes an index with a
+file per section), Content defined once (121: a building kind, a good, a vessel, a siege machine
+and an order are each defined in one place), One copy of the rules (122: the client runs the Rust
+rules as wasm instead of a hand-written TypeScript copy), Client tidy (123) and Agent docs (124:
+an architecture map and how-to recipes, written last so they describe what the others leave
+behind), in that order. None changes a game rule. While Epic 120 is open no feature epic runs
+beside it. Bandits (16) stays set aside.
+
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
@@ -248,7 +258,6 @@ I sleep.
 | 96  | [Cities that can't be talked over](https://github.com/dasanten/strategy-code-poc/issues/1188)   | ticketed                |
 | 97  | [Goods get used](https://github.com/dasanten/strategy-code-poc/issues/1189)                     | ticketed                |
 | 98  | [NPC cities with intent](https://github.com/dasanten/strategy-code-poc/issues/1190)             | ticketed                |
-
 | 99 | [Faster map loading](https://github.com/dasanten/strategy-code-poc/issues/1198) | ticketed |
 | 100 | [A new world](https://github.com/dasanten/strategy-code-poc/issues/1253) | ticketed |
 | 101 | [Rich and poor land](https://github.com/dasanten/strategy-code-poc/issues/1262) | ticketed |
@@ -270,6 +279,7 @@ I sleep.
 | 117 | [Creative mode](https://github.com/dasanten/strategy-code-poc/issues/1498) | ticketed |
 | 118 | [Pixel art](https://github.com/dasanten/strategy-code-poc/issues/1514) | done in one session |
 | 119 | [Pixel frontier UI](https://github.com/dasanten/strategy-code-poc/issues/1519) | ticketed |
+| 120 | [Fewer collisions](https://github.com/dasanten/strategy-code-poc/issues/1560) | ticketed |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
