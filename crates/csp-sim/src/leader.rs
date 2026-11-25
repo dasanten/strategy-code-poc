@@ -12,6 +12,8 @@ use crate::orders::str_field;
 use crate::queries::city_area::in_city_area;
 use crate::queries::leader::{hand_over_problem, serves_others, ServesOthers as Serves};
 use crate::queries::residents::can_work;
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
 
 /// The input of a handover order (`HandOverRequest`): the Leader names the new one.
@@ -94,7 +96,17 @@ pub(crate) static HAND_OVER_META: OrderMeta = OrderMeta::fns(
     |w, s, o, t| validate_hand_over(w, s.user_id, &hand_over_request(o), t.map(|t| t.size)),
     |w, s, o, t| apply_hand_over(w, s.user_id, &hand_over_request(o), t.map(|t| t.size)),
 )
-.keeps_script();
+.keeps_script()
+.script(&[HAND_OVER_ACTION]);
+
+const HAND_OVER_ACTION: ScriptAction = ScriptAction {
+    name: "handOver",
+    group: ActionGroup::Ruling,
+    request: Request::Fields(&[arg("newLeaderId")]),
+    cost: 10.0,
+    description: "As my realm’s Leader, make another resident its Leader: an adult of my realm serving no one else (no mercenary contract, not in the alliance army), standing in the same city of my realm as I do. Free and at once; I stay on as an ordinary resident.",
+    returns: ScriptType::String,
+};
 
 /// Invariant (`leadersServeNoOne`): every realm's Leader is a living adult of that realm who
 /// serves no one else. A Leader who is Down still leads.

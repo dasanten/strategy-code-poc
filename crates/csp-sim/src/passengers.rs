@@ -18,6 +18,8 @@ use crate::queries::vessels::{
     across_docked_ship, between_vessels, board_vessel_problem, landing_tile, shore_problem,
     vessel_aboard, vessel_by_id, vessel_of_resident,
 };
+use crate::script_actions::{arg, arg_as, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::walking::WalkTo;
 use crate::walls::is_wall_or_gate;
 use crate::world::{is_walkable, nearest_free_tile};
@@ -110,7 +112,17 @@ impl OrderKind for Board {
     }
 }
 
-pub(crate) static BOARD_META: OrderMeta = OrderMeta::request("board", &Board).queue_step();
+pub(crate) static BOARD_META: OrderMeta =
+    OrderMeta::request("board", &Board).queue_step().script(&[BOARD_ACTION]);
+
+const BOARD_ACTION: ScriptAction = ScriptAction {
+    name: "board",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[arg("carriageId"), arg_as("asCrew?", "asCrew")]),
+    cost: 10.0,
+    description: "Get on a carriage of my realm on my tile, or a boat of my realm beside me (on land touching its water tile), or a ship of my realm docked at the haven I stand on, as a passenger, and go along with it. With `asCrew` true, aboard a ship as one of its crew, who sail it and take no room (grown only). Riders dismount first: no horse goes aboard.",
+    returns: ScriptType::String,
+};
 
 /// Why a passenger can't get off onto (x, y) (`getOffTileProblem`): a tile right next to their
 /// carriage that is walkable and has no wall or gate on it.
@@ -216,7 +228,17 @@ impl OrderKind for GetOff {
     }
 }
 
-pub(crate) static GET_OFF_META: OrderMeta = OrderMeta::request("getOff", &GetOff).queue_step();
+pub(crate) static GET_OFF_META: OrderMeta =
+    OrderMeta::request("getOff", &GetOff).queue_step().script(&[GET_OFF_ACTION]);
+
+const GET_OFF_ACTION: ScriptAction = ScriptAction {
+    name: "getOff",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[arg_as("x?", "x"), arg_as("y?", "y")]),
+    cost: 10.0,
+    description: "Get off the carriage I am aboard, onto its tile or the tile x, y right next to it; off a boat, onto the free land tile x, y beside it, or without one the first free one.",
+    returns: ScriptType::String,
+};
 
 /// An order kind that first gets the ordered resident off their carriage (`getsOffFirst`).
 pub struct GetsOffFirst<K>(pub K);
