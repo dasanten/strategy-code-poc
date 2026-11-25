@@ -3,35 +3,15 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::named_enum::named_enum;
+
 use super::{KeptBreeding, Stock};
 
-/// Declares [`BuildingKind`]: each kind with the one name it has in saves, on the wire, in scripts
-/// and in the balance tables.
-macro_rules! building_kinds {
-    ($($(#[$attr:meta])* $kind:ident = $name:literal,)*) => {
-        // What a kind is and does is its `spec`.
-        /// The kinds of building (`BuildingKind`).
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
-        pub enum BuildingKind {
-            $($(#[$attr])* #[serde(rename = $name)] $kind,)*
-        }
-
-        impl BuildingKind {
-            /// Every kind, in the order they are declared: the order of every list and table made
-            /// from the specs.
-            pub const ALL: &'static [BuildingKind] = &[$(BuildingKind::$kind),*];
-
-            /// The kind's name.
-            pub const fn name(self) -> &'static str {
-                match self {
-                    $(BuildingKind::$kind => $name,)*
-                }
-            }
-        }
-    };
-}
-
-building_kinds! {
+named_enum! {
+// What a kind is and does is its `spec`.
+/// The kinds of building (`BuildingKind`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+pub enum BuildingKind {
     TownHall = "townHall",
     House = "house",
     Storage = "storage",
@@ -61,6 +41,7 @@ building_kinds! {
     /// A catapult site (`CONTEXT.md`: Siege machine, Catapult): finished, it is gone and a catapult
     /// stands there.
     Catapult = "catapult",
+}
 }
 
 /// A building or construction site (`Building`).

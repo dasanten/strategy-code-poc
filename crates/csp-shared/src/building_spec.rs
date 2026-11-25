@@ -146,17 +146,20 @@ macro_rules! opt {
 }
 pub(crate) use opt;
 
-/// A `Table` keyed by the kind's name, with a row for each kind whose spec gives a value, in the
-/// order of `BuildingKind::ALL`.
+/// A `Table` keyed by name, with a row for each kind whose spec gives a value, in the order of the
+/// enum's `ALL`: of `BuildingKind`, or of the enum named.
 macro_rules! spec_table {
-    ($value:ty, |$spec:ident| $of:expr) => {{
-        use crate::world::BuildingKind;
-        const fn value_of(kind: BuildingKind) -> Option<$value> {
+    ($value:ty, |$spec:ident| $of:expr) => {
+        crate::building_spec::spec_table!(BuildingKind: $value, |$spec| $of)
+    };
+    ($enum:ident: $value:ty, |$spec:ident| $of:expr) => {{
+        use crate::world::$enum;
+        const fn value_of(kind: $enum) -> Option<$value> {
             let $spec = kind.spec();
             $of
         }
-        const KINDS: &[BuildingKind] =
-            $crate::building_spec::kinds_where!(|k| value_of(k).is_some());
+        const KINDS: &[$enum] =
+            $crate::building_spec::kinds_where!($enum, |k| value_of(k).is_some());
         const ROWS: [(&str, $value); KINDS.len()] = {
             let Some(first) = value_of(KINDS[0]) else { unreachable!() };
             let mut rows = [(KINDS[0].name(), first); KINDS.len()];
@@ -174,13 +177,17 @@ macro_rules! spec_table {
 }
 pub(crate) use spec_table;
 
-/// The kinds that pass, in the order of `BuildingKind::ALL`, as a `&'static` slice.
+/// The kinds that pass, in the order of the enum's `ALL`, as a `&'static` slice: of `BuildingKind`,
+/// or of the enum named.
 macro_rules! kinds_where {
-    (|$kind:ident| $passes:expr) => {{
-        const fn passes($kind: crate::world::BuildingKind) -> bool {
+    (|$kind:ident| $passes:expr) => {
+        crate::building_spec::kinds_where!(BuildingKind, |$kind| $passes)
+    };
+    ($enum:ident, |$kind:ident| $passes:expr) => {{
+        const fn passes($kind: crate::world::$enum) -> bool {
             $passes
         }
-        const ALL: &[crate::world::BuildingKind] = crate::world::BuildingKind::ALL;
+        const ALL: &[crate::world::$enum] = crate::world::$enum::ALL;
         const COUNT: usize = {
             let (mut i, mut n) = (0, 0);
             while i < ALL.len() {
@@ -191,7 +198,7 @@ macro_rules! kinds_where {
             }
             n
         };
-        const FOUND: [crate::world::BuildingKind; COUNT] = {
+        const FOUND: [crate::world::$enum; COUNT] = {
             let mut found = [ALL[0]; COUNT];
             let (mut i, mut n) = (0, 0);
             while i < ALL.len() {
