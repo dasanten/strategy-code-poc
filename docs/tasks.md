@@ -315,7 +315,7 @@ its tickets or closes.
   and is merged once green. Only merges into `main` deploy.
 - **Rules vs numbers:** a missing game rule becomes a `needs Daniel` question and lands in
   its section file under `docs/context/` (a new term also in `CONTEXT.md`, the
-  index). Balance numbers are picked in `crates/csp-shared/src/balance.rs` and listed in
+  index). Balance numbers are picked in `crates/csp-shared/src/balance/` (one file per domain) and listed in
   the PR for review.
 - **Scope-only epics:** an epic without tickets lists its open rule questions. When the epic
   before it is nearly done, settle those questions with Daniel, then write its tickets.

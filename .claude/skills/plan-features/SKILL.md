@@ -32,7 +32,7 @@ Run `git fetch origin`, then show Daniel a short state, no more than a screen:
    recommended answer, until every rule is settled. Rules go into their section file
    under `docs/context/` as they settle (a new term also into the index `CONTEXT.md`); a
    real decision with alternatives gets an ADR. Numbers are not questions: they are picked later
-   in `crates/csp-shared/src/balance.rs`.
+   in `crates/csp-shared/src/balance/`.
 2. **Epic:** an issue labelled `epic`, titled `Epic <n>: <name>`, saying what Daniel can do at the
    end and how it shows in the browser.
 3. **Tickets:** thin vertical slices (as in the `to-issues` skill), added as sub-issues in work
