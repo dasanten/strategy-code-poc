@@ -213,13 +213,19 @@ pub fn kept_from_walls(world: &WorldState, city: &City) -> Stock {
 /// Larkspur's quarry brought its Stone home load by load, and a begun smelter, mine, smithy and mint
 /// took each one, so it never held its party's.
 pub fn waits_for_party(world: &WorldState, city: &City, project: &CityProject) -> bool {
+    !lacks_past_party(world, city, project).is_empty()
+}
+
+/// The Wood and Stone a project waits for (`waits_for_party`): what it needs and the city doesn't
+/// hold above its reserve and the party's. Empty for a project that doesn't wait.
+pub fn lacks_past_party(world: &WorldState, city: &City, project: &CityProject) -> Vec<Good> {
     use crate::queries::building::{build_materials_of, materials_needed};
     use csp_shared::balance::NPC_WALL_TILES_PER_TRIP;
-    let CityProject::Build { building, x, y, material } = project else { return false };
+    let CityProject::Build { building, x, y, material } = project else { return Vec::new() };
     if matches!(building, BuildingKind::Farm | BuildingKind::LumberCamp | BuildingKind::Quarry)
         || kept_for_party(world, city).is_none()
     {
-        return false;
+        return Vec::new();
     }
     let wall = matches!(building, BuildingKind::Wall | BuildingKind::Gate);
     let need = if wall {
@@ -235,16 +241,21 @@ pub fn waits_for_party(world: &WorldState, city: &City, project: &CityProject) -
     };
     let need: Stock = need.into_iter().filter(|(g, _)| PARTY_BUILD_GOODS.contains(g)).collect();
     if need.is_empty() {
-        return false;
+        return Vec::new();
     }
     // A wall may spend the Stone its reserve sets aside for it (Epic 113); anything else only what
     // lies above its reserve and the party's.
-    if wall {
-        return !holds_for_walls(world, city, &need);
-    }
+    let free = if wall { walls_may_spend(world, city) } else { Stock::new() };
     let stock = npc_city_stock(world, city);
     let kept = kept_from_walls(world, city);
-    !need.iter().all(|(good, n)| held(&stock, *good) - held(&kept, *good) >= *n)
+    let may_spend = |good: Good| {
+        if wall {
+            held(&free, good)
+        } else {
+            held(&stock, good) - held(&kept, good)
+        }
+    };
+    need.into_iter().filter(|(good, n)| may_spend(*good) < *n).map(|(good, _)| good).collect()
 }
 
 /// Whether the city's storages hold `goods` for its walls: above what its repairs leave there

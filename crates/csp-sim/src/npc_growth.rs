@@ -6,6 +6,7 @@
 //! (ADR 0002). The city decides all this in its planning pass and keeps the project in its plan;
 //! each tick it only gives its builders their part in it (`take_part`).
 
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::f64::consts::PI;
 
@@ -493,27 +494,29 @@ pub fn next_project(
     let first = |want: CityProject| {
         materials_first(world, city, home, terrain, rings.as_ref(), want, &mut HashSet::new())
     };
-    let ok =
-        |p: &CityProject| !crate::npc_founding::waits_for_party(world, city, &first(p.clone()));
+    // What those that wait lack, the most wanted's first.
+    let waiting: RefCell<Vec<Good>> = RefCell::default();
+    let ok = |p: &CityProject| {
+        let lacks = crate::npc_founding::lacks_past_party(world, city, &first(p.clone()));
+        let goes = lacks.is_empty();
+        waiting.borrow_mut().extend(lacks);
+        goes
+    };
     if let Some(want) = wanted(world, city, home, terrain, rings.as_ref(), &ok) {
         return Some(first(want));
     }
     // While it keeps Wood or Stone for its founding party's load (saving for it, or its daughter
     // lacking the rest), a building that would spend them
     // waits (`CONTEXT.md`: Full city; Daniel, 2026-11-19, #1379): the workplace for a material the
-    // party lacks instead, if it has none, else nothing, so its hands gather them.
+    // party lacks instead, if it has none, then for one those that wait lack (#1559: a village
+    // holding its party's Wood but not a trip's of its new wall's on top had no lumber camp, and
+    // waited for that Wood for ever), else nothing, so its hands gather them.
     crate::npc_founding::founding_lacks(world, city, Some(home), terrain.size)
         .into_iter()
-        .filter_map(|short| {
-            chain_project(
-                world,
-                city,
-                home,
-                terrain,
-                rings.as_ref(),
-                short.good,
-                &mut HashSet::new(),
-            )
+        .map(|short| short.good)
+        .chain(waiting.into_inner())
+        .filter_map(|good| {
+            chain_project(world, city, home, terrain, rings.as_ref(), good, &mut HashSet::new())
         })
         .find(|p| !crate::npc_founding::waits_for_party(world, city, p))
 }
