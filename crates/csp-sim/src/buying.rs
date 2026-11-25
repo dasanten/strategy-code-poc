@@ -15,6 +15,8 @@ use crate::queries::command::commands;
 use crate::queries::goods::take_out;
 use crate::queries::names::{held, placed};
 use crate::queries::trade_quotes::{buy_problem, buyers_at_town_hall, coins_at_town_hall};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
 
 /// Checks a buy order (`buyCity.validate`): one of the Player's residents, standing on an NPC
@@ -48,7 +50,18 @@ pub(crate) static BUY_CITY_META: OrderMeta = OrderMeta::fns(
     |w, s, o, _| validate_buy_city(w, s, o),
     |w, s, o, _| apply_buy_city(w, s, o),
 )
-.gets_off_first();
+.gets_off_first()
+.script(&[BUY_CITY_ACTION]);
+
+const BUY_CITY_ACTION: ScriptAction = ScriptAction {
+    name: "buyCity",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("cityId")]),
+    cost: 10.0,
+    description:
+        "On an NPC city’s town hall, buy it with the coins my realm’s residents there carry.",
+    returns: ScriptType::String,
+};
 
 /// Carries out buy orders (`resolvePurchases`). Where the city still sells to the realm, the buyer
 /// still stands on its town hall and the realm's residents there carry its price, the coins are

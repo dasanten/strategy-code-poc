@@ -17,6 +17,8 @@ use crate::queries::balance::{skill_of, skill_value, subject_parts, training_gai
 use crate::queries::building::{building_at, teacher_at, train_problem, trainees_of};
 use crate::queries::names::placed;
 use crate::queue::field_str as str_field;
+use crate::script_actions::{ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 
 /// Checks a train order (`train.validate`): a grown resident of the sender's trains at the
 /// finished training ground they stand on. Of the game's cities only a big one's soldiers train.
@@ -68,7 +70,17 @@ pub(crate) static TRAIN_META: OrderMeta =
         .gets_off_first()
         .adults_only()
         .npc_city()
-        .goes_on_until_stopped();
+        .goes_on_until_stopped()
+        .script(&[TRAIN_ACTION]);
+
+const TRAIN_ACTION: ScriptAction = ScriptAction {
+    name: "train",
+    group: ActionGroup::Work,
+    request: Request::ByHand(&[]),
+    cost: 10.0,
+    description: "Train at the training ground on my tile, while I stand there: I learn its subject while a teacher is there, never past the teacher. Room for 6 trainees per ground.",
+    returns: ScriptType::String,
+};
 
 /// What a trainee at `ground` would learn this tick (`lesson`): the subject its teacher teaches
 /// and their gain in it; no subject while there is no teacher or they are at the ceiling.

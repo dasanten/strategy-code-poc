@@ -1,17 +1,9 @@
-//! What a script does with itself: stop, end, wait, say what it is doing and log.
+//! What a script does with itself that asks for no order: end, wait, say what it is doing, log.
 
 use crate::script_api::{Is, ScriptBinding};
 use crate::script_views::ScriptType;
 
 pub(super) const CONTROL: &[ScriptBinding] = &[
-    ScriptBinding {
-        name: "stop",
-        is: Is::Action,
-        params: &[],
-        cost: 10.0,
-        description: "Stop what I was ordered to do and stand idle.",
-        returns: ScriptType::String,
-    },
     ScriptBinding {
         name: "end",
         is: Is::Action,

@@ -24,6 +24,8 @@ use crate::queries::names::placed;
 use crate::queries::people::CARRYING_A_CHILD;
 use crate::queries::residents::can_work;
 use crate::random::{hash_str, Mulberry32};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 
 /// Ticks of tending a foal takes (`STABLE_BREED_TICKS` of shared `horses.ts`).
 pub const STABLE_BREED_TICKS: f64 = STABLE_BREED_DAYS * TICKS_PER_GAME_DAY;
@@ -120,7 +122,17 @@ pub(crate) static BREED_META: OrderMeta = OrderMeta::fns(
 .gets_off_first()
 .adults_only()
 .npc_city()
-.blocked_carrying_child();
+.blocked_carrying_child()
+.script(&[BREED_ACTION]);
+
+const BREED_ACTION: ScriptAction = ScriptAction {
+    name: "breed",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("stableId"), arg("horseIds")]),
+    cost: 10.0,
+    description: "At the stable I stand at, tend two fed horses of mine in it, like [\"h1\", \"h2\"], until their foal is born.",
+    returns: ScriptType::String,
+};
 
 /// Requests this tick's tending from residents' breed orders (`requestBreeding`).
 pub fn request_breeding(world: &WorldState) -> Vec<BreedAction> {

@@ -18,6 +18,8 @@ use crate::orders::OrderKind;
 use crate::placing::Ground;
 use crate::queries::names::placed;
 use crate::random::{new_id, Mulberry32};
+use crate::script_actions::{ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
 use crate::starting_city::resident_tiles;
 use crate::world::is_walkable;
@@ -215,7 +217,16 @@ impl OrderKind for ClaimHorses {
 }
 
 pub(crate) static CLAIM_HORSES_META: OrderMeta =
-    OrderMeta::request("claimHorses", &ClaimHorses).keeps_script();
+    OrderMeta::request("claimHorses", &ClaimHorses).keeps_script().script(&[CLAIM_HORSES_ACTION]);
+
+const CLAIM_HORSES_ACTION: ScriptAction = ScriptAction {
+    name: "claimHorses",
+    group: ActionGroup::Ruling,
+    request: Request::Fields(&[]),
+    cost: 10.0,
+    description: "Claim my Player’s Horse offer: two new horses for my realm, in its stable nearest the Leader’s city, or else by a storage or the Leader with Food by them. Free and at once; refused once claimed, unless an admin has offered horses again, or while my realm has no living Leader.",
+    returns: ScriptType::String,
+};
 
 /// The invariant `horse-offers-once` (`horseOffersOnce`): no account id is in
 /// `horseOffersClaimed` twice.

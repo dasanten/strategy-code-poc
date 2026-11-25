@@ -17,6 +17,8 @@ use crate::queries::vessels::{
     beside_vessel, row_off_problem, row_target, steals_vessel, vessel_by_id, vessel_of_resident,
     vessel_room,
 };
+use crate::script_actions::{arg, place, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::stealing::{take_over, Taken};
 
 /// Why a resident can't take a vessel's oars now (`CONTEXT.md`: Rowing): grown, of its realm,
@@ -152,7 +154,17 @@ impl OrderKind for Row {
     }
 }
 
-pub(crate) static ROW_META: OrderMeta = OrderMeta::request("row", &Row).queue_step();
+pub(crate) static ROW_META: OrderMeta =
+    OrderMeta::request("row", &Row).queue_step().script(&[ROW_ACTION]);
+
+const ROW_ACTION: ScriptAction = ScriptAction {
+    name: "row",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[place("vessel", "vesselId"), arg("x"), arg("y")]),
+    cost: 10.0,
+    description: "Row a boat of my realm, by it or its id, to the water tile x, y, or to the nearest free water tile beside it when x, y is land. I must be aboard it or beside it (I board first), and grown. A Step at a time over water; my Strength and Seafaring set the pace, and rowing teaches Seafaring. My order is \"row\" until it gets there.",
+    returns: ScriptType::String,
+};
 
 #[cfg(test)]
 pub(crate) mod tests;

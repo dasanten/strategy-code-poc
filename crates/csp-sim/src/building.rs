@@ -24,6 +24,8 @@ use crate::queries::names::{kind_of, placed};
 use crate::queries::vessels::launch_tile;
 use crate::queue::field_str as str_field;
 use crate::random::new_id;
+use crate::script_actions::{arg, arg_as, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::survival::gather_pile;
 
 /// Founds a city around the finished town hall `town_hall_id` (`foundCity` of `cities.ts`).
@@ -510,4 +512,14 @@ pub(crate) static BUILD_META: OrderMeta =
         .gets_off_first()
         .adults_only()
         .npc_city()
-        .blocked_carrying_child();
+        .blocked_carrying_child()
+        .script(&[BUILD_ACTION]);
+
+const BUILD_ACTION: ScriptAction = ScriptAction {
+    name: "build",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("building"), arg_as("material?", "material")]),
+    cost: 10.0,
+    description: "Lay out or join a construction site of that kind on my tile. A wall or gate is of \"wood\" (by default) or \"stone\"; a stone one may be laid out on a wooden one of its kind, which stands until the stone one is finished.",
+    returns: ScriptType::String,
+};

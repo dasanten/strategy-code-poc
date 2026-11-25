@@ -15,6 +15,8 @@ use crate::order_sender::{npc_training_problem, ordered_resident, OrderSender};
 use crate::queries::building::{building_at, teach_problem, teacher_at};
 use crate::queries::names::placed;
 use crate::queue::field_str as str_field;
+use crate::script_actions::{ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 
 /// The training subject an order's input names, if it names one (`isTrainingSubject`).
 pub fn subject_of(order: &OrderRequest) -> Option<TrainingSubject> {
@@ -74,7 +76,17 @@ pub(crate) static TEACH_META: OrderMeta =
         .gets_off_first()
         .adults_only()
         .npc_city()
-        .goes_on_until_stopped();
+        .goes_on_until_stopped()
+        .script(&[TEACH_ACTION]);
+
+const TEACH_ACTION: ScriptAction = ScriptAction {
+    name: "teach",
+    group: ActionGroup::Work,
+    request: Request::ByHand(&["subject"]),
+    cost: 10.0,
+    description: "Teach a stat (\"strength\", \"endurance\", \"agility\", \"intellect\") or a skill (\"combat\", …) at the training ground on my tile, while I stand there. One teacher per ground.",
+    returns: ScriptType::String,
+};
 
 /// Ends the teaching that no longer holds (`stepTeaching`): a teacher who has left the ground's
 /// footprint, whose ground is gone, or who is one teacher too many there stops.

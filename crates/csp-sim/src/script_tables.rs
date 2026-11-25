@@ -1,5 +1,6 @@
 //! The script tables: the source of what a script sees and the client is told of it, one module
-//! per table. They are the script views (`views`), the game API of a resident's (`api`) and of an
+//! per table. The actions that ask for an order stand with their orders (`script_actions`). The
+//! tables are the script views (`views`), the game API of a resident's (`api`) and of an
 //! army's script (`army_api`), what a param accepts (`param_descriptions`) and the default scripts
 //! (`default_scripts`, each script a file of its own). After a change run `pnpm script-data:rust`.
 

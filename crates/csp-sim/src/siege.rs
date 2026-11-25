@@ -26,6 +26,8 @@ use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::building::{build_materials_of, build_work_for};
+use crate::script_actions::{arg, place, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 
 use crate::queries::driving::carriage_can_go_to;
 use crate::queries::names::{held, placed};
@@ -192,7 +194,16 @@ impl OrderKind for Crew {
 }
 
 pub(crate) static CREW_META: OrderMeta =
-    OrderMeta::request("crew", &Crew).gets_off_first().adults_only();
+    OrderMeta::request("crew", &Crew).gets_off_first().adults_only().script(&[CREW_ACTION]);
+
+const CREW_ACTION: ScriptAction = ScriptAction {
+    name: "crew",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[place("machine", "machineId")]),
+    cost: 10.0,
+    description: "Join the crew of a siege machine of my realm, by it or its id: I walk onto its tile, following it if it is pushed on, and am one of its crew there until I leave its tile. My order is \"crew\" until I get there.",
+    returns: ScriptType::String,
+};
 
 /// The push order (`push`): one of a machine's crew pushes it to (x, y), a tile a carriage could
 /// go to, with at least its crew size on its tile (`CONTEXT.md`: Siege machine). Another of the
@@ -262,7 +273,17 @@ impl OrderKind for Push {
     }
 }
 
-pub(crate) static PUSH_META: OrderMeta = OrderMeta::request("push", &Push).adults_only();
+pub(crate) static PUSH_META: OrderMeta =
+    OrderMeta::request("push", &Push).adults_only().script(&[PUSH_ACTION]);
+
+const PUSH_ACTION: ScriptAction = ScriptAction {
+    name: "push",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[place("machine", "machineId"), arg("x"), arg("y")]),
+    cost: 10.0,
+    description: "Push a siege machine, by it or its id, to the tile x, y, where a carriage could go. I must be one of its crew on its tile, with at least as many crew as it needs there; they go along with it, slowly, a Step at a time. My order is \"push\" until it gets there.",
+    returns: ScriptType::String,
+};
 
 /// A crew order got onto its machine's tile (`walking.rs`): the resident joins its crew, if the
 /// machine still stands there and is still of their realm. The order is done either way.
@@ -422,7 +443,17 @@ impl OrderKind for RamAt {
     }
 }
 
-pub(crate) static RAM_META: OrderMeta = OrderMeta::request("ram", &RamAt).adults_only();
+pub(crate) static RAM_META: OrderMeta =
+    OrderMeta::request("ram", &RamAt).adults_only().script(&[RAM_ACTION]);
+
+const RAM_ACTION: ScriptAction = ScriptAction {
+    name: "ram",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[place("machine", "machineId"), place("wall", "targetId")]),
+    cost: 10.0,
+    description: "Swing a ram, by it or its id, at the wall or gate next to it, by it or its id: one of another realm's city, or of nobody's. I must be one of its crew on its tile, with at least as many crew as it needs there. It strikes far harder than a blow until the wall falls, and nobody up on a wall reaches its crew under its roof. My order is \"ram\" until then.",
+    returns: ScriptType::String,
+};
 
 /// Resolves this tick's ram strikes (`CONTEXT.md`: Ram, ADR 0002): each ram order that still holds
 /// gets `1 / RAM_STRIKE_TICKS` closer to its next strike; a strike raises the alarm as a blow at
@@ -645,7 +676,17 @@ impl OrderKind for ThrowAt {
     }
 }
 
-pub(crate) static THROW_META: OrderMeta = OrderMeta::request("throw", &ThrowAt).adults_only();
+pub(crate) static THROW_META: OrderMeta =
+    OrderMeta::request("throw", &ThrowAt).adults_only().script(&[THROW_ACTION]);
+
+const THROW_ACTION: ScriptAction = ScriptAction {
+    name: "throw",
+    group: ActionGroup::Movement,
+    request: Request::ByHand(&["machine", "wallOrX", "y?"]),
+    cost: 10.0,
+    description: "Shoot a catapult, by it or its id, at a wall, gate or tower within its reach: by it or its id, or by the tile x, y of it. It must be one of another realm's city, or of nobody's. I must be one of its crew on its tile, with at least as many crew as it needs there. Each shot throws one Stone that its crew carry or that lies on its tile; out of Stone it stops. It hits only the building, never anyone. My order is \"throw\" until the wall falls.",
+    returns: ScriptType::String,
+};
 
 /// Resolves this tick's catapult shots (`CONTEXT.md`: Catapult, ADR 0002): each throw order that
 /// still holds gets `1 / CATAPULT_SHOT_TICKS` closer to its next shot; a shot takes one Stone and
