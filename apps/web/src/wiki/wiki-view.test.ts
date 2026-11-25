@@ -56,7 +56,7 @@ import {
   HOW_TO_TRADE_PATH,
   WIKI_PATH,
 } from './wiki-view.js'
-import { WIKI_TOPICS, Wiki } from './Wiki.js'
+import { WIKI_TOPICS, Wiki } from '../Wiki.js'
 
 const render = () => renderToStaticMarkup(createElement(Wiki))
 
@@ -200,6 +200,18 @@ describe('wiki figures', () => {
 })
 
 describe('wiki page', () => {
+  const folder = new URL('./', import.meta.url)
+  const files = fs
+    .readdirSync(folder)
+    .filter((name) => !name.includes('.test.'))
+    .map((name) => new URL(name, folder))
+  /** The page shell, every topic and the pieces they share. */
+  const pageFiles = [
+    new URL('../Wiki.tsx', import.meta.url),
+    ...files.filter((f) => f.pathname.endsWith('.tsx')),
+  ]
+  const helperFiles = files.filter((f) => f.pathname.endsWith('.ts'))
+
   it('explains Zeal and rallying the crew with the balance numbers', () => {
     const html = render()
     expect(html).toContain('id="zeal"')
@@ -217,7 +229,7 @@ describe('wiki page', () => {
   })
 
   it('types no number itself: every figure comes from the balance', () => {
-    let source = fs.readFileSync(new URL('./Wiki.tsx', import.meta.url), 'utf8')
+    let source = pageFiles.map((file) => fs.readFileSync(file, 'utf8')).join('\n')
     source = source.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
     // Drop every {…} expression, innermost first, then the tags: what is left is the page's text.
     let before
@@ -230,8 +242,8 @@ describe('wiki page', () => {
   })
 
   it('imports no number from @csp/shared: they come from the JSON Rust writes (@csp/balance)', () => {
-    for (const file of ['Wiki.tsx', 'wiki-view.ts', 'wiki-scripting.ts']) {
-      const source = fs.readFileSync(new URL(`./${file}`, import.meta.url), 'utf8')
+    for (const file of [...pageFiles, ...helperFiles]) {
+      const source = fs.readFileSync(file, 'utf8')
       const shared = [...source.matchAll(/import\s*\{([^}]*)\}\s*from\s*'@csp\/shared'/g)]
         .flatMap((m) => m[1]!.split(','))
         .map((name) => name.trim())

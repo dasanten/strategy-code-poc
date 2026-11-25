@@ -13,8 +13,8 @@
 - **Balance numbers** live in `crates/csp-shared/src/balance.rs`; pick sensible values and list
   them in the PR, then run `pnpm balance:rust` and commit `packages/balance/` (the client's copy).
   Rules (what happens) are Daniel's call.
-- **Wiki** (`/wiki`, `apps/web/src/Wiki.tsx`): a ticket that changes a rule also updates its wiki
-  section. Numbers come from `@csp/balance`, never typed into its text.
+- **Wiki** (`/wiki`, one file per section: `apps/web/src/wiki/<topic>.tsx`): a ticket that changes
+  a rule also updates its wiki section. Numbers come from `@csp/balance`, never typed into its text.
 - **Keep scripting cheap to add** (ADR 0002): everything goes through the game API
   (`crates/csp-sim/src/script_api.rs`, `script_tables.rs`); orders only request actions; order
   state is plain serialisable data. After changing the script tables, run `pnpm script-data:rust`.
