@@ -559,14 +559,20 @@ async fn closes_a_client_older_than_the_server_serves_with_the_updated_code() {
 /// (`client_constants`), which the staleness test keeps equal to the server's.
 #[test]
 fn the_client_speaks_the_servers_protocol_version_and_knows_its_close_code() {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../apps/web/src/shared/protocol.ts");
-    let protocol = std::fs::read_to_string(path).unwrap().replace("\r\n", "\n");
-    let reexports = protocol.find("} from '@csp/shared-types'").map(|end| &protocol[..end]);
-    for name in ["PROTOCOL_VERSION", "WS_CLOSE_UPDATED", "WS_CLOSE_RELOAD"] {
-        assert!(
-            reexports.is_some_and(|r| r.contains(&format!("  {name},"))),
-            "apps/web/src/shared/protocol.ts does not take {name} from the generated constants"
-        );
+    // Where the client uses them, it imports them from the generated constants.
+    let web = concat!(env!("CARGO_MANIFEST_DIR"), "/../../apps/web/src/");
+    let uses = [
+        ("useWorld.ts", "PROTOCOL_VERSION"),
+        ("socket-frames.ts", "WS_CLOSE_UPDATED"),
+        ("socket-frames.ts", "WS_CLOSE_RELOAD"),
+    ];
+    for (file, name) in uses {
+        let text = std::fs::read_to_string(format!("{web}{file}")).unwrap().replace("\r\n", "\n");
+        let from_generated = text
+            .split("import ")
+            .filter(|i| i.contains("} from '@csp/shared-types'"))
+            .any(|i| i.split("} from").next().is_some_and(|names| names.contains(name)));
+        assert!(from_generated, "{file} does not take {name} from the generated constants");
     }
     let constants = csp_server::client_constants::constants_text();
     assert!(constants.contains(&format!("export const PROTOCOL_VERSION = {PROTOCOL_VERSION};")));

@@ -184,8 +184,11 @@ fn more_of_two_realms(world: &mut Value) {
         "at": { "x": sx, "y": sy }, "progress": 0 });
 }
 
+/// A fixture world: its name, its file, and what is added to it.
+type Fixture = (&'static str, &'static str, Option<fn(&mut Value)>);
+
 fn sent() -> Vec<Sent> {
-    let worlds: [(&str, &str, Option<fn(&mut Value)>); 2] = [
+    let worlds: [Fixture; 2] = [
         ("two-realms", "sight/two-realms.json", Some(more_of_two_realms)),
         ("transfers", "trade/transfers.json", None),
     ];
