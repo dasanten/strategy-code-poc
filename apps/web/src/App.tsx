@@ -59,7 +59,8 @@ import {
 } from './shared/carriages.js'
 import { mountOffProblem, horseOfResident, riderOf } from './shared/horses.js'
 import { horsesInNeed } from './shared/reviving.js'
-import { isDown } from './shared/world.js'
+import { isDown, NODE_WORKPLACE } from './shared/world.js'
+import { buildProblem, nodeCorner, type KnownGround } from './world-rules.js'
 import {
   isPassableTerrain,
   isWater,
@@ -290,13 +291,11 @@ import { pickPreview, previewPickOf, type PreviewWorld } from './pick-preview.js
 import { PHONE_QUERY } from './sheet-view.js'
 import { buildingNodeKind } from './building-info-view.js'
 import {
-  buildHereProblem,
   describeTile,
   escapeStep,
   hitchChoice,
   makeLeaderProblem,
   nameHeirProblem,
-  nodeFit,
   type ActionId,
   commandedCarriages,
   strangersCarriage,
@@ -1356,17 +1355,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const buildProblemAt =
     (w: NonNullable<typeof world>, x: number, y: number) =>
     (kind: BuildingKind, material?: WallMaterial) =>
-      material === 'stone' && stoneOverAt(w, x, y, kind)
-        ? undefined
-        : buildHereProblem(
-            kind,
-            x,
-            y,
-            w,
-            (nx, ny) => nodeAt?.(nx, ny),
-            // Terrain not loaded counts as unexplored: nothing is laid out there.
-            { size: w.map.size, at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED },
-          )
+      buildProblem(kind, x, y, knownGround(w), material)
+  /** The terrain and nodes the Player explored, as the checks on where buildings go read them. */
+  const knownGround = (w: NonNullable<typeof world>): KnownGround => ({
+    size: w.map.size,
+    // Terrain not loaded counts as unexplored: nothing is laid out there.
+    at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED,
+    nodeAt: (nx, ny) => nodeAt?.(nx, ny),
+  })
   /**
    * Why a kind picked before its tile can't go on the tile (`CONTEXT.md`: Realm order), as the
    * Build menu there would say it: the placement rule, a node's workplace off its node.
@@ -2277,7 +2273,6 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
   const preview = (() => {
     if (!world || !pick || !pickAt) return undefined
-    const size = world.map.size
     const seen: PreviewWorld = {
       ...wayGround(world),
       ...planWorld(world),
@@ -2287,10 +2282,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         // A kind picked before its tile is judged as the Build menu there would (realm control).
         realmOrder?.step === 'where'
           ? realmBuildProblem(world, x, y, kind, realmOrder.material)
-          : buildHereProblem(kind, x, y, world, (nx, ny) => nodeAt?.(nx, ny), {
-              size,
-              at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED,
-            }),
+          : buildProblem(kind, x, y, knownGround(world)),
     }
     const what = previewPickOf(pick, {
       lineFrom: group.length > 1 ? groupLineFrom : lineFrom,
@@ -2980,9 +2972,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 nodeFit: (() => {
                   const node = nodeAt?.(selectedTile.x, selectedTile.y)
                   if (!node || !terrainAt) return undefined
-                  // Terrain not loaded counts as unexplored: nothing is laid out there.
-                  const at = (x: number, y: number) => terrainAt(x, y) ?? UNEXPLORED
-                  return nodeFit(node, world, nodeAt!, { size: world.map.size, at })
+                  return nodeCorner(node, NODE_WORKPLACE[node.kind], knownGround(world))
                 })(),
               },
               GOOD_LABELS,

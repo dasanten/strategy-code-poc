@@ -11,7 +11,7 @@ import {
 } from './build-menu-view.js'
 import { BUILD_GROUPS } from './shared/building-info.js'
 import { BUILDING_NAMES } from './map/palette.js'
-import { buildHereProblem } from './selection-view.js'
+import { buildProblemOn as buildHereProblem } from './test-mirror.js'
 
 const plains = { size: 200, at: () => Terrain.Plains }
 const seen = { buildings: [] as Building[], cities: [] as City[] }

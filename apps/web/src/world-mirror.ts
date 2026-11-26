@@ -11,6 +11,8 @@ let mirror: WorldMirror | undefined
 /** What came before the module loaded: the latest welcome and every tick after it. */
 let waiting: string[] = []
 let loading: Promise<void> | undefined
+/** Whether a welcome went into the mirror. */
+let welcomed = false
 
 /** Takes in a message from the server, by its `type`, as the text the socket brought. */
 export function feedMirror(type: string, text: string): void {
@@ -34,15 +36,31 @@ function start(): void {
 
 function apply(m: WorldMirror, type: 'welcome' | 'tick', text: string): void {
   try {
-    if (type === 'welcome') m.welcome(text)
-    else m.tick(text)
+    if (type === 'welcome') {
+      m.welcome(text)
+      welcomed = true
+    } else m.tick(text)
   } catch (e) {
     // A message the mirror can't read changes nothing; the next welcome starts it over.
     console.error(`rules module: the ${type} message`, e)
   }
 }
 
+/**
+ * Starts the mirror over from a `welcome` message's text at once, for a test (`test-mirror.ts`);
+ * the module must have loaded, as it has in Node. Without text, the mirror is gone.
+ */
+export function mirrorWelcome(text?: string): void {
+  waiting = []
+  welcomed = false
+  if (text === undefined) return
+  // The same mirror starts over, as from the server's next welcome: its lookups are built again.
+  mirror ??= new WorldMirror()
+  mirror.welcome(text)
+  welcomed = true
+}
+
 /** The mirror, once the module has loaded and a welcome went in. */
 export function worldMirror(): WorldMirror | undefined {
-  return mirror && mirror.count > 0 ? mirror : undefined
+  return mirror && welcomed ? mirror : undefined
 }

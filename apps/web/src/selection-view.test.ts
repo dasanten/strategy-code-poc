@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { buildProblemOn as buildHereProblem, nodeCornerOn as nodeFit } from './test-mirror.js'
 import {
   CARRIAGE_CAPACITY,
   OCCUPATION_GAME_DAYS,
@@ -58,13 +59,11 @@ import { BUILDING_NAMES } from './map/palette.js'
 import {
   ACTION_KEYS,
   actionForKey,
-  buildHereProblem,
   describeTile,
   escapeStep,
   keepRows,
   makeLeaderProblem,
   nameHeirProblem,
-  nodeFit,
   groupOrders,
   orderGroupOf,
   residentActions,
@@ -2372,7 +2371,8 @@ describe('where a node’s workplace fits on what the Player knows', () => {
       ),
     ).toEqual({ x: 9, y: 10 })
     const water = lookup((x, y) => (x === 9 && y === 11 ? Terrain.Lake : Terrain.Forest))
-    const boxed = { ...seen, buildings: [east, building({ kind: 'house', x: 9, y: 8 })] }
+    const west = building({ id: 'b-house-2', kind: 'house', x: 9, y: 8 })
+    const boxed = { ...seen, buildings: [east, west] }
     expect(nodeFit(forest, boxed, nodeAt, water)).toBeUndefined()
   })
 

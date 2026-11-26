@@ -16,8 +16,6 @@ import {
   NODE_GOOD,
   teacherAt,
   traineesOf,
-  buildProblem,
-  nodeCorner,
   hasChoice,
   recipeFor,
   recipeGood,
@@ -27,7 +25,6 @@ import {
   isSiegeSite,
   materialsOfKind,
   workOfKind,
-  type TerrainLookup,
 } from './shared/building.js'
 import { CARRYING_A_CHILD, GOODS, isDown, NODE_WORKPLACE } from './shared/world.js'
 import {
@@ -129,7 +126,7 @@ import type {
 } from '@csp/shared-types'
 import { covers, FOOTPRINT, footprintTiles } from './shared/footprint.js'
 import { conditionLine, isRuin, repairable } from './shared/decay.js'
-import { wrap, Terrain, UNEXPLORED } from './shared/terrain.js'
+import { Terrain, UNEXPLORED } from './shared/terrain.js'
 import { fullAt, gatheredOn, isPickedOver, patchLeft } from './shared/patch.js'
 import { handOverProblem, heirProblem } from './shared/leader.js'
 import { aboutTime, workLeft } from './shared/estimates.js'
@@ -961,7 +958,7 @@ export interface TileCard {
   gate?: Building
   /**
    * A resource node with nothing built on it: its workplace, and the north-west tile where that
-   * fits (`nodeFit`), if anywhere.
+   * fits (`nodeCorner`), if anywhere.
    */
   buildHere?: { kind: BuildingKind; at: { x: number; y: number } | undefined }
   /** A city the card links to in the city inspector: an own town hall's. */
@@ -1260,53 +1257,8 @@ export interface TileThings {
   commandedCarriages?: ReadonlySet<string>
   /** The buildings the Player remembers out of sight, and the tick now (`CONTEXT.md`: Last seen). */
   lastSeen?: { buildings: LastSeenBuilding[]; tick: number }
-  /** Where the node's workplace fits on what the Player knows (`nodeFit`), if anywhere. */
+  /** Where the node's workplace fits on what the Player knows (`nodeCorner`), if anywhere. */
   nodeFit?: { x: number; y: number }
-}
-
-/**
- * Where the workplace of a resource node can be laid out, as far as the Player knows
- * (`nodeCorner`, `CONTEXT.md`: Where buildings go): the buildings they see, the nodes and terrain
- * they have explored. The server checks again when the order arrives.
- */
-export function nodeFit(
-  node: KnownNode,
-  seen: { buildings: Building[]; cities: City[] },
-  nodeAt: (x: number, y: number) => KnownNode | undefined,
-  terrain: TerrainLookup,
-): { x: number; y: number } | undefined {
-  // The nodes a footprint over this one could also cover.
-  const reach = FOOTPRINT[NODE_WORKPLACE[node.kind]] - 1
-  const nodes: KnownNode[] = []
-  for (let dy = -reach; dy <= reach; dy++) {
-    for (let dx = -reach; dx <= reach; dx++) {
-      const n = nodeAt(wrap(node.x + dx, terrain.size), wrap(node.y + dy, terrain.size))
-      if (n) nodes.push(n)
-    }
-  }
-  return nodeCorner({ ...seen, nodes }, terrain, node)
-}
-
-/**
- * Why a building of `kind` can't be laid out from (x, y), its footprint running east and south, as
- * far as the Player knows (`buildProblem`, `CONTEXT.md`: Where buildings go): the buildings and
- * cities they see, the nodes and terrain they have explored. The server checks again when the
- * order arrives.
- */
-export function buildHereProblem(
-  kind: BuildingKind,
-  x: number,
-  y: number,
-  seen: { buildings: Building[]; cities: City[] },
-  nodeAt: (x: number, y: number) => KnownNode | undefined,
-  terrain: TerrainLookup,
-): string | undefined {
-  const nodes: KnownNode[] = []
-  for (const [tx, ty] of footprintTiles({ kind, x, y }, terrain.size)) {
-    const n = nodeAt(tx, ty)
-    if (n) nodes.push(n)
-  }
-  return buildProblem({ ...seen, nodes }, x, y, kind, terrain)
 }
 
 /** A node's kind in words: "forest", "iron ore". */

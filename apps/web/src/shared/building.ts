@@ -1,8 +1,7 @@
 // Ported from packages/shared/src/building.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { covers, footprintTiles, isAt } from './footprint.js'
-import { inAnyCityArea } from '@csp/lang-wasm'
+import { covers, isAt } from './footprint.js'
 import {
   BUILD_MENU_GROUPS,
   BUILDING_KINDS,
@@ -10,36 +9,22 @@ import {
   MACHINE_SPECS,
   type BuildingSpec,
 } from '@csp/balance'
-import { GOOD_WEIGHT, RECIPES, WORKPLACE_MAX_WORKERS } from './narrowed.js'
-import { canWork, carriageCanEnter, stockWeight, type Recipe } from './stats.js'
-import {
-  Terrain,
-  isPassableTerrain,
-  terrainAt,
-  tileIndex,
-  touchesSea,
-  touchesWater,
-  type TerrainMap,
-  wrap,
-  wrapDelta,
-} from './terrain.js'
-import { CARRYING_A_CHILD, NODE_WORKPLACE, isTrainingSubject } from './world.js'
-import { MAP_SIZE, TRAINING_GROUND_MAX_TRAINEES, buildWork, carryCapacity } from '@csp/balance'
+import { RECIPES, WORKPLACE_MAX_WORKERS } from './narrowed.js'
+import { carriageCanEnter, type Recipe } from './stats.js'
+import { Terrain, terrainAt, tileIndex, type TerrainMap, wrap, wrapDelta } from './terrain.js'
+import { MAP_SIZE, buildWork } from '@csp/balance'
 import type {
-  BuildLine,
   Building,
   BuildingKind,
   Good,
   Pile,
   Resident,
   ResidentOrder,
-  ResourceNode,
-  Stock,
   WallMaterial,
   WorldState,
 } from '@csp/shared-types'
 import { NODE_GOOD } from '@csp/shared-types'
-import { siteWorkOf, hasChoice, recipeFor, cornersCovering } from '@csp/lang-wasm'
+import { siteWorkOf, recipeFor } from '@csp/lang-wasm'
 
 export {
   materialsNeeded,
@@ -93,46 +78,10 @@ export const SHARES_A_TILE: readonly BuildingKind[] = kindsWhere((spec) => spec.
  */
 export const SITES_OF_MOVERS: readonly BuildingKind[] = SHARES_A_TILE.filter((k) => k !== 'road')
 
-/** Workplaces that turn goods into other goods (`RECIPES`): smelters, mints and smithies. */
-export const PROCESSING: readonly BuildingKind[] = kindsWhere((spec) => spec.processes)
-
 /** The good a recipe makes. */
 export function recipeGood(recipe: Recipe): Good {
   return (Object.keys(recipe.output) as Good[])[0]!
 }
-
-/**
- * Buildable kinds that go on any passable terrain but Mountain, off any resource node
- * (`CONTEXT.md`: Where buildings go): the processing workplaces, the city buildings, training
- * grounds (`CONTEXT.md`: Training ground) and havens, which go on the shore besides (`ON_SHORE`).
- */
-export const OFF_NODES: readonly BuildingKind[] = kindsWhere((spec) => spec.stands === 'offNodes')
-
-/**
- * Buildable kinds that go on the shore, with a tile of their footprint touching Lake or Sea
- * straight or diagonally (`CONTEXT.md`: Haven): havens.
- */
-export const ON_SHORE: readonly BuildingKind[] = kindsWhere((spec) => spec.onShore)
-
-/** Buildable kinds that go on Plains, off any resource node: stables and farms. */
-export const ON_PLAINS: readonly BuildingKind[] = kindsWhere((spec) => spec.stands === 'onPlains')
-
-/**
- * Buildable kinds that go only in a city's area, every tile of their footprint: houses
- * (`CONTEXT.md`: House). A storage goes anywhere, outside a city as an outpost storage
- * (`CONTEXT.md`: Outpost storage).
- */
-export const IN_CITY_AREA: readonly BuildingKind[] = kindsWhere((spec) => spec.inCityArea)
-
-/**
- * What a build menu offers off any resource node, in its order: every buildable kind but the
- * nodes' workplaces and roads (which have their own), city buildings first.
- */
-export const OFF_NODE_BUILDS: readonly BuildingKind[] = [
-  ...OFF_NODES.filter((k) => !PROCESSING.includes(k)),
-  ...ON_PLAINS,
-  ...PROCESSING,
-]
 
 /**
  * Kinds of building that keep goods in a storage of their own: storages, the Trade
@@ -187,33 +136,6 @@ export function roadAt(
   return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'road')
 }
 
-/** The carriage site on a tile, if there is one (`CONTEXT.md`: Carriage). */
-export function carriageSiteAt(
-  world: Pick<WorldState, 'buildings'>,
-  x: number,
-  y: number,
-): Building | undefined {
-  return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'carriage')
-}
-
-/** The boat site on a tile, if there is one (`CONTEXT.md`: Building a boat). */
-export function boatSiteAt(
-  world: Pick<WorldState, 'buildings'>,
-  x: number,
-  y: number,
-): Building | undefined {
-  return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'boat')
-}
-
-/** The ship site on a tile, if there is one (`CONTEXT.md`: Building a ship). */
-export function shipSiteAt(
-  world: Pick<WorldState, 'buildings'>,
-  x: number,
-  y: number,
-): Building | undefined {
-  return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'ship')
-}
-
 /** The kinds of site siege machines are built as (`MACHINE_SPECS`): ram and catapult sites. */
 export const SIEGE_SITES: readonly BuildingKind[] = Object.values(MACHINE_SPECS).map(
   (m) => m.builtAs,
@@ -221,60 +143,6 @@ export const SIEGE_SITES: readonly BuildingKind[] = Object.values(MACHINE_SPECS)
 
 /** Whether a kind is the site of a siege machine. */
 export const isSiegeSite = (kind: BuildingKind) => SIEGE_SITES.includes(kind)
-
-/**
- * The site of a siege machine on a tile, if there is one (`CONTEXT.md`: Siege machine): of `kind`,
- * or of any machine.
- */
-export function siegeSiteAt(
-  world: Pick<WorldState, 'buildings'>,
-  x: number,
-  y: number,
-  kind?: BuildingKind,
-): Building | undefined {
-  return world.buildings.find(
-    (b) => b.x === x && b.y === y && (kind === undefined ? isSiegeSite(b.kind) : b.kind === kind),
-  )
-}
-
-/**
- * What of `kind` stands on a tile, finished or not: its road for a road, its carriage, boat or
- * ship site for a carriage, boat or ship, else its building.
- */
-export function constructionAt(
-  world: WorldState,
-  x: number,
-  y: number,
-  kind: BuildingKind,
-): Building | undefined {
-  if (kind === 'road') return roadAt(world, x, y)
-  if (kind === 'carriage') return carriageSiteAt(world, x, y)
-  if (kind === 'boat') return boatSiteAt(world, x, y)
-  if (kind === 'ship') return shipSiteAt(world, x, y)
-  if (isSiegeSite(kind)) return siegeSiteAt(world, x, y, kind)
-  return buildingAt(world, x, y)
-}
-
-/**
- * The finished stable a carriage site on (x, y) is built at (`CONTEXT.md`: Carriage): one whose
- * footprint covers the tile or lies right next to it, the one covering it first.
- */
-export function stableFor(
-  world: Pick<WorldState, 'buildings'>,
-  x: number,
-  y: number,
-  size = MAP_SIZE,
-): Building | undefined {
-  const here = buildingAt(world, x, y, size)
-  if (here?.kind === 'stable' && !here.site) return here
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      const b = buildingAt(world, wrap(x + dx, size), wrap(y + dy, size), size)
-      if (b?.kind === 'stable' && !b.site) return b
-    }
-  }
-  return undefined
-}
 
 /**
  * The tiles with a finished road, as tile indices on a map `size` across, for `groundAt`. Road
@@ -305,152 +173,6 @@ export function carriageCanGoTo(
 /** Whether a building of `kind` of `material` is of stone: only a wall, gate or tower can be. */
 export function isStone(kind: BuildingKind, material?: WallMaterial | null): boolean {
   return material === 'stone' && (kind === 'wall' || kind === 'gate' || kind === 'tower')
-}
-
-/**
- * The terrain of tiles as far as it is known, for checking where buildings go: the client knows
- * only its explored chunks and says `UNEXPLORED` for the rest, where no building goes.
- */
-export interface TerrainLookup {
-  size: number
-  at: (x: number, y: number) => number
-}
-
-/** What `buildProblem` looks at: the buildings, the resource nodes, and the cities (`IN_CITY_AREA`). */
-export type PlacingWorld = Pick<WorldState, 'buildings' | 'cities'> & {
-  nodes: readonly Pick<ResourceNode, 'kind' | 'x' | 'y'>[]
-}
-
-function lookupOf(terrain: TerrainMap | TerrainLookup): (x: number, y: number) => Terrain {
-  return 'tiles' in terrain
-    ? (x, y) => terrainAt(terrain, x, y)
-    : (x, y) => terrain.at(x, y) as Terrain
-}
-
-/**
- * Why a building of this kind can't be laid out with the north-west tile of its footprint on
- * (x, y) (`CONTEXT.md`: Where buildings go, Footprint), or undefined if it can: every tile of the
- * footprint passable and free of other buildings; workplaces with one tile on a resource node of
- * their kind, stables and farms wholly on Plains, smelters, mints, smithies, town halls, houses,
- * storages, training grounds, walls and gates off Mountain, a house only in a city’s area (`CONTEXT.md`:
- * House); only a node’s workplace covers a node. A road goes on any passable land, Mountain too, node or not, and
- * next to a building on its tile, but one road per tile (`CONTEXT.md`: Road). A carriage site
- * goes on a tile of a finished stable or right next to one, where a carriage can stand, off any
- * resource node and any other building, one per tile (`CONTEXT.md`: Carriage). Without `terrain`
- * the terrain rules are not checked.
- */
-export function buildProblem(
-  world: PlacingWorld,
-  x: number,
-  y: number,
-  kind: BuildingKind,
-  terrain?: TerrainMap | TerrainLookup,
-): string | undefined {
-  if (!BUILDABLE.includes(kind)) return `a ${kind} can't be built yet`
-  const at = terrain && lookupOf(terrain)
-  if (kind === 'road') {
-    const t = at?.(x, y)
-    if (t !== undefined && !isPassableTerrain(t)) return 'a road goes on passable land'
-    if (roadAt(world, x, y)) return 'there is already a road on this tile'
-    return undefined
-  }
-  const size = terrain?.size ?? MAP_SIZE
-  if (kind === 'carriage') {
-    const t = at?.(x, y)
-    if (t !== undefined && !carriageCanEnter(t)) return 'a carriage can’t stand on this land'
-    if (world.nodes.some((n) => n.x === x && n.y === y))
-      return 'a carriage goes off any resource node'
-    if (!stableFor(world, x, y, size)) return 'a carriage is built at a finished stable'
-    const here = buildingAt(world, x, y, size)
-    if (here && here.kind !== 'stable') return 'there is already a building there'
-    if (carriageSiteAt(world, x, y)) return 'there is already a carriage site on this tile'
-    return undefined
-  }
-  if (isSiegeSite(kind)) {
-    // `CONTEXT.md`: Siege machine: laid out in the field, anywhere a carriage could stand.
-    const t = at?.(x, y)
-    if (t !== undefined && !carriageCanEnter(t))
-      return `a ${kind} is built where a carriage could stand`
-    if (world.nodes.some((n) => n.x === x && n.y === y))
-      return `a ${kind} goes off any resource node`
-    if (buildingAt(world, x, y, size)) return 'there is already a building there'
-    if (siegeSiteAt(world, x, y)) return 'there is already a siege machine site on this tile'
-    return undefined
-  }
-  if (kind === 'boat') {
-    // `CONTEXT.md`: Building a boat: on a haven tile that touches the water.
-    const haven = buildingAt(world, x, y, size)
-    if (haven?.kind !== 'haven' || haven.site || (at && !touchesWater([[x, y]], size, at)))
-      return 'a boat is built on a tile of a finished haven touching the water'
-    if (boatSiteAt(world, x, y)) return 'there is already a boat site on this tile'
-    return undefined
-  }
-  if (kind === 'ship') {
-    // `CONTEXT.md`: Building a ship: on a haven tile that touches Sea.
-    const haven = buildingAt(world, x, y, size)
-    if (haven?.kind !== 'haven' || haven.site || (at && !touchesSea([[x, y]], size, at)))
-      return 'a ship is built on a tile of a finished haven touching the Sea'
-    if (shipSiteAt(world, x, y)) return 'there is already a ship site on this tile'
-    return undefined
-  }
-  const placed = { kind, x, y }
-  const tiles = footprintTiles(placed, size)
-  const nodes = world.nodes.filter((n) => covers(placed, n.x, n.y, size))
-  const all = (ok: (t: Terrain) => boolean) => !at || tiles.every(([tx, ty]) => ok(at(tx, ty)))
-  if (!all(isPassableTerrain)) return `a ${kind} goes on passable land`
-  if (ON_PLAINS.includes(kind)) {
-    if (nodes.length > 0 || !all((t) => t === Terrain.Plains))
-      return `a ${kind} goes wholly on Plains, off any resource node`
-  } else if (OFF_NODES.includes(kind)) {
-    if (nodes.length > 0 || !all((t) => t !== Terrain.Mountain))
-      return `a ${kind} goes off any resource node, and not on Mountain`
-    if (IN_CITY_AREA.includes(kind) && !inAnyCityArea(world.buildings, tiles, size).every(Boolean))
-      return `a ${kind} goes in a city’s area`
-    if (ON_SHORE.includes(kind) && at && !touchesWater(tiles, size, at))
-      return `a ${kind} goes on the shore, touching Lake or Sea`
-  } else if (nodes.length !== 1 || NODE_WORKPLACE[nodes[0]!.kind] !== kind)
-    return `a ${kind} goes with one tile on a fitting resource node`
-  if (tiles.some(([tx, ty]) => buildingAt(world, tx, ty, size)))
-    return 'there is already a building there'
-  return undefined
-}
-
-/**
- * Why resident `r` can't build `building` with the north-west tile of its footprint `at` once they
- * stand there, or undefined if they can: lay out a site there, or join the unfinished one of that
- * kind there (`CONTEXT.md`: Construction site, Child).
- */
-export function buildAtProblem(
-  world: WorldState,
-  r: Resident,
-  building: unknown,
-  at: { x: number; y: number },
-  terrain?: TerrainMap,
-): string | undefined {
-  if (!canWork(r, world.tick)) return 'children can’t build'
-  if (r.carrying) return CARRYING_A_CHILD
-  if (!BUILDABLE.includes(building as BuildingKind)) return 'that can’t be built'
-  const kind = building as BuildingKind
-  const here = constructionAt(world, at.x, at.y, kind)
-  if (here?.site && here.kind === kind) return undefined
-  return buildProblem(world, at.x, at.y, kind, terrain)
-}
-
-/**
- * Where a node's workplace can be laid out (`CONTEXT.md`: Where buildings go): the north-west
- * tile of a footprint that covers the node and fits, the node's own tile first; none when no
- * footprint over it fits.
- */
-export function nodeCorner(
-  world: PlacingWorld,
-  terrain: TerrainMap | TerrainLookup,
-  node: Pick<ResourceNode, 'kind' | 'x' | 'y'>,
-): { x: number; y: number } | undefined {
-  const kind = NODE_WORKPLACE[node.kind]
-  for (const [x, y] of cornersCovering(kind, node.x, node.y, terrain.size)) {
-    if (!buildProblem(world, x, y, kind, terrain)) return { x, y }
-  }
-  return undefined
 }
 
 /** Most workers each kind of workplace takes, for the kinds residents can work so far. */
@@ -485,52 +207,6 @@ export function workplaceGood(
   return node ? NODE_GOOD[node.kind] : undefined
 }
 
-/**
- * The goods a workplace that processes goods can use up for its next batches (`CONTEXT.md`:
- * Smelter, Smithy): the input of any of its recipes that its workers carry and that lies in its
- * pile (`CONTEXT.md`: A building's pile).
- */
-export function inputAt(world: WorldState, workplace: Building): Stock {
-  const out: Stock = {}
-  const pile = buildingPile(world, workplace)
-  const goods = new Set((RECIPES[workplace.kind] ?? []).flatMap((r) => Object.keys(r.input)))
-  for (const good of goods as Set<Good>) {
-    const carried = workersOf(world, workplace).reduce((n, w) => n + (w.carried[good] ?? 0), 0)
-    const units = carried + (pile?.goods[good] ?? 0)
-    if (units > 0) out[good] = units
-  }
-  return out
-}
-
-/** Whether a workplace has the input for one more batch of `recipe` (`inputAt`). */
-export function hasInput(world: WorldState, workplace: Building, recipe: Recipe): boolean {
-  const at = inputAt(world, workplace)
-  return (Object.entries(recipe.input) as [Good, number][]).every(([g, n]) => (at[g] ?? 0) >= n)
-}
-
-/**
- * The input a resident working a workplace that processes goods fetches for it (`CONTEXT.md`:
- * Fetching inputs): of each good of `recipe`'s input it lacks for a batch (`inputAt`), as many
- * batches' worth as fit in the resident's hands beside what they carry, so a smithy with Wood
- * enough gets only Iron; empty while it has a batch's input, or none fits.
- */
-export function inputToFetch(
-  world: WorldState,
-  workplace: Building,
-  recipe: Recipe,
-  resident: Resident,
-): Stock {
-  const at = inputAt(world, workplace)
-  const short = (Object.entries(recipe.input) as [Good, number][]).filter(
-    ([g, n]) => (at[g] ?? 0) < n,
-  )
-  const room = carryCapacity(resident, world.tick) - stockWeight(resident.carried)
-  const batch = short.reduce((kg, [g, n]) => kg + n * GOOD_WEIGHT[g], 0)
-  const batches = batch > 0 ? Math.floor(room / batch + 1e-9) : 0
-  if (batches < 1) return {}
-  return Object.fromEntries(short.map(([g, n]) => [g, n * batches]))
-}
-
 /** The residents working a workplace: holding a work-at order for it and standing at it. */
 export function workersOf<R extends Pick<Resident, 'order' | 'x' | 'y'>>(
   world: { residents: readonly R[] },
@@ -557,34 +233,6 @@ export function teacherAt<R extends Pick<Resident, 'order' | 'x' | 'y'>>(
 }
 
 /**
- * Why a resident can't start teaching `subject` at the building on their tile, or undefined if
- * they can (`CONTEXT.md`: Teacher): it has to be a finished training ground nobody else teaches
- * at, and they grown. A teacher there may switch to another subject.
- */
-export function teachProblem(
-  world: WorldState,
-  resident: Resident,
-  subject: unknown,
-): string | undefined {
-  if (!canWork(resident, world.tick)) return 'children can’t teach'
-  if (!isTrainingSubject(subject)) return 'teach a stat or a skill'
-  const here = buildingAt(world, resident.x, resident.y)
-  if (!here || here.kind !== 'trainingGround') return 'there is no training ground here'
-  if (here.site) return 'it is still a construction site'
-  const o = resident.order
-  if (o?.kind === 'teach' && o.buildingId === here.id && o.subject === subject)
-    return 'already teaching here'
-  const teacher = teacherAt(here, world.residents)
-  if (teacher && teacher !== resident) {
-    const what = teacher.order?.kind === 'teach' ? teacher.order.subject : subject
-    return `${teacher.name} teaches ${capitalised(what)} here`
-  }
-  return undefined
-}
-
-const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
-
-/**
  * Who trains at a training ground (`CONTEXT.md`: Trainee): the residents holding a train order for
  * it and standing on its footprint, found from residents' orders as its teacher is.
  */
@@ -599,23 +247,6 @@ export function traineesOf<R extends Pick<Resident, 'order' | 'x' | 'y'>>(
 }
 
 /**
- * Why a resident can't start training at the building on their tile, or undefined if they can
- * (`CONTEXT.md`: Trainee): it has to be a finished training ground with room for another
- * trainee, and they grown. They need no teacher there to start: without one they wait.
- */
-export function trainProblem(world: WorldState, resident: Resident): string | undefined {
-  if (!canWork(resident, world.tick)) return 'children can’t train'
-  const here = buildingAt(world, resident.x, resident.y)
-  if (!here || here.kind !== 'trainingGround') return 'there is no training ground here'
-  if (here.site) return 'it is still a construction site'
-  const o = resident.order
-  if (o?.kind === 'train' && o.buildingId === here.id) return 'already training here'
-  if (traineesOf(here, world.residents).length >= TRAINING_GROUND_MAX_TRAINEES)
-    return `the training ground has room for ${TRAINING_GROUND_MAX_TRAINEES} trainees`
-  return undefined
-}
-
-/**
  * The realms holding a workplace (`CONTEXT.md`: Holding a workplace): those whose residents work
  * it, and so get its output. There is no ownership flag, and the city a farm was laid out for
  * doesn't count; nobody holds a workplace that nobody works.
@@ -626,36 +257,6 @@ export function holdersOf(
 ): string[] {
   const realms = workersOf(world, workplace).map((r) => r.owner)
   return [...new Set(realms.filter((id): id is string => id !== null))].sort()
-}
-
-/**
- * Why a resident can't start working the building on their tile, or undefined if they can: it
- * has to be a finished workplace residents can work, with room for one more worker. At a smithy
- * `makes` names one of its recipes' goods (`recipeFor`), at a smelter it may (Iron without);
- * elsewhere it is left out. A worker there can switch to making something else.
- */
-export function workProblem(
-  world: WorldState,
-  resident: Resident,
-  makes?: Good,
-): string | undefined {
-  const here = buildingAt(world, resident.x, resident.y)
-  const max = here && MAX_WORKERS[here.kind]
-  if (!here || max === undefined) return 'there is no workplace to work here'
-  if (hasChoice(here.kind)) {
-    if (makes === undefined && !recipeFor(here.kind)) return `say what to make at the ${here.kind}`
-    if (makes !== undefined && !recipeFor(here.kind, makes))
-      return `a ${here.kind} can't make ${makes}`
-  } else if (makes !== undefined) return `nothing to choose at a ${here.kind}`
-  if (!workplaceGood(world, here, makes)) return 'there is no workplace to work here'
-  if (here.site) return 'it is still a construction site'
-  const o = resident.order
-  if (o?.kind === 'workAt' && o.buildingId === here.id) {
-    if (o.makes === makes) return 'already working here'
-    return undefined
-  }
-  if (workersOf(world, here).length >= max) return `it already has ${max} workers`
-  return undefined
 }
 
 /**
@@ -691,41 +292,6 @@ export function workPace(
 }
 
 /**
- * Whether tearing down `b` would leave a carriage or ridden horse on Mountain without a road
- * (`CONTEXT.md`: Road): it is a finished road on Mountain with one standing on it.
- */
-export function strandsOnMountain(
-  world: Pick<WorldState, 'carriages' | 'horses' | 'residents'>,
-  b: Building,
-  terrain: TerrainMap,
-): boolean {
-  if (b.kind !== 'road' || b.site || terrainAt(terrain, b.x, b.y) !== Terrain.Mountain) return false
-  const here = (k: { x: number; y: number }) => k.x === b.x && k.y === b.y
-  const ridden = (h: { id: string }) => world.residents.some((r) => r.riding === h.id)
-  return world.carriages.some(here) || world.horses.some((h) => here(h) && ridden(h))
-}
-
-/**
- * Why the building or site can't be torn down by a resident on (x, y), or undefined if it can:
- * they must stand at it. So far only what can be built can be torn down, and its sites. A road on
- * Mountain waits for carriages and ridden horses on it to leave (`strandsOnMountain`).
- */
-export function tearDownProblem(
-  world: WorldState,
-  x: number,
-  y: number,
-  buildingId: string,
-  terrain?: TerrainMap,
-): string | undefined {
-  const b = world.buildings.find((c) => c.id === buildingId)
-  if (!b || !covers(b, x, y)) return 'the resident is not at that building'
-  if (!BUILDABLE.includes(b.kind)) return `a ${b.kind} can’t be torn down yet`
-  if (terrain && strandsOnMountain(world, b, terrain))
-    return 'a carriage or rider on this mountain road would be stranded'
-  return undefined
-}
-
-/**
  * The tiles of a road or wall along a straight line from `from` to `to`, both ends included, the
  * short way round on a map `size` across (`CONTEXT.md`: Road, Wall / Gate). Each tile is one step
  * on from the one before, straight or diagonal (`CONTEXT.md`: Step), the tile closest to the line,
@@ -755,36 +321,6 @@ export type LineBuildOrder = Extract<ResidentOrder, { kind: 'roadLine' | 'wallLi
 /** Whether an order is one along a line, a road line or a wall line. */
 export function isLineOrder(o: ResidentOrder | null | undefined): o is LineBuildOrder {
   return o?.kind === 'roadLine' || o?.kind === 'wallLine'
-}
-
-/** A tile of a Build line still to build, with its construction site once one is laid out. */
-export interface LineTile {
-  x: number
-  y: number
-  siteId: string | null
-}
-
-/**
- * Tile (x, y) of a line of `building` as still to build (`CONTEXT.md`: Build line): with the
- * unfinished site of that kind on it, or none where one can be laid out. Undefined where the tile
- * has one already (a road, or a wall or gate) or can't take one, so the line skips it.
- */
-export function lineTile(
-  world: WorldState,
-  building: BuildLine['building'],
-  x: number,
-  y: number,
-  terrain?: TerrainMap | TerrainLookup,
-): LineTile | undefined {
-  const here = constructionAt(world, x, y, building)
-  if (here?.site && here.kind === building) return { x, y, siteId: here.id }
-  return buildProblem(world, x, y, building, terrain) ? undefined : { x, y, siteId: null }
-}
-
-/** The tiles of a Build line still to build (`lineTile`), from its start to its end. */
-export function lineToBuild(world: WorldState, line: BuildLine, terrain?: TerrainMap): LineTile[] {
-  const tiles = roadLine(line.from, line.to, terrain?.size ?? MAP_SIZE)
-  return tiles.flatMap(([x, y]) => lineTile(world, line.building, x, y, terrain) ?? [])
 }
 
 /**
