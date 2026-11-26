@@ -251,6 +251,7 @@ type WithPath = Extract<ResidentOrder, { path: unknown }>
  */
 const MOVES_NOW: { [K in WithPath['kind']]: (o: Extract<WithPath, { kind: K }>) => boolean } = {
   walkTo: () => true,
+  stroll: () => true,
   drive: () => true,
   relocate: () => true,
   attack: () => true,

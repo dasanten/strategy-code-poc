@@ -502,6 +502,8 @@ export function stepLabel(
     return `${word} the ${BUILDING_NAMES[b.kind]}${city ? ` in ${city}` : ''}`
   }
   switch (order.kind) {
+    case 'stroll':
+      return `Stroll to ${at(order)}`
     case 'walkTo':
       return `Walk to ${at(order)}`
     case 'drive':

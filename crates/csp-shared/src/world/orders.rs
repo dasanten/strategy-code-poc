@@ -32,6 +32,15 @@ pub struct WalkOrder {
     pub army: Option<String>,
 }
 
+/// Strolling to a tile (trial).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct StrollOrder {
+    pub target: Tile,
+    pub path: Option<TilePath>,
+    pub progress: f64,
+}
+
 /// Picking up goods on the resident's tile.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
@@ -499,6 +508,7 @@ pub struct AcceptOfferOrder {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ResidentOrder {
     WalkTo(WalkOrder),
+    Stroll(StrollOrder),
     Drive(DriveOrder),
     Haul(HaulOrder),
     PickUp(PickUpOrder),

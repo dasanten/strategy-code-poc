@@ -132,6 +132,7 @@ pub mod rowing;
 pub mod ruins;
 pub mod running;
 pub mod sailing;
+pub mod strolling;
 pub mod script_actions;
 pub mod script_api;
 pub mod script_bindings;

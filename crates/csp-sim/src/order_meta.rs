@@ -213,6 +213,7 @@ macro_rules! running_orders {
 
 running_orders! {
     WalkTo => crate::walking::WALK_TO_META,
+    Stroll => crate::strolling::STROLL_META,
     Drive => crate::driving::DRIVE_META,
     Haul => crate::hauling::HAUL_META,
     PickUp => crate::carrying::PICK_UP_META,
@@ -257,6 +258,7 @@ running_orders! {
 /// Every order kind's facts. Their order is also that of their script actions in the game API.
 pub static ORDER_METAS: &[&OrderMeta] = &[
     &crate::walking::WALK_TO_META,
+    &crate::strolling::STROLL_META,
     &crate::driving::DRIVE_META,
     &crate::riding::MOUNT_META,
     &crate::riding::DISMOUNT_META,

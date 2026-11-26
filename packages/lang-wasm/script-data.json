@@ -2975,6 +2975,17 @@
       "returns": "string"
     },
     {
+      "name": "stroll",
+      "is": "action",
+      "params": [
+        "x",
+        "y"
+      ],
+      "cost": 10,
+      "description": "Stroll to a tile.",
+      "returns": "string"
+    },
+    {
       "name": "drive",
       "is": "action",
       "params": [
@@ -4318,6 +4329,13 @@
   "orderKinds": [
     {
       "kind": "walkTo",
+      "queueStep": true,
+      "stepGroup": "move",
+      "neverEnds": false,
+      "goesOnUntilStopped": false
+    },
+    {
+      "kind": "stroll",
       "queueStep": true,
       "stepGroup": "move",
       "neverEnds": false,

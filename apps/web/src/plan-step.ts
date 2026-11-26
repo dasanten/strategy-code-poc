@@ -66,6 +66,7 @@ export type PlanAsk =
 
 export type PlanStepId =
   | 'walk'
+  | 'stroll'
   | 'work'
   | 'build'
   | 'tearDown'
@@ -131,6 +132,13 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     icon: '🚶',
     makes: { kind: 'walkTo' },
     picks: [{ pick: 'tile', prompt: 'where to walk' }],
+  },
+  {
+    id: 'stroll',
+    label: 'Stroll to',
+    icon: '🚶',
+    makes: { kind: 'stroll' },
+    picks: [{ pick: 'tile', prompt: 'where to stroll' }],
   },
   {
     id: 'explore',
@@ -705,6 +713,8 @@ export function planOrder(
   const at = { x: p?.x, y: p?.y }
   const a = answer
   switch (plan.kind) {
+    case 'stroll':
+      return { order: { kind: 'stroll', x: p.x, y: p.y } }
     case 'walk':
       return { order: { kind: 'walkTo', x: p.x, y: p.y } }
     case 'drive':

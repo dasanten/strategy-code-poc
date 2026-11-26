@@ -1368,6 +1368,10 @@ const ORDER_DOING: { [K in ResidentOrder['kind']]: (o: OrderOf<K>, c: DoingConte
     if (!o.path) return `Finding a way to ${o.target.x}, ${o.target.y}`
     return `${walking} to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
   },
+  stroll: (o, { left }) => {
+    if (!o.path) return `Finding a way to ${o.target.x}, ${o.target.y}`
+    return `Strolling to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
+  },
   drive: (o, { left }) => {
     if (!o.path) return `Finding a way for the carriage to ${o.target.x}, ${o.target.y}`
     return `Driving to ${o.target.x}, ${o.target.y} · ${left(o.path)}`

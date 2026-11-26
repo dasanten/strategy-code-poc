@@ -338,6 +338,7 @@ macro_rules! running_orders {
 
 running_orders! {
     WalkTo,
+    Stroll,
     Drive,
     Haul,
     PickUp,
