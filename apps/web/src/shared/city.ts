@@ -11,7 +11,6 @@ import { wrap, wrapDelta, wrapDistance } from './terrain.js'
 import { TRADE_ORG } from './trade-org.js'
 import { isDown } from './world.js'
 import {
-  CITY_AREA_MARGIN,
   CITY_BUILDING_REACH,
   CITY_PRICE_PER_RESIDENT,
   CITY_PRICE_STANDING_SWING,
@@ -27,7 +26,7 @@ import {
 } from '@csp/balance'
 import type { Building, City, Resident, WorldState } from '@csp/shared-types'
 import { CITY_BUILDINGS } from '@csp/shared-types'
-import { idNumber } from '@csp/lang-wasm'
+import { cityAreaTileList, cityIdsAtTile, idNumber, nearCityAreaAll } from '@csp/lang-wasm'
 
 export { idNumber } from '@csp/lang-wasm'
 
@@ -176,7 +175,7 @@ const before = (p: Claim, q: Claim) =>
 /**
  * Whether a tile lies in a city's area (`CONTEXT.md`: City area): within `CITY_AREA_MARGIN` of
  * the footprint of one of its finished city buildings, the footprints included. `size` is the
- * map's.
+ * map's. The rule is the server's (`nearCityAreaAll`); to ask of many tiles, ask that once.
  */
 export function inCityArea(
   world: { buildings: readonly Building[] },
@@ -185,12 +184,7 @@ export function inCityArea(
   y: number,
   size: number,
 ): boolean {
-  return world.buildings.some(
-    (b) =>
-      b.cityId === city.id &&
-      isCityBuilding(b) &&
-      nearFootprint(b, { x, y }, CITY_AREA_MARGIN, size),
-  )
+  return nearCityAreaAll(world.buildings, city.id, [[x, y]], 0, size)[0]!
 }
 
 /** Whether a tile lies in a city's area or within `tiles` of it (`inCityArea`). */
@@ -202,12 +196,7 @@ export function nearCityArea(
   tiles: number,
   size: number,
 ): boolean {
-  return world.buildings.some(
-    (b) =>
-      b.cityId === city.id &&
-      isCityBuilding(b) &&
-      nearFootprint(b, { x, y }, CITY_AREA_MARGIN + tiles, size),
-  )
+  return nearCityAreaAll(world.buildings, city.id, [[x, y]], tiles, size)[0]!
 }
 
 /** The cities whose area the tile lies in; areas can overlap where cities meet. */
@@ -217,7 +206,8 @@ export function citiesAt(
   y: number,
   size: number,
 ): City[] {
-  return world.cities.filter((c) => inCityArea(world, c, x, y, size))
+  const ids = cityIdsAt(world, x, y, size)
+  return world.cities.filter((c) => ids.includes(c.id))
 }
 
 /** The ids of the cities whose area the tile lies in (`citiesAt`), going through the buildings once. */
@@ -227,31 +217,16 @@ export function cityIdsAt(
   y: number,
   size: number,
 ): string[] {
-  const ids: string[] = []
-  for (const b of world.buildings) {
-    if (b.cityId === null || !isCityBuilding(b) || ids.includes(b.cityId)) continue
-    if (nearFootprint(b, { x, y }, CITY_AREA_MARGIN, size)) ids.push(b.cityId)
-  }
-  return ids
+  return cityIdsAtTile(world.buildings, x, y, size)
 }
 
 /** Every tile in a city's area, as "x,y" keys on the map. */
 export function cityAreaTiles(
   world: { buildings: readonly Building[] },
-  city: City,
+  city: Pick<City, 'id'>,
   size: number,
 ): Set<string> {
-  const out = new Set<string>()
-  for (const b of world.buildings) {
-    if (b.cityId !== city.id || !isCityBuilding(b)) continue
-    const side = FOOTPRINT[b.kind]
-    for (let dy = -CITY_AREA_MARGIN; dy < side + CITY_AREA_MARGIN; dy++) {
-      for (let dx = -CITY_AREA_MARGIN; dx < side + CITY_AREA_MARGIN; dx++) {
-        out.add(`${wrap(b.x + dx, size)},${wrap(b.y + dy, size)}`)
-      }
-    }
-  }
-  return out
+  return new Set(cityAreaTileList(world.buildings, city.id, size).map(([x, y]) => `${x},${y}`))
 }
 
 /**

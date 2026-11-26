@@ -1,8 +1,8 @@
 // Ported from packages/shared/src/building.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { citiesAt } from './city.js'
 import { covers, footprintTiles, isAt } from './footprint.js'
+import { inAnyCityArea } from '@csp/lang-wasm'
 import {
   BUILD_MENU_GROUPS,
   BUILDING_KINDS,
@@ -404,8 +404,7 @@ export function buildProblem(
   } else if (OFF_NODES.includes(kind)) {
     if (nodes.length > 0 || !all((t) => t !== Terrain.Mountain))
       return `a ${kind} goes off any resource node, and not on Mountain`
-    const inCity = (t: [number, number]) => citiesAt(world, t[0], t[1], size).length > 0
-    if (IN_CITY_AREA.includes(kind) && !tiles.every(inCity))
+    if (IN_CITY_AREA.includes(kind) && !inAnyCityArea(world.buildings, tiles, size).every(Boolean))
       return `a ${kind} goes in a city’s area`
     if (ON_SHORE.includes(kind) && at && !touchesWater(tiles, size, at))
       return `a ${kind} goes on the shore, touching Lake or Sea`

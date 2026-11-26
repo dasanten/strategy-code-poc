@@ -83,7 +83,7 @@ import {
   CreativeGroupMove,
   CreativeResidentActions,
 } from './CreativeResidents.js'
-import { inCityArea } from './shared/city.js'
+import { cityIdsAt } from './shared/city.js'
 import { isAt, covers } from './shared/footprint.js'
 import { targetParam } from './shared/default-scripts.js'
 import { HORSE_GRANT_HORSES, PASSENGER_WEIGHT } from '@csp/balance'
@@ -3035,9 +3035,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 )
                 const offer = creativeOffer(tileBuilding, carriage, name, shared)
                 const cities = creativeCities(knownCities, world.home.realmId)
-                const tileCity = knownCities.find((c) =>
-                  inCityArea({ buildings: knownBuildings }, c, x, y, world.map.size),
-                )
+                const areaIds = cityIdsAt({ buildings: knownBuildings }, x, y, world.map.size)
+                const tileCity = knownCities.find((c) => areaIds.includes(c.id))
                 const here = world.residents.filter(
                   (r) => Math.floor(r.x) === x && Math.floor(r.y) === y,
                 )
