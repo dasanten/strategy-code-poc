@@ -5,6 +5,9 @@
 
 import type {
   Building,
+  KeptBreeding,
+  SwapQuote,
+  TraderPrice,
   BuildingKind,
   BuildLine,
   Carriage,
@@ -1064,4 +1067,82 @@ export function feedsOnce(order: OrderRequest): boolean {
 /** The line a Build line step builds, if it is one with its road or wall and two ends. */
 export function stepLine(order: OrderRequest): BuildLine | undefined {
   return opt(rule<BuildLine | null>('stepLine', order))
+}
+
+// Swaps, traders and stables (T122.5b).
+
+/** The terms of a swap (`CONTEXT.md`: Swap), its prices as functions of the unit. */
+export interface SwapTerms {
+  give: PricedGood
+  want: PricedGood
+  /** The units of `want` the trader asks for. */
+  wanted: number
+  holder: TradeHolder
+  /** The units of `want` it will hand over. */
+  spare: number
+  /** The units of `give` it will take. */
+  takes: number
+  /** The Coins it has to give back. */
+  placeCoins: number
+  /** The price of the `n`th unit of `want` it hands over, from 1. */
+  wantPrice: (n: number) => number
+  /** What it pays for the `n`th unit of `give` it takes, from 1. */
+  givePrice: (n: number) => number
+}
+
+/**
+ * Works a swap out unit by unit (`CONTEXT.md`: Swap), as the Rust does. The prices go across as
+ * lists, the `n`th unit's at `n - 1`, as far as the swap can reach: what is wanted and spare of
+ * `want`, what is held and taken of `give`.
+ */
+export function cutSwap(terms: SwapTerms): SwapQuote {
+  const { give, want, wanted, holder, spare, takes, placeCoins } = terms
+  const prices = (n: number, price: (n: number) => number) =>
+    Array.from({ length: Math.max(0, Math.floor(n)) }, (_, i) => price(i + 1))
+  const held = holder.stock[give] ?? 0
+  return rule('cutSwap', {
+    give,
+    want,
+    wanted,
+    holder: holderOf(holder),
+    // No JSON for Infinity: none is no end.
+    spare: Number.isFinite(spare) ? spare : null,
+    takes: Number.isFinite(takes) ? takes : null,
+    placeCoins: Number.isFinite(placeCoins) ? placeCoins : null,
+    wantPrices: prices(Math.min(wanted, spare), terms.wantPrice),
+    givePrices: prices(Math.min(held, takes), terms.givePrice),
+  })
+}
+
+/** A wandering trader's prices for every good but coins, from what it has to trade. */
+export function traderPrices(t: Pick<Trader, 'escortIds'>, carriage: Carriage): TraderPrice[] {
+  return rule('traderPrices', t.escortIds, asCarriage(carriage))
+}
+
+/** How many escorts a wandering trader walks with, one more for every few robberies. */
+export function traderEscortsWanted(trader: Pick<Trader, 'robberies'>): number {
+  return rule('traderEscortsWanted', [], trader.robberies)
+}
+
+/** The horses at a stable: those on its footprint. */
+export function horsesIn<H extends { id: string; x: number; y: number }>(
+  horses: readonly H[],
+  stable: Building,
+): H[] {
+  const few = horses.map(({ id, x, y }) => asHorse({ id, x, y }))
+  const ids = new Set(rule<string[]>('horsesIn', few, asBuilding(stable)))
+  return horses.filter((h) => ids.has(h.id))
+}
+
+/** The breeding a stable keeps for these two horses, if it keeps one. */
+export function keptBreeding(
+  stable: Pick<Building, 'breedings'>,
+  horseIds: readonly string[],
+): KeptBreeding | undefined {
+  const b = asBuilding({ kind: 'stable', ...stable })
+  const kept = rule<KeptBreeding | null>('keptBreeding', b, horseIds)
+  // The stable's own entry, as callers compare it with others.
+  const same = (k: KeptBreeding) =>
+    kept !== null && k.horseIds.every((id, i) => id === kept.horseIds[i])
+  return stable.breedings?.find(same)
 }
