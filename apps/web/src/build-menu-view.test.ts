@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BUILDABLE, buildMenu } from './shared/building.js'
+import { BUILDABLE, SHARES_A_TILE, buildMenu } from './shared/building.js'
 import { Terrain } from './shared/terrain.js'
 import type { Building, BuildingKind, City, KnownNode } from '@csp/shared-types'
 import {
@@ -164,7 +164,8 @@ describe('the Build menu', () => {
         .map((k) => k.kind)
     const off = open(menu())
     expect(off).not.toContain('lumberCamp')
-    const vehicles = ['road', 'carriage', 'boat', 'ship', 'ram', 'catapult']
+    // What shares a tile is a road or a vehicle's site, never in the planner's list.
+    const vehicles: readonly string[] = SHARES_A_TILE
     expect(off.filter((k) => !vehicles.includes(k)).sort()).toEqual(
       [...buildMenu(undefined)].sort(),
     )
