@@ -280,8 +280,8 @@ I sleep.
 | 118 | [Pixel art](https://github.com/dasanten/strategy-code-poc/issues/1514) | done in one session |
 | 119 | [Pixel frontier UI](https://github.com/dasanten/strategy-code-poc/issues/1519) | ticketed |
 | 120 | [Fewer collisions](https://github.com/dasanten/strategy-code-poc/issues/1560) | done |
-| 121 | [Content defined once](https://github.com/dasanten/strategy-code-poc/issues/1568) | ticketed |
-| 122 | [One copy of the rules](https://github.com/dasanten/strategy-code-poc/issues/1579) | ticketed, after 121 |
+| 121 | [Content defined once](https://github.com/dasanten/strategy-code-poc/issues/1568) | done |
+| 122 | [One copy of the rules](https://github.com/dasanten/strategy-code-poc/issues/1579) | ticketed |
 | 123 | [Client tidy](https://github.com/dasanten/strategy-code-poc/issues/1588) | ticketed, after 122 |
 | 124 | [Agent docs](https://github.com/dasanten/strategy-code-poc/issues/1595) | ticketed, after 123 |
 
