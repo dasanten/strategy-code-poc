@@ -1441,8 +1441,11 @@ const ORDER_DOING: { [K in ResidentOrder['kind']]: (o: OrderOf<K>, c: DoingConte
   swap: (o) => `Swapping for ${GOOD_LABELS[o.want].toLowerCase()}`,
   buyHorse: () => 'Buying a horse',
   sellHorse: () => 'Selling a horse',
-  // As it always was: handing in a transfer had no text of its own (#BUG).
-  handIn: () => 'Idle',
+  // A Trade Org transfer (`CONTEXT.md`: Transfer), named for the city it goes to when known.
+  handIn: (o, { cities }) => {
+    const city = cities.find((c) => c.id === o.toCityId)?.name
+    return city ? `Handing in a transfer to ${city}` : 'Handing in a transfer'
+  },
   attack: (o, { about }) =>
     o.path
       ? about
