@@ -12,13 +12,7 @@ import { covers, isAt } from './footprint.js'
 import { pileAt } from './goods.js'
 import { type TerrainMap, wrap } from './terrain.js'
 import { isDown } from './world.js'
-import {
-  HORSE_REACH,
-  OWN_FOOD,
-  STABLE_BREED_DAYS,
-  STABLE_CAPACITY,
-  TICKS_PER_GAME_DAY,
-} from '@csp/balance'
+import { HORSE_REACH, STABLE_BREED_DAYS, STABLE_CAPACITY, TICKS_PER_GAME_DAY } from '@csp/balance'
 import type {
   BreedOrder,
   Building,
@@ -29,6 +23,9 @@ import type {
   Stock,
   WorldState,
 } from '@csp/shared-types'
+import { riderSpareFood } from '@csp/lang-wasm'
+
+export { riderSpareFood } from '@csp/lang-wasm'
 
 /** World queries about horses and stables (ADR 0002: the game API orders and scripts share). */
 
@@ -79,14 +76,6 @@ export function horseFood(
   }
   if (rider && riderSpareFood(rider) >= 1) out.push(rider.carried)
   return out
-}
-
-/**
- * The Food a rider carries beyond their own food (`OWN_FOOD`), which the horse they ride may eat
- * (`CONTEXT.md`: Riding): the rider never goes without for the horse.
- */
-export function riderSpareFood(rider: Pick<Resident, 'carried'>): number {
-  return Math.max(0, (rider.carried.food ?? 0) - OWN_FOOD)
 }
 
 /** Whose horses a resident may breed (`CONTEXT.md`: Breeding): a realm's, or an NPC city's. */

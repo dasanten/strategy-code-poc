@@ -6,6 +6,8 @@
   section file (a new term also to the index) before building on it.
 - **Decisions:** `docs/adr/`. The game vision in `CONTEXT.md` and `docs/context/` wins over ADR 0001 where they
   conflict.
+- **Adding content** (a building kind, a good, a vessel or siege machine, an order): the steps are
+  in `docs/adding-content.md`.
 - **What to do next:** GitHub tickets, how they work in `docs/tasks.md`. `/next-ticket` picks the
   next one and works it into a PR. PRs reference their tickets (`Closes #n`, `Part of #epic`).
 - **CI minutes are scarce** (ADR 0009): ticket PRs go into the epic branch `epic/<n>-<slug>` and

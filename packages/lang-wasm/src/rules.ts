@@ -10,8 +10,15 @@ import type {
   FirstDayLine,
   Good,
   LoadLevel,
+  NpcCityPrice,
   PricedGood,
+  Resident,
   ResourceKind,
+  ScriptParam,
+  SwapRate,
+  Task,
+  Trader,
+  Waypoint,
   SkillName,
   Stock,
   WallMaterial,
@@ -361,4 +368,144 @@ export function inContact(
   b: { x: number; y: number },
 ): boolean {
   return rule('inContact', size, [a.x, a.y], [b.x, b.y])
+}
+
+// Rules on a few fields of one thing (T122.5b): each passes the fields its Rust function reads.
+
+/** A resident's age in game years (`CONTEXT.md`: Age): a child ages faster than a grown one. */
+export function ageInYears(resident: Pick<Resident, 'bornAt'>, tick: number): number {
+  // NaN (no birth seen) comes back as JSON's null.
+  return rule<number | null>('ageInYears', resident.bornAt, tick) ?? NaN
+}
+
+/** Whether a resident is grown, old enough to work (`ADULT_AGE`). */
+export function canWork(resident: Pick<Resident, 'bornAt'>, tick: number): boolean {
+  return rule('canWork', resident.bornAt, tick)
+}
+
+/** Whether a resident may carry `goods`: anything once grown, a child only a child's goods. */
+export function canHandle(
+  resident: Pick<Resident, 'bornAt'>,
+  tick: number,
+  goods: readonly string[],
+): boolean {
+  return rule('canHandle', resident.bornAt, tick, goods)
+}
+
+/** The Food a rider carries beyond their own food, for their horse. */
+export function riderSpareFood(rider: Pick<Resident, 'carried'>): number {
+  return rule('riderSpareFood', rider.carried)
+}
+
+/** What a trader has to trade of its carriage's `load`: all but its escorts' Food for the way. */
+export function traderStock(t: Pick<Trader, 'escortIds'>, load: Stock): Stock {
+  return rule('traderStock', t.escortIds.length, load)
+}
+
+/**
+ * The tiles of a transfer's whole way: from the warehouse to the sender's storage `from` (none
+ * for a hand-in), on to the recipient's storage `to`, and back.
+ */
+export function transferTiles(
+  size: number,
+  warehouse: { x: number; y: number },
+  from: { x: number; y: number } | null,
+  to: { x: number; y: number },
+): number {
+  const at = (p: { x: number; y: number }) => [p.x, p.y]
+  return rule('transferTiles', size, at(warehouse), from && at(from), at(to))
+}
+
+/** The most of `wanted` units a transfer takes from `held`, with its fee over `tiles`. */
+export function quoteTransfer(
+  held: Partial<Record<Good, number>>,
+  good: Good,
+  wanted: number,
+  tiles: number,
+  unloadShare = 0,
+): { units: number; fee: number } {
+  return rule('quoteTransfer', held, good, wanted, tiles, unloadShare)
+}
+
+/** Why a Player holding `held` can't put a waypoint named `name` on (x, y), if they can't. */
+export function addWaypointProblem(
+  held: readonly Waypoint[],
+  x: unknown,
+  y: unknown,
+  name: unknown,
+  size: number,
+): string | undefined {
+  return opt(rule<string | null>('addWaypointProblem', held, x, y, name, size))
+}
+
+/** Why the waypoint `id` can't be renamed `name`, if it can't. */
+export function renameWaypointProblem(
+  held: readonly Waypoint[],
+  id: unknown,
+  name: unknown,
+): string | undefined {
+  return opt(rule<string | null>('renameWaypointProblem', held, id, name))
+}
+
+/** Why the waypoint `id` can't be taken away, if it can't. */
+export function removeWaypointProblem(held: readonly Waypoint[], id: unknown): string | undefined {
+  return opt(rule<string | null>('removeWaypointProblem', held, id))
+}
+
+/** Why an offer's terms won't do, if they won't: a good for a different good, in whole units. */
+export function offerTermsProblem(terms: {
+  gives: unknown
+  givesUnits: unknown
+  wants: unknown
+  wantsUnits: unknown
+  times: unknown
+}): string | undefined {
+  const { gives, givesUnits, wants, wantsUnits, times } = terms
+  return opt(
+    rule<string | null>('offerTermsProblem', { gives, givesUnits, wants, wantsUnits, times }),
+  )
+}
+
+/** Why `c` is no condition, if it is not (`CONTEXT.md`: Condition). */
+export function conditionProblem(c: unknown): string | undefined {
+  return opt(rule<string | null>('conditionProblem', c))
+}
+
+/** An NPC city's swap rates from its prices (`CONTEXT.md`: Swap). */
+export function npcSwapRates(
+  prices: readonly Pick<NpcCityPrice, 'good' | 'forSale' | 'wanted' | 'buy' | 'sell'>[],
+): SwapRate[] {
+  const lines = prices.map(({ good, forSale, wanted, buy, sell }) => ({
+    good,
+    forSale,
+    wanted,
+    buy,
+    sell,
+  }))
+  return rule('npcSwapRates', lines)
+}
+
+/** The param a default script takes its target in, if it is the default of a task with one. */
+export function targetParam(script: { task?: Task | null }): string | undefined {
+  return opt(rule<string | null>('targetParam', script.task))
+}
+
+/** A param as the Rust reads it: where its line is doesn't matter to these rules. */
+function paramInfo(p: Partial<ScriptParam>): object {
+  return { name: '', type: 'number', ...p, line: 0, column: 0 }
+}
+
+/** Whether a script's params make it a work script: it declares `param workplace: building`. */
+export function isWorkScript(params: readonly Pick<ScriptParam, 'name' | 'type'>[]): boolean {
+  return rule('isWorkScript', params.map(paramInfo))
+}
+
+/** Whether a script has nothing to go on without this param: no default, no `none:` comment. */
+export function paramNeedsValue(p: Pick<ScriptParam, 'default' | 'description'>): boolean {
+  return rule('paramNeedsValue', paramInfo(p))
+}
+
+/** Whether a value fits a `choice` param: one of the words its line lists. */
+export function isParamChoice(param: Pick<ScriptParam, 'choices'>, value: unknown): boolean {
+  return rule('isParamChoice', paramInfo({ type: 'choice', ...param }), value)
 }

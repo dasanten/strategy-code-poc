@@ -24,15 +24,15 @@ import {
 import type {
   Building,
   City,
-  NpcCityPrice,
   PricedGood,
   Resident,
   SwapQuote,
-  SwapRate,
   TradeHolder,
   TradeLimit,
   WorldState,
 } from '@csp/shared-types'
+
+export { npcSwapRates } from '@csp/lang-wasm'
 
 /** A swap that moves nothing, and says why when `limit` is given. */
 export function noSwap(limit?: TradeLimit): SwapQuote {
@@ -167,31 +167,6 @@ export function quoteNpcSwap(
     wantPrice: (n) => npcPriceFor(want, wantStock - (n - 1), reserve, swing).sell,
     givePrice: (n) => npcPriceFor(give, giveStock + n, reserve, swing).buy,
   })
-}
-
-/**
- * An NPC city's rates (`CONTEXT.md`: Swap): each good it is short of against each it has spare,
- * worked out from the prices it names, so nothing new is kept and the city plans nothing. A rate
- * goes in the smallest whole units its prices allow: the units of what it has spare that one unit
- * of what it is short of pays for, or the units of that good one unit of its spare costs, rounded
- * up as a swap is. It stays within what the city has spare; a pair it could not swap even once,
- * needing more than it is short of, has no rate. Pure.
- */
-export function npcSwapRates(
-  prices: readonly Pick<NpcCityPrice, 'good' | 'forSale' | 'wanted' | 'buy' | 'sell'>[],
-): SwapRate[] {
-  const spare = prices.filter((p) => p.forSale >= 1)
-  return prices
-    .filter((p) => p.wanted >= 1)
-    .flatMap((give) =>
-      spare.flatMap((want) => {
-        const onePays = Math.floor(give.buy / want.sell)
-        const gives = onePays >= 1 ? 1 : Math.ceil(want.sell / give.buy)
-        if (gives > give.wanted) return []
-        const units = Math.min(Math.max(onePays, 1), Math.floor(want.forSale))
-        return [{ give: give.good, gives, want: want.good, units }]
-      }),
-    )
 }
 
 /**

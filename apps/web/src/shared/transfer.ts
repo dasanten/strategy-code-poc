@@ -3,7 +3,6 @@
 
 import { commandsCarriage } from './alliance.js'
 import { isAt } from './footprint.js'
-import { GOOD_WEIGHT } from './narrowed.js'
 import { tradeOrgRefuses } from './standing.js'
 import { canWork } from './stats.js'
 import { wrapDistance } from './terrain.js'
@@ -11,7 +10,9 @@ import { NO_CARAVANS, tradeOrgHq } from './trade-org.js'
 import { deliveryStorage, tradeCoinWarehouse, tradingWarehouseAt } from './warehouse.js'
 import { GOODS } from './world.js'
 import type { Building, Good, Resident, WorldState } from '@csp/shared-types'
-import { transferFee, feeAtPickUp, transferLoad } from '@csp/lang-wasm'
+import { transferLoad } from '@csp/lang-wasm'
+
+export { transferTiles, quoteTransfer } from '@csp/lang-wasm'
 
 export { transferFee, feeAtPickUp, transferLoad } from '@csp/lang-wasm'
 
@@ -45,45 +46,6 @@ export function nearestWarehouse(
   for (const w of transferWarehouses(world)) {
     const tiles = wrapDistance(size, w, storage)
     if (tiles < bestTiles) [best, bestTiles] = [w, tiles]
-  }
-  return best
-}
-
-/**
- * The tiles of a transfer's whole way (`CONTEXT.md`: Transfer): from the `warehouse` to the
- * sender's storage `from` (none for a hand-in), on to the recipient's storage `to`, and back.
- */
-export function transferTiles(
-  size: number,
-  warehouse: { x: number; y: number },
-  from: { x: number; y: number } | null,
-  to: { x: number; y: number },
-): number {
-  const stops = from ? [warehouse, from, to, warehouse] : [warehouse, to, warehouse]
-  let tiles = 0
-  for (let i = 1; i < stops.length; i++) tiles += wrapDistance(size, stops[i - 1]!, stops[i]!)
-  return tiles
-}
-
-/**
- * The most of `wanted` units of `good` a transfer takes from `held` (`CONTEXT.md`: Transfer),
- * with its fee over `tiles`: cut down to the units held, one delivery load and the coins held
- * for the fee (for a transfer of coins, the units and the fee together). Only the part of the fee
- * taken at the pick-up counts (`feeAtPickUp`), and the fee answered is the whole of it. Pure.
- */
-export function quoteTransfer(
-  held: Partial<Record<Good, number>>,
-  good: Good,
-  wanted: number,
-  tiles: number,
-  unloadShare = 0,
-): { units: number; fee: number } {
-  let best = { units: 0, fee: 0 }
-  for (let n = 1; n <= Math.min(wanted, transferLoad(good)); n++) {
-    const fee = transferFee(n * GOOD_WEIGHT[good], tiles)
-    const coins = feeAtPickUp(fee, unloadShare) + (good === 'coins' ? n : 0)
-    if (n > (held[good] ?? 0) || coins > (held.coins ?? 0)) break
-    best = { units: n, fee }
   }
   return best
 }
