@@ -126,7 +126,7 @@ export function TradeNpcTemperPart() {
         they come unarmed. It lends nobody while it weighs a demand, while its town hall is
         occupied, or while your armed residents stand in its City area or in sight of it. Those it
         lends never act against it: they refuse an order to attack its residents, walls or gates, to
-        climb its walls or to tear down its buildings, whether you give it by hand, in a queue, to a
+        climb, ram or throw at its walls or to tear down its buildings, whether you give it by hand, in a queue, to a
         group or an army or from a script, and they can't occupy its town hall nor count as your
         fighters toward it. Struck by one of its own, they still defend themselves. The Trade
         Organization hires out soldiers at {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a

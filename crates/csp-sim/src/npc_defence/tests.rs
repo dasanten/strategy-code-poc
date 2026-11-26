@@ -1258,3 +1258,23 @@ fn a_trading_posts_farmers_fetch_tools_and_go_on_farming_with_them() {
         );
     }
 }
+
+#[test]
+fn count_a_rams_or_catapults_crew_at_their_wall_as_attackers_but_not_while_pushing_it() {
+    let mut p = village();
+    let wall = p.at(BuildingKind::Wall);
+    outsider(&mut p.world, "p1", wall.x, wall.y - 1.0);
+    for o in [
+        json!({ "kind": "ram", "machineId": "m1", "targetId": wall.id, "progress": 0 }),
+        json!({ "kind": "throw", "machineId": "m1", "targetId": wall.id, "progress": 0 }),
+    ] {
+        p.r_mut("p1").order = order(o.clone());
+        assert_eq!(p.attackers(), vec!["p1".to_string()], "{o}");
+    }
+    // Pushing the machine up strikes nothing yet (#1620).
+    p.r_mut("p1").order = order(json!({
+        "kind": "push", "machineId": "m1", "target": { "x": wall.x, "y": wall.y - 1.0 },
+        "path": null, "progress": 0,
+    }));
+    assert_eq!(p.attackers(), Vec::<String>::new());
+}
