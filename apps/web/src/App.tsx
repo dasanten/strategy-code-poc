@@ -2152,17 +2152,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   )
   const arrivesIn =
     world &&
-    arrivalOf(
-      {
-        size: world.map.size,
-        tick: world.tick,
-        horses: world.horses,
-        carriages: world.carriages,
-        residents: world.residents,
-        buildings: world.buildings,
-      },
-      terrainAt,
-    )
+    arrivalOf({ size: world.map.size, buildings: world.buildings }, terrainAt)
   const onTile = <T extends { x: number; y: number }>(things: T[] | undefined) =>
     selected && things?.find((t) => t.x === selected.x && t.y === selected.y)
   // A road may share its tile with a building (`CONTEXT.md`: Road); a building is wherever its
@@ -2313,7 +2303,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             goer === 'carriage' && carriage
               ? { kind: 'drive' as const, carriageId: carriage.id, ...way, progress: 0 }
               : { kind: 'walkTo' as const, ...way, progress: 0 }
-          return arrivesIn?.({ ...r, order })
+          return arrivesIn?.(r, order)
         },
       }))
     return pickPreview(what, pickAt, seen, goers)
@@ -2373,14 +2363,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             ? undefined
             : {
                 tiles: found.length,
-                ticks: arrivesIn?.({
-                  ...r,
-                  order: {
-                    kind: 'walkTo',
-                    target: at,
-                    path: found.map(([x, y]) => [x, y] as [number, number]),
-                    progress: 0,
-                  },
+                ticks: arrivesIn?.(r, {
+                  kind: 'walkTo',
+                  target: at,
+                  path: found.map(([x, y]) => [x, y] as [number, number]),
+                  progress: 0,
                 }),
               }
       ways.set(key, way)

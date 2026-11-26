@@ -79,6 +79,25 @@ impl WorldMirror {
             .map(|b| b.id.clone())
     }
 
+    /// About how many ticks until resident `id` arrives where they walk, ride or drive
+    /// (`arrivalTicks`, `estimate_rules`): `order`, as JSON, is a way to estimate in place of
+    /// their own; `ground` the ground of each tile of its path, in order. Undefined for one not in
+    /// sight or going nowhere; an error for an order it can't read.
+    #[wasm_bindgen(js_name = arrivalTicks)]
+    pub fn arrival_ticks(
+        &self,
+        id: &str,
+        order: Option<String>,
+        ground: &[u8],
+    ) -> Result<Option<f64>, String> {
+        let order = match order {
+            Some(json) => Some(serde_json::from_str(&json).map_err(|e| e.to_string())?),
+            None => None,
+        };
+        let (world, size) = (self.mirror.world(), self.mirror.size());
+        Ok(crate::estimate_rules::arrival_ticks(world, size, id, order, ground))
+    }
+
     /// Calls the check on the world `name` (`world_rules`) with `args`, a JSON array of its
     /// arguments; answers its result as JSON, or an error for a rule it doesn't know or arguments
     /// it can't read.

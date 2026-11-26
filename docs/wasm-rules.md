@@ -249,3 +249,53 @@ The download is still over its limit, by 37 KB. The update's mean is under 4 ms 
 0.2–0.4 ms; its p95 is not, and T122.1 measured the browser pane about 0.65 ms slower than Node.
 Daniel raised the download limit to 550 kB on 2026-11-26 (#1637), so 537 KB is inside it. The
 tables above keep the 500 kB that held when they were measured.
+
+## Way estimates, reach and the rest of the map (T122.8, #1641)
+
+What #1586 left in `apps/web/src/shared/`, each given what it reads with the call (Daniel's
+decision on #1641), so nothing new is mirrored:
+
+| Rule                                                                              | Now                                                                                                                                                                                                                                                                              |
+| :-------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `arrivalTicks` (`wayTicks` in it)                                                 | `WorldMirror.arrivalTicks(id, order, ground)` (`crates/csp-lang-wasm/src/estimate_rules.rs`): the resident, their horse and carriage from the mirror, the ground of the way's tiles as one `Uint8Array`; one call per way. The route preview passes the way it draws as `order`. |
+| `cityMembership` (the far map's city sizes), with the reach it asks per pair      | `cityMembership(buildings, cityIds, halls, size)` (`area_rules.rs`): every building in one typed array, one call per fill of the far map's cache                                                                                                                                 |
+| `nearFootprint`, `footprintsNear`, `gapTo`                                        | gone from the client: only `cityMembership` asked them                                                                                                                                                                                                                           |
+| `wallMap`, `shutOut` and the wall steps                                           | gone from the client: no view asked them (only a test did); the server decides who steps where                                                                                                                                                                                   |
+| `allied`, `alliedRealms`, `commanderOf`, `defendsCity`, `occupierOf` and the rest | gone from the client: no view asked them. Shared sight (`sharingSight`) had already gone; the server sends what an alliance sees                                                                                                                                                 |
+| `previewPath` (`apps/web/src/map/path-preview.ts`)                                | stays in TypeScript, as it runs as the pointer moves; `path-preview-parity.test.ts` holds it to the Rust pathfinder's fixture (`fixtures/paths/requests.json`)                                                                                                                   |
+
+The text of estimates (`aboutTime`, `timeLeft`, `workLeft` and the countdowns) stays with the
+client: it words a number, and `csp-sim` has no twin of it.
+
+The parity test already asks the mirror `arrivalTicks` (on Plains everywhere, as the fixtures hold
+no terrain), `cityMembership`, `allied`, `alliedRealms` and `wallMap`; nothing is added there.
+
+What changed in behaviour:
+
+- **Which orders get an estimate** is the server's (`Going::estimated` while it goes now): the same
+  kinds as the TypeScript (walking, relocating, driving, a haul route while driving, a store or fetch
+  order while it walks to its place).
+- **A resident not in the mirror** (in no `welcome` yet, or gone in a message the client hasn't
+  shown) has no estimate; the TypeScript estimated anyone the client's world held.
+- **A construction site of no city** went to the area rules as city 999, a finished building of a
+  city the client never named (`-1 + SITE`); it is a site of no city now.
+
+With `wasm-opt -Oz` (#1637), gzipped at level 6 as served: the module is **551.8 KB** (1,503 KB raw),
+from 537.0 KB at the epic tip built the same way: **1.8 KB over the 550 kB limit**. Of the 14.8 KB,
+the arrival rule is 7.7 KB (`csp-sim`'s `arrival_ticks`: every order's `going()` and the pace
+rules; reading the order from JSON costs nothing, the mirror already reads orders) and
+`cityMembership` 6.3 KB. Both are the server's own rules, moved here by this ticket; the limit is
+Daniel's call.
+
+Timed in Node 22 on the first `welcome` of the T122.1 messages (a real Player of the live world:
+4,450 buildings and 13 cities in sight, 38,854 buildings and 51 cities remembered, 21 residents
+with a way), the old TypeScript against the call, same answers for all of them:
+
+| What                                                         | TypeScript |   Module |
+| :----------------------------------------------------------- | ---------: | -------: |
+| `cityMembership`, in sight (the far map's cache fill)        |    39.0 ms |  36.5 ms |
+| `cityMembership`, remembered                                 |   154.5 ms | 139.1 ms |
+| `arrivalTicks` for all 21 ways (a Residents list, the cards) |   434.6 ms |  0.64 ms |
+
+The TypeScript estimate called `rideSpeed`, a value rule in the module since #1634, once per tile
+of a ridden way: that is the 435 ms. The call crosses once per way.

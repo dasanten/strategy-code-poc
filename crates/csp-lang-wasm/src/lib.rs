@@ -7,6 +7,7 @@
 //! the JSON `packages/lang-wasm/script-data.json`, written by the `script-data` binary.
 
 pub mod area_rules;
+pub mod estimate_rules;
 pub mod rules;
 pub mod value_rules;
 pub mod world_rules;

@@ -95,6 +95,27 @@ export function cityIdsAtTile(
   return [...found].map((n) => ids[n]!)
 }
 
+/**
+ * Which city each finished city building belongs to (`cityMembership`, `CONTEXT.md`: City
+ * building), building id to city id; a building missing from it belongs to none. Cities grow in a
+ * chain from their town halls; the whole map's buildings go across in one call.
+ */
+export function cityMembershipOf(
+  buildings: readonly (AreaBuilding & Pick<Building, 'id'>)[],
+  cities: readonly { id: string; townHallId: string }[],
+  size: number,
+): Map<string, string> {
+  const place = new Map(buildings.map((b, i) => [b.id, i]))
+  const flat = encode(buildings, () => -1, false)
+  const halls = Int32Array.from(cities.map((c) => place.get(c.townHallId) ?? -1))
+  const found = wasm.cityMembership(flat, cities.map((c) => c.id).join('\n'), halls, size)
+  const out = new Map<string, string>()
+  found.forEach((c, i) => {
+    if (c >= 0) out.set(buildings[i]!.id, cities[c]!.id)
+  })
+  return out
+}
+
 /** For each of `tiles`, whether it lies in the area of any city (`citiesAt` not empty), asked in one call. */
 export function inAnyCityArea(
   buildings: readonly AreaBuilding[],

@@ -1,7 +1,8 @@
 import { TERRAIN_SPEED, TICKS_PER_GAME_YEAR, WALK_TICKS_PER_TILE } from '@csp/balance'
 import { Terrain, UNEXPLORED } from './shared/terrain.js'
 import type { Building, ResidentOrder, ScriptSummary } from '@csp/shared-types'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { mirrorOf } from './test-mirror.js'
 import { arrivalOf, doingLine, interruptedLine, scriptLine, type DoingOf } from './doing-view.js'
 
 const summary = (id: number, task: ScriptSummary['task']): ScriptSummary => ({
@@ -393,39 +394,46 @@ describe('scriptLine', () => {
 })
 
 describe('arrivalOf', () => {
+  const stat = { base: 10, trained: 0 }
+  const way = (path: [number, number][]): ResidentOrder => ({
+    kind: 'walkTo',
+    target: { x: 2, y: 0 },
+    path,
+    progress: 0,
+  })
+  const ada = {
+    id: 'r1',
+    owner: 'me',
+    stats: { strength: stat, endurance: stat, agility: stat, intellect: stat },
+    bornAt: -30 * TICKS_PER_GAME_YEAR,
+    order: way([
+      [1, 0],
+      [2, 0],
+    ]),
+  }
+  const road = { id: 'rd', kind: 'road' as const, cityId: null, x: 2, y: 0 } as Building
+  const world = { size: 64, buildings: [road] }
+  const ground = (x: number) => (x === 1 ? UNEXPLORED : Terrain.Mountain)
+  const plains = WALK_TICKS_PER_TILE / TERRAIN_SPEED[Terrain.Plains]
+  const onRoad = WALK_TICKS_PER_TILE / TERRAIN_SPEED[Terrain.Road]
+  afterEach(() => mirrorOf())
+
   it('counts a road over any terrain, and unexplored ground as Plains', () => {
-    const stat = { base: 10, trained: 0 }
-    const r = {
-      id: 'r1',
-      name: 'Ada',
-      owner: 'me',
-      cityId: null,
-      x: 0,
-      y: 0,
-      stats: { strength: stat, endurance: stat, agility: stat, intellect: stat },
-      skills: {},
-      health: 100,
-      hunger: 100,
-      bornAt: -30 * TICKS_PER_GAME_YEAR,
-      lifespan: 60,
-      carried: {},
-      order: {
-        kind: 'walkTo' as const,
-        target: { x: 2, y: 0 },
-        path: [
-          [1, 0],
-          [2, 0],
-        ] as [number, number][],
-        progress: 0,
-      },
-    }
-    const road = { id: 'rd', kind: 'road' as const, x: 2, y: 0 } as Building
-    const world = { size: 64, tick: 0, horses: [], carriages: [], buildings: [road] }
-    const ticks = arrivalOf(world, (x) => (x === 1 ? UNEXPLORED : Terrain.Mountain))(r)
-    expect(ticks).toBeCloseTo(
-      WALK_TICKS_PER_TILE / TERRAIN_SPEED[Terrain.Plains] +
-        WALK_TICKS_PER_TILE / TERRAIN_SPEED[Terrain.Road],
-    )
+    mirrorOf({ size: 64, residents: [ada], buildings: [road] })
+    expect(arrivalOf(world, ground)(ada)).toBeCloseTo(plains + onRoad)
+  })
+
+  it('estimates a way given in place of their own order, as the route preview does', () => {
+    mirrorOf({ size: 64, residents: [{ ...ada, order: null }], buildings: [road] })
+    const ticks = arrivalOf(world, ground)({ ...ada, order: null }, way([[1, 0]]))
+    expect(ticks).toBeCloseTo(plains)
+    expect(arrivalOf(world, ground)({ ...ada, order: null })).toBeUndefined()
+  })
+
+  it('tells nothing until the mirror has a world, nor of one it doesn’t hold', () => {
+    expect(arrivalOf(world, ground)(ada)).toBeUndefined()
+    mirrorOf({ size: 64, residents: [], buildings: [road] })
+    expect(arrivalOf(world, ground)(ada)).toBeUndefined()
   })
 })
 

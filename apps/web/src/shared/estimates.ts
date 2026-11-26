@@ -1,94 +1,21 @@
 // Ported from packages/shared/src/estimates.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// types come from @csp/shared-types and the balance numbers from @csp/balance. A way's arrival
+// estimate (`arrivalTicks`) is asked of the rules module: `arrivalOf` in `doing-view.ts`.
 
 import { teardownLeft, workNeeded, workPace, workingOn } from './building.js'
-import { horseFor } from './carriages.js'
-import { STABLE_BREED_TICKS, horseRidden } from './horses.js'
-import { rideSpeed } from './stats.js'
-import { Terrain, stepLength } from './terrain.js'
+import { STABLE_BREED_TICKS } from './horses.js'
 import { TICKS_PER_GAME_HOUR } from './time.js'
 import {
   ADULT_AGE,
   CARRYING_TICKS,
-  MAX_HUNGER,
   PAIRING_WAIT_TICKS,
   TICKS_PER_GAME_DAY,
   TICK_MS,
-  driveSpeed,
   ticksForAge,
-  walkSpeed,
 } from '@csp/balance'
-import type { Building, CarriageHorse, CarriagePlace, Horse, Resident } from '@csp/shared-types'
+import type { Building, Resident } from '@csp/shared-types'
 
 export { foodPerTick } from '@csp/lang-wasm'
-
-/**
- * Ticks a way of `path` from `from` takes (`CONTEXT.md`: Doing, Estimates): each step its length
- * (`stepLength`) at the pace onto the tile it goes to, less the `progress` already made into the
- * first. `pace` is in tiles per tick, as the movement rules give it; a step at no pace counts as
- * one at `slowest`.
- */
-export function wayTicks(
-  size: number,
-  from: { x: number; y: number },
-  path: readonly (readonly [number, number])[],
-  progress: number,
-  pace: (x: number, y: number) => number,
-  slowest: number,
-): number {
-  let ticks = 0
-  let [x, y] = [from.x, from.y]
-  for (const [i, [nx, ny]] of path.entries()) {
-    const speed = pace(nx, ny) || slowest
-    const length = stepLength(size, x, y, nx, ny) || 1
-    ticks += (i === 0 ? Math.max(0, length - progress) : length) / speed
-    ;[x, y] = [nx, ny]
-  }
-  return ticks
-}
-
-/** What a resident's arrival is worked out from: who and what moves, and the ground. */
-export interface ArrivalWorld {
-  size: number
-  tick: number
-  horses: readonly (CarriageHorse & Partial<Pick<Horse, 'hunger'>>)[]
-  carriages: readonly (CarriagePlace & { id: string })[]
-  residents?: readonly Pick<Resident, 'riding'>[]
-  /** The ground of a tile as the movement rules see it (`groundAt`): a road over any terrain. */
-  ground: (x: number, y: number) => Terrain
-}
-
-/**
- * About how many ticks until a walking, riding or driving resident arrives (`CONTEXT.md`: Doing,
- * Estimates): their way still to go, at the pace that applies on each tile today, from the same
- * rules the server moves them by (`walkSpeed`, `rideSpeed`, `driveSpeed`). A store or fetch order
- * counts while it walks to its place. Undefined while they go nowhere or their way is still being
- * found.
- */
-export function arrivalTicks(world: ArrivalWorld, r: Resident): number | undefined {
-  const o = r.order
-  const moving =
-    o?.kind === 'walkTo' ||
-    o?.kind === 'relocate' ||
-    o?.kind === 'drive' ||
-    (o?.kind === 'haul' && o.phase === 'driving') ||
-    ((o?.kind === 'store' || o?.kind === 'fetch') && o.phase === 'walking')
-  if (!moving || !o.path) return undefined
-  const slowest = walkSpeed(r, Terrain.Mountain, world.tick)
-  let pace: (g: Terrain) => number
-  if (o.kind !== 'drive' && o.kind !== 'haul') {
-    const horse = horseRidden(world, r)
-    pace = horse
-      ? (g) => rideSpeed(r, { stats: horse.stats, hunger: horse.hunger ?? MAX_HUNGER }, g)
-      : (g) => walkSpeed(r, g, world.tick)
-  } else {
-    const carriage = world.carriages.find((k) => k.id === o.carriageId)
-    const horse = carriage && horseFor(world, carriage)
-    // Without a horse each step goes at once, a tile a tick.
-    pace = horse ? (g) => driveSpeed(r, horse, g) : () => 1
-  }
-  return wayTicks(world.size, r, o.path, o.progress, (x, y) => pace(world.ground(x, y)), slowest)
-}
 
 /**
  * About how long `ticks` last, to plan around (`CONTEXT.md`: Doing, Estimates): real time first,
