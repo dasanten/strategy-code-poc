@@ -38,6 +38,7 @@ describe('the world mirror', () => {
   const welcome = (buildings: Building[]) =>
     JSON.stringify({
       type: 'welcome',
+      tick: 1,
       map: { size: SIZE },
       entities: buildings.map(seen),
     })
@@ -69,6 +70,7 @@ describe('the world mirror', () => {
     mirror.welcome(welcome([building('b1', 'farm', 10, 10), building('b2', 'storage', 30, 30)]))
     const tick = {
       type: 'tick',
+      tick: 2,
       changed: [seen(building('b3', 'house', 40, 40)), seen(building('b1', 'farm', 12, 10))],
       gone: ['b2'],
     }

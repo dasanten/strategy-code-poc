@@ -16,6 +16,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 #[derive(Deserialize)]
 struct Welcome<'a> {
     map: MapSize,
+    tick: u64,
     #[serde(borrow)]
     entities: Vec<&'a RawValue>,
 }
@@ -28,6 +29,7 @@ struct MapSize {
 /// What the mirror reads of a `tick` message: what came into sight or changed, what left it.
 #[derive(Deserialize)]
 struct Tick<'a> {
+    tick: u64,
     #[serde(borrow)]
     changed: Vec<&'a RawValue>,
     gone: Vec<String>,
@@ -50,16 +52,15 @@ impl WorldMirror {
     /// Starts over from a `welcome` message, as JSON. An error for one it can't read.
     pub fn welcome(&mut self, json: &str) -> Result<(), String> {
         let msg: Welcome = serde_json::from_str(json).map_err(|e| e.to_string())?;
-        self.mirror.welcome(msg.map.size, seen_entities(msg.entities)?);
+        self.mirror.welcome(msg.map.size, msg.tick, seen_entities(msg.entities)?);
         Ok(())
     }
 
     /// Takes in a `tick` message, as JSON. An error for one it can't read, which changes nothing.
     pub fn tick(&mut self, json: &str) -> Result<(), String> {
         let msg: Tick = serde_json::from_str(json).map_err(|e| e.to_string())?;
-        if !msg.changed.is_empty() || !msg.gone.is_empty() {
-            self.mirror.tick(seen_entities(msg.changed)?, &msg.gone);
-        }
+        // Every tick, changed or not: the world is at the server's tick.
+        self.mirror.tick(msg.tick, seen_entities(msg.changed)?, &msg.gone);
         Ok(())
     }
 

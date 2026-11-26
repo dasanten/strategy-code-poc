@@ -12,7 +12,7 @@ fn building(id: &str, kind: &str, x: i32, y: i32) -> serde_json::Value {
 }
 
 fn welcome(entities: Vec<serde_json::Value>) -> String {
-    json!({ "type": "welcome", "map": { "size": 64 }, "entities": entities }).to_string()
+    json!({ "type": "welcome", "tick": 1, "map": { "size": 64 }, "entities": entities }).to_string()
 }
 
 #[test]
@@ -44,6 +44,7 @@ fn the_mirror_takes_in_ticks_and_answers_by_tile() {
     assert_eq!(m.building_at(11, 11).as_deref(), Some("b1"));
     let tick = json!({
         "type": "tick",
+        "tick": 2,
         "changed": [building("b3", "house", 40, 40), building("b1", "farm", 12, 10)],
         "gone": ["b2"],
     });
@@ -63,7 +64,7 @@ fn the_mirror_refuses_a_message_it_cant_read_and_keeps_what_it_had() {
     let mut m = WorldMirror::new();
     m.welcome(&welcome(vec![building("b1", "farm", 10, 10)])).expect("a welcome");
     // A resident with nothing of what the server sends of one.
-    let tick = json!({ "type": "tick", "changed": [{ "is": "resident", "id": "r1" }], "gone": [] });
+    let tick = json!({ "type": "tick", "tick": 2, "changed": [{ "is": "resident", "id": "r1" }], "gone": [] });
     assert!(m.tick(&tick.to_string()).is_err());
     assert_eq!(m.building_at(10, 10).as_deref(), Some("b1"));
 }

@@ -51,30 +51,57 @@ What costs bytes in the module:
 The server sends a Player what is in their sight (`sight.rs`), and less of some of it. The mirror
 fills the rest with defaults (`csp_sim::mirror`):
 
-| Not sent                                                                                              | The mirror holds                                            |
-| :---------------------------------------------------------------------------------------------------- | :---------------------------------------------------------- |
-| A stranger's health and hunger, and until when they are Down                                          | full health, fed; Down without an end (`DOWN_UNTIL_UNSEEN`) |
-| A horse's health and hunger, unless the Player's                                                      | the same                                                    |
-| What is in a building, carriage or vessel not seen inside                                             | empty                                                       |
-| A script's memory and log, since when it waits, an army's script but its id                           | empty, waiting since 0                                      |
-| A caravan's or trader's stop, plan, load and job                                                      | at its storage, with nothing to do                          |
-| Whether an order holds against blows, the Alarm a defence script interrupted                          | none                                                        |
-| Realms, events, crimes, contracts, standings, offers, demands, Last seen and the rest of `WorldState` | none at all                                                 |
+| Not sent                                                                                      | The mirror holds                                                        |
+| :-------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------- |
+| A stranger's health and hunger, and until when they are Down                                  | full health, fed; Down without an end (`DOWN_UNTIL_UNSEEN`)             |
+| A horse's health and hunger, unless the Player's                                              | the same                                                                |
+| What is in a building, carriage or vessel not seen inside                                     | empty                                                                   |
+| A script's memory and log, since when it waits, an army's script but its id                   | empty, waiting since 0                                                  |
+| A caravan's or trader's stop, plan, load and job                                              | at its storage, with nothing to do                                      |
+| Whether an order holds against blows, the Alarm a defence script interrupted                  | none                                                                    |
+| Realms, events, crimes, contracts, standings, demands, Last seen and the rest of `WorldState` | none at all                                                             |
+| A carried Direct offer, which stands at no storage                                            | none (offers at a storage in sight come with it: `SeenBuilding.offers`) |
 
 So a rule that reads one of them answers on the mirror as if it were so. The parity test
 (`crates/csp-sim/tests/mirror_parity.rs`) asks each rule it covers on the fixture worlds, for each
 realm, of the full world and of a mirror of what that realm is sent with every tile in sight, and
-fails on a rule that answers otherwise unless it is named there. Named so far, with what the client
-shows in that case today (its TypeScript copy reads the same Seen data, so the same):
+fails on a rule that answers otherwise unless it is named there. Named so far, by what they read,
+with what the client shows in that case today: where its TypeScript copy reads the same Seen data,
+the same; for most of the rest it shows the server's answer, sent with the city, building or in
+`diplomacy`:
 
-| Rule           | On the mirror                                              | The client today        |
-| :------------- | :--------------------------------------------------------- | :---------------------- |
-| `inputAt`      | a workplace not seen inside has none of its input in stock | the same: no stock sent |
-| `npcCityStock` | an NPC city's storage not seen inside holds nothing        | the same                |
-| `storedFood`   | a city's storage not seen inside holds no Food             | the same                |
+| Rule                                                                                     | On the mirror                                                         | The client today                                           |
+| :--------------------------------------------------------------------------------------- | :-------------------------------------------------------------------- | :--------------------------------------------------------- |
+| **Realms** (`world.realms`: none)                                                        |                                                                       |                                                            |
+| `realmName`, `organizationLabel`                                                         | any realm is "a fallen realm"                                         | its own realm's name from `home`, others' from `diplomacy` |
+| `realmsKnownTo`                                                                          | no realm                                                              | `diplomacy.knownRealms` from the server                    |
+| `realmsToOfferTo`                                                                        | no realm                                                              | `diplomacy.directOfferRealms` from the server              |
+| `realmsStandingTogether`                                                                 | no realm                                                              | no view asks it                                            |
+| `directOfferProblem`, `carriedOfferProblem`                                              | to any realm: "send a direct offer to a realm"                        | no view asks them; the server checks the order             |
+| `transferProblem`, `pickUpTransferProblem`, `handInProblem`                              | any city: "not a city of a realm"                                     | no view asks them; the server checks the order             |
+| **Standings** (`world.standings`: none, so each is 0)                                    |                                                                       |                                                            |
+| `standingOf`, `standingSwing`                                                            | 0                                                                     | no view asks them                                          |
+| `standingsFor`                                                                           | none                                                                  | `diplomacy.standings` from the server                      |
+| `npcCityRefuses`                                                                         | no NPC city refuses anyone                                            | `SeenCity.refuses` from the server                         |
+| `sellsTo`                                                                                | every NPC city for sale sells                                         | `SeenCity.wontSell` from the server                        |
+| `cityPrice`                                                                              | the price at standing 0                                               | `SeenCity.price` from the server                           |
+| `npcHirePrice`                                                                           | the price at standing 0                                               | `SeenCity.hire` from the server                            |
+| `shutOut`, `wallsKey`, `wallMap`                                                         | no city shuts its gates to anyone                                     | no view asks them                                          |
+| `buyProblem`, `npcTradeProblem`, `swapProblem`, `buyHorseProblem`, `npcHorseSaleProblem` | never "won't trade with you" (or "too low standing"): the next reason | no view asks them; the server checks the order             |
+| **Standings and stock not seen inside**                                                  |                                                                       |                                                            |
+| `npcCityPrices`                                                                          | prices at standing 0, on no stock                                     | `SeenCity.trade` from the server                           |
+| `npcHorseOffers`, `horsesToSell`                                                         | prices at standing 0; the city has no Coins to buy a horse            | `SeenCity.horses`, `SeenCity.horsesToSell` from the server |
+| `npcHorsePurchaseProblem`                                                                | never "won't trade with you"; "hasn't the coins"                      | no view asks it; the server checks the order               |
+| **Resource nodes** (`world.nodes`: none)                                                 |                                                                       |                                                            |
+| `nodeCorner`                                                                             | no node workplace goes anywhere                                       | the same rule on the nodes the Player explored             |
 
-Any rule that reads realms, standings, contracts, alliances, offers or demands reads none on the
-mirror; those come in their own messages (`diplomacy` and the rest) and are not mirrored yet.
+The test asks 234 rules, every world-reading twin of the client's rules that `csp-sim` holds;
+a rule not named here answers on the mirror as on the full world, on these fixtures. The
+fixtures hold no alliances, contracts, demands, crimes, directives, debts, armies, vessels,
+caravans or traders, so the rules that read those agree there without showing that the mirror
+holds them: on a world with them, any rule that reads realms, standings, contracts, alliances,
+or demands reads none on the mirror. Those come in their own messages (`diplomacy` and the
+rest) and are not mirrored yet.
 
 ## Measurements (T122.1)
 
