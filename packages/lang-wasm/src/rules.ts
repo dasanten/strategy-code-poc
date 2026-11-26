@@ -5,7 +5,23 @@
 
 import type {
   Building,
+  KeptBreeding,
+  SwapQuote,
+  TraderPrice,
   BuildingKind,
+  BuildLine,
+  Carriage,
+  City,
+  Offer,
+  OfferQuote,
+  OrderRequest,
+  TradeHolder,
+  TradeQuote,
+  TradeSide,
+  Directive,
+  DirectiveGoal,
+  MercenaryContract,
+  Realm,
   CarriedFeeBy,
   ClientFirstDayLine,
   FirstDayLine,
@@ -28,6 +44,7 @@ import type {
   Stock,
   WallMaterial,
 } from '@csp/shared-types'
+import { MAP_SIZE } from '@csp/balance'
 import * as wasm from '../generated/csp_lang_wasm.js'
 
 /** What one batch at a workplace uses up and makes (`RECIPES`). */
@@ -770,4 +787,362 @@ export function feedProblem(
 ): string | undefined {
   const t = target && asResident(target)
   return opt(rule<string | null>('feedProblem', asResident(feeder), t, tick, size))
+}
+
+// Rules on one contract, realm, directive or carriage (T122.5b).
+
+/** Work a building or site gets a tick from these workers. */
+export function workPace(
+  b: Building,
+  workers: readonly Resident[],
+  tick: number,
+  under?: number,
+): number {
+  return rule('workPace', asBuilding(b), workers.map(asResident), tick, under)
+}
+
+/** A contract as the module reads one, from what the caller has of it. */
+function asContract(c: object): object {
+  return {
+    id: '',
+    lenderId: '',
+    hirerId: '',
+    offeredBy: 'lender',
+    residentIds: [],
+    days: 0,
+    pricePerWeek: 0,
+    storageId: '',
+    startedAt: null,
+    paidWeeks: 0,
+    ...c,
+  }
+}
+
+/** Game weeks a contract runs, the last one maybe short; each is paid in full. */
+export function contractWeeks(c: Pick<MercenaryContract, 'days'>): number {
+  return rule('contractWeeks', asContract(c))
+}
+
+/** The tick a started contract ends. */
+export function contractEndsAt(c: MercenaryContract & { startedAt: number }): number {
+  return rule('contractEndsAt', asContract(c), c.startedAt)
+}
+
+/** The tick by which the contract's next unpaid week has to be paid; none once all are paid. */
+export function contractPayBy(c: MercenaryContract): number | null {
+  return rule('contractPayBy', asContract(c))
+}
+
+/** A realm as the module reads one, from what the caller has of it. */
+function asRealm(r: object): object {
+  return { id: '', userId: 0, leaderId: '', ...r }
+}
+
+/** When the realm sent the demands that still count against today's (`DEMANDS_PER_GAME_DAY`). */
+export function demandsCounted(realm: Pick<Realm, 'demandsSentAt'>, tick: number): number[] {
+  return rule('demandsCounted', asRealm(realm), tick)
+}
+
+/** How many more demands the realm may send today. */
+export function demandsLeft(realm: Pick<Realm, 'demandsSentAt'>, tick: number): number {
+  return rule('demandsLeft', asRealm(realm), tick)
+}
+
+/** A directive as the module reads one, from what the caller has of it. */
+function asDirective(d: object): object {
+  return {
+    id: '',
+    target: '',
+    withAlliance: false,
+    reason: '',
+    givenBy: '',
+    givenAt: 0,
+    goals: [],
+    soldiersKilled: 0,
+    price: null,
+    ...d,
+  }
+}
+
+/** Whether one of a directive's goals is met (`CONTEXT.md`: Admin directive). */
+export function goalMet(d: Pick<Directive, 'soldiersKilled'>, goal: DirectiveGoal): boolean {
+  return rule('goalMet', asDirective(d), goal)
+}
+
+/** Whether all of a directive's goals are met, so it ends. One without goals never ends. */
+export function goalsMet(d: Pick<Directive, 'goals' | 'soldiersKilled'>): boolean {
+  return rule('goalsMet', asDirective(d))
+}
+
+/** A name as sent, for the module to tell nothing sent from `null` sent. */
+function given(v: unknown): object {
+  return v === undefined ? {} : { v }
+}
+
+/** Why the Player of `realm` can't rename `target` to `name` now, if they can't. */
+export function renameProblem(
+  realm: Pick<Realm, 'id' | 'leaderId' | 'name'>,
+  target: Resident | undefined,
+  name: unknown,
+  realmName?: unknown,
+): string | undefined {
+  const t = target && asResident(target)
+  const p = rule<string | null>('renameProblem', asRealm(realm), t, given(name), given(realmName))
+  return opt(p)
+}
+
+/** Why the Player of `realm` can't rename `horse` to `name` now, if they can't. */
+export function horseRenameProblem(
+  realm: Pick<Realm, 'id'>,
+  horse: Pick<Horse, 'realmId'> | undefined,
+  name: unknown,
+): string | undefined {
+  const h = horse && asHorse(horse)
+  return opt(rule<string | null>('horseRenameProblem', asRealm(realm), h, given(name)))
+}
+
+/** What each side of a carried offer pays over its ways: the sender's and the other side's fee. */
+export function carriedFeesOver(
+  way: { senderTiles: number; otherTiles: number },
+  feeBy: CarriedFeeBy,
+  goods: { gives: Good; givesUnits: number; wants: Good; wantsUnits: number; times: number },
+): { senderFee: number; otherFee: number } {
+  const { senderTiles, otherTiles } = way
+  const { gives, givesUnits, wants, wantsUnits, times } = goods
+  const g = { gives, givesUnits, wants, wantsUnits, times }
+  return rule('carriedFeesOver', { senderTiles, otherTiles }, feeBy, g)
+}
+
+/** What of a carriage the module reads (`SeenCarriage`). */
+const CARRIAGE_FIELDS = ['id', 'realmId', 'cityId', 'x', 'y', 'horseId', 'load']
+
+/** A carriage as the module reads one, from what the caller has of it. */
+function asCarriage(k: object): object {
+  const known = Object.fromEntries(Object.entries(k).filter(([f]) => CARRIAGE_FIELDS.includes(f)))
+  return {
+    id: '',
+    realmId: null,
+    cityId: null,
+    x: 0,
+    y: 0,
+    horseId: null,
+    loadLevel: 'empty',
+    passengerIds: [],
+    standsStill: false,
+    ...known,
+  }
+}
+
+/** Why a resident can't board a carriage as a passenger, if they can't. */
+export function boarderProblem(
+  resident: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId' | 'order' | 'aboard' | 'riding'>,
+  carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>,
+): string | undefined {
+  return opt(rule<string | null>('boarderProblem', asResident(resident), asCarriage(carriage)))
+}
+
+/** Why a resident can't unhitch a carriage's horse now, if they can't. */
+export function unhitchProblem(
+  resident: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId' | 'bornAt'>,
+  carriage: Pick<Carriage, 'x' | 'y' | 'realmId' | 'cityId' | 'horseId'> | undefined,
+  tick: number,
+): string | undefined {
+  const k = carriage && asCarriage(carriage)
+  return opt(rule<string | null>('unhitchProblem', asResident(resident), k, tick))
+}
+
+// The last rules on one thing (T122.5b): who works on a site, trade holders and quotes, a city's,
+// and a queue step's.
+
+/** The residents working on a building or site now, standing on it (`CONTEXT.md`: Construction). */
+export function workingOn<R extends Resident>(
+  b: Building,
+  residents: readonly R[],
+  tearingDown: boolean,
+  size = MAP_SIZE,
+): R[] {
+  // Only what the rule reads of each goes across: where they are and what they do.
+  const few = residents.map(({ id, x, y, order }) => asResident({ id, x, y, order }))
+  const ids = new Set(rule<string[]>('workingOn', asBuilding(b), few, tearingDown, size))
+  return residents.filter((r) => ids.has(r.id))
+}
+
+/** A resident's hands as a trade holder: what they carry and what more they could. */
+export function handsOf(resident: Resident, tick: number): TradeHolder {
+  return rule('handsOf', asResident(resident), tick)
+}
+
+/** A carriage as a trade holder: its load and the room left on it. */
+export function loadOf(carriage: Carriage, capacity: number): TradeHolder {
+  return rule('loadOf', asCarriage(carriage), capacity)
+}
+
+/** A trade holder as the module reads one. */
+function holderOf(h: TradeHolder): TradeHolder {
+  return { stock: h.stock, room: h.room }
+}
+
+/**
+ * What a trade of up to `wanted` units of a good would move with a side holding `stock` of it
+ * and `coinStock` coins, priced from `floor` (`CONTEXT.md`: Warehouse prices). Pure.
+ */
+export function quoteAtPrices(
+  stock: number,
+  floor: number,
+  coinStock: number,
+  holder: TradeHolder,
+  side: TradeSide,
+  good: PricedGood,
+  wanted: number,
+  owed = 0,
+  theirRoom = Infinity,
+): TradeQuote {
+  const room = Number.isFinite(theirRoom) ? theirRoom : null
+  const h = holderOf(holder)
+  return rule('quoteAtPrices', stock, floor, coinStock, h, side, good, wanted, owed, room)
+}
+
+/** What a trade of up to `wanted` units with a wandering trader would move (`CONTEXT.md`: Trader stop). */
+export function quoteTraderTrade(
+  t: Pick<Trader, 'escortIds'>,
+  load: Stock,
+  capacity: number,
+  holder: TradeHolder,
+  side: TradeSide,
+  good: PricedGood,
+  wanted: number,
+): TradeQuote {
+  const h = holderOf(holder)
+  return rule('quoteTraderTrade', t.escortIds.length, load, capacity, h, side, good, wanted)
+}
+
+/** An offer as the module reads one, from what the caller has of it. */
+function asOffer(o: object): object {
+  return { id: '', realmId: '', storageId: '', x: 0, y: 0, ...o }
+}
+
+/** What accepting an offer up to `wanted` times moves (`CONTEXT.md`: Offer). */
+export function quoteOffer(
+  offer: Pick<Offer, 'gives' | 'givesUnits' | 'wants' | 'wantsUnits' | 'times'>,
+  holder: TradeHolder,
+  wanted: number,
+  available = Infinity,
+): OfferQuote {
+  const { gives, givesUnits, wants, wantsUnits, times } = offer
+  const o = asOffer({ gives, givesUnits, wants, wantsUnits, times })
+  const a = Number.isFinite(available) ? available : null
+  return rule('quoteOffer', o, holderOf(holder), wanted, a)
+}
+
+/** A city as the module reads one, from what the caller has of it. */
+function asCity(c: object): object {
+  return { id: '', name: '', realmId: null, townHallId: '', occupation: null, ...c }
+}
+
+/** Why the Player of `realm` can't rename `city` to `name` now, if they can't. */
+export function cityRenameProblem(
+  realm: Pick<Realm, 'id'>,
+  city: City | undefined,
+  name: unknown,
+): string | undefined {
+  const c = city && asCity(city)
+  return opt(rule<string | null>('cityRenameProblem', asRealm(realm), c, given(name)))
+}
+
+/** How a city that was a Player's stands toward the Player now (`CONTEXT.md`: Former Player). */
+export function formerPlayerStanding(city: Pick<City, 'formerPlayer'>, tick: number): number {
+  return rule('formerPlayerStanding', asCity(city), tick)
+}
+
+/** Whether a queue step never ends on its own (`CONTEXT.md`: Queue). */
+export function neverEnds(order: OrderRequest): boolean {
+  return rule('neverEnds', order)
+}
+
+/** Whether a Feed the stable step feeds it once and ends. */
+export function feedsOnce(order: OrderRequest): boolean {
+  return rule('feedsOnce', order)
+}
+
+/** The line a Build line step builds, if it is one with its road or wall and two ends. */
+export function stepLine(order: OrderRequest): BuildLine | undefined {
+  return opt(rule<BuildLine | null>('stepLine', order))
+}
+
+// Swaps, traders and stables (T122.5b).
+
+/** The terms of a swap (`CONTEXT.md`: Swap), its prices as functions of the unit. */
+export interface SwapTerms {
+  give: PricedGood
+  want: PricedGood
+  /** The units of `want` the trader asks for. */
+  wanted: number
+  holder: TradeHolder
+  /** The units of `want` it will hand over. */
+  spare: number
+  /** The units of `give` it will take. */
+  takes: number
+  /** The Coins it has to give back. */
+  placeCoins: number
+  /** The price of the `n`th unit of `want` it hands over, from 1. */
+  wantPrice: (n: number) => number
+  /** What it pays for the `n`th unit of `give` it takes, from 1. */
+  givePrice: (n: number) => number
+}
+
+/**
+ * Works a swap out unit by unit (`CONTEXT.md`: Swap), as the Rust does. The prices go across as
+ * lists, the `n`th unit's at `n - 1`, as far as the swap can reach: what is wanted and spare of
+ * `want`, what is held and taken of `give`.
+ */
+export function cutSwap(terms: SwapTerms): SwapQuote {
+  const { give, want, wanted, holder, spare, takes, placeCoins } = terms
+  const prices = (n: number, price: (n: number) => number) =>
+    Array.from({ length: Math.max(0, Math.floor(n)) }, (_, i) => price(i + 1))
+  const held = holder.stock[give] ?? 0
+  return rule('cutSwap', {
+    give,
+    want,
+    wanted,
+    holder: holderOf(holder),
+    // No JSON for Infinity: none is no end.
+    spare: Number.isFinite(spare) ? spare : null,
+    takes: Number.isFinite(takes) ? takes : null,
+    placeCoins: Number.isFinite(placeCoins) ? placeCoins : null,
+    wantPrices: prices(Math.min(wanted, spare), terms.wantPrice),
+    givePrices: prices(Math.min(held, takes), terms.givePrice),
+  })
+}
+
+/** A wandering trader's prices for every good but coins, from what it has to trade. */
+export function traderPrices(t: Pick<Trader, 'escortIds'>, carriage: Carriage): TraderPrice[] {
+  return rule('traderPrices', t.escortIds, asCarriage(carriage))
+}
+
+/** How many escorts a wandering trader walks with, one more for every few robberies. */
+export function traderEscortsWanted(trader: Pick<Trader, 'robberies'>): number {
+  return rule('traderEscortsWanted', [], trader.robberies)
+}
+
+/** The horses at a stable: those on its footprint. */
+export function horsesIn<H extends { id: string; x: number; y: number }>(
+  horses: readonly H[],
+  stable: Building,
+): H[] {
+  const few = horses.map(({ id, x, y }) => asHorse({ id, x, y }))
+  const ids = new Set(rule<string[]>('horsesIn', few, asBuilding(stable)))
+  return horses.filter((h) => ids.has(h.id))
+}
+
+/** The breeding a stable keeps for these two horses, if it keeps one. */
+export function keptBreeding(
+  stable: Pick<Building, 'breedings'>,
+  horseIds: readonly string[],
+): KeptBreeding | undefined {
+  const b = asBuilding({ kind: 'stable', ...stable })
+  const kept = rule<KeptBreeding | null>('keptBreeding', b, horseIds)
+  // The stable's own entry, as callers compare it with others.
+  const same = (k: KeptBreeding) =>
+    kept !== null && k.horseIds.every((id, i) => id === kept.horseIds[i])
+  return stable.breedings?.find(same)
 }

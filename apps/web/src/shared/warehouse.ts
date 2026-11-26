@@ -3,25 +3,24 @@
 
 import { townHallOf } from './city.js'
 import { GOOD_WEIGHT, WAREHOUSE_FLOOR } from './narrowed.js'
-import { stockWeight } from './stats.js'
 import { GOODS } from './world.js'
-import { DELIVERY_LOAD, HQ_FLOOR_FACTOR, HQ_FOOD_FLOOR_FACTOR, carryCapacity } from '@csp/balance'
+import { DELIVERY_LOAD, HQ_FLOOR_FACTOR, HQ_FOOD_FLOOR_FACTOR } from '@csp/balance'
 import type {
   Building,
-  Carriage,
   DeliveryQuote,
   Good,
   PricedGood,
-  Resident,
   Stock,
   TradeHolder,
-  TradeLimit,
   TradeQuote,
   TradeSide,
   WorldState,
 } from '@csp/shared-types'
 import { HQ_COIN_WAREHOUSE } from '@csp/shared-types'
 import { priceFor, deliveryFee } from '@csp/lang-wasm'
+import { quoteAtPrices } from '@csp/lang-wasm'
+
+export { handsOf, loadOf, quoteAtPrices } from '@csp/lang-wasm'
 
 export { type Price, priceFor, deliveryFee } from '@csp/lang-wasm'
 
@@ -85,19 +84,6 @@ export function tradeCoinWarehouse(
   )
 }
 
-/** A resident's hands as a trade holder: what they carry and what more they could. */
-export function handsOf(resident: Resident, tick: number): TradeHolder {
-  return {
-    stock: resident.carried,
-    room: carryCapacity(resident, tick) - stockWeight(resident.carried),
-  }
-}
-
-/** A carriage as a trade holder: its load and the room left on it (`carriageCapacity`). */
-export function loadOf(carriage: Carriage, capacity: number): TradeHolder {
-  return { stock: carriage.load, room: capacity - stockWeight(carriage.load) }
-}
-
 /**
  * What a trade of up to `wanted` units of a good would move (`CONTEXT.md`: Trading with the Trade
  * Organization, Warehouse prices). Each unit goes at the warehouse's price as its stock stands
@@ -122,59 +108,6 @@ export function quoteTrade(
   const coinStock = coinWarehouse.stock?.coins ?? 0
   const stock = warehouse.stock?.[good] ?? 0
   return quoteAtPrices(stock, floor, coinStock, holder, side, good, wanted, owed)
-}
-
-/**
- * What a trade of up to `wanted` units of a good would move with a side holding `stock` of it and
- * `coinStock` coins, which prices it from `floor` (`priceFor`), as `quoteTrade` says. `theirRoom`
- * is the room that side has for what the trade adds to it, in kg: a wandering trader's carriage
- * (`CONTEXT.md`: Trader stop). Pure: nothing moves.
- */
-export function quoteAtPrices(
-  stock: number,
-  floor: number,
-  coinStock: number,
-  holder: TradeHolder,
-  side: TradeSide,
-  good: PricedGood,
-  wanted: number,
-  owed = 0,
-  theirRoom = Infinity,
-): TradeQuote {
-  const held = holder.stock[good] ?? 0
-  const heldCoins = holder.stock.coins ?? 0
-  let units = 0
-  let coins = 0
-  let limit: TradeLimit | undefined
-  while (units < wanted) {
-    const n = units + 1
-    if (side === 'sell') {
-      if (n > held) limit = 'held'
-      else {
-        const p = priceFor(good, stock + n, floor).buy
-        const room = holder.room + n * GOOD_WEIGHT[good] - (coins + p) * GOOD_WEIGHT.coins
-        const added = n * GOOD_WEIGHT[good] - (coins + p) * GOOD_WEIGHT.coins
-        if (coins + p > coinStock) limit = 'theirCoins'
-        else if (room < -1e-9) limit = 'room'
-        else if (added > theirRoom + 1e-9) limit = 'theirRoom'
-        else coins += p
-      }
-    } else {
-      if (n > stock - owed) limit = 'stock'
-      else {
-        const p = priceFor(good, stock - units, floor).sell
-        const room = holder.room + (coins + p) * GOOD_WEIGHT.coins - n * GOOD_WEIGHT[good]
-        const added = (coins + p) * GOOD_WEIGHT.coins - n * GOOD_WEIGHT[good]
-        if (coins + p > heldCoins) limit = 'coins'
-        else if (room < -1e-9) limit = 'room'
-        else if (added > theirRoom + 1e-9) limit = 'theirRoom'
-        else coins += p
-      }
-    }
-    if (limit) break
-    units = n
-  }
-  return limit ? { units, coins, limit } : { units, coins }
 }
 
 /**

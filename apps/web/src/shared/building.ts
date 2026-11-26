@@ -12,7 +12,7 @@ import {
 import { RECIPES, WORKPLACE_MAX_WORKERS } from './narrowed.js'
 import { type Recipe } from './stats.js'
 import { tileIndex, wrap, wrapDelta } from './terrain.js'
-import { MAP_SIZE, buildWork } from '@csp/balance'
+import { MAP_SIZE } from '@csp/balance'
 import type {
   Building,
   BuildingKind,
@@ -24,7 +24,11 @@ import type {
   WorldState,
 } from '@csp/shared-types'
 import { NODE_GOOD } from '@csp/shared-types'
-import { siteWorkOf, recipeFor } from '@csp/lang-wasm'
+import { recipeFor } from '@csp/lang-wasm'
+
+export { workingOn } from '@csp/lang-wasm'
+
+export { workPace } from '@csp/lang-wasm'
 
 export {
   materialsNeeded,
@@ -243,38 +247,6 @@ export function holdersOf(
 ): string[] {
   const realms = workersOf(world, workplace).map((r) => r.owner)
   return [...new Set(realms.filter((id): id is string => id !== null))].sort()
-}
-
-/**
- * The residents working on a building or construction site now, standing on it: building it (a
- * build order or a line order on its site) or, with `tearingDown`, tearing it down.
- */
-export function workingOn(
-  b: Building,
-  residents: readonly Resident[],
-  tearingDown: boolean,
-  size = MAP_SIZE,
-): Resident[] {
-  return residents.filter((r) => {
-    const o = r.order
-    const on = tearingDown
-      ? o?.kind === 'tearDown' && o.buildingId === b.id
-      : (o?.kind === 'build' || (isLineOrder(o) && o.phase === 'building')) && o.siteId === b.id
-    return on && isAt(r, b, size)
-  })
-}
-
-/**
- * Work a building or construction site gets a tick from these residents, building it or tearing
- * it down, as the server counts it (`buildWork`, `siteWorkOf`); `under` is the terrain beneath.
- */
-export function workPace(
-  b: Building,
-  workers: readonly Resident[],
-  tick: number,
-  under?: number,
-): number {
-  return workers.reduce((sum, r) => sum + siteWorkOf(buildWork(r, tick), b.kind, under), 0)
 }
 
 /**

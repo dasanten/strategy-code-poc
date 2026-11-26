@@ -1,9 +1,10 @@
 // Ported from packages/shared/src/horses.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { isAt } from './footprint.js'
 import { STABLE_BREED_DAYS, TICKS_PER_GAME_DAY } from '@csp/balance'
-import type { Building, Horse, KeptBreeding, Resident } from '@csp/shared-types'
+import type { Building, Horse, Resident } from '@csp/shared-types'
+
+export { horsesIn, keptBreeding } from '@csp/lang-wasm'
 
 export { riderSpareFood } from '@csp/lang-wasm'
 
@@ -12,30 +13,12 @@ export { riderSpareFood } from '@csp/lang-wasm'
 /** Ticks a resident tends two horses at a stable before their foal is born (`STABLE_BREED_DAYS`). */
 export const STABLE_BREED_TICKS = STABLE_BREED_DAYS * TICKS_PER_GAME_DAY
 
-/** The horses standing in a stable, hitched or not. */
-export function horsesIn<H extends { x: number; y: number }>(
-  horses: readonly H[],
-  stable: Building,
-): H[] {
-  return horses.filter((h) => isAt(h, stable))
-}
-
 /** The residents breeding at a stable (`BreedOrder`). */
 export function breedersAt<R extends Pick<Resident, 'order'>>(
   residents: readonly R[],
   stable: Building,
 ): R[] {
   return residents.filter((r) => r.order?.kind === 'breed' && r.order.stableId === stable.id)
-}
-
-/** The breeding progress the stable keeps for the two horses, in either order, if it keeps any. */
-export function keptBreeding(
-  stable: Pick<Building, 'breedings'>,
-  horseIds: readonly string[],
-): KeptBreeding | undefined {
-  return stable.breedings?.find(
-    (k) => horseIds.includes(k.horseIds[0]) && horseIds.includes(k.horseIds[1]),
-  )
 }
 
 /** The horse a resident rides (`CONTEXT.md`: Riding), if they ride one. */

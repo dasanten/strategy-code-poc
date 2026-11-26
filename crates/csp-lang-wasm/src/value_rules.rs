@@ -6,9 +6,10 @@
 
 use csp_lang::ParamInfo;
 use csp_shared::world::{
-    BuildingKind, CarriedFeeBy, Good, HorseStats, ResourceKind, SkillName, Stock, Task,
-    TrainingSubject, WallMaterial, Waypoint,
+    BuildingKind, CarriedFeeBy, Directive, DirectiveGoal, Good, HorseStats, MercenaryContract,
+    Realm, ResourceKind, SkillName, Stock, Task, TrainingSubject, WallMaterial, Waypoint,
 };
+use csp_shared::world::{Offer, OrderRequest, TradeSide};
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -68,6 +69,107 @@ fn horse_arg(mut v: Value) -> Result<csp_shared::world::Horse, String> {
     serde_json::from_value::<csp_shared::protocol::SeenHorse>(v)
         .map(csp_sim::mirror::horse)
         .map_err(|e| format!("a horse: {e}"))
+}
+
+/// A carriage the client passes, as a Player sees it or whole (`csp_sim::mirror::carriage`).
+fn carriage_arg(mut v: Value) -> Result<csp_shared::world::Carriage, String> {
+    if let Some(map) = v.as_object_mut() {
+        map.remove("is");
+    }
+    serde_json::from_value::<csp_shared::protocol::SeenCarriage>(v)
+        .map(csp_sim::mirror::carriage)
+        .map_err(|e| format!("a carriage: {e}"))
+}
+
+/// A name a Player sends, as the client passes it: `{ "v": value }`, with no `v` for none, so
+/// that nothing sent and `null` sent stay apart as `Given` keeps them.
+#[derive(serde::Deserialize)]
+struct Given {
+    #[serde(default, deserialize_with = "present")]
+    v: Option<Value>,
+}
+
+/// A field that is there, `null` or not, as `Some`.
+fn present<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Value>, D::Error> {
+    <Value as serde::Deserialize>::deserialize(d).map(Some)
+}
+
+impl Given {
+    fn given(&self) -> people::Given<'_> {
+        match &self.v {
+            None => people::Given::Missing,
+            Some(Value::String(s)) => people::Given::Text(s),
+            Some(_) => people::Given::NotText,
+        }
+    }
+}
+
+/// A city the client passes, as a Player sees it (`SeenCity`) or whole: what the rules read of
+/// it is the city's own fields.
+fn city_arg(mut v: Value) -> Result<csp_shared::world::City, String> {
+    if let Some(map) = v.as_object_mut() {
+        // What a Player sees of it besides the city, which these rules don't read.
+        for key in
+            ["is", "price", "wontSell", "refuses", "hire", "trade", "retaliatingAgainst", "horses"]
+        {
+            map.remove(key);
+        }
+    }
+    serde_json::from_value::<csp_shared::world::City>(v).map_err(|e| format!("a city: {e}"))
+}
+
+/// A trade holder as the client passes it: what it holds and the room it has left.
+#[derive(serde::Deserialize)]
+struct Holder {
+    stock: Stock,
+    room: f64,
+}
+
+impl Holder {
+    fn as_holder(&self) -> warehouse_trade::TradeHolder<'_> {
+        warehouse_trade::TradeHolder { stock: &self.stock, room: self.room }
+    }
+}
+
+/// What stops a trade short, as the client names it.
+fn limit_name(limit: warehouse_trade::TradeLimit) -> &'static str {
+    use warehouse_trade::TradeLimit::*;
+    match limit {
+        Coins => "coins",
+        Held => "held",
+        Room => "room",
+        Stock => "stock",
+        TheirCoins => "theirCoins",
+        TheirRoom => "theirRoom",
+        Unwanted => "unwanted",
+        Refused => "refused",
+    }
+}
+
+/// A trade quote as the client has it: its limit only when something cut it short.
+fn trade_quote(q: warehouse_trade::TradeQuote) -> Value {
+    let mut out = json!({ "units": q.units, "coins": q.coins });
+    if let Some(limit) = q.limit {
+        out["limit"] = json!(limit_name(limit));
+    }
+    out
+}
+
+/// A trader as the rules read one, from its escorts and the robberies on its way: what a Player
+/// sees of a trader (`SeenTrader`) read the way the world mirror reads one.
+fn trader_of(escort_ids: Vec<String>, robberies: f64) -> csp_shared::world::Trader {
+    let mut t = csp_sim::mirror::trader(csp_shared::protocol::SeenTrader {
+        id: String::new(),
+        post_id: String::new(),
+        carriage_id: String::new(),
+        driver_id: None,
+        escort_ids,
+        heading: csp_shared::world::Heading::Post,
+        standing: None,
+        prices: None,
+    });
+    t.robberies = robberies;
+    t
 }
 
 /// A price as the client has it.
@@ -508,6 +610,278 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
             let feeder = resident_arg(feeder)?;
             let target = target.map(resident_arg).transpose()?;
             json!(csp_sim::reviving::feed_problem(&feeder, target.as_ref(), tick, size))
+        }
+        // Rules on one contract, realm, directive or carriage (T122.5b): the client passes it.
+        "workPace" => {
+            let (b, workers, tick, under): (Value, Vec<Value>, f64, Option<u8>) = args(name, json)?;
+            let b = building_arg(b)?;
+            let workers =
+                workers.into_iter().map(resident_arg).collect::<Result<Vec<_>, String>>()?;
+            let refs: Vec<&csp_shared::world::Resident> = workers.iter().collect();
+            json!(building::work_pace(&b, &refs, tick, under))
+        }
+        "contractWeeks" => {
+            let (c,): (MercenaryContract,) = args(name, json)?;
+            json!(csp_sim::queries::contract::contract_weeks(&c))
+        }
+        "contractEndsAt" => {
+            let (c, started_at): (MercenaryContract, f64) = args(name, json)?;
+            json!(csp_sim::queries::contract::contract_ends_at(&c, started_at))
+        }
+        "contractPayBy" => {
+            let (c,): (MercenaryContract,) = args(name, json)?;
+            json!(csp_sim::queries::contract::contract_pay_by(&c))
+        }
+        "demandsCounted" => {
+            let (realm, tick): (Realm, f64) = args(name, json)?;
+            json!(demand::demands_counted(&realm, tick))
+        }
+        "demandsLeft" => {
+            let (realm, tick): (Realm, f64) = args(name, json)?;
+            json!(demand::demands_left(&realm, tick))
+        }
+        "goalMet" => {
+            let (d, goal): (Directive, DirectiveGoal) = args(name, json)?;
+            json!(csp_sim::directive::goal_met(&d, &goal))
+        }
+        "goalsMet" => {
+            let (d,): (Directive,) = args(name, json)?;
+            json!(csp_sim::directive::goals_met(&d))
+        }
+        "renameProblem" => {
+            let (realm, target, label, realm_name): (Realm, Option<Value>, Given, Given) =
+                args(name, json)?;
+            let target = target.map(resident_arg).transpose()?;
+            json!(people::rename_problem(
+                &realm,
+                target.as_ref(),
+                label.given(),
+                realm_name.given()
+            ))
+        }
+        "horseRenameProblem" => {
+            let (realm, h, label): (Realm, Option<Value>, Given) = args(name, json)?;
+            let h = h.map(horse_arg).transpose()?;
+            json!(people::horse_rename_problem(&realm, h.as_ref(), label.given()))
+        }
+        "carriedFeesOver" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Way {
+                sender_tiles: f64,
+                other_tiles: f64,
+            }
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Goods {
+                gives: Good,
+                gives_units: f64,
+                wants: Good,
+                wants_units: f64,
+                times: f64,
+            }
+            let (way, fee_by, g): (Way, CarriedFeeBy, Goods) = args(name, json)?;
+            let way = direct_offer::CarriedWay {
+                sender_tiles: way.sender_tiles,
+                other_tiles: way.other_tiles,
+            };
+            let goods = direct_offer::OfferGoods {
+                gives: g.gives,
+                gives_units: g.gives_units,
+                wants: g.wants,
+                wants_units: g.wants_units,
+                times: g.times,
+            };
+            let (sender, other) = direct_offer::carried_fees_over(&way, fee_by, goods);
+            json!({ "senderFee": sender, "otherFee": other })
+        }
+        "boarderProblem" => {
+            let (r, k): (Value, Value) = args(name, json)?;
+            let (r, k) = (resident_arg(r)?, carriage_arg(k)?);
+            json!(csp_sim::queries::driving::boarder_problem(&r, &k))
+        }
+        "unhitchProblem" => {
+            let (r, k, tick): (Value, Option<Value>, f64) = args(name, json)?;
+            let r = resident_arg(r)?;
+            let k = k.map(carriage_arg).transpose()?;
+            json!(csp_sim::queries::driving::unhitch_problem(&r, k.as_ref(), tick))
+        }
+        // The last rules on one thing (T122.5b): who works on a site, trade holders and quotes,
+        // a city's, and a queue step's.
+        "workingOn" => {
+            let (b, residents, tearing_down, size): (Value, Vec<Value>, bool, i32) =
+                args(name, json)?;
+            let b = building_arg(b)?;
+            let residents =
+                residents.into_iter().map(resident_arg).collect::<Result<Vec<_>, String>>()?;
+            let on = building::working_on(&b, &residents, tearing_down, size);
+            json!(on.iter().map(|r| r.id.as_str()).collect::<Vec<_>>())
+        }
+        "handsOf" => {
+            let (r, tick): (Value, f64) = args(name, json)?;
+            let r = resident_arg(r)?;
+            let h = warehouse_trade::hands_of(&r, tick);
+            json!({ "stock": h.stock, "room": h.room })
+        }
+        "loadOf" => {
+            let (k, capacity): (Value, f64) = args(name, json)?;
+            let k = carriage_arg(k)?;
+            let h = warehouse_trade::load_of(&k, capacity);
+            json!({ "stock": h.stock, "room": h.room })
+        }
+        "quoteAtPrices" => {
+            let (stock, floor, coin_stock, holder, side, good, wanted, owed, their_room): (
+                f64,
+                f64,
+                f64,
+                Holder,
+                TradeSide,
+                Good,
+                f64,
+                f64,
+                Option<f64>,
+            ) = args(name, json)?;
+            let q = warehouse_trade::quote_at_prices(
+                stock,
+                floor,
+                coin_stock,
+                holder.as_holder(),
+                side,
+                good,
+                wanted,
+                owed,
+                their_room.unwrap_or(f64::INFINITY),
+                &[],
+            );
+            trade_quote(q)
+        }
+        "quoteTraderTrade" => {
+            let (escorts, load, capacity, holder, side, good, wanted): (
+                usize,
+                Stock,
+                f64,
+                Holder,
+                TradeSide,
+                Good,
+                f64,
+            ) = args(name, json)?;
+            let q = csp_sim::queries::trade_quotes::quote_trader_trade(
+                escorts,
+                &load,
+                capacity,
+                holder.as_holder(),
+                side,
+                good,
+                wanted,
+                &[],
+            );
+            trade_quote(q)
+        }
+        "quoteOffer" => {
+            let (offer, holder, wanted, available): (Offer, Holder, f64, Option<f64>) =
+                args(name, json)?;
+            let q = csp_sim::queries::offers::quote_offer(
+                &offer,
+                &holder.as_holder(),
+                wanted,
+                available.unwrap_or(f64::INFINITY),
+            );
+            let mut out = json!({ "times": q.times, "gives": q.gives, "wants": q.wants });
+            if let Some(limit) = q.limit {
+                out["limit"] = json!(limit_name(limit));
+            }
+            out
+        }
+        "cityRenameProblem" => {
+            let (realm, city, label): (Realm, Option<Value>, Given) = args(name, json)?;
+            let city = city.map(city_arg).transpose()?;
+            json!(people::city_rename_problem(&realm, city.as_ref(), label.given()))
+        }
+        "formerPlayerStanding" => {
+            let (city, tick): (Value, f64) = args(name, json)?;
+            json!(csp_sim::queries::standing::former_player_standing(&city_arg(city)?, tick))
+        }
+        "neverEnds" => {
+            let (order,): (OrderRequest,) = args(name, json)?;
+            json!(csp_sim::queue::never_ends(&order))
+        }
+        "feedsOnce" => {
+            let (order,): (OrderRequest,) = args(name, json)?;
+            json!(csp_sim::queue::feeds_once(&order))
+        }
+        "stepLine" => {
+            let (order,): (OrderRequest,) = args(name, json)?;
+            json!(csp_sim::queue::step_line(&order))
+        }
+        // Swaps, traders and stables (T122.5b).
+        "cutSwap" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Terms {
+                give: Good,
+                want: Good,
+                wanted: f64,
+                holder: Holder,
+                /// None for no end, as JSON has no Infinity.
+                spare: Option<f64>,
+                takes: Option<f64>,
+                place_coins: Option<f64>,
+                /// The price of the 1st, 2nd, ... unit of `want`, as far as the swap can go.
+                want_prices: Vec<f64>,
+                /// What is paid for the 1st, 2nd, ... unit of `give`, as far as it can go.
+                give_prices: Vec<f64>,
+            }
+            let (t,): (Terms,) = args(name, json)?;
+            let nth = |prices: &[f64], n: f64| prices.get(n as usize - 1).copied().unwrap_or(0.0);
+            let q = csp_sim::queries::trade_quotes::cut_swap(
+                csp_sim::queries::trade_quotes::SwapTerms {
+                    give: t.give,
+                    want: t.want,
+                    wanted: t.wanted,
+                    holder: t.holder.as_holder(),
+                    spare: t.spare.unwrap_or(f64::INFINITY),
+                    takes: t.takes.unwrap_or(f64::INFINITY),
+                    place_coins: t.place_coins.unwrap_or(f64::INFINITY),
+                    want_price: |n| nth(&t.want_prices, n),
+                    give_price: |n| nth(&t.give_prices, n),
+                },
+            );
+            let mut out = json!({
+                "units": q.units,
+                "gives": q.gives,
+                "coins": q.coins,
+                "bought": q.bought,
+                "sold": q.sold,
+            });
+            if let Some(limit) = q.limit {
+                out["limit"] = json!(limit_name(limit));
+            }
+            out
+        }
+        "traderPrices" => {
+            let (escorts, carriage): (Vec<String>, Value) = args(name, json)?;
+            let trader = trader_of(escorts, 0.0);
+            let prices = trader_trade::trader_prices(&trader, &carriage_arg(carriage)?);
+            json!(prices
+                .iter()
+                .map(|p| json!({ "good": p.good, "stock": p.stock, "buy": p.buy, "sell": p.sell }))
+                .collect::<Vec<_>>())
+        }
+        "traderEscortsWanted" => {
+            let (_, robberies): (Vec<String>, f64) = args(name, json)?;
+            json!(csp_sim::caravans::trader_escorts_wanted(&trader_of(Vec::new(), robberies)))
+        }
+        "horsesIn" => {
+            let (horses, stable): (Vec<Value>, Value) = args(name, json)?;
+            let horses = horses.into_iter().map(horse_arg).collect::<Result<Vec<_>, String>>()?;
+            let stable = building_arg(stable)?;
+            let inside = csp_sim::queries::horses::horses_in(&horses, &stable);
+            json!(inside.iter().map(|h| h.id.as_str()).collect::<Vec<_>>())
+        }
+        "keptBreeding" => {
+            let (stable, horse_ids): (Value, Vec<String>) = args(name, json)?;
+            let stable = building_arg(stable)?;
+            json!(csp_sim::queries::breeding::kept_breeding(&stable, &horse_ids))
         }
         _ => return Err(format!("no rule {name}")),
     };

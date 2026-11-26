@@ -1,16 +1,9 @@
 // Ported from packages/shared/src/offers.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { GOOD_WEIGHT } from './narrowed.js'
-import type {
-  Building,
-  Good,
-  OfferQuote,
-  Stock,
-  TradeHolder,
-  Offer,
-  WorldState,
-} from '@csp/shared-types'
+import type { Building, Good, Stock, Offer, WorldState } from '@csp/shared-types'
+
+export { quoteOffer } from '@csp/lang-wasm'
 
 export { offerTermsProblem } from '@csp/lang-wasm'
 
@@ -81,29 +74,3 @@ export function timesToPost(
  */
 export const offerOpenTo = (o: Pick<Offer, 'direct'>, side: string): boolean =>
   !o.direct || (o.direct.toId === side && !o.direct.carried)
-
-/**
- * What accepting an offer up to `wanted` times moves (`CONTEXT.md`: Offer): as many times as it
- * still stands (`available` units of what it gives are in the storage), as the trader can pay, and
- * as fits them, what they hand over making room. Pure: nothing moves.
- */
-export function quoteOffer(
-  offer: Pick<Offer, 'gives' | 'givesUnits' | 'wants' | 'wantsUnits' | 'times'>,
-  holder: TradeHolder,
-  wanted: number,
-  available = Infinity,
-): OfferQuote {
-  const left = Math.min(offer.times, Math.floor(available / offer.givesUnits))
-  const paid = wantsNothing(offer)
-    ? Infinity
-    : Math.floor((holder.stock[offer.wants] ?? 0) / offer.wantsUnits)
-  const gain =
-    offer.givesUnits * GOOD_WEIGHT[offer.gives] - offer.wantsUnits * GOOD_WEIGHT[offer.wants]
-  const fits = gain > 0 ? Math.floor((Math.max(0, holder.room) + 1e-9) / gain) : Infinity
-  const times = Math.min(wanted, left, paid, fits)
-  const quote = { times, gives: times * offer.givesUnits, wants: times * offer.wantsUnits }
-  if (times === wanted) return quote
-  if (times === left) return { ...quote, limit: 'stock' }
-  if (times === paid) return { ...quote, limit: offer.wants === 'coins' ? 'coins' : 'held' }
-  return { ...quote, limit: 'room' }
-}

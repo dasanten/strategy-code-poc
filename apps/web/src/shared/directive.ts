@@ -1,7 +1,9 @@
 // Ported from packages/shared/src/directive.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import type { DirectiveGoal, DirectiveGoalView, Directive } from '@csp/shared-types'
+import type { DirectiveGoalView } from '@csp/shared-types'
+
+export { goalMet } from '@csp/lang-wasm'
 
 export {
   MAX_DIRECTIVE_REASON,
@@ -14,11 +16,6 @@ export {
  * 0002). Every Player sees each directive's target, reason and goals; who gave it and how far its
  * goals have come stay with admins.
  */
-
-/** Whether a directive's goal is met. */
-export function goalMet(d: Pick<Directive, 'soldiersKilled'>, goal: DirectiveGoal): boolean {
-  return goal.kind === 'city' ? goal.met : d.soldiersKilled >= goal.count
-}
 
 /** A directive's goal in words, for the admin panel and Players. */
 export function describeGoal(goal: DirectiveGoalView): string {

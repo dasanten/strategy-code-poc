@@ -183,6 +183,23 @@ and `csp_sim::mirror::{resident, horse}`). The module is 541 KB gzipped (1,727 K
 495 KB: over the 500 kB limit, which waits on #1637. The mirror's update is not touched (only
 `resident` and `horse` in `mirror.rs` became public), so its time stays as measured in T122.4.
 
+## Size after the third part of T122.5b
+
+The rules on one contract, realm, directive or carriage, `workPace` and the rename problems
+(#1634) add readers for `MercenaryContract`, `Realm`, `Directive` and `SeenCarriage`: the module is
+557 KB gzipped (1,792 KB raw), from 541 KB. The mirror's update is not touched.
+
+## Size after the fourth part of T122.5b
+
+`workingOn`, the trade holders and quotes, the city rules and the queue step rules (#1634) add
+readers for `City`, `Offer` and `OrderRequest`: the module is 570 KB gzipped (1,850 KB raw), from
+557 KB. The mirror's update is not touched.
+
+## Size after the last part of T122.5b
+
+`cutSwap`, `traderPrices`, `traderEscortsWanted`, `horsesIn` and `keptBreeding` (#1634): the
+module is 574 KB gzipped (1,868 KB raw), from 570 KB. The mirror's update is not touched.
+
 ## The checks on the world (T122.6)
 
 The checks that say whether something is allowed and why not, and read the world, are asked of

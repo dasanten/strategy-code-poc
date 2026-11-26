@@ -236,7 +236,7 @@ describe('meters and countdowns', () => {
         stats: {
           strength: { base: strength, trained: 0 },
           intellect: { base: 10, trained: 0 },
-          stamina: { base: 10, trained: 0 },
+          endurance: { base: 10, trained: 0 },
           agility: { base: 10, trained: 0 },
         },
         skills: { construction: skill },
