@@ -17,7 +17,7 @@ csp-lang.workspace = true
 csp-sim.workspace = true
 csp-shared.workspace = true
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
 # Pinned: `wasm-bindgen-cli` must be this same version (`scripts/wasm-build.mjs` says so).
 wasm-bindgen = "=0.2.130"
 

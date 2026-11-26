@@ -8,10 +8,13 @@ reaches them through `@csp/lang-wasm` (`packages/lang-wasm/src/index.ts`).
 
 - `crates/csp-lang-wasm/src/rules.rs`: the functions the client calls, each a thin
   `#[wasm_bindgen]` wrapper around `csp-sim`'s own (`csp_sim::queries::...`).
-- **The world mirror** (`WorldMirror`) holds what the client sees in the module's memory. The client
-  hands it the server's `welcome` message once and each `tick` message after it, as the JSON text
-  the socket brought. Rules that read the world are its methods, called with ids and coordinates.
-  T122.1's mirror is throwaway and keeps only the buildings in sight; T122.4 brings the real one.
+- **The world mirror** (`WorldMirror`, around `csp_sim::mirror::SightMirror`) holds what the
+  client sees in the module's memory, as a `WorldState` the rules read as the server's world. The
+  client (`apps/web/src/world-mirror.ts`, fed by `useWorld`) hands it the server's `welcome`
+  message once and each `tick` message after it, as the JSON text the socket brought; nothing
+  crosses back but answers. Rules that read the world are its methods, called with ids and
+  coordinates. Everything in sight is kept in place in its list, found by id, in the server's order,
+  so a tick costs what it changed.
 - `pnpm wasm:build` (`scripts/wasm-build.mjs`) builds the module into
   `packages/lang-wasm/generated/`. In the browser it loads on `loadLang()`; in Node and Vitest it
   loads as `@csp/lang-wasm` is imported.
@@ -32,11 +35,40 @@ What costs bytes in the module:
 
 - **Deserializing a type costs its code.** Deserializing a whole `WorldState` (from JSON, even an
   empty one) adds about 300 KB gzipped; build a world with `WorldState::default()` and deserialize
-  only the parts a rule reads. The throwaway mirror reads entities through a small tagged enum
-  that keeps buildings and skips everything else (`#[serde(other)]`).
+  only the parts a rule reads.
 - **The name section** was half the module's bytes. The build removes it
   (`--remove-name-section`, also in the `Dockerfile`).
 - `wasm-opt` is not installed here nor in the image; with it, the module would be smaller still.
+
+## What the mirror doesn't know
+
+The server sends a Player what is in their sight (`sight.rs`), and less of some of it. The mirror
+fills the rest with defaults (`csp_sim::mirror`):
+
+| Not sent                                                                                              | The mirror holds                                            |
+| :---------------------------------------------------------------------------------------------------- | :---------------------------------------------------------- |
+| A stranger's health and hunger, and until when they are Down                                          | full health, fed; Down without an end (`DOWN_UNTIL_UNSEEN`) |
+| A horse's health and hunger, unless the Player's                                                      | the same                                                    |
+| What is in a building, carriage or vessel not seen inside                                             | empty                                                       |
+| A script's memory and log, since when it waits, an army's script but its id                           | empty, waiting since 0                                      |
+| A caravan's or trader's stop, plan, load and job                                                      | at its storage, with nothing to do                          |
+| Whether an order holds against blows, the Alarm a defence script interrupted                          | none                                                        |
+| Realms, events, crimes, contracts, standings, offers, demands, Last seen and the rest of `WorldState` | none at all                                                 |
+
+So a rule that reads one of them answers on the mirror as if it were so. The parity test
+(`crates/csp-sim/tests/mirror_parity.rs`) asks each rule it covers on the fixture worlds, for each
+realm, of the full world and of a mirror of what that realm is sent with every tile in sight, and
+fails on a rule that answers otherwise unless it is named there. Named so far, with what the client
+shows in that case today (its TypeScript copy reads the same Seen data, so the same):
+
+| Rule           | On the mirror                                              | The client today        |
+| :------------- | :--------------------------------------------------------- | :---------------------- |
+| `inputAt`      | a workplace not seen inside has none of its input in stock | the same: no stock sent |
+| `npcCityStock` | an NPC city's storage not seen inside holds nothing        | the same                |
+| `storedFood`   | a city's storage not seen inside holds no Food             | the same                |
+
+Any rule that reads realms, standings, contracts, alliances, offers or demands reads none on the
+mirror; those come in their own messages (`diplomacy` and the rest) and are not mirrored yet.
 
 ## Measurements (T122.1)
 
@@ -68,3 +100,32 @@ How each was taken:
 
 The update is the tightest of the four: T122.4's mirror reads more than buildings, so it should
 keep a tick's cost to what the tick changed, as this one does, and measure again.
+
+## Measurements (T122.4: the whole mirror)
+
+The same messages and machine as above, with the mirror now holding everything in sight:
+
+| What                         |  Limit |                                             Measured |
+| :--------------------------- | -----: | ---------------------------------------------------: |
+| Added download, compressed   | 500 kB |                             493 KB gzipped as served |
+| Start                        | 150 ms |            47 ms (module 2.9 ms, first mirror 44 ms) |
+| Mirror update per tick       |   4 ms |      3.9–4.1 ms mean, 4.2–4.7 ms p95 over three runs |
+| One rule call (`buildingAt`) |   1 ms | 0.002 ms mean; 0.2 ms the first call after an update |
+
+What it took to get there:
+
+- **Each thing in sight is read straight into its type.** `SeenEntity` is an internally tagged
+  enum: serde buffers each entity before reading it, which costs twice the time, and from that
+  buffer a map with number keys (a script's params by script id) doesn't read at all. The mirror
+  reads the `is` the server writes first and the rest straight into that kind's type
+  (`seen_entity_raw` in `rules.rs`).
+- **`ResidentOrder` reads tag first** (`tag_first!` in `orders.rs`), the same for saves on the
+  server; the derive's buffering of every resident's order and path was most of what was left.
+- Tried and dropped: `opt-level = 3` for `serde_json` and `csp-shared` in the wasm profile (no
+  faster, 14 KB bigger), `float_roundtrip` off (0.3 ms faster, but it changes how every number
+  the server reads is rounded).
+
+Both the download and the update are at their limits. A tick of this world changes about 400
+residents, who move: reading their JSON is most of the update. What would give room is in a
+follow-up issue: fewer fields per moving resident in a tick, `wasm-opt` in the image, or a binary
+tick message.

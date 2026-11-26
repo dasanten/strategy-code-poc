@@ -58,7 +58,7 @@ const seen = JSON.parse(welcome)
 console.log(
   `start: ${ms(loaded + mirrored)} (module ${ms(loaded)}, first mirror ${ms(mirrored)}),` +
     ` welcome ${kb(welcome.length)} with ${seen.entities.length} things in sight,` +
-    ` ${mirror.count} of them buildings`,
+    ` ${mirror.count} of them mirrored`,
 )
 
 // After each update the rule's first call builds its lookup by tile again: timed apart.
@@ -111,6 +111,6 @@ t = performance.now()
 mirror.welcome(everything)
 console.log(
   `with Last seen: first mirror ${ms(performance.now() - t)} of ${kb(everything.length)},` +
-    ` ${mirror.count} buildings`,
+    ` ${mirror.count} things`,
 )
 mirror.free()

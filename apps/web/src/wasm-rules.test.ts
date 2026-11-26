@@ -38,11 +38,11 @@ describe('the world mirror', () => {
     y,
   })
   const seen = (b: Building) => ({ is: 'building', ...b })
-  const welcome = (buildings: Building[], others: object[] = []) =>
+  const welcome = (buildings: Building[]) =>
     JSON.stringify({
       type: 'welcome',
       map: { size: SIZE },
-      entities: [...buildings.map(seen), ...others],
+      entities: buildings.map(seen),
     })
 
   it('finds the building on a tile as the TypeScript copy does, across the map’s join too', () => {
@@ -53,8 +53,7 @@ describe('the world mirror', () => {
       building('b4', 'townHall', 20, 5),
     ]
     const mirror = new WorldMirror()
-    // A resident in sight is mirrored by id only: the throwaway mirror reads buildings alone.
-    mirror.welcome(welcome(buildings, [{ is: 'resident', id: 'r1', x: 1, y: 1 }]))
+    mirror.welcome(welcome(buildings))
     expect(mirror.count).toBe(4)
     for (let y = 0; y < SIZE; y++) {
       for (let x = 0; x < SIZE; x++) {

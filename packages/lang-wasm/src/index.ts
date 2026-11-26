@@ -185,8 +185,8 @@ export function buildingWork(kind: BuildingKind, under?: number): number {
 
 /**
  * What the client sees, kept in the module's memory: the server's `welcome` message goes in once,
- * each `tick` message after it, as the JSON text the socket brought. Throwaway (T122.1): only the
- * buildings in sight, for `buildingAt`; T122.4 brings the real mirror.
+ * each `tick` message after it, as the JSON text the socket brought: everything in sight, as a
+ * `WorldState` the rules read (T122.4, `docs/wasm-rules.md`).
  */
 export class WorldMirror {
   private readonly mirror = new (ready().WorldMirror)()
@@ -201,7 +201,7 @@ export class WorldMirror {
     this.mirror.tick(json)
   }
 
-  /** How many buildings are in sight. */
+  /** How many things are in sight. */
   get count(): number {
     return this.mirror.count
   }
