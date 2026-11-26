@@ -30,6 +30,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates crates
 RUN cargo build --profile wasm --target wasm32-unknown-unknown --package csp-lang-wasm --lib \
     && wasm-bindgen --target web --out-dir /wasm --out-name csp_lang_wasm \
+        --remove-name-section --remove-producers-section \
         target/wasm32-unknown-unknown/wasm/csp_lang_wasm.wasm
 
 # --- the client, built as before ------------------------------------------------------------

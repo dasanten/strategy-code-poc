@@ -66,6 +66,10 @@ if (!existsSync(bindings) || statSync(built).mtimeMs > statSync(bindings).mtimeM
     outDir,
     '--out-name',
     'csp_lang_wasm',
+    // The function names are half the module's bytes and only name frames in a stack trace
+    // (docs/wasm-rules.md).
+    '--remove-name-section',
+    '--remove-producers-section',
     built,
   ])
   let wasmOpt = true
@@ -95,6 +99,26 @@ if (!existsSync(bindings) || statSync(built).mtimeMs > statSync(bindings).mtimeM
 }
 
 const bytes = readFileSync(bindings)
+
+// What the browser lacks (ADR 0045): on wasm32-unknown-unknown the standard library builds
+// `Instant::now()`, `SystemTime::now()` and threads as calls that only fail when they run. Code
+// that can reach one carries its message into the module (dead code is dropped), so a message in
+// the module is a call the rules can reach: the build fails before a browser finds it.
+const LACKING = [
+  ['time not implemented on this platform', 'Instant::now() or SystemTime::now()'],
+  ['operation not supported on this platform', 'a thread, a file or another OS call'],
+  ['failed to spawn thread', 'a thread'],
+]
+const text = bytes.toString('latin1')
+const found = LACKING.filter(([message]) => text.includes(message))
+if (found.length > 0) {
+  console.error(
+    'wasm:build: the module can reach what the browser lacks:\n' +
+      found.map(([message, what]) => `  ${what} ("${message}")`).join('\n') +
+      '\n  Keep it out of what crates/csp-lang-wasm calls (docs/wasm-rules.md).',
+  )
+  process.exit(1)
+}
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`
 console.log(
   `wasm:build: packages/lang-wasm/generated/csp_lang_wasm_bg.wasm is ${kb(bytes.length)}` +

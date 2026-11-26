@@ -70,7 +70,7 @@ pub use vessels::*;
 pub use world_format::{parse_save, SaveError, WORLD_FORMAT_VERSION};
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WorldState {
     /// Starts at 0 and only ever goes up by `world.tick++`.
