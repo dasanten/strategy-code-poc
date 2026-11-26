@@ -1,6 +1,5 @@
 import init, * as wasm from '../generated/csp_lang_wasm.js'
 import type { ScriptParamType } from './script-data.js'
-import type { BuildingKind } from '@csp/shared-types'
 
 /**
  * The editor's script checker (ADR 0030): `csp-lang`'s, the server's own, compiled to
@@ -9,6 +8,7 @@ import type { BuildingKind } from '@csp/shared-types'
  * are synchronous and throw until it has loaded.
  */
 export * from './script-data.js'
+export * from './rules.js'
 
 /** A finding at a place in a script. */
 export interface Diagnostic {
@@ -170,18 +170,10 @@ export function scriptParams(source: string): ParamInfo[] {
 }
 
 /**
- * The game's rules, `csp-sim`'s own, from the same module (ADR 0045, T122.1). The first slice: a
- * rule that needs no world, and a throwaway mirror of what the client sees that a world-reading
- * rule asks by coordinates (`docs/wasm-rules.md`).
+ * The game's rules, `csp-sim`'s own, from the same module (ADR 0045): those that take only
+ * values are in `rules.ts`; a throwaway mirror of what the client sees that a world-reading rule
+ * asks by coordinates (`docs/wasm-rules.md`).
  */
-
-/**
- * Work a building of `kind` takes in ticks of one unskilled resident of average Strength, over the
- * terrain `under` where known (`buildingWork`).
- */
-export function buildingWork(kind: BuildingKind, under?: number): number {
-  return ready().buildingWork(kind, under)
-}
 
 /**
  * What the client sees, kept in the module's memory: the server's `welcome` message goes in once,

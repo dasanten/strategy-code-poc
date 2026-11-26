@@ -6,24 +6,17 @@ import { recipeFor } from './building.js'
 import { cityFoodUse, cityResidents, forSale, npcCityRefuses } from './city.js'
 import { covers, isAt } from './footprint.js'
 import { horsesIn, ownsHorse } from './horses.js'
-import { BUILD_MATERIALS, GOOD_WEIGHT, NPC_VILLAGE, WAREHOUSE_FLOOR } from './narrowed.js'
+import { BUILD_MATERIALS, GOOD_WEIGHT } from './narrowed.js'
 import { standingOf } from './standing.js'
 import { canWork, isArmed } from './stats.js'
-import { PRICED_GOODS, priceFor, type Price } from './warehouse.js'
+import { PRICED_GOODS } from './warehouse.js'
 import { WEAPONS } from './world.js'
 import {
   CITY_PRICE_STANDING_SWING,
   HORSE_FOOD_PER_DAY,
-  NPC_FOUND_PARTY_MOST,
-  NPC_FOUND_RESIDENTS_PER_MEMBER,
-  NPC_FOUND_VILLAGE_RESIDENTS,
-  NPC_FULL_DAYS,
-  NPC_FULL_DAYS_LEAST,
-  NPC_FULL_RESIDENTS_PER_DAY,
   NPC_HORSES_BASE,
   NPC_RESIDENTS_PER_HORSE,
   NPC_RESIDENTS_PER_NEEDS_STEP,
-  NPC_SOLDIER_SHARE,
   NPC_TRADE,
   NPC_WAR_CHEST_PER_RESIDENT,
   STABLE_CAPACITY,
@@ -45,6 +38,9 @@ import type {
   WorldState,
 } from '@csp/shared-types'
 import { NPC_SMITHY_WEAPON } from '@csp/shared-types'
+import { npcPriceFor, npcSoldierTarget } from '@csp/lang-wasm'
+
+export { npcPriceFor, npcSoldierTarget, npcFullDays, npcFoundingPartySize } from '@csp/lang-wasm'
 
 export { NPC_SMITHY_WEAPON } from '@csp/shared-types'
 
@@ -83,35 +79,6 @@ export function npcCityStock(world: Pick<WorldState, 'buildings'>, city: City): 
     }
   }
   return sum
-}
-
-/**
- * How many soldiers an NPC city keeps (`CONTEXT.md`: NPC city): `NPC_SOLDIER_SHARE` of its
- * adults, rounded up.
- */
-export function npcSoldierTarget(adults: number): number {
-  return Math.ceil(adults * NPC_SOLDIER_SHARE)
-}
-
-/**
- * Game days a full NPC city of `residents` waits before it founds (`CONTEXT.md`: Full city): a game
- * week up to `NPC_FOUND_VILLAGE_RESIDENTS`, a game day less for each `NPC_FULL_RESIDENTS_PER_DAY`
- * past that, and never less than `NPC_FULL_DAYS_LEAST`.
- */
-export function npcFullDays(residents: number): number {
-  const past = Math.max(0, residents - NPC_FOUND_VILLAGE_RESIDENTS)
-  return Math.max(NPC_FULL_DAYS_LEAST, NPC_FULL_DAYS - past / NPC_FULL_RESIDENTS_PER_DAY)
-}
-
-/**
- * How many adults a full NPC city of `residents` sends to found a daughter (`CONTEXT.md`: Founding):
- * a village's worth up to `NPC_FOUND_VILLAGE_RESIDENTS`, one more for each
- * `NPC_FOUND_RESIDENTS_PER_MEMBER` past that, and never more than `NPC_FOUND_PARTY_MOST`.
- */
-export function npcFoundingPartySize(residents: number): number {
-  const past = Math.max(0, residents - NPC_FOUND_VILLAGE_RESIDENTS)
-  const more = Math.floor(past / NPC_FOUND_RESIDENTS_PER_MEMBER)
-  return Math.min(NPC_FOUND_PARTY_MOST, NPC_VILLAGE.residents + more)
 }
 
 /**
@@ -204,15 +171,6 @@ export function npcReserve(world: WorldState, city: City): Stock {
 }
 
 /**
- * The floor an NPC city prices a good from, as a warehouse prices from its stock floor
- * (`priceFor`): its reserve of the good, or a trading post's floor (`WAREHOUSE_FLOOR`) when that
- * is more, so a good it barely keeps is not given away.
- */
-function priceFloor(good: PricedGood, reserve: Stock): number {
-  return Math.max(WAREHOUSE_FLOOR[good], reserve[good] ?? 0)
-}
-
-/**
  * How far an NPC city's standing toward the trader moves its prices (`CONTEXT.md`: Trading with
  * an NPC city): the share `CITY_PRICE_STANDING_SWING` × standing / `STANDING_RANGE`, as for its
  * own price (`cityPrice`). 0 without a trader.
@@ -224,19 +182,6 @@ export function standingSwing(
 ): number {
   if (traderId === null || traderId === undefined) return 0
   return (CITY_PRICE_STANDING_SWING * standingOf(world, city.id, traderId)) / STANDING_RANGE
-}
-
-/**
- * An NPC city's price for one unit of a good with `stock` of it in its storages (`CONTEXT.md`:
- * Trading with an NPC city): a warehouse's price from that stock (`priceFor`) and its floor,
- * then moved by its standing (`swing`): it sells for (1 − swing) of that and buys for (1 + swing),
- * always at least a coin lower than it sells. Whole coins.
- */
-export function npcPriceFor(good: PricedGood, stock: number, reserve: Stock, swing: number): Price {
-  const base = priceFor(good, stock, priceFloor(good, reserve))
-  const sell = Math.max(2, Math.round(base.sell * (1 - swing)))
-  const buy = Math.max(1, Math.min(sell - 1, Math.round(base.buy * (1 + swing))))
-  return { buy, sell }
 }
 
 /**

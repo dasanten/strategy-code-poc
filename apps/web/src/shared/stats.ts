@@ -1,17 +1,9 @@
 // Ported from packages/shared/src/balance.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import {
-  CHILD_GOODS,
-  GOOD_WEIGHT,
-  RECIPES,
-  SKILL_MAX,
-  WEAPON_ATTACK,
-  WORKPLACE_SKILL,
-} from './narrowed.js'
+import { CHILD_GOODS, RECIPES, SKILL_MAX, WEAPON_ATTACK, WORKPLACE_SKILL } from './narrowed.js'
 import {
   ADULT_AGE,
-  CARRIAGE_SPEED,
   CHILD_YEAR_DAYS,
   CONSTRUCTION_SKILL_MAX,
   CONSTRUCTION_SKILL_PER_DAY,
@@ -46,9 +38,10 @@ import type {
   Resident,
   SkillName,
   StatName,
-  Stock,
   Weapon,
 } from '@csp/shared-types'
+
+export { type Recipe, stockWeight, carriageCanEnter } from '@csp/lang-wasm'
 
 /** Ticks from birth until a resident is grown up. */
 const CHILDHOOD_TICKS = ADULT_AGE * CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY
@@ -111,14 +104,6 @@ export interface NpcCitySize {
   food: number
 }
 
-/** What some goods weigh together, in kg. */
-export function stockWeight(stock: Stock): number {
-  return (Object.entries(stock) as [Good, number][]).reduce(
-    (kg, [good, units]) => kg + units * GOOD_WEIGHT[good],
-    0,
-  )
-}
-
 /**
  * How much of the usual food a resident needs on a tile of the given terrain at the given tick
  * (`CONTEXT.md`: Terrain, Hunger): their `hungerFactor`, times the terrain's extra food use
@@ -132,14 +117,6 @@ export function foodUse(resident: Resident, terrain: number, tick: number): numb
     Math.min(HUNGER_ENDURANCE_LIMIT, away * ENDURANCE_TERRAIN_EFFECT),
   )
   return hungerFactor(resident, tick) * (1 + extra * (1 - soften))
-}
-
-/**
- * Whether a carriage can enter ground of the given kind (`groundAt`): passable land or a road, but
- * no bare mountains (`carriageCanGoTo`).
- */
-export function carriageCanEnter(terrain: number): boolean {
-  return ((CARRIAGE_SPEED as Partial<Record<number, number>>)[terrain] ?? 0) > 0
 }
 
 /**
@@ -164,14 +141,6 @@ export function constructionLearned(resident: Resident, tick: number): number {
   const pace = statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE
   const room = Math.max(0, CONSTRUCTION_SKILL_MAX - (resident.skills.construction ?? 0))
   return Math.min(room, (CONSTRUCTION_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace)
-}
-
-/** What a workplace that processes goods turns into what, one batch at a time. */
-export interface Recipe {
-  /** Goods one batch uses up. */
-  input: Stock
-  /** Goods one batch makes. */
-  output: Stock
 }
 
 /**

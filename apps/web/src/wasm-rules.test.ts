@@ -1,8 +1,8 @@
 import { BUILDING_KINDS } from '@csp/balance'
-import { buildingWork as rustBuildingWork, WorldMirror } from '@csp/lang-wasm'
+import { buildingWork, WorldMirror } from '@csp/lang-wasm'
 import type { Building, BuildingKind } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
-import { buildingAt, buildingWork } from './shared/building.js'
+import { buildingAt } from './shared/building.js'
 import { Terrain } from './shared/terrain.js'
 
 /**
@@ -11,20 +11,17 @@ import { Terrain } from './shared/terrain.js'
  */
 
 describe('a rule that needs no world', () => {
-  it('answers the work a building takes as the TypeScript copy does, over each terrain', () => {
+  it('answers the work a building takes, over each terrain', () => {
     for (const kind of BUILDING_KINDS) {
       for (const under of [undefined, Terrain.Plains, Terrain.Mountain]) {
-        expect([kind, under, rustBuildingWork(kind, under)]).toEqual([
-          kind,
-          under,
-          buildingWork(kind, under),
-        ])
+        expect(buildingWork(kind, under)).toBeGreaterThanOrEqual(0)
       }
     }
+    expect(buildingWork('road', Terrain.Mountain)).toBeGreaterThan(buildingWork('road'))
   })
 
-  it('says NaN for a kind that is none', () => {
-    expect(rustBuildingWork('castle' as BuildingKind)).toBeNaN()
+  it('throws for a kind that is none: a call that does not fit its Rust function is a bug', () => {
+    expect(() => buildingWork('castle' as BuildingKind)).toThrow(/buildingWork/)
   })
 })
 

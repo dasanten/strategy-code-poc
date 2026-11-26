@@ -1,28 +1,16 @@
 //! The game's rules for the client, as WebAssembly (ADR 0045, Epic 122): `csp-sim`'s own
 //! functions, called from the browser instead of a TypeScript copy of them.
 //!
-//! Rules that need no world are functions ([`building_work`]). Rules that read the world are
-//! methods of [`WorldMirror`], called with ids and coordinates, never with the world: the mirror
+//! Rules that read the world are methods of [`WorldMirror`], called with ids and coordinates, never with the world: the mirror
 //! (`csp_sim::mirror::SightMirror`) is what one Player sees, as a `WorldState`, fed the server's
-//! `welcome` message once and each `tick` message after it (T122.4).
+//! `welcome` message once and each `tick` message after it (T122.4). The rules that take only values are in `value_rules`.
 
 use csp_shared::protocol::SeenEntity;
-use csp_shared::world::BuildingKind;
 use csp_sim::mirror::SightMirror;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use wasm_bindgen::prelude::wasm_bindgen;
-
-/// Work a building of `kind` takes in ticks of one unskilled resident of average Strength, over
-/// the terrain `under` where known (`buildingWork`). NaN for a kind that isn't one.
-#[wasm_bindgen(js_name = buildingWork)]
-pub fn building_work(kind: &str, under: Option<u8>) -> f64 {
-    match serde_json::from_value::<BuildingKind>(serde_json::Value::String(kind.into())) {
-        Ok(kind) => csp_sim::queries::building::building_work(kind, under),
-        Err(_) => f64::NAN,
-    }
-}
 
 /// What the mirror reads of the server's `welcome` message.
 #[derive(Deserialize)]

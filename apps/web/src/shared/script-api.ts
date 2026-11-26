@@ -3,12 +3,9 @@
 
 import type { ScriptParam } from '@csp/shared-types'
 
-export { SCRIPT_PARAM_TYPES } from '@csp/shared-types'
+export { isParamNumber } from '@csp/lang-wasm'
 
-/** Whether a value fits a `number` param: a whole number of zero or more. */
-export function isParamNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
-}
+export { SCRIPT_PARAM_TYPES } from '@csp/shared-types'
 
 /** Whether a value fits a `choice` param: one of the words its line lists. */
 export function isParamChoice(param: Pick<ScriptParam, 'choices'>, value: unknown): boolean {

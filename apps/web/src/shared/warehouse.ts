@@ -5,24 +5,13 @@ import { commandsCarriage } from './alliance.js'
 import { KEEPS_GOODS } from './building.js'
 import { townHallOf } from './city.js'
 import { covers, isAt } from './footprint.js'
-import { GOOD_WEIGHT, WAREHOUSE_BASE_PRICE, WAREHOUSE_FLOOR } from './narrowed.js'
+import { GOOD_WEIGHT, WAREHOUSE_FLOOR } from './narrowed.js'
 import { freeStock } from './offers.js'
 import { tradeOrgRefuses } from './standing.js'
 import { canWork, stockWeight } from './stats.js'
 import { NO_CARAVANS, tradeOrgHq } from './trade-org.js'
 import { GOODS } from './world.js'
-import {
-  BUY_SHARE,
-  DELIVERY_FEE_BASE,
-  DELIVERY_FEE_PER_KG_TILE,
-  DELIVERY_LOAD,
-  HQ_FLOOR_FACTOR,
-  HQ_FOOD_FLOOR_FACTOR,
-  PRICE_ELASTICITY,
-  PRICE_RANGE,
-  PRICE_REFERENCE_FLOORS,
-  carryCapacity,
-} from '@csp/balance'
+import { DELIVERY_LOAD, HQ_FLOOR_FACTOR, HQ_FOOD_FLOOR_FACTOR, carryCapacity } from '@csp/balance'
 import type {
   Building,
   Carriage,
@@ -40,6 +29,9 @@ import type {
   WorldState,
 } from '@csp/shared-types'
 import { HQ_COIN_WAREHOUSE } from '@csp/shared-types'
+import { priceFor, deliveryFee } from '@csp/lang-wasm'
+
+export { type Price, priceFor, deliveryFee } from '@csp/lang-wasm'
 
 export { HQ_COIN_WAREHOUSE } from '@csp/shared-types'
 
@@ -81,30 +73,6 @@ export function stockFloor(world: Pick<WorldState, 'cities' | 'buildings'>, b: B
   // A good with no floor (the steel weapons and armour, T101.5) is not traded at a warehouse yet.
   for (const g of keeps) if (WAREHOUSE_FLOOR[g] > 0) floor[g] = WAREHOUSE_FLOOR[g] * factor(g)
   return floor
-}
-
-/** What a warehouse pays for (`buy`) and asks for (`sell`) one unit of a good, in coins. */
-export interface Price {
-  buy: number
-  sell: number
-}
-
-/**
- * A warehouse's price for one good from its own stock and floor (`CONTEXT.md`: Warehouse prices,
- * Price anchor): the base price at `PRICE_REFERENCE_FLOORS` floors of stock, rising as stock
- * falls and falling as it grows, within `PRICE_RANGE`. It buys at `BUY_SHARE` of that, always at
- * least a coin lower than it sells. Whole coins.
- */
-export function priceFor(good: Exclude<Good, 'coins'>, stock: number, floor: number): Price {
-  const base = WAREHOUSE_BASE_PRICE[good]
-  const reference = Math.max(1, floor * PRICE_REFERENCE_FLOORS)
-  const factor = Math.min(
-    PRICE_RANGE.max,
-    Math.max(PRICE_RANGE.min, (reference / Math.max(1, stock)) ** PRICE_ELASTICITY),
-  )
-  const sell = Math.max(2, Math.round(base * factor))
-  const buy = Math.max(1, Math.min(sell - 1, Math.floor(sell * BUY_SHARE)))
-  return { buy, sell }
 }
 
 /**
@@ -404,14 +372,6 @@ export function deliveryStorage(
   cityId: string,
 ): Building | undefined {
   return world.buildings.find((b) => b.cityId === cityId && b.kind === 'storage' && !b.site)
-}
-
-/**
- * A delivery's fee, in coins (`CONTEXT.md`: Delivery): `DELIVERY_FEE_BASE`, and
- * `DELIVERY_FEE_PER_KG_TILE` for each kg carried each tile from the warehouse to the storage.
- */
-export function deliveryFee(kg: number, tiles: number): number {
-  return DELIVERY_FEE_BASE + Math.ceil(kg * tiles * DELIVERY_FEE_PER_KG_TILE - 1e-9)
 }
 
 /**

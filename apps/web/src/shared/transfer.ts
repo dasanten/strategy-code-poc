@@ -8,42 +8,18 @@ import { tradeOrgRefuses } from './standing.js'
 import { canWork } from './stats.js'
 import { wrapDistance } from './terrain.js'
 import { NO_CARAVANS, tradeOrgHq } from './trade-org.js'
-import {
-  deliveryFee,
-  deliveryStorage,
-  tradeCoinWarehouse,
-  tradingWarehouseAt,
-} from './warehouse.js'
+import { deliveryStorage, tradeCoinWarehouse, tradingWarehouseAt } from './warehouse.js'
 import { GOODS } from './world.js'
-import { DELIVERY_LOAD, TRANSFER_FEE_FACTOR } from '@csp/balance'
 import type { Building, Good, Resident, WorldState } from '@csp/shared-types'
+import { transferFee, feeAtPickUp, transferLoad } from '@csp/lang-wasm'
+
+export { transferFee, feeAtPickUp, transferLoad } from '@csp/lang-wasm'
 
 /*
  * Transfers between realms (`CONTEXT.md`: Transfer): the Trade Organization carries goods or
  * coins from one realm to a city of another as a courier, for a fee. The queries here are the
  * game API the UI, scripts and server share (ADR 0002).
  */
-
-/**
- * A transfer's fee, in coins (`CONTEXT.md`: Transfer): `TRANSFER_FEE_FACTOR` times a delivery's
- * fee (`deliveryFee`) for `kg` over the caravan's whole way of `tiles`.
- */
-export function transferFee(kg: number, tiles: number): number {
-  return TRANSFER_FEE_FACTOR * deliveryFee(kg, tiles)
-}
-
-/**
- * The part of a transfer's fee its caravan takes at the pick-up, the rest (`unloadShare` of it,
- * rounded up) being taken where it unloads (`CONTEXT.md`: Direct offer). A plain transfer's is all.
- */
-export function feeAtPickUp(fee: number, unloadShare = 0): number {
-  return fee - Math.ceil(fee * unloadShare)
-}
-
-/** The most units of `good` one transfer carries: one delivery load (`DELIVERY_LOAD`). */
-export function transferLoad(good: Good): number {
-  return Math.floor(DELIVERY_LOAD / GOOD_WEIGHT[good] + 1e-9)
-}
 
 /**
  * The warehouses whose caravans carry transfers: every finished Trade Org warehouse that prices

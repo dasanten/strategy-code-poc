@@ -34,12 +34,12 @@ describe('the Build menu’s groups', () => {
 describe('buildingInfo', () => {
   it('takes a processing workplace’s recipes, skill, workers, footprint and cost from the balance', () => {
     const info = buildingInfo('smelter')
-    expect(info.recipes).toBe(RECIPES.smelter)
+    expect(info.recipes).toEqual(RECIPES.smelter)
     expect(info.yields).toEqual([])
     expect(info.skill).toBe('smelting')
     expect(info.maxWorkers).toBe(WORKPLACE_MAX_WORKERS.smelter)
     expect(info.footprint).toBe(FOOTPRINT.smelter)
-    expect(info.materials).toBe(BUILD_MATERIALS.smelter)
+    expect(info.materials).toEqual(BUILD_MATERIALS.smelter)
     expect(info.work).toBeGreaterThan(0)
   })
 
