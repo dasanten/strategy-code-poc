@@ -36,13 +36,22 @@ function encode(
 const ofCity = (buildings: readonly AreaBuilding[], cityId: string) =>
   encode(buildings, (c) => (c === cityId ? 0 : -1), true)
 
+/** Every tile in a city's area as `x, y` pairs in one array, each once (`cityAreaTiles`). */
+export function cityAreaTileArray(
+  buildings: readonly AreaBuilding[],
+  cityId: string,
+  size: number,
+): Int32Array {
+  return wasm.cityAreaTiles(ofCity(buildings, cityId), 0, size)
+}
+
 /** Every tile in a city's area, as `[x, y]`, each once (`cityAreaTiles`). */
 export function cityAreaTileList(
   buildings: readonly AreaBuilding[],
   cityId: string,
   size: number,
 ): [number, number][] {
-  const flat = wasm.cityAreaTiles(ofCity(buildings, cityId), 0, size)
+  const flat = cityAreaTileArray(buildings, cityId, size)
   const out: [number, number][] = []
   for (let i = 0; i < flat.length; i += 2) out.push([flat[i]!, flat[i + 1]!])
   return out
