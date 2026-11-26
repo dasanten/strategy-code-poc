@@ -7,11 +7,8 @@ import {
   covers,
   footprintKeys,
   footprintTiles,
-  footprintsNear,
-  gapTo,
   isAt,
   middleOf,
-  nearFootprint,
 } from './footprint.js'
 import { Terrain, type TerrainMap } from './terrain.js'
 import type { Building, WorldState } from '@csp/shared-types'
@@ -91,29 +88,6 @@ describe('footprints (`CONTEXT.md`: Footprint)', () => {
     expect(isAt({ x: 8, y: 8 }, farm, SIZE)).toBe(true)
     expect(isAt({ x: 11, y: 11 }, farm, SIZE)).toBe(true)
     expect(isAt({ x: 12, y: 11 }, farm, SIZE)).toBe(false)
-  })
-
-  it('measure gaps from their edges, the short way round', () => {
-    expect(gapTo(storage, { x: 5, y: 4 }, SIZE)).toEqual([0, 0])
-    expect(gapTo(storage, { x: 6, y: 4 }, SIZE)).toEqual([1, 0])
-    expect(gapTo(storage, { x: 2, y: 9 }, SIZE)).toEqual([2, 4])
-    expect(gapTo({ kind: 'wall', x: 0, y: 0 }, { x: SIZE - 2, y: 0 }, SIZE)).toEqual([2, 0])
-    expect(nearFootprint(storage, { x: 7, y: 7 }, 2, SIZE)).toBe(true)
-    expect(nearFootprint(storage, { x: 8, y: 7 }, 2, SIZE)).toBe(false)
-  })
-
-  it('come near each other by the steps between their edges', () => {
-    const hall = { kind: 'townHall' as const, x: 10, y: 10 }
-    // The hall covers 10–12: a storage over it is 0 steps off, one at 13 touches it (1 step), one
-    // at 15 leaves a gap of two tiles (3 steps).
-    expect(footprintsNear(hall, { kind: 'storage', x: 12, y: 10 }, 0, SIZE)).toBe(true)
-    expect(footprintsNear(hall, { kind: 'storage', x: 13, y: 10 }, 0, SIZE)).toBe(false)
-    expect(footprintsNear(hall, { kind: 'storage', x: 13, y: 10 }, 1, SIZE)).toBe(true)
-    expect(footprintsNear(hall, { kind: 'storage', x: 15, y: 10 }, 2, SIZE)).toBe(false)
-    expect(footprintsNear(hall, { kind: 'storage', x: 15, y: 10 }, 3, SIZE)).toBe(true)
-    // West of it the storage's own width counts: at 7 it covers 7–8, a tile off the hall.
-    expect(footprintsNear(hall, { kind: 'storage', x: 7, y: 10 }, 2, SIZE)).toBe(true)
-    expect(footprintsNear(hall, { kind: 'storage', x: 6, y: 10 }, 2, SIZE)).toBe(false)
   })
 
   it('have a middle tile, rounded to the north-west', () => {

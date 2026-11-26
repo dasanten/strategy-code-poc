@@ -38,7 +38,8 @@ fn world_of(buildings: &[i32]) -> Result<WorldState, String> {
             .ok()
             .and_then(|k| BuildingKind::ALL.get(k))
             .ok_or_else(|| format!("no building kind {}", b[2]))?;
-        let (city, site) = if b[3] >= SITE { (b[3] - SITE, true) } else { (b[3], false) };
+        // A site of no city is -1 + `SITE`.
+        let (city, site) = if b[3] >= SITE - 1 { (b[3] - SITE, true) } else { (b[3], false) };
         world.buildings.push(Building {
             id: format!("b{i}"),
             kind,
@@ -120,9 +121,58 @@ pub fn in_any_city_area(buildings: &[i32], tiles: &[i32], size: i32) -> Result<V
         .collect())
 }
 
+/// Which city each of `buildings` belongs to (`cityMembership`, `CONTEXT.md`: City building): for
+/// each building, in order, the place in `city_ids` of its city, -1 for none. `city_ids` are the
+/// cities' ids, one per line, read for which city is older on a tie (`idNumber`); `halls` the place
+/// among `buildings` of each one's town hall, -1 when it isn't among them. The buildings' own city
+/// numbers are not read: membership is worked out from the town halls outward.
+#[wasm_bindgen(js_name = cityMembership)]
+pub fn city_membership(
+    buildings: &[i32],
+    city_ids: &str,
+    halls: &[i32],
+    size: i32,
+) -> Result<Vec<i32>, String> {
+    let mut world = world_of(buildings)?;
+    let ids: Vec<&str> = if city_ids.is_empty() { Vec::new() } else { city_ids.split('\n').collect() };
+    if ids.len() != halls.len() {
+        return Err("one town hall for each city".into());
+    }
+    for (id, &hall) in ids.iter().zip(halls) {
+        let city = serde_json::json!({
+            "id": id, "name": "", "realmId": null, "townHallId": format!("b{hall}"), "occupation": null,
+        });
+        world.cities.push(serde_json::from_value(city).map_err(|e| e.to_string())?);
+    }
+    let members = city_area::city_membership(&world, size);
+    Ok((0..world.buildings.len())
+        .map(|i| {
+            members
+                .get(&format!("b{i}"))
+                .and_then(|c| ids.iter().position(|id| id == c))
+                .map_or(-1, |p| p as i32)
+        })
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn membership_answers_as_csp_sim_does() {
+        let size = 64;
+        let hall = kind(BuildingKind::TownHall);
+        // Two halls; houses chain from each; one house far from both.
+        let b = [
+            10, 10, hall, -1, 15, 10, HOUSE, -1, 18, 10, HOUSE, -1, 40, 40, hall, -1, 44, 40,
+            HOUSE, -1, 60, 20, HOUSE, -1, 20, 10, HOUSE, 999,
+        ];
+        let got = city_membership(&b, "c2\nc7", &[0, 3], size).unwrap();
+        assert_eq!(got, [0, 0, 0, 1, 1, -1, -1]);
+        assert_eq!(city_membership(&b, "", &[], size).unwrap(), [-1; 7]);
+        assert!(city_membership(&b, "c2", &[], size).is_err());
+    }
 
     const HOUSE: i32 = 1;
 

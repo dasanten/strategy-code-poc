@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { BUILD_MATERIALS, BUILD_WORK, STONE_BUILD_MATERIALS, STONE_BUILD_WORK } from './narrowed.js'
 import { STONE_WALL_STRENGTH, WALL_STRENGTH } from './narrowed.js'
 import { isStone, materialsOfKind, stoneOverAt, workOfKind } from './building.js'
-import { brokenReturns, wallMap, wallStrength } from './walls.js'
+import { brokenReturns, wallStrength } from './walls.js'
 import type { Building } from '@csp/shared-types'
 
 const wall = (kind: 'wall' | 'gate', material?: 'stone'): Building => ({
@@ -53,16 +53,6 @@ describe('towers (`CONTEXT.md`: Tower)', () => {
     expect(wallStrength(tower())).toBe(WALL_STRENGTH.tower)
     expect(wallStrength(tower('stone'))).toBe(STONE_WALL_STRENGTH.tower)
     expect(WALL_STRENGTH.tower).toBeGreaterThan(WALL_STRENGTH.gate)
-  })
-
-  it('are wall on every tile of their footprint', () => {
-    const walls = wallMap(
-      { buildings: [tower()], cities: [], realms: [], alliances: [], standings: [] } as never,
-      { size: 16, tiles: new Array(256).fill(0) } as never,
-    )
-    const tiles = [...walls.tiles.keys()].sort((a, b) => a - b)
-    expect(tiles).toEqual([4 * 16 + 4, 4 * 16 + 5, 5 * 16 + 4, 5 * 16 + 5])
-    expect([...walls.tiles.values()].every((w) => w.kind === 'wall')).toBe(true)
   })
 })
 

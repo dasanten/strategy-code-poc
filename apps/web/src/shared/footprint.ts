@@ -1,14 +1,15 @@
 // Ported from packages/shared/src/footprint.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { wrap, wrapDelta } from './terrain.js'
+import { wrap } from './terrain.js'
 import { BUILDING_KINDS, BUILDING_SPECS, MAP_SIZE } from '@csp/balance'
 import type { Building, BuildingKind } from '@csp/shared-types'
 
 /**
  * Footprints (`CONTEXT.md`: Footprint, At a building): the square of tiles a building covers. A
  * building's `x`, `y` is the north-west tile of its footprint; the footprint runs east and south
- * from there, across the map's joins like everything else, and is never turned.
+ * from there, across the map's joins like everything else, and is never turned. Reach between
+ * footprints (`footprintsNear`) is asked of the rules module with its callers (T122.8).
  */
 
 /** Tiles along each side of each kind's footprint (`CONTEXT.md`: Footprint). */
@@ -46,55 +47,6 @@ export function footprintTiles(b: Placed, size = MAP_SIZE): [number, number][] {
 /** The footprint's tiles as "x,y" keys. */
 export function footprintKeys(b: Placed, size = MAP_SIZE): string[] {
   return footprintTiles(b, size).map(([x, y]) => `${x},${y}`)
-}
-
-/**
- * How many steps a tile is from a footprint along each direction, the short way round: 0 along a
- * direction where it is in line with the footprint, 1 right next to it.
- */
-export function gapTo(b: Placed, p: { x: number; y: number }, size = MAP_SIZE): [number, number] {
-  const side = FOOTPRINT[b.kind]
-  const along = (from: number, to: number) => {
-    const d = wrapDelta(from, to, size)
-    return d < 0 ? -d : Math.max(0, d - (side - 1))
-  }
-  return [along(b.x, p.x), along(b.y, p.y)]
-}
-
-/**
- * Whether a tile lies within `reach` tiles of a footprint along each direction (0: on it), the
- * short way round.
- */
-export function nearFootprint(
-  b: Placed,
-  p: { x: number; y: number },
-  reach: number,
-  size = MAP_SIZE,
-): boolean {
-  const [gx, gy] = gapTo(b, p, size)
-  return gx <= reach && gy <= reach
-}
-
-/**
- * Whether two footprints come within `reach` steps of each other along each direction, from the
- * edge of one to the edge of the other (0: they overlap or are in line, 1: they touch), the short
- * way round.
- */
-export function footprintsNear(a: Placed, b: Placed, reach: number, size = MAP_SIZE): boolean {
-  const sa = FOOTPRINT[a.kind]
-  const sb = FOOTPRINT[b.kind]
-  return (
-    footprintGap(a.x, b.x, sa, sb, size) <= reach && footprintGap(a.y, b.y, sa, sb, size) <= reach
-  )
-}
-
-/**
- * The steps between footprints of sides `sa` (from `from`) and `sb` (from `to`) along one
- * direction (`footprintsNear`); not a closure there, as city membership asks it very often.
- */
-function footprintGap(from: number, to: number, sa: number, sb: number, size: number): number {
-  const d = wrapDelta(from, to, size)
-  return d < 0 ? Math.max(0, -d - (sb - 1)) : Math.max(0, d - (sa - 1))
 }
 
 /** The tile in the middle of a footprint, rounded to the north-west: where to aim at it. */

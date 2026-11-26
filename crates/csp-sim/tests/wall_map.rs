@@ -64,3 +64,18 @@ fn the_walls_key_changes_with_a_gate_closing_and_foreign_walls_are_told_apart() 
         Some("no such wall or gate")
     );
 }
+
+/// `apps/web/src/shared/building.test.ts`, its tower test, moved here with the client's copy of
+/// `wallMap` (T122.8): a tower is wall on every tile of its footprint (`CONTEXT.md`: Tower).
+#[test]
+fn a_tower_is_wall_on_every_tile_of_its_footprint() {
+    let mut world = empty_world(&plains(16));
+    world.buildings.push(building("t", BuildingKind::Tower, 4.0, 4.0));
+    let walls = wall_map(&world, &plains(16));
+    let mut tiles: Vec<usize> = walls.tiles.keys().copied().collect();
+    tiles.sort_unstable();
+    let want: Vec<usize> =
+        [(4, 4), (5, 4), (4, 5), (5, 5)].iter().map(|&(x, y)| tile_index(16, x, y)).collect();
+    assert_eq!(tiles, want);
+    assert!(walls.tiles.values().all(|w| w.kind == csp_sim::walls::WallKind::Wall));
+}

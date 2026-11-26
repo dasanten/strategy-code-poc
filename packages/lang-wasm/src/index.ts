@@ -205,6 +205,17 @@ export class WorldMirror {
   }
 
   /**
+   * About how many ticks until resident `id` arrives where they walk, ride or drive
+   * (`arrivalTicks`, `crates/csp-lang-wasm/src/estimate_rules.rs`): `order` is a way to estimate in
+   * place of their own, `ground` the ground of each tile of the path estimated, in its order (a
+   * road over any terrain, Plains where unexplored). Undefined for a resident not in sight or
+   * going nowhere. One call per way.
+   */
+  arrivalTicks(id: string, order: object | undefined, ground: Uint8Array): number | undefined {
+    return this.mirror.arrivalTicks(id, order && JSON.stringify(order), ground)
+  }
+
+  /**
    * Calls the check on the world `name` (`crates/csp-lang-wasm/src/world_rules.rs`) with `args`,
    * which go across as JSON (`undefined` as `null`), and answers its JSON result. Throws for a
    * rule the module doesn't have or arguments it can't read.
