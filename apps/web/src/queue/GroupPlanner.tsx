@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import type { Building, ScriptSummary, Waypoint } from '@csp/shared-types'
-import { GivePlan, PasteSteps, QueueBlock, SavedQueueTools } from '../residents/Residents.js'
+import { QueueBlock } from './QueueBlock.js'
+import { GivePlan, PasteSteps } from './PlanFoot.js'
+import { SavedQueueTools } from './SavedQueueTools.js'
 import { editPlan, EMPTY_PLAN, type QueuePlan } from './queue-view.js'
 
 /**
