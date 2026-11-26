@@ -247,4 +247,5 @@ machine as T122.1 (`node scripts/wasm-rules-bench.mjs`, Node 22), the module wit
 
 The download is still over its limit, by 37 KB. The update's mean is under 4 ms in Node, by about
 0.2–0.4 ms; its p95 is not, and T122.1 measured the browser pane about 0.65 ms slower than Node.
-What next is Daniel's call, in #1637.
+Daniel raised the download limit to 550 kB on 2026-11-26 (#1637), so 537 KB is inside it. The
+tables above keep the 500 kB that held when they were measured.
