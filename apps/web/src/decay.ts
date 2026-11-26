@@ -8,7 +8,7 @@ import { repairWork, rebuildWork, conditionOf } from '@csp/lang-wasm'
 export const DECAY_DAYS = B.DECAY_DAYS as unknown as Partial<Record<BuildingKind, number>>
 
 /** How a building's condition reads: good, worn, nearly a ruin, or a ruin. */
-export type Condition = 'good' | 'worn' | 'nearlyRuin' | 'ruin'
+type Condition = 'good' | 'worn' | 'nearlyRuin' | 'ruin'
 
 /** How each condition reads on a building's card. */
 const CONDITION_NAMES: Record<Condition, string> = {

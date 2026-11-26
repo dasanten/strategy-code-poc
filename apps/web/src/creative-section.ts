@@ -14,7 +14,7 @@ import { KEEPS_GOODS } from './building.js'
 import { canWork } from '@csp/lang-wasm'
 
 /** Something goods can be given to or taken from, as the section lists it. */
-export interface CreativeHolder {
+interface CreativeHolder {
   id: string
   label: string
 }

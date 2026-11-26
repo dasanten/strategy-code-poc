@@ -49,9 +49,9 @@ import type {
 } from '@csp/shared-types'
 
 /** Where the Creative bar reads and sets the time controls (`CREATIVE_PATH` on the server). */
-export const CREATIVE_PATH = '/api/admin/creative'
+const CREATIVE_PATH = '/api/admin/creative'
 /** Where the Creative bar keeps checkpoints (`CHECKPOINTS_PATH` on the server). */
-export const CHECKPOINTS_PATH = `${CREATIVE_PATH}/checkpoints`
+const CHECKPOINTS_PATH = `${CREATIVE_PATH}/checkpoints`
 
 /** A failed API call, with the server's message for the user. */
 export class ApiFailure extends Error {

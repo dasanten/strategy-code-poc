@@ -256,7 +256,7 @@ export function whoWhere(order: WhoOrder, at: WhoAt): string {
 }
 
 /** The tiles of a line from its start to its end (`roadLine`), on a map `size` tiles across. */
-export function lineTiles(line: Pick<WhoLine, 'from' | 'to'>, size: number): Tile[] {
+function lineTiles(line: Pick<WhoLine, 'from' | 'to'>, size: number): Tile[] {
   return roadLine(line.from, line.to, size).map(([x, y]) => ({ x, y }))
 }
 

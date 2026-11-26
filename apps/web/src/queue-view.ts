@@ -304,7 +304,7 @@ function idsOfQueue(items: readonly QueueItem[]): number[] {
  * The queue's items as an edit-queue request keeps them: each step and block by its id, without
  * the rounds the server counts.
  */
-export function itemsOf(q: Pick<Queue, 'items'>): PlanItem[] {
+function itemsOf(q: Pick<Queue, 'items'>): PlanItem[] {
   const keep = (items: readonly QueueItem[]): PlanItem[] =>
     items.map((item) => {
       if ('repeat' in item) return { id: item.id, repeat: item.repeat, items: keep(item.items) }
@@ -362,7 +362,7 @@ function withoutResident(order: OrderRequest): OrderRequest {
  * `queue` order starting one when they have none, as a paste into an empty planner does
  * (`CONTEXT.md`: Planner clipboard). With no steps, the edit ends the queue.
  */
-export function queueRequest(
+function queueRequest(
   r: Pick<Resident, 'id'> & Partial<Pick<Resident, 'queue'>>,
   steps: PlanItem[],
   loop?: boolean,
@@ -372,7 +372,7 @@ export function queueRequest(
 }
 
 /** The order editing the resident's queue to these steps. */
-export function editRequest(
+function editRequest(
   r: Pick<Resident, 'id'>,
   steps: PlanItem[],
   loop?: boolean,

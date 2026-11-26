@@ -67,9 +67,9 @@ export function ralliesAt(
 }
 
 /** Why the Player's Leader standing at `building` can't rally the crew now, if they can't (ADR 0019). */
-export const NOT_AT_A_RALLY_PLACE = 'not at a workplace or construction site'
-export const NO_ZEAL_LEFT = 'no Zeal left'
-export const ALREADY_RALLYING = 'already rallying the crew here'
+const NOT_AT_A_RALLY_PLACE = 'not at a workplace or construction site'
+const NO_ZEAL_LEFT = 'no Zeal left'
+const ALREADY_RALLYING = 'already rallying the crew here'
 
 /** Why the Leader, standing at `building` with `order`, can't rally the crew now, if they can't. */
 export function rallyProblem(

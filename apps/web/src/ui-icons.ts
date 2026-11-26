@@ -10,7 +10,7 @@ import { PIXEL_SLICES } from './map/pixel-slices.js'
  */
 
 /** A cell of the placeholder sheet as [column, row]. */
-export type PlaceholderCell = readonly [number, number]
+type PlaceholderCell = readonly [number, number]
 
 /** Where an icon's art comes from: a sheet's slice, a placeholder cell, or both. */
 export interface UiIconArt {
@@ -140,10 +140,3 @@ export function iconHasArt(name: string, slices: SheetSlices = exportedSlices): 
   if (art.placeholder) return true
   return art.slice !== undefined && slices(art.sheet ?? 'ui')[art.slice] !== undefined
 }
-
-/** The sheets the UI icons draw from, to read which of their slices are drawn. */
-export const ICON_SHEETS: readonly PixelSheet[] = [
-  ...new Set(
-    Object.values(UI_ICONS as Readonly<Record<string, UiIconArt>>).map((a) => a.sheet ?? 'ui'),
-  ),
-]

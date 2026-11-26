@@ -10,7 +10,7 @@ import { GOODS } from './world.js'
 import type { Relationship } from './theme.js'
 
 /** The Cities tab's lists, in this order (`CONTEXT.md`: Cities tab). */
-export const CITY_LISTS = [
+const CITY_LISTS = [
   { id: 'own', title: 'Your cities' },
   { id: 'inSight', title: 'Others in sight' },
   { id: 'lastSeen', title: 'Last seen' },

@@ -32,7 +32,7 @@ type Aim = { id: string } | { at: { x: number; y: number }; site?: Building['kin
  * both stops of a haul (not an army it supplies, which moves), and the building of the other
  * orders done at one.
  */
-export function orderAims(o: ResidentOrder | null | undefined): Aim[] {
+function orderAims(o: ResidentOrder | null | undefined): Aim[] {
   switch (o?.kind) {
     case 'workAt':
     case 'tearDown':
@@ -62,7 +62,7 @@ export function orderAims(o: ResidentOrder | null | undefined): Aim[] {
 }
 
 /** The ids the script a resident runs has picked for its params: buildings, storages, carriages. */
-export function paramAims(r: Pick<SeenResident, 'script'>): Aim[] {
+function paramAims(r: Pick<SeenResident, 'script'>): Aim[] {
   const params = r.script?.params ?? {}
   return Object.values(params).flatMap((v) => (typeof v === 'string' ? [{ id: v }] : []))
 }

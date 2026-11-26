@@ -270,7 +270,7 @@ function signature(b: ScriptBinding): string {
 }
 
 /** The short line beside a name: its kind, what a call costs, and which API it is from. */
-export function apiDetail(n: ApiName): string {
+function apiDetail(n: ApiName): string {
   const b = bindingOf(n)
   const parts = [b.is === 'value' ? 'value' : `${b.is}, +${b.cost} step${b.cost === 1 ? '' : 's'}`]
   if (n.mark) parts.push(n.mark)
@@ -281,7 +281,7 @@ export function apiDetail(n: ApiName): string {
  * What hovering a name, or a completion's info, shows: its signature, kind, cost and
  * description, both descriptions where the resident's and the army's differ.
  */
-export function apiInfo(n: ApiName): string {
+function apiInfo(n: ApiName): string {
   const lines = [`${signature(bindingOf(n))} · ${apiDetail(n)}`]
   if (n.resident && n.army && n.resident.description !== n.army.description) {
     lines.push(`Resident: ${n.resident.description}`, `Army: ${n.army.description}`)
@@ -465,7 +465,7 @@ function closers(source: string): string | null {
  * the whole script, then on what comes before the cursor with its brackets closed, since the
  * rest may not parse while the Player types.
  */
-export function viewBefore(
+function viewBefore(
   source: string,
   dot: number,
   to: number,
@@ -488,7 +488,7 @@ export function viewBefore(
 }
 
 /** How a field's kind of value reads: "number", "resident", "list of building". */
-export function typeText(type: ScriptType): string {
+function typeText(type: ScriptType): string {
   if (typeof type === 'string') return type
   return 'list' in type ? `list of ${typeText(type.list)}` : type.view
 }

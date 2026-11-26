@@ -1,4 +1,4 @@
-import { MAX_HUNGER, PAIRING_WAIT_TICKS, TICKS_PER_GAME_DAY } from '@csp/balance'
+import { MAX_HUNGER } from '@csp/balance'
 import { ageInYears } from '@csp/lang-wasm'
 import type { City, Diplomacy, Good, Resident, Stock } from '@csp/shared-types'
 
@@ -304,14 +304,6 @@ export function scriptsRun(scripts: readonly (string | undefined)[]): string[] {
     .map(([name, n]) => `${n} ${n === 1 ? 'runs' : 'run'} ${name}`)
   if (none > 0) lines.push(`${none} ${none === 1 ? 'runs' : 'run'} no script`)
   return lines
-}
-
-/**
- * Game days until a pair's wait is over and one partner can start carrying (`CONTEXT.md`:
- * Pairing): the pairing wait counted from when they paired, never below 0.
- */
-export function pairingDaysLeft(since: number, tick: number): number {
-  return Math.max(0, Math.ceil((since + PAIRING_WAIT_TICKS - tick) / TICKS_PER_GAME_DAY))
 }
 
 /**

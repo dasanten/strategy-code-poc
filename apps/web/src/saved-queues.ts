@@ -164,14 +164,14 @@ export function storeQueues(
  * Where the browser notes the names of queues the game gave (the stable hand's "Farm and feed",
  * `CONTEXT.md`: Starting city) that it already put among a realm's saved queues.
  */
-export const givenKey = (realm: string) => `csp.queues.${realm}.given`
+const givenKey = (realm: string) => `csp.queues.${realm}.given`
 
 /**
  * The saved queues with a queue the game gave under `name` saved, unless the browser already
  * did (`given` holds the names it did): once removed, it stays removed. A queue the Player saved
  * under that name is kept. Undefined when there is nothing to do.
  */
-export function withGiven(
+function withGiven(
   queues: SavedQueues,
   given: readonly string[],
   name: string,

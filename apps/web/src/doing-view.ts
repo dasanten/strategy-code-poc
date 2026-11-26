@@ -43,7 +43,7 @@ export interface DoingOf {
 }
 
 /** The Doing line of someone up on a wall walk with nothing to do (`CONTEXT.md`: Wall walk). */
-export const UP_ON_THE_WALL = 'Up on the wall walk'
+const UP_ON_THE_WALL = 'Up on the wall walk'
 
 /**
  * Whether a driver just struck drives on with their defence script yet to say otherwise, so their
@@ -101,7 +101,7 @@ export function scriptLine(
  * What someone Down is doing (`CONTEXT.md`: Down): lying Down from hunger, with about how long
  * is left before they die when that is seen (`downUntil`) and `tick` is given.
  */
-export function downLine(r: { downUntil?: number }, tick?: number): string {
+function downLine(r: { downUntil?: number }, tick?: number): string {
   if (r.downUntil === undefined || tick === undefined) return 'Down from hunger'
   return `Down from hunger: ${timeLeft(r.downUntil - tick)}`
 }

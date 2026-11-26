@@ -13,7 +13,7 @@ import { copyItems, type PlanItem } from './plan-blocks.js'
  * What the clipboard holds: steps (each its order, places included, and duration) and repeat
  * blocks of them (`CONTEXT.md`: Repeat block), with no ids.
  */
-export type ClipItem = PlanItem
+type ClipItem = PlanItem
 
 let held: readonly ClipItem[] = []
 const listeners = new Set<() => void>()

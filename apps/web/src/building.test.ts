@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { BUILD_MATERIALS, BUILD_WORK } from './narrowed.js'
 import {
-  BUILD_MATERIALS,
-  BUILD_WORK,
   STONE_BUILD_MATERIALS,
   STONE_BUILD_WORK,
   STONE_WALL_STRENGTH,
   WALL_STRENGTH,
-} from './narrowed.js'
+} from '@csp/balance'
 import { isStone, stoneOverAt } from './building.js'
 import { materialsOfKind, workOfKind, wallStrength } from '@csp/lang-wasm'
 import type { Building } from '@csp/shared-types'

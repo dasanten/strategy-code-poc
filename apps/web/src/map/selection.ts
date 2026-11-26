@@ -70,7 +70,7 @@ export function pickableAt(
 }
 
 /** A building as the picking rule needs it. */
-export type PickBuilding = Pick<Building, 'id' | 'kind' | 'x' | 'y' | 'cityId'>
+type PickBuilding = Pick<Building, 'id' | 'kind' | 'x' | 'y' | 'cityId'>
 
 /**
  * What a click on the map picks (`CONTEXT.md`: Picking on the map): one of the Player's

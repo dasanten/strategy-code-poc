@@ -21,7 +21,7 @@ import {
 import { PIXEL_SLICES } from './pixel-slices.js'
 
 /** Pixels per symbol in the atlas: enough for the largest token at the closest zoom. */
-export const ATLAS_CELL = 96
+const ATLAS_CELL = 96
 /** Empty pixels around each symbol, so scaled-down neighbours don't bleed into each other. */
 const PAD = 2
 

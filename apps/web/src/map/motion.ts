@@ -26,7 +26,7 @@ const JUMP_TILES = 3
 const LOOK_AHEAD = 4
 
 /** The way a token is going along: the tiles still to go, and how far into the first step it is. */
-export interface Going {
+interface Going {
   path: readonly (readonly [number, number])[]
   /** In tiles, as an order's `progress`: a diagonal step is `DIAGONAL_STEP` long. */
   progress: number
@@ -270,7 +270,7 @@ const MOVES_NOW: { [K in WithPath['kind']]: (o: Extract<WithPath, { kind: K }>) 
  * The way a resident's order goes along while they walk or drive it (`CONTEXT.md`: Motion on the
  * map): walk to, drive, haul, Store, Fetch, a road or wall line, going after someone.
  */
-export function goingOf(order: ResidentOrder | null | undefined): Going | undefined {
+function goingOf(order: ResidentOrder | null | undefined): Going | undefined {
   const o = order
   if (!o || !('path' in o) || !o.path || o.path.length === 0) return undefined
   const now = MOVES_NOW[o.kind] as (o: WithPath) => boolean

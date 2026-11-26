@@ -192,7 +192,7 @@ export function minimapPixels(
 }
 
 /** What a dot on the minimap stands for; drawn in this order, the Player's waypoints on top. */
-export type MinimapDotKind = 'resident' | 'carriage' | 'city' | 'home' | 'waypoint'
+type MinimapDotKind = 'resident' | 'carriage' | 'city' | 'home' | 'waypoint'
 
 export interface MinimapDot {
   kind: MinimapDotKind

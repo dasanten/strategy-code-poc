@@ -373,7 +373,7 @@ export interface HaulSetup {
  * A resident's pair and the child they carry (`CONTEXT.md`: Pairing, Carrying): who carries, and
  * about how long until it is born; undefined for one who is neither.
  */
-export function familyLine(r: Resident, residents: Resident[], tick: number): string | undefined {
+function familyLine(r: Resident, residents: Resident[], tick: number): string | undefined {
   if (r.carrying) {
     return `Carrying ${r.carrying.partnerName}’s child · ${bornIn(r.carrying.since, tick)}`
   }
@@ -4936,7 +4936,7 @@ function holding(holders: string[], realmId: string): string {
  * first, then the Player's scripts. For a group, `picked` is the one all of them keep, or
  * undefined while they differ; picking sets it for all of them.
  */
-export function DefenceScript({
+function DefenceScript({
   picked,
   scripts,
   onPick,
@@ -4983,7 +4983,7 @@ export function DefenceScript({
  * (default) first, then None, then the Player's scripts. For a group, `picked` is the one all of
  * them keep, or undefined while they differ; picking sets it for all of them.
  */
-export function AlarmScript({
+function AlarmScript({
   picked,
   scripts,
   onPick,

@@ -43,7 +43,7 @@ function gameTimeAbout(ticks: number): string {
 export const timeLeft = (ticks: number) => `${aboutTime(ticks)} left`
 
 /** Ticks left of `work` at `pace` work a tick; undefined when nobody is at it (pace 0). */
-export function ticksAtPace(work: number, pace: number): number | undefined {
+function ticksAtPace(work: number, pace: number): number | undefined {
   return pace > 0 ? Math.ceil(Math.max(0, work) / pace) : undefined
 }
 

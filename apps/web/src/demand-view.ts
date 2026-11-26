@@ -17,7 +17,7 @@ export const senderLine = (from: RealmLabel) =>
   from.realmId === TRADE_ORG ? 'The Trade Organization' : `The realm of ${from.realm}`
 
 /** Whether the game answers demands sent to this side: an NPC city or the Trade Organization. */
-export const answersByGame = (org: RealmLabel) => org.city === true || org.realmId === TRADE_ORG
+const answersByGame = (org: RealmLabel) => org.city === true || org.realmId === TRADE_ORG
 
 /** What was demanded of whom, as the one who sent it reads it, waiting for the answer. */
 export function sentLine(d: Pick<DemandView, 'to' | 'terms'>): string {

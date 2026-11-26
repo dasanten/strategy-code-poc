@@ -27,6 +27,7 @@
     "test:ignored": "cargo nextest run --cargo-profile slow --profile ignored --workspace --run-ignored only",
     "nightly:ignored": "node scripts/nightly-ignored.mjs",
     "lint": "eslint .",
+    "knip": "knip --no-progress",
     "format": "prettier --write ."
   },
   "devDependencies": {
@@ -35,6 +36,7 @@
     "binaryen": "132.0.0",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
+    "knip": "6.48.0",
     "prettier": "^3.9.10",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.71.2",

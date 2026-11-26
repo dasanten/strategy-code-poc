@@ -21,7 +21,7 @@ export interface Structures {
 }
 
 /** A city's area: its tiles, and a square around them to tell whether any is on screen. */
-export interface CityArea {
+interface CityArea {
   /** The tiles as x, y pairs. */
   tiles: Int32Array
   /** A tile of the area, and how many tiles from it, along either side, the area reaches. */

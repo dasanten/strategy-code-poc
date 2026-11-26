@@ -81,7 +81,7 @@ export function colourKey(holder: RegionHolderInfo): string {
  * The admin map's land layer colours each kind of region (`CONTEXT.md`: Region) its own: the
  * colour keys its overlay uses (`region-kind:` and the kind's name), each with a fixed colour.
  */
-export const LAND_KIND_COLOURS: Readonly<Record<string, number>> = {
+const LAND_KIND_COLOURS: Readonly<Record<string, number>> = {
   'region-kind:Heartland': 0x7cc95a,
   'region-kind:Frontier': 0xc0623a,
   'region-kind:Island': 0x8a6fd6,

@@ -60,11 +60,6 @@ export function tileIndex(size: number, x: number, y: number): number {
   return wrap(y, size) * size + wrap(x, size)
 }
 
-/** The terrain at (x, y); coordinates past a side continue on the other. */
-export function terrainAt(map: TerrainMap, x: number, y: number): Terrain {
-  return map.tiles[tileIndex(map.size, x, y)] as Terrain
-}
-
 /** Whether the terrain is water (`CONTEXT.md`: Water): Lake or Sea, where only vessels go. */
 export function isWater(t: number): boolean {
   return t === Terrain.Lake || t === Terrain.Sea

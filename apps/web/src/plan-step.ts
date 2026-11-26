@@ -424,7 +424,7 @@ export const PLAN_TASKS: Partial<Readonly<Record<PlanStepId, Task>>> = Object.fr
   PLAN_STEPS.flatMap((k) => (k.makes?.kind === 'task' ? [[k.id, k.makes.task]] : [])),
 )
 
-export function planKind(id: PlanStepId): PlanKind {
+function planKind(id: PlanStepId): PlanKind {
   return PLAN_STEPS.find((k) => k.id === id)!
 }
 

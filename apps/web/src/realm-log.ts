@@ -14,7 +14,7 @@ import { NODE_NAMES } from './map/palette.js'
 import { formatMove } from './standing-view.js'
 
 /** How bad an event is, for its colour in the log. */
-export type EventTone = 'bad' | 'warn' | 'info'
+type EventTone = 'bad' | 'warn' | 'info'
 
 /** A place an event names, which the Player can find on the map from the log. */
 export interface EventPlace {

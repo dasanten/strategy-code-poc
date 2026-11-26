@@ -25,7 +25,7 @@ export function levelForScale(scale: number): number {
 }
 
 /** How many tiles a chunk of `level` spans a side (the last ones of the map fewer). */
-export const levelSpan = (level: number) => CHUNK_SIZE * 2 ** level
+const levelSpan = (level: number) => CHUNK_SIZE * 2 ** level
 
 /** The tiles a chunk of `level` covers on the map: its corner and size, without padding. */
 export function levelChunkRect(

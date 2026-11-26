@@ -84,7 +84,7 @@ const drawnNow = () => drawnSprites
  * the colour of the text around it, less its `<title>`: on hover that would win over the
  * cell's own title, which says why it's dimmed.
  */
-export function BuildingIcon({ kind, material }: { kind: BuildingKind; material?: WallMaterial }) {
+function BuildingIcon({ kind, material }: { kind: BuildingKind; material?: WallMaterial }) {
   const drawn = useSyncExternalStore(onDrawnSprites, drawnNow, drawnNow)
   const sprite = buildingSprite(kind, material)
   if (sprite && drawn?.has(pixelArt(sprite.sheet, sprite.slice))) {

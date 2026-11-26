@@ -39,7 +39,7 @@ export interface OrderPanelSpec {
  * command bar on a desktop (`CommandBar` places it); `inline` under its order in the phone's
  * sheet. The sections inside are `.inspector-block`s, laid out as the kit's sections (`.sec`).
  */
-export function OrderPanel({
+function OrderPanel({
   panel,
   inline = false,
   style,

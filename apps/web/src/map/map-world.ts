@@ -68,7 +68,7 @@ export interface MapWorld {
 }
 
 /** How the admin map differs from a Player's: colours, crowns and the far tier. */
-export interface AdminLook {
+interface AdminLook {
   /** Each realm's colour on its tokens, instead of how the viewer stands to it. */
   realmColour: (realmId: string) => number
   /** Every Leader wears the crown. */
