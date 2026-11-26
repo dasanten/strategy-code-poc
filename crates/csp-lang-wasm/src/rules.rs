@@ -1,14 +1,15 @@
 //! The game's rules for the client, as WebAssembly (ADR 0045, T122.1): `csp-sim`'s own functions,
 //! called from the browser instead of a TypeScript copy of them.
 //!
-//! A first, throwaway mirror of what the client sees ([`WorldMirror`]): the server's `welcome` message and each `tick`
-//! message go into it once, and a rule that reads the world ([`WorldMirror::building_at`]) is
-//! called with coordinates, never with the world. T122.4 replaces the mirror with the real one.
+//! A first, throwaway mirror of what the client sees ([`WorldMirror`]): the server's `welcome`
+//! message and each `tick` message go into it once, and a rule that reads the world
+//! ([`WorldMirror::building_at`]) is called with coordinates, never with the world. T122.4 replaces
+//! the mirror with the real one. The rules that take only values are in `value_rules`.
 
 use std::collections::HashMap;
 
 use csp_shared::protocol::SeenBuilding;
-use csp_shared::world::{Building, BuildingKind, WorldState};
+use csp_shared::world::{Building, WorldState};
 use serde::Deserialize;
 use wasm_bindgen::prelude::wasm_bindgen;
 

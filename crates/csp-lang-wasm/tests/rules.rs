@@ -18,10 +18,11 @@ fn welcome(entities: Vec<serde_json::Value>) -> String {
 #[test]
 fn a_rule_without_a_world_answers_the_sims_own() {
     use csp_shared::world::BuildingKind;
-    let on = Some(Terrain::Mountain as u8);
+    let mountain = Terrain::Mountain as u8;
+    let on = Some(mountain);
     let sim = csp_sim::queries::building::building_work;
     let work = |args: &str| rule("buildingWork", args).unwrap().parse::<f64>().unwrap();
-    assert_eq!(work(&format!(r#"["road", {}, null]"#, on.unwrap())), sim(BuildingKind::Road, on));
+    assert_eq!(work(&format!(r#"["road", {}, null]"#, mountain)), sim(BuildingKind::Road, on));
     assert_eq!(work(r#"["farm", null, null]"#), sim(BuildingKind::Farm, None));
 }
 
