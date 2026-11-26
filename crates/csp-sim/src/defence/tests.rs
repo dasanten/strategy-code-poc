@@ -108,3 +108,35 @@ fn flags_a_defence_script_that_is_no_script_id() {
     live_mut(&mut world, "w1").defence_script_id = Some(750);
     assert!(defence_script_sound(&world).is_empty());
 }
+
+/// Bug #1619: an order going on after the defence script finds its way again from where the
+/// resident stands, as they may have moved meanwhile: a crew, push, row or sail order too.
+#[test]
+fn a_crew_push_row_or_sail_order_going_on_finds_its_way_again() {
+    use csp_shared::world::{CrewOrder, PushOrder, RowOrder};
+    let path = || Some(vec![(6.0, 7.0), (6.0, 8.0)]);
+    let target = Tile { x: 6.0, y: 8.0 };
+    let row = RowOrder { vessel_id: "v1".into(), target, path: path(), progress: 3.0 };
+    for order in [
+        ResidentOrder::Crew(CrewOrder { machine_id: "m1".into(), path: path(), progress: 3.0 }),
+        ResidentOrder::Push(PushOrder {
+            machine_id: "m1".into(),
+            target,
+            path: path(),
+            progress: 3.0,
+        }),
+        ResidentOrder::Row(row.clone()),
+        ResidentOrder::Sail(row),
+    ] {
+        let mut world = setup();
+        let r = live_mut(&mut world, "w1");
+        r.interrupted = Some(Interrupted { order: Some(order), script: None, alarm: None });
+        r.script = Some(script(0));
+        let i = world.residents.iter().position(|r| r.id == "w1").unwrap();
+        assert!(resume_interrupted(&mut world, i));
+        let order = world.residents[i].order.as_ref().expect("the order goes on");
+        let going = crate::running::moving(Some(order)).expect("a moving order");
+        assert!(going.path.is_none(), "{order:?}");
+        assert_eq!(going.progress, 0.0, "{order:?}");
+    }
+}
