@@ -1188,7 +1188,12 @@ describe('the card for a tile', () => {
 
   it('lists a farm’s crew in sight as rows with their meters, the Player’s own to open', () => {
     const farm = building({ kind: 'farm', cityId: 'c-me' })
-    const working = { kind: 'workAt', buildingId: farm.id }
+    const working = {
+      kind: 'workAt',
+      buildingId: farm.id,
+      at: { x: farm.x, y: farm.y },
+      progress: 0,
+    }
     const ana = {
       id: 'ana',
       name: 'Ana',
@@ -1243,7 +1248,12 @@ describe('the card for a tile', () => {
     const walk = { kind: 'walkTo', target: { x: 0, y: 0 }, path: null, progress: 0 }
     const fetching = { ...walk, kind: 'fetch', goods: { ironOre: 10 }, phase: 'walking' }
     const residents = [
-      crew('Ana', { kind: 'workAt', buildingId: smelter.id }),
+      crew('Ana', {
+        kind: 'workAt',
+        buildingId: smelter.id,
+        at: { x: smelter.x, y: smelter.y },
+        progress: 0,
+      }),
       crew('Bo', { ...walk, kind: 'store', goods: { iron: null }, phase: 'walking' }),
       crew('Cy', fetching),
       crew('Di', walk),

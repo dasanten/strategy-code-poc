@@ -174,3 +174,11 @@ call, in #1637.
 The rules on a few fields of one thing (`ageInYears` to `isParamChoice`, #1634) add about 10 KB
 gzipped: the module is 495 KB gzipped (1,528 KB raw), from 485 KB, 5 KB under the limit. The
 rest of #1634 does not fit until #1637 is decided.
+
+## Size after the second part of T122.5b
+
+The rules on one building, resident or horse (`materialsNeeded` to `feedProblem`, #1634) take
+the thing whole and read it the way the mirror does (`SeenBuilding`, `SeenResident`, `SeenHorse`
+and `csp_sim::mirror::{resident, horse}`). The module is 541 KB gzipped (1,727 KB raw) with #1586, from
+495 KB: over the 500 kB limit, which waits on #1637. The mirror's update is not touched (only
+`resident` and `horse` in `mirror.rs` became public), so its time stays as measured in T122.4.

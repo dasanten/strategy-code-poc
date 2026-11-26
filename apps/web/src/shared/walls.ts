@@ -3,13 +3,13 @@
 
 import { allied, alliedRealms } from './alliance.js'
 import { npcCityRefuses } from './city.js'
-import { STONE_WALL_STRENGTH, WALL_STRENGTH } from './narrowed.js'
-import { isStone, materialsOfKind } from './building.js'
 import { footprintTiles } from './footprint.js'
 import { isPassableTerrain, tileIndex, type TerrainMap, wrap, wrapDelta } from './terrain.js'
 import { TRADE_ORG } from './trade-org.js'
-import { BROKEN_MATERIALS_RETURNED, WALL_ENCLOSES_MAX } from '@csp/balance'
-import type { Building, Good, Resident, Stock, WorldState } from '@csp/shared-types'
+import { WALL_ENCLOSES_MAX } from '@csp/balance'
+import type { Building, Resident, WorldState } from '@csp/shared-types'
+
+export { brokenReturns, wallStrength, wallStrengthLeft } from '@csp/lang-wasm'
 
 /** World queries about walls and gates (`CONTEXT.md`: Walls in combat; ADR 0002). */
 
@@ -255,33 +255,6 @@ export function onOwnWall(
   if (!city || side === null) return false
   // An NPC city's walls are its own residents' and its allies' (`wallSide`).
   return allied(world, city.realmId ?? city.id, side)
-}
-
-/** Damage a finished wall or gate takes before it falls (`WALL_STRENGTH`). */
-export function wallStrength(b: Building): number {
-  const of = isStone(b.kind, b.material) ? STONE_WALL_STRENGTH : WALL_STRENGTH
-  return of[b.kind === 'gate' ? 'gate' : b.kind === 'tower' ? 'tower' : 'wall']
-}
-
-/** Damage a wall or gate can still take before it falls. */
-export function wallStrengthLeft(b: Building): number {
-  return Math.max(0, wallStrength(b) - (b.damage ?? 0))
-}
-
-/**
- * Goods left on the tile of a wall or gate that was broken (`CONTEXT.md`: Walls in combat):
- * `BROKEN_MATERIALS_RETURNED` of its materials, in whole units.
- */
-export function brokenReturns(b: Building): Stock {
-  const out: Stock = {}
-  for (const [good, units] of Object.entries(materialsOfKind(b.kind, b.material)) as [
-    Good,
-    number,
-  ][]) {
-    const back = Math.floor(units * BROKEN_MATERIALS_RETURNED)
-    if (back > 0) out[good] = back
-  }
-  return out
 }
 
 /**

@@ -3,20 +3,11 @@
 
 import { KEEPS_GOODS, pileTile } from './building.js'
 import { covers } from './footprint.js'
-import { GOOD_WEIGHT } from './narrowed.js'
-import { stockWeight } from './stats.js'
 import { besideVessel } from './vessels.js'
 import { isDown } from './world.js'
-import { carryCapacity } from '@csp/balance'
-import type {
-  Building,
-  Good,
-  GoodsSpot,
-  Pile,
-  Resident,
-  Stock,
-  WorldState,
-} from '@csp/shared-types'
+import type { Building, GoodsSpot, Pile, Resident, Stock, WorldState } from '@csp/shared-types'
+
+export { unitsThatFit } from '@csp/lang-wasm'
 
 export { putAwayUnits } from '@csp/lang-wasm'
 
@@ -95,10 +86,4 @@ export function downOn(
 ): Resident | undefined {
   const r = world.residents.find((d) => d.id === residentId)
   return r && isDown(r) && r.x === x && r.y === y ? r : undefined
-}
-
-/** How many more whole units of a good fit in what the resident carries, at the given tick. */
-export function unitsThatFit(resident: Resident, good: Good, tick: number): number {
-  const room = carryCapacity(resident, tick) - stockWeight(resident.carried)
-  return Math.max(0, Math.floor(room / GOOD_WEIGHT[good] + 1e-9))
 }

@@ -8,6 +8,8 @@ import { HORSE_FILL_PER_FOOD, MAX_HUNGER } from '@csp/balance'
 import type { Resident } from '@csp/shared-types'
 import { NO_CHILD_FEEDS, NO_FOOD_TO_FEED, HORSE_FULL } from '@csp/shared-types'
 
+export { feedProblem } from '@csp/lang-wasm'
+
 export { NO_CHILD_FEEDS, NO_FOOD_TO_FEED, HORSE_FULL } from '@csp/shared-types'
 
 /**
@@ -48,20 +50,6 @@ function feederProblem(
   if (!inContact(size, feeder, target)) return tooFar
   if ((feeder.carried.food ?? 0) < 1) return NO_FOOD_TO_FEED
   return undefined
-}
-
-/**
- * Why `feeder` can't Feed `target` now, undefined when they can: a grown resident with Food in
- * their hands, on or next to the tile of a resident who is Down. `size` is the map's.
- */
-export function feedProblem(
-  feeder: Feeder,
-  target: FeedTarget | undefined,
-  tick: number,
-  size: number,
-): string | undefined {
-  if (!target || !isDown(target)) return 'nobody Down there to feed'
-  return feederProblem(feeder, target, tick, size, 'stand on or next to their tile to feed them')
 }
 
 /**

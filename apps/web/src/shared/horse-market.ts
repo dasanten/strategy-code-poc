@@ -5,44 +5,16 @@ import { carriagePulledBy } from './carriages.js'
 import { forSale, npcCityRefuses } from './city.js'
 import { isAt } from './footprint.js'
 import { horsesIn, ownsHorse, riderOf } from './horses.js'
-import { GOOD_WEIGHT } from './narrowed.js'
 import { npcCityStock, npcHorsesWanted, npcStorages, standingSwing } from './npc-trade.js'
-import { canWork, horseAgeInYears } from './stats.js'
-import { handsOf } from './warehouse.js'
-import { HORSE_STAT_NAMES, isDown } from './world.js'
-import {
-  HORSE_PRICE_AGE_FLOOR,
-  HORSE_PRICE_AGE_PER_YEAR,
-  HORSE_PRICE_BASE,
-  HORSE_PRICE_PAID_SHARE,
-  HORSE_PRICE_PER_STAT,
-  HORSE_PRICE_STATS_FLOOR,
-  HORSE_STAT_AVERAGE,
-  NPC_HORSES_KEPT,
-} from '@csp/balance'
+import { isDown } from './world.js'
+import { HORSE_PRICE_BASE, HORSE_PRICE_PAID_SHARE, NPC_HORSES_KEPT } from '@csp/balance'
 import type { Building, City, Horse, NpcHorseOffer, Resident, WorldState } from '@csp/shared-types'
 import { horseStockFactor } from '@csp/lang-wasm'
+import { horseBuyerProblem, horseSellerProblem, horseWorth } from '@csp/lang-wasm'
+
+export { horseBuyerProblem, horseSellerProblem, horseWorth } from '@csp/lang-wasm'
 
 export { horseStockFactor } from '@csp/lang-wasm'
-
-/**
- * What a horse is worth for its stats and age (`CONTEXT.md`: Horse market), as a share of
- * `HORSE_PRICE_BASE`: `HORSE_PRICE_PER_STAT` either way for each point its mean stat is from
- * average, and `HORSE_PRICE_AGE_PER_YEAR` less for each game year of age, each with its floor.
- */
-export function horseWorth(horse: Pick<Horse, 'stats' | 'bornAt'>, tick: number): number {
-  const mean =
-    HORSE_STAT_NAMES.reduce((sum, s) => sum + horse.stats[s], 0) / HORSE_STAT_NAMES.length
-  const stats = Math.max(
-    HORSE_PRICE_STATS_FLOOR,
-    1 + HORSE_PRICE_PER_STAT * (mean - HORSE_STAT_AVERAGE),
-  )
-  const age = Math.max(
-    HORSE_PRICE_AGE_FLOOR,
-    1 - HORSE_PRICE_AGE_PER_YEAR * horseAgeInYears(horse, tick),
-  )
-  return stats * age
-}
 
 /** The horses an NPC city has, wherever they stand. */
 export function npcHorsesOf<H extends Pick<Horse, 'realmId' | 'cityId'>>(
@@ -124,21 +96,6 @@ export function npcHorseSaleProblem(
 }
 
 /**
- * Why a resident can't pay for a horse now, or undefined when they can (`CONTEXT.md`: Horse market):
- * they are grown up and hold the Coins in their hands.
- */
-export function horseBuyerProblem(
-  resident: Pick<Resident, 'bornAt' | 'carried'>,
-  price: number,
-  tick: number,
-): string | undefined {
-  if (!canWork(resident, tick)) return 'children can’t trade'
-  const coins = Math.floor(resident.carried.coins ?? 0)
-  if (coins < price) return `it costs ${price} coins and they hold ${coins}`
-  return undefined
-}
-
-/**
  * Why an NPC city won't buy a horse from a realm, whoever goes there, or undefined when it would
  * (`CONTEXT.md`: Horse market, NPC city reaction): it refuses the realm, the horse pulls a carriage,
  * is ridden or is Down, it has as many as it wants, or its storages lack the Coins.
@@ -162,21 +119,6 @@ export function npcHorsePurchaseProblem(
   const coins = npcCityStock(world, city).coins ?? 0
   if (coins < npcHorseBuyPrice(world, city, horse, realmId))
     return `${city.name} hasn’t the coins for ${horse.name}`
-  return undefined
-}
-
-/**
- * Why a resident can't take the Coins for a horse now, or undefined when they can (`CONTEXT.md`:
- * Horse market): they are grown up and can carry all of them in their hands.
- */
-export function horseSellerProblem(
-  resident: Resident,
-  price: number,
-  tick: number,
-): string | undefined {
-  if (!canWork(resident, tick)) return 'children can’t trade'
-  if (handsOf(resident, tick).room - price * GOOD_WEIGHT.coins < -1e-9)
-    return `they can’t carry the ${price} coins`
   return undefined
 }
 

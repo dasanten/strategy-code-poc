@@ -2,12 +2,13 @@
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
 import { townHallOf } from './city.js'
-import { middleOf, type Placed } from './footprint.js'
 import { isArmed } from './stats.js'
-import { wrapDelta } from './terrain.js'
-import { TRADE_ORG_ARMY, TRADE_ORG_HQ } from '@csp/balance'
+import { TRADE_ORG_ARMY } from '@csp/balance'
 import type { City, Resident, WorldState } from '@csp/shared-types'
 import { TRADE_ORG } from '@csp/shared-types'
+import { inInnerRingAround } from '@csp/lang-wasm'
+
+export { inInnerRingAround } from '@csp/lang-wasm'
 
 export { TRADE_ORG, TRADE_ORG_NAME, NO_CARAVANS } from '@csp/shared-types'
 
@@ -51,17 +52,6 @@ export function inInnerRing(
   const hq = tradeOrgHq(world)
   const hall = hq && townHallOf(world, hq)
   return !!hall && inInnerRingAround(hall, at, size)
-}
-
-/** `inInnerRing` for the HQ whose town hall is `hall`. */
-export function inInnerRingAround(
-  hall: Placed,
-  at: { x: number; y: number },
-  size: number,
-): boolean {
-  const c = middleOf(hall, size)
-  const d = Math.hypot(wrapDelta(c.x, at.x, size), wrapDelta(c.y, at.y, size))
-  return d <= TRADE_ORG_HQ.innerRadius + 0.5
 }
 
 /**
