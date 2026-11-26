@@ -83,18 +83,6 @@ export function buildProblem(
   return ask('buildProblem', ...buildArgs(kind, x, y, material, ground))
 }
 
-/** `buildProblem` for each of `kinds` on (x, y), in one call: what a Build menu asks. */
-export function buildProblems(
-  kinds: readonly { kind: BuildingKind; material?: WallMaterial }[],
-  x: number,
-  y: number,
-  ground: KnownGround,
-): Problem[] {
-  return askAll(
-    kinds.map((k) => ['buildProblem', buildArgs(k.kind, x, y, k.material, ground)] as const),
-  )
-}
-
 /**
  * Where a node's workplace can be laid out (`nodeCorner`, `CONTEXT.md`: Where buildings go): the
  * north-west tile of a footprint that covers the node and fits, the node's own tile first; none
