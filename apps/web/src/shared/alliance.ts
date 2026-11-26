@@ -9,7 +9,6 @@ import { joinRequestsFor } from './persuasion.js'
 import { organizationLabel, standingOf, standingsFor } from './standing.js'
 import { TRADE_ORG, TRADE_ORG_NAME, tradeOrgHq } from './trade-org.js'
 import { debtOf, deliveriesFor } from './warehouse.js'
-import { type WorldState } from './world.js'
 import {
   CRIME_MEMORY_DAYS,
   NPC_ALLIANCE_JOIN_STANDING,
@@ -24,6 +23,7 @@ import type {
   Diplomacy,
   RealmLabel,
   Resident,
+  WorldState,
 } from '@csp/shared-types'
 
 export { ALLIANCE_NAME_MAX_LENGTH } from '@csp/shared-types'

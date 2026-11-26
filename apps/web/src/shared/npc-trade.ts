@@ -10,7 +10,7 @@ import { BUILD_MATERIALS, GOOD_WEIGHT, NPC_VILLAGE, WAREHOUSE_FLOOR } from './na
 import { standingOf } from './standing.js'
 import { canWork, isArmed } from './stats.js'
 import { PRICED_GOODS, priceFor, type Price } from './warehouse.js'
-import { WEAPONS, type Offer, type WorldState } from './world.js'
+import { WEAPONS } from './world.js'
 import {
   CITY_PRICE_STANDING_SWING,
   HORSE_FOOD_PER_DAY,
@@ -41,6 +41,8 @@ import type {
   TradeHolder,
   TradeQuote,
   TradeSide,
+  Offer,
+  WorldState,
 } from '@csp/shared-types'
 import { NPC_SMITHY_WEAPON } from '@csp/shared-types'
 

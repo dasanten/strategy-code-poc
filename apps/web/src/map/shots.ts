@@ -17,7 +17,10 @@ export interface Shot {
  * hidden.
  */
 export function shots(
-  residents: readonly Pick<SeenResident, 'id' | 'x' | 'y' | 'order' | 'equipped' | 'carried' | 'up'>[],
+  residents: readonly Pick<
+    SeenResident,
+    'id' | 'x' | 'y' | 'order' | 'equipped' | 'carried' | 'up'
+  >[],
   size: number,
 ): Shot[] {
   const byId = new Map(residents.map((r) => [r.id, r]))

@@ -24,7 +24,14 @@ describe('rowOffProblem', () => {
   })
 
   it('refuses while an armed resident of its owner is beside it and none of the thief’s realm', () => {
-    const guard = { ...grown, id: 'w1', owner: 'r1', x: 1, y: 4, equipped: { weapon: 'spear' as const } }
+    const guard = {
+      ...grown,
+      id: 'w1',
+      owner: 'r1',
+      x: 1,
+      y: 4,
+      equipped: { weapon: 'spear' as const },
+    }
     expect(rowOffProblem(world(guard), thief, boat, 'r2')).toBe(
       'an armed resident guards that boat',
     )

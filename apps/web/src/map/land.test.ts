@@ -66,7 +66,11 @@ describe('the land the Player knows', () => {
   })
 
   it('says pass or land bridge on a tile of one', () => {
-    expect(regionAt(state, SIZE, 34, 1)).toEqual({ name: 'Greywold', kind: 'frontier', way: 'pass' })
+    expect(regionAt(state, SIZE, 34, 1)).toEqual({
+      name: 'Greywold',
+      kind: 'frontier',
+      way: 'pass',
+    })
   })
 
   it('names the region and its kind on the tile card', () => {

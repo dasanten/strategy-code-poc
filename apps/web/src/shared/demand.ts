@@ -10,7 +10,7 @@ import { organizationLabel } from './standing.js'
 import { NO_CARAVANS, TRADE_ORG, tradeOrgHq } from './trade-org.js'
 import { pickUpTransferProblem, transferFee, transferLoad, transferWarehouses } from './transfer.js'
 import { deliveryStorage } from './warehouse.js'
-import { GOODS, type Demand, type Realm, type WorldState } from './world.js'
+import { GOODS } from './world.js'
 import {
   DEMANDS_PER_GAME_DAY,
   DEMAND_NOTE_MAX_LENGTH,
@@ -19,7 +19,17 @@ import {
   OUTWEIGH_HOLD_DAYS,
   TICKS_PER_GAME_DAY,
 } from '@csp/balance'
-import type { City, DemandHandOver, DemandView, Good, RealmLabel, Stock } from '@csp/shared-types'
+import type {
+  City,
+  DemandHandOver,
+  DemandView,
+  Good,
+  RealmLabel,
+  Stock,
+  Demand,
+  Realm,
+  WorldState,
+} from '@csp/shared-types'
 
 /** World queries about demands (`CONTEXT.md`: Demand; ADR 0002: the API orders and scripts share). */
 

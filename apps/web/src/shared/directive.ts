@@ -2,8 +2,14 @@
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
 import { isArmed } from './stats.js'
-import { type Directive, type WorldState } from './world.js'
-import type { DirectiveGoal, DirectiveGoalView, DirectiveView, Resident } from '@csp/shared-types'
+import type {
+  DirectiveGoal,
+  DirectiveGoalView,
+  DirectiveView,
+  Resident,
+  Directive,
+  WorldState,
+} from '@csp/shared-types'
 
 export {
   MAX_DIRECTIVE_REASON,

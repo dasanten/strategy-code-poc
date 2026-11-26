@@ -9,7 +9,7 @@ import { GOOD_WEIGHT } from './narrowed.js'
 import { npcCityStock, npcHorsesWanted, npcStorages, standingSwing } from './npc-trade.js'
 import { canWork, horseAgeInYears } from './stats.js'
 import { handsOf } from './warehouse.js'
-import { HORSE_STAT_NAMES, isDown, type WorldState } from './world.js'
+import { HORSE_STAT_NAMES, isDown } from './world.js'
 import {
   HORSE_PRICE_AGE_FLOOR,
   HORSE_PRICE_AGE_PER_YEAR,
@@ -22,7 +22,7 @@ import {
   HORSE_STAT_AVERAGE,
   NPC_HORSES_KEPT,
 } from '@csp/balance'
-import type { Building, City, Horse, NpcHorseOffer, Resident } from '@csp/shared-types'
+import type { Building, City, Horse, NpcHorseOffer, Resident, WorldState } from '@csp/shared-types'
 
 /**
  * What a horse is worth for its stats and age (`CONTEXT.md`: Horse market), as a share of

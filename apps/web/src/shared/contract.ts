@@ -2,9 +2,8 @@
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
 import { organizationLabel } from './standing.js'
-import { type WorldState } from './world.js'
 import { TICKS_PER_GAME_DAY } from '@csp/balance'
-import type { ContractView, MercenaryContract, RealmLabel } from '@csp/shared-types'
+import type { ContractView, MercenaryContract, RealmLabel, WorldState } from '@csp/shared-types'
 import { GAME_DAYS_PER_WEEK, TICKS_PER_GAME_WEEK } from '@csp/shared-types'
 
 /** World queries about mercenary contracts (ADR 0002: the game API orders and scripts share). */

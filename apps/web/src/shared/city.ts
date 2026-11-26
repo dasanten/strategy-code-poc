@@ -9,7 +9,7 @@ import { standingOf } from './standing.js'
 import { isArmed } from './stats.js'
 import { wrap, wrapDelta, wrapDistance } from './terrain.js'
 import { TRADE_ORG } from './trade-org.js'
-import { isDown, type WorldState } from './world.js'
+import { isDown } from './world.js'
 import {
   CITY_AREA_MARGIN,
   CITY_BUILDING_REACH,
@@ -25,7 +25,7 @@ import {
   TICKS_PER_GAME_DAY,
   hungerFactor,
 } from '@csp/balance'
-import type { Building, City, Resident } from '@csp/shared-types'
+import type { Building, City, Resident, WorldState } from '@csp/shared-types'
 import { CITY_BUILDINGS } from '@csp/shared-types'
 
 /** World queries about cities (ADR 0002: the game API orders and scripts share). */

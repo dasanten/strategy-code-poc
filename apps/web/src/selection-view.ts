@@ -28,7 +28,7 @@ import {
   workOfKind,
   type TerrainLookup,
 } from './shared/building.js'
-import { CARRYING_A_CHILD, GOODS, isDown, NODE_WORKPLACE, type HaulOrder } from './shared/world.js'
+import { CARRYING_A_CHILD, GOODS, isDown, NODE_WORKPLACE } from './shared/world.js'
 import {
   HORSE_FOOD_PER_DAY,
   HORSE_HUNGRY_SHARE,
@@ -124,6 +124,7 @@ import type {
   DrifterLine,
   RealmLabel,
   VeinWord,
+  HaulOrder,
 } from '@csp/shared-types'
 import { covers, FOOTPRINT, footprintTiles } from './shared/footprint.js'
 import { conditionLine, isRuin, repairable } from './shared/decay.js'

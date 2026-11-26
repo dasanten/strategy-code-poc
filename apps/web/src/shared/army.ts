@@ -2,9 +2,8 @@
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
 import { wrapDistance } from './terrain.js'
-import { type WorldState } from './world.js'
 import { HAUL_HORSE_FOOD } from '@csp/balance'
-import type { Army, Carriage, Resident } from '@csp/shared-types'
+import type { Army, Carriage, Resident, WorldState } from '@csp/shared-types'
 
 /** World queries about armies (ADR 0002: the game API orders and scripts share). */
 
