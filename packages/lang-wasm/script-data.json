@@ -4896,7 +4896,7 @@
       "queueStep": false,
       "stepGroup": null,
       "neverEnds": false,
-      "goesOnUntilStopped": false
+      "goesOnUntilStopped": true
     },
     {
       "kind": "formArmy",
