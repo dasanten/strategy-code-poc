@@ -280,4 +280,22 @@ What changed in behaviour:
 - **A construction site of no city** went to the area rules as city 999, a finished building of a
   city the client never named (`-1 + SITE`); it is a site of no city now.
 
-The module is 591 KB gzipped (1,919 KB raw), from 584 KB.
+With `wasm-opt -Oz` (#1637), gzipped at level 6 as served: the module is **551.8 KB** (1,503 KB raw),
+from 537.0 KB at the epic tip built the same way: **1.8 KB over the 550 kB limit**. Of the 14.8 KB,
+the arrival rule is 7.7 KB (`csp-sim`'s `arrival_ticks`: every order's `going()` and the pace
+rules; reading the order from JSON costs nothing, the mirror already reads orders) and
+`cityMembership` 6.3 KB. Both are the server's own rules, moved here by this ticket; the limit is
+Daniel's call.
+
+Timed in Node 22 on the first `welcome` of the T122.1 messages (a real Player of the live world:
+4,450 buildings and 13 cities in sight, 38,854 buildings and 51 cities remembered, 21 residents
+with a way), the old TypeScript against the call, same answers for all of them:
+
+| What                                                         | TypeScript |   Module |
+| :----------------------------------------------------------- | ---------: | -------: |
+| `cityMembership`, in sight (the far map's cache fill)        |    39.0 ms |  36.5 ms |
+| `cityMembership`, remembered                                 |   154.5 ms | 139.1 ms |
+| `arrivalTicks` for all 21 ways (a Residents list, the cards) |   434.6 ms |  0.64 ms |
+
+The TypeScript estimate called `rideSpeed`, a value rule in the module since #1634, once per tile
+of a ridden way: that is the 435 ms. The call crosses once per way.
