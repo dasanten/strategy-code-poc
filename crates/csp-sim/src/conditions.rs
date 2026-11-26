@@ -17,7 +17,7 @@ use crate::queries::residents::{carry_capacity, good_weight, stock_weight};
 use crate::queries::vessels::vessel_capacity;
 
 /// The highest hour a condition names: a day's hours run 0 to 23.
-const LAST_HOUR: f64 = 23.0;
+pub const LAST_HOUR: f64 = 23.0;
 
 /// The condition a request sends, or why it isn't one (`conditionProblem`): one of the kinds, an
 /// amount a whole number from 0, a share from 0 to 1, an hour a whole number from 0 to 23.

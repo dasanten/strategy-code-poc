@@ -3,10 +3,10 @@
 
 import { CHUNK_SIZE } from './terrain.js'
 import { RICHNESSES } from './richness.js'
-import type { KnownNode, ResourceKind, TerrainChunk } from '@csp/shared-types'
+import type { KnownNode, TerrainChunk } from '@csp/shared-types'
+import { NODE_KINDS } from '@csp/shared-types'
 
-/** Resource node kinds by the byte that stands for them in a served chunk. Only add to the end. */
-export const NODE_KINDS: readonly ResourceKind[] = ['forest', 'stone', 'ironOre', 'goldOre', 'coal']
+export { NODE_KINDS } from '@csp/shared-types'
 
 /**
  * A chunk as served from `terrainChunkPath`: the `CHUNK_SIZE`² terrain bytes, then three bytes

@@ -11,20 +11,17 @@ import type {
   WorldState,
 } from '@csp/shared-types'
 
+export {
+  MAX_DIRECTIVE_REASON,
+  MAX_DIRECTIVE_GOALS,
+  MAX_DIRECTIVE_SOLDIERS,
+} from '@csp/shared-types'
+
 /**
  * World queries about admin directives (`CONTEXT.md`: Admin directive), for the game API (ADR
  * 0002). Every Player sees each directive's target, reason and goals; who gave it and how far its
  * goals have come stay with admins.
  */
-
-/** The longest reason an admin can give, in characters. */
-export const MAX_DIRECTIVE_REASON = 500
-
-/** The most goals one directive can have. */
-export const MAX_DIRECTIVE_GOALS = 8
-
-/** The most soldiers a `soldiers` goal can ask to be killed. */
-export const MAX_DIRECTIVE_SOLDIERS = 10_000
 
 /**
  * The Organizations a directive names: its target, and with `withAlliance` every member of the

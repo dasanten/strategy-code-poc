@@ -3,25 +3,14 @@
 
 import type { Condition } from '@csp/shared-types'
 import { GOODS } from './world.js'
+import { LAST_HOUR } from '@csp/shared-types'
+
+export { CONDITION_KINDS, LAST_HOUR } from '@csp/shared-types'
 
 /**
  * Conditions (`CONTEXT.md`: Condition): what a Wait until, an If block or a Repeat until asks.
  * They are checked by the server, for each resident by themself.
  */
-
-/** Every kind of condition, in the order the condition editor offers them. */
-export const CONDITION_KINDS: readonly Condition['kind'][] = [
-  'carries',
-  'load',
-  'stock',
-  'need',
-  'mounted',
-  'aboard',
-  'hour',
-]
-
-/** The highest hour a condition names: a day's hours run 0 to 23. */
-export const LAST_HOUR = 23
 
 /** The fields each kind of condition holds besides its kind, and whether each must be there. */
 const FIELDS: Record<Condition['kind'], Record<string, boolean>> = {

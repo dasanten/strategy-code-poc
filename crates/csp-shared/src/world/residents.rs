@@ -5,6 +5,8 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::named_enum::named_enum;
+
 use super::{
     AlarmScriptId, GivenUnderAttack, Good, Interrupted, OrderEnded, Queue, ResidentOrder,
     RunningScript, ScriptLogLine, ScriptParamValues, Stock, Tile,
@@ -38,36 +40,20 @@ pub struct Stat {
     pub trained: f64,
 }
 
+named_enum! {
 /// Something learned by doing or training (`SkillName`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
 pub enum SkillName {
-    Mining,
-    Woodcutting,
-    Smelting,
-    Smithing,
-    Construction,
-    Farming,
-    Combat,
-    Driving,
-    Seafaring,
+    Mining = "mining",
+    Woodcutting = "woodcutting",
+    Smelting = "smelting",
+    Smithing = "smithing",
+    Construction = "construction",
+    Farming = "farming",
+    Combat = "combat",
+    Driving = "driving",
+    Seafaring = "seafaring",
 }
-
-impl SkillName {
-    /// The skill's name, as serde writes it.
-    pub const fn name(self) -> &'static str {
-        match self {
-            SkillName::Mining => "mining",
-            SkillName::Woodcutting => "woodcutting",
-            SkillName::Smelting => "smelting",
-            SkillName::Smithing => "smithing",
-            SkillName::Construction => "construction",
-            SkillName::Farming => "farming",
-            SkillName::Combat => "combat",
-            SkillName::Driving => "driving",
-            SkillName::Seafaring => "seafaring",
-        }
-    }
 }
 
 /// What a training ground teaches (`TrainingSubject`): a stat or a skill.

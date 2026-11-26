@@ -34,10 +34,12 @@ macro_rules! roots {
     }};
 }
 
-/// Writes every client type, and an `index.ts` that re-exports each file, into `dir`.
+/// Writes every client type, the client's constants (`client_constants`), and an `index.ts` that
+/// re-exports each file, into `dir`.
 pub fn export_into(dir: &Path) -> io::Result<()> {
     fs::create_dir_all(dir)?;
     client_roots(&config(dir))?;
+    fs::write(dir.join("constants.ts"), crate::client_constants::constants_text())?;
     let names = generated_names(dir)?;
     add_missing_imports(dir, &names)?;
     let mut index = String::from(

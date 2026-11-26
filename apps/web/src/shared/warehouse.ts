@@ -39,13 +39,9 @@ import type {
   WarehousePrice,
   WorldState,
 } from '@csp/shared-types'
+import { HQ_COIN_WAREHOUSE } from '@csp/shared-types'
 
-/**
- * Where the Trade Org HQ's coin warehouse stands from its town hall, north-west tile from
- * north-west tile (`CONTEXT.md`: Warehouse): the HQ keeps its coins there and its other goods in
- * its other warehouse.
- */
-export const HQ_COIN_WAREHOUSE = { dx: 4, dy: -4 }
+export { HQ_COIN_WAREHOUSE } from '@csp/shared-types'
 
 /** Goods other than coins: what a warehouse puts a price on. */
 export const PRICED_GOODS = GOODS.filter((g): g is Exclude<Good, 'coins'> => g !== 'coins')

@@ -43,12 +43,14 @@ import type {
   Pile,
   Resident,
   ResidentOrder,
-  ResourceKind,
   ResourceNode,
   Stock,
   WallMaterial,
   WorldState,
 } from '@csp/shared-types'
+import { NODE_GOOD } from '@csp/shared-types'
+
+export { NODE_GOOD, LINE_BUILDING } from '@csp/shared-types'
 
 /** World queries about buildings and construction sites (ADR 0002: the game API orders and scripts share). */
 
@@ -539,15 +541,6 @@ export function takesWorkSettings(b: Pick<Building, 'kind'>): boolean {
   return WORKPLACE_MAX_WORKERS[b.kind] !== undefined
 }
 
-/** The good each kind of node yields once worked (`CONTEXT.md`: Resource node). */
-export const NODE_GOOD: Record<ResourceKind, Good> = {
-  forest: 'wood',
-  stone: 'stone',
-  ironOre: 'ironOre',
-  goldOre: 'goldOre',
-  coal: 'coal',
-}
-
 /**
  * The good a workplace makes (`CONTEXT.md`: Workplace): Food on a farm; on a resource node, what
  * the node yields, so a mine makes iron ore, gold ore or coal by the node it stands on; at a smelter or
@@ -867,12 +860,6 @@ export function roadLine(
 
 /** A road line or wall line order, with its kind (`LineOrder` is what both hold). */
 export type LineBuildOrder = Extract<ResidentOrder, { kind: 'roadLine' | 'wallLine' }>
-
-/** What a line order builds on each of its tiles (`CONTEXT.md`: Road, Wall / Gate). */
-export const LINE_BUILDING: Record<LineBuildOrder['kind'], 'road' | 'wall'> = {
-  roadLine: 'road',
-  wallLine: 'wall',
-}
 
 /** Whether an order is one along a line, a road line or a wall line. */
 export function isLineOrder(o: ResidentOrder | null | undefined): o is LineBuildOrder {
