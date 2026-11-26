@@ -155,6 +155,23 @@ fn trade_quote(q: warehouse_trade::TradeQuote) -> Value {
     out
 }
 
+/// A trader as the rules read one, from its escorts and the robberies on its way: what a Player
+/// sees of a trader (`SeenTrader`) read the way the world mirror reads one.
+fn trader_of(escort_ids: Vec<String>, robberies: f64) -> csp_shared::world::Trader {
+    let mut t = csp_sim::mirror::trader(csp_shared::protocol::SeenTrader {
+        id: String::new(),
+        post_id: String::new(),
+        carriage_id: String::new(),
+        driver_id: None,
+        escort_ids,
+        heading: csp_shared::world::Heading::Post,
+        standing: None,
+        prices: None,
+    });
+    t.robberies = robberies;
+    t
+}
+
 /// A price as the client has it.
 fn price(p: warehouse::Price) -> Value {
     json!({ "buy": p.buy, "sell": p.sell })
@@ -795,6 +812,76 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
         "stepLine" => {
             let (order,): (OrderRequest,) = args(name, json)?;
             json!(csp_sim::queue::step_line(&order))
+        }
+        // Swaps, traders and stables (T122.5b).
+        "cutSwap" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Terms {
+                give: Good,
+                want: Good,
+                wanted: f64,
+                holder: Holder,
+                /// None for no end, as JSON has no Infinity.
+                spare: Option<f64>,
+                takes: Option<f64>,
+                place_coins: Option<f64>,
+                /// The price of the 1st, 2nd, ... unit of `want`, as far as the swap can go.
+                want_prices: Vec<f64>,
+                /// What is paid for the 1st, 2nd, ... unit of `give`, as far as it can go.
+                give_prices: Vec<f64>,
+            }
+            let (t,): (Terms,) = args(name, json)?;
+            let nth = |prices: &[f64], n: f64| prices.get(n as usize - 1).copied().unwrap_or(0.0);
+            let q = csp_sim::queries::trade_quotes::cut_swap(
+                csp_sim::queries::trade_quotes::SwapTerms {
+                    give: t.give,
+                    want: t.want,
+                    wanted: t.wanted,
+                    holder: t.holder.as_holder(),
+                    spare: t.spare.unwrap_or(f64::INFINITY),
+                    takes: t.takes.unwrap_or(f64::INFINITY),
+                    place_coins: t.place_coins.unwrap_or(f64::INFINITY),
+                    want_price: |n| nth(&t.want_prices, n),
+                    give_price: |n| nth(&t.give_prices, n),
+                },
+            );
+            let mut out = json!({
+                "units": q.units,
+                "gives": q.gives,
+                "coins": q.coins,
+                "bought": q.bought,
+                "sold": q.sold,
+            });
+            if let Some(limit) = q.limit {
+                out["limit"] = json!(limit_name(limit));
+            }
+            out
+        }
+        "traderPrices" => {
+            let (escorts, carriage): (Vec<String>, Value) = args(name, json)?;
+            let trader = trader_of(escorts, 0.0);
+            let prices = trader_trade::trader_prices(&trader, &carriage_arg(carriage)?);
+            json!(prices
+                .iter()
+                .map(|p| json!({ "good": p.good, "stock": p.stock, "buy": p.buy, "sell": p.sell }))
+                .collect::<Vec<_>>())
+        }
+        "traderEscortsWanted" => {
+            let (_, robberies): (Vec<String>, f64) = args(name, json)?;
+            json!(csp_sim::caravans::trader_escorts_wanted(&trader_of(Vec::new(), robberies)))
+        }
+        "horsesIn" => {
+            let (horses, stable): (Vec<Value>, Value) = args(name, json)?;
+            let horses = horses.into_iter().map(horse_arg).collect::<Result<Vec<_>, String>>()?;
+            let stable = building_arg(stable)?;
+            let inside = csp_sim::queries::horses::horses_in(&horses, &stable);
+            json!(inside.iter().map(|h| h.id.as_str()).collect::<Vec<_>>())
+        }
+        "keptBreeding" => {
+            let (stable, horse_ids): (Value, Vec<String>) = args(name, json)?;
+            let stable = building_arg(stable)?;
+            json!(csp_sim::queries::breeding::kept_breeding(&stable, &horse_ids))
         }
         _ => return Err(format!("no rule {name}")),
     };

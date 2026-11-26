@@ -16,12 +16,11 @@ import type {
   TradeSide,
   Trader,
   TraderVisit,
-  TraderPrice,
   WorldState,
 } from '@csp/shared-types'
-import { traderPriceFor } from '@csp/lang-wasm'
-import { traderStock } from '@csp/lang-wasm'
 import { quoteTraderTrade } from '@csp/lang-wasm'
+
+export { traderPrices } from '@csp/lang-wasm'
 
 export { quoteTraderTrade } from '@csp/lang-wasm'
 
@@ -65,15 +64,6 @@ export function traderVisitsTo(
     const s = traderStanding(world, t)
     const city = s && world.cities.find((c) => c.id === s.cityId)
     return s && city?.realmId === realmId ? [{ ...s, traderId: t.id, city: city.name }] : []
-  })
-}
-
-/** A wandering trader's prices for every good but coins, from what it has to trade. */
-export function traderPrices(t: Pick<Trader, 'escortIds'>, carriage: Carriage): TraderPrice[] {
-  const stock = traderStock(t, carriage.load)
-  return PRICED_GOODS.map((good) => {
-    const held = stock[good] ?? 0
-    return { good, stock: held, ...traderPriceFor(good, held) }
   })
 }
 

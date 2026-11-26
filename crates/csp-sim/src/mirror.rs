@@ -405,7 +405,7 @@ fn caravan(c: SeenCaravan) -> Caravan {
 /// A wandering trader: who it is and which way it heads. Its plan, its stand and what it keeps
 /// in mind aren't sent: at the storage, with nothing planned (its prices at a stop are sent, not
 /// kept).
-fn trader(t: SeenTrader) -> Trader {
+pub fn trader(t: SeenTrader) -> Trader {
     Trader {
         id: t.id,
         carriage_id: t.carriage_id,

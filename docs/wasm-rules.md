@@ -194,3 +194,8 @@ The rules on one contract, realm, directive or carriage, `workPace` and the rena
 `workingOn`, the trade holders and quotes, the city rules and the queue step rules (#1634) add
 readers for `City`, `Offer` and `OrderRequest`: the module is 570 KB gzipped (1,850 KB raw), from
 557 KB. The mirror's update is not touched.
+
+## Size after the last part of T122.5b
+
+`cutSwap`, `traderPrices`, `traderEscortsWanted`, `horsesIn` and `keptBreeding` (#1634): the
+module is 574 KB gzipped (1,868 KB raw), from 570 KB. The mirror's update is not touched.

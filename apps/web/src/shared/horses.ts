@@ -18,12 +18,14 @@ import type {
   Building,
   CarriageHorse,
   Horse,
-  KeptBreeding,
   Resident,
   Stock,
   WorldState,
 } from '@csp/shared-types'
 import { riderSpareFood } from '@csp/lang-wasm'
+import { horsesIn } from '@csp/lang-wasm'
+
+export { horsesIn, keptBreeding } from '@csp/lang-wasm'
 
 export { riderSpareFood } from '@csp/lang-wasm'
 
@@ -88,30 +90,12 @@ export function ownsHorse(owner: HorseOwner, h: Pick<Horse, 'realmId' | 'cityId'
     : h.realmId === null && h.cityId === owner.cityId
 }
 
-/** The horses standing in a stable, hitched or not. */
-export function horsesIn<H extends { x: number; y: number }>(
-  horses: readonly H[],
-  stable: Building,
-): H[] {
-  return horses.filter((h) => isAt(h, stable))
-}
-
 /** The residents breeding at a stable (`BreedOrder`). */
 export function breedersAt<R extends Pick<Resident, 'order'>>(
   residents: readonly R[],
   stable: Building,
 ): R[] {
   return residents.filter((r) => r.order?.kind === 'breed' && r.order.stableId === stable.id)
-}
-
-/** The breeding progress the stable keeps for the two horses, in either order, if it keeps any. */
-export function keptBreeding(
-  stable: Pick<Building, 'breedings'>,
-  horseIds: readonly string[],
-): KeptBreeding | undefined {
-  return stable.breedings?.find(
-    (k) => horseIds.includes(k.horseIds[0]) && horseIds.includes(k.horseIds[1]),
-  )
 }
 
 /**

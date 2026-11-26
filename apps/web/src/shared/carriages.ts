@@ -14,7 +14,6 @@ import {
   CARAVAN_ROBBERIES_PER_ESCORT,
   MAP_SIZE,
   PASSENGER_WEIGHT,
-  TRADER_ESCORTS,
   carriageCapacityWith,
 } from '@csp/balance'
 import type {
@@ -33,6 +32,8 @@ import type {
   WorldState,
 } from '@csp/shared-types'
 import { boarderProblem } from '@csp/lang-wasm'
+
+export { traderEscortsWanted } from '@csp/lang-wasm'
 
 export { boarderProblem, unhitchProblem } from '@csp/lang-wasm'
 
@@ -73,14 +74,6 @@ export function caravanEscortsWanted(
   postId: string,
 ): number {
   return escortsAfter(CARAVAN_ESCORTS, world.routeRobberies[postId] ?? 0)
-}
-
-/**
- * How many escorts a wandering trader walks with (`CONTEXT.md`: Wandering trader): as for a caravan,
- * from `TRADER_ESCORTS`, by how often it was robbed.
- */
-export function traderEscortsWanted(trader: Pick<Trader, 'robberies'>): number {
-  return escortsAfter(TRADER_ESCORTS, trader.robberies)
 }
 
 /** `escorts`, and one more for every `CARAVAN_ROBBERIES_PER_ESCORT` robberies, up to the most. */
