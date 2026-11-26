@@ -16,10 +16,10 @@ pub const TEARDOWN_MATERIALS_RETURNED: f64 = 0.5;
 /// (`CONTEXT.md`: Decay): it loses an even share each game day, used or not. A city left alone for
 /// a real month (1800 game days) is still there: its buildings may be worn, but none has fallen to
 /// ruin from decay alone (Daniel, 2026-11-17). Decay only: Food and defence while away are the
-/// Player's own scripts. Roads and the wooden walls and gates go fastest, in
-/// 45 real days; farms in 60; timber buildings in 75; storages, workplaces on a node, training
-/// grounds and havens in 90; the town hall in 120; those mostly of stone (warehouse, smelter, mint,
-/// smithy) in 180. A kind not listed (a carriage, boat or ship site, a tower) never decays.
+/// Player's own scripts. Roads and the wooden walls and gates go fastest, in 45 real days; farms
+/// in 60; timber buildings and towers in 75; storages, workplaces on a node, training grounds and
+/// havens in 90; the town hall in 120; those mostly of stone (warehouse, smelter, mint,
+/// smithy) in 180. A kind not listed (a carriage, boat or ship site) never decays.
 pub const DECAY_DAYS: Table<f64> = spec_table!(f64, |s| s.decay_days);
 
 /// Share of its condition lost from which a building reads worn, rather than good

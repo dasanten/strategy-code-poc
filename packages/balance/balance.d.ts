@@ -1526,6 +1526,7 @@ export interface Balance {
     warehouse: number
     wall: number
     gate: number
+    tower: number
     farm: number
     stable: number
     mine: number
