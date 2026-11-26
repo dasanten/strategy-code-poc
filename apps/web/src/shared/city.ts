@@ -26,6 +26,9 @@ import {
   hungerFactor,
 } from '@csp/balance'
 import type { Building, BuildingKind, City, Resident, WorldState } from '@csp/shared-types'
+import { idNumber } from '@csp/lang-wasm'
+
+export { idNumber } from '@csp/lang-wasm'
 
 /** World queries about cities (ADR 0002: the game API orders and scripts share). */
 
@@ -46,11 +49,6 @@ export const CITY_BUILDINGS: readonly BuildingKind[] = [
 /** Whether a building counts toward a city's shape: a finished city building. */
 export function isCityBuilding(b: Building): boolean {
   return CITY_BUILDINGS.includes(b.kind) && !b.site
-}
-
-/** The number in an entity's id; ids are numbered in the order things came to be. */
-export function idNumber(id: string): number {
-  return Number(id.replace(/^\D+/, ''))
 }
 
 /**

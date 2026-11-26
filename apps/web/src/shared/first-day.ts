@@ -1,7 +1,9 @@
 // Ported from packages/shared/src/first-day.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import type { ClientFirstDayLine, FirstDay, FirstDayLine } from '@csp/shared-types'
+import type { FirstDay, FirstDayLine } from '@csp/shared-types'
+
+export { isFirstDayLine, isClientFirstDayLine } from '@csp/lang-wasm'
 
 /**
  * The first-day card (`CONTEXT.md`: First day): a checklist a new realm's HUD shows, kept per
@@ -24,16 +26,6 @@ export const CLIENT_FIRST_DAY_LINES = [
 export const FIRST_DAY_PATH = '/api/first-day'
 
 export const FIRST_DAY_DISMISS_PATH = '/api/first-day/dismiss'
-
-/** Whether `line` names one of the card's lines; a client can send anything. */
-export function isFirstDayLine(line: unknown): line is FirstDayLine {
-  return typeof line === 'string' && (FIRST_DAY_LINES as readonly string[]).includes(line)
-}
-
-/** Whether the client may report `line`; it can send anything. */
-export function isClientFirstDayLine(line: unknown): line is ClientFirstDayLine {
-  return typeof line === 'string' && (CLIENT_FIRST_DAY_LINES as readonly string[]).includes(line)
-}
 
 /** The card with `line` ticked too, its lines kept in the card's order. */
 export function tickFirstDay(card: FirstDay, line: FirstDayLine): FirstDay {

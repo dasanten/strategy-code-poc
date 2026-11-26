@@ -7,6 +7,7 @@
 //! the JSON `packages/lang-wasm/script-data.json`, written by the `script-data` binary.
 
 pub mod rules;
+pub mod value_rules;
 
 use std::cell::OnceCell;
 use std::collections::HashMap;

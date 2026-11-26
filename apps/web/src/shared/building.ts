@@ -2,17 +2,9 @@
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
 import { citiesAt } from './city.js'
-import { FOOTPRINT, covers, footprintTiles, isAt } from './footprint.js'
+import { covers, footprintTiles, isAt } from './footprint.js'
 import { BUILD_MENU_GROUPS, BUILDING_KINDS, BUILDING_SPECS, type BuildingSpec } from '@csp/balance'
-import {
-  BUILD_MATERIALS,
-  BUILD_WORK,
-  GOOD_WEIGHT,
-  RECIPES,
-  STONE_BUILD_MATERIALS,
-  STONE_BUILD_WORK,
-  WORKPLACE_MAX_WORKERS,
-} from './narrowed.js'
+import { GOOD_WEIGHT, RECIPES, WORKPLACE_MAX_WORKERS } from './narrowed.js'
 import { canWork, carriageCanEnter, stockWeight, type Recipe } from './stats.js'
 import {
   Terrain,
@@ -28,7 +20,6 @@ import {
 import { CARRYING_A_CHILD, NODE_WORKPLACE, isTrainingSubject } from './world.js'
 import {
   MAP_SIZE,
-  MOUNTAIN_ROAD_WORK_FACTOR,
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
   TRAINING_GROUND_MAX_TRAINEES,
@@ -49,6 +40,26 @@ import type {
   WallMaterial,
   WorldState,
 } from '@csp/shared-types'
+import {
+  materialsOfKind,
+  workOfKind,
+  siteWorkOf,
+  hasChoice,
+  recipeFor,
+  cornersCovering,
+} from '@csp/lang-wasm'
+
+export {
+  buildingWork,
+  materialsOfKind,
+  workOfKind,
+  workFactor,
+  siteWorkOf,
+  hasChoice,
+  recipeFor,
+  buildMenu,
+  cornersCovering,
+} from '@csp/lang-wasm'
 
 /** World queries about buildings and construction sites (ADR 0002: the game API orders and scripts share). */
 
@@ -89,23 +100,6 @@ export function recipeGood(recipe: Recipe): Good {
 }
 
 /**
- * The recipe a worker follows at a workplace that processes goods (`RECIPES`): the one that makes
- * `makes`, or with no `makes` the workplace's first recipe, so a smelter makes Iron unless told
- * Steel (`CONTEXT.md`: Coal). Undefined for a workplace that processes nothing, a good it can't
- * make, or a smithy with no `makes`: its workers always say which weapon or armour.
- */
-export function recipeFor(kind: BuildingKind, makes?: Good): Recipe | undefined {
-  const recipes = RECIPES[kind] ?? []
-  if (makes === undefined) return kind === 'smithy' ? undefined : recipes[0]
-  return recipes.find((r) => recipeGood(r) === makes)
-}
-
-/** Whether a workplace has more than one recipe, so its workers say what they make (a smithy, or a smelter for Steel). */
-export function hasChoice(kind: BuildingKind): boolean {
-  return (RECIPES[kind]?.length ?? 0) > 1
-}
-
-/**
  * Buildable kinds that go on any passable terrain but Mountain, off any resource node
  * (`CONTEXT.md`: Where buildings go): the processing workplaces, the city buildings, training
  * grounds (`CONTEXT.md`: Training ground) and havens, which go on the shore besides (`ON_SHORE`).
@@ -137,14 +131,6 @@ export const OFF_NODE_BUILDS: readonly BuildingKind[] = [
   ...ON_PLAINS,
   ...PROCESSING,
 ]
-
-/**
- * What a build menu offers a resident on a tile: the workplace of the resource node there, or
- * with none every kind that goes off a node (`OFF_NODE_BUILDS`).
- */
-export function buildMenu(node: Pick<ResourceNode, 'kind'> | undefined): BuildingKind[] {
-  return node ? [NODE_WORKPLACE[node.kind]] : [...OFF_NODE_BUILDS]
-}
 
 /**
  * Kinds of building that keep goods in a storage of their own: storages, the Trade
@@ -314,47 +300,9 @@ export function materialsNeeded(site: Building): Stock {
   return out
 }
 
-/**
- * How many times its `BUILD_WORK` a building of `kind` takes, with `under` the terrain beneath its
- * tile where known: `MOUNTAIN_ROAD_WORK_FACTOR` for a road on Mountain (`CONTEXT.md`: Road), 1
- * otherwise. A resident's work on it, building or tearing down, counts that much less
- * (`siteWorkOf`), so a site's work still runs up to `BUILD_WORK`.
- */
-export function workFactor(kind: BuildingKind, under?: number): number {
-  return kind === 'road' && under === Terrain.Mountain ? MOUNTAIN_ROAD_WORK_FACTOR : 1
-}
-
-/**
- * Work a building of `kind` takes in ticks of one unskilled resident of average Strength, with
- * `under` the terrain beneath it (`workFactor`): what a Player is shown.
- */
-export function buildingWork(kind: BuildingKind, under?: number, material?: WallMaterial): number {
-  return workOfKind(kind, material) * workFactor(kind, under)
-}
-
 /** Whether a building of `kind` of `material` is of stone: only a wall, gate or tower can be. */
 export function isStone(kind: BuildingKind, material?: WallMaterial | null): boolean {
   return material === 'stone' && (kind === 'wall' || kind === 'gate' || kind === 'tower')
-}
-
-/**
- * The materials a building of `kind` of `material` takes (`CONTEXT.md`: Wood or stone): a stone
- * wall's or gate's from `STONE_BUILD_MATERIALS`, any other's from `BUILD_MATERIALS`.
- */
-export function materialsOfKind(kind: BuildingKind, material?: WallMaterial | null): Stock {
-  if (isStone(kind, material)) return STONE_BUILD_MATERIALS[kind as 'wall' | 'gate' | 'tower']
-  return BUILD_MATERIALS[kind] ?? {}
-}
-
-/** Work a building of `kind` of `material` takes, before `workFactor`. */
-export function workOfKind(kind: BuildingKind, material?: WallMaterial | null): number {
-  if (isStone(kind, material)) return STONE_BUILD_WORK[kind as 'wall' | 'gate' | 'tower']
-  return BUILD_WORK[kind] ?? 0
-}
-
-/** How much `work` of a resident counts on a building of `kind` over `under` (`workFactor`). */
-export function siteWorkOf(work: number, kind: BuildingKind, under?: number): number {
-  return work / workFactor(kind, under)
 }
 
 /** Work a construction site still needs, out of its `BUILD_WORK` (`siteWorkOf`). */
@@ -470,24 +418,6 @@ export function buildProblem(
   if (tiles.some(([tx, ty]) => buildingAt(world, tx, ty, size)))
     return 'there is already a building there'
   return undefined
-}
-
-/**
- * The north-west tiles a footprint of `kind` may have so that it covers (x, y), the tile itself
- * first: where a resident standing there could lay it out (`CONTEXT.md`: At a building).
- */
-export function cornersCovering(
-  kind: BuildingKind,
-  x: number,
-  y: number,
-  size = MAP_SIZE,
-): [number, number][] {
-  const side = FOOTPRINT[kind]
-  const out: [number, number][] = []
-  for (let dy = 0; dy < side; dy++) {
-    for (let dx = 0; dx < side; dx++) out.push([wrap(x - dx, size), wrap(y - dy, size)])
-  }
-  return out
 }
 
 /**

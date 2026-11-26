@@ -7,7 +7,7 @@ import { GOOD_WEIGHT } from './narrowed.js'
 import { stockWeight } from './stats.js'
 import { besideVessel } from './vessels.js'
 import { isDown } from './world.js'
-import { OWN_FOOD, carryCapacity } from '@csp/balance'
+import { carryCapacity } from '@csp/balance'
 import type {
   Building,
   Good,
@@ -17,6 +17,8 @@ import type {
   Stock,
   WorldState,
 } from '@csp/shared-types'
+
+export { putAwayUnits } from '@csp/lang-wasm'
 
 /** World queries about where goods are (ADR 0002: the game API orders and scripts share). */
 
@@ -99,13 +101,4 @@ export function downOn(
 export function unitsThatFit(resident: Resident, good: Good, tick: number): number {
   const room = carryCapacity(resident, tick) - stockWeight(resident.carried)
   return Math.max(0, Math.floor(room / GOOD_WEIGHT[good] + 1e-9))
-}
-
-/**
- * How many of a carried good a resident puts away (stores, drops, loads, delivers) unless asked
- * for an exact amount: all of it, but Food only beyond their own food (`CONTEXT.md`: Own food),
- * `ownFood` units: `OWN_FOOD` unless a store order asks to keep another amount.
- */
-export function putAwayUnits(good: Good, carried: number, ownFood = OWN_FOOD): number {
-  return good === 'food' ? Math.max(0, carried - ownFood) : carried
 }
