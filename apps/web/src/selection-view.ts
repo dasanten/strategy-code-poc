@@ -8,25 +8,28 @@ import {
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
   HOUSING_ROOM,
-} from './shared/narrowed.js'
+} from './narrowed.js'
 import {
   BUILDABLE,
   SHARES_A_TILE,
   MAX_WORKERS,
-  NODE_GOOD,
   teacherAt,
   traineesOf,
-  hasChoice,
-  recipeFor,
   recipeGood,
-  teardownWork,
-  workFactor,
   isStone,
   isSiegeSite,
+} from './building.js'
+import { NODE_GOOD } from '@csp/shared-types'
+import {
+  hasChoice,
+  recipeFor,
+  teardownWork,
+  workFactor,
   materialsOfKind,
   workOfKind,
-} from './shared/building.js'
-import { CARRYING_A_CHILD, GOODS, isDown, NODE_WORKPLACE } from './shared/world.js'
+} from '@csp/lang-wasm'
+import { CARRYING_A_CHILD, NODE_WORKPLACE } from '@csp/shared-types'
+import { GOODS, isDown } from './world.js'
 import {
   HORSE_FOOD_PER_DAY,
   HORSE_HUNGRY_SHARE,
@@ -52,17 +55,14 @@ import {
   carriageOfResident,
   horsesToHitch,
   carriagePulledBy,
-  unhitchProblem,
   drivenCarriageId,
-} from './shared/carriages.js'
-import { riderOf, STABLE_BREED_TICKS, breedersAt, keptBreeding } from './shared/horses.js'
-import {
-  feedHorseProblem,
-  feedProblem,
-  horsesInNeed,
-  NO_CHILD_FEEDS,
-  NO_FOOD_TO_FEED,
-} from './shared/reviving.js'
+} from './carriages.js'
+import { unhitchProblem } from '@csp/lang-wasm'
+import { riderOf, STABLE_BREED_TICKS, breedersAt } from './horse-rules.js'
+import { keptBreeding } from '@csp/lang-wasm'
+import { feedHorseProblem, horsesInNeed } from './reviving.js'
+import { feedProblem } from '@csp/lang-wasm'
+import { NO_CHILD_FEEDS, NO_FOOD_TO_FEED } from '@csp/shared-types'
 import {
   horseAgeInYears,
   trainingCeiling,
@@ -70,13 +70,10 @@ import {
   canWork,
   stockWeight,
   madePerDay,
-  bestWeapon,
-  wornProtection,
-  isArmed,
-  type Geared,
-} from './shared/stats.js'
-import { richnessFactor } from './shared/richness.js'
-import { isOutpostStorage } from './shared/city.js'
+} from '@csp/lang-wasm'
+import { bestWeapon, wornProtection, isArmed, type Geared } from './stats.js'
+import { richnessFactor } from './richness.js'
+import { isOutpostStorage } from './city.js'
 import type {
   BuildingKind,
   Richness,
@@ -113,11 +110,13 @@ import type {
   VeinWord,
   HaulOrder,
 } from '@csp/shared-types'
-import { covers, FOOTPRINT, footprintTiles } from './shared/footprint.js'
-import { conditionLine, isRuin, repairable } from './shared/decay.js'
-import { Terrain, UNEXPLORED } from './shared/terrain.js'
-import { fullAt, gatheredOn, isPickedOver, patchLeft } from './shared/patch.js'
-import { aboutTime, workLeft } from './shared/estimates.js'
+import { covers, FOOTPRINT, footprintTiles } from './footprint.js'
+import { conditionLine, isRuin } from './decay.js'
+import { repairable } from '@csp/lang-wasm'
+import { Terrain } from './terrain.js'
+import { UNEXPLORED } from '@csp/shared-types'
+import { fullAt, gatheredOn, isPickedOver, patchLeft } from './patch.js'
+import { aboutTime, workLeft } from './estimates.js'
 import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
@@ -126,7 +125,7 @@ import { faresKnown, horseFaresKnown } from './seen.js'
 import { FEED_HORSE_HINT, horseDownLine, horseNeed } from './horses-view.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 import { describeOccupation, type OccupationView } from './city-view.js'
-import { besideVessel, crewShort, vesselCapacity } from './shared/vessels.js'
+import { besideVessel, crewShort, vesselCapacity } from './vessels.js'
 import {
   boardVesselProblems,
   driveOffProblems,

@@ -206,3 +206,69 @@ pub fn training_ceiling(
 pub fn carry_capacity(r: &Resident, tick: f64) -> f64 {
     CARRY_BASE + CARRY_PER_STRENGTH * stat_value(r, StatName::Strength, tick)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::resident;
+    use csp_shared::balance::{ticks_for_age, TRAINING_GROUND_MAX_TRAINEES};
+    use csp_shared::time::TICKS_PER_GAME_YEAR;
+
+    /// An adult of average Strength and Intellect with the given skills.
+    fn worker(skills: &[(SkillName, f64)]) -> Resident {
+        let mut r = resident("w");
+        r.born_at = -ticks_for_age(25.0);
+        r.skills = skills.iter().copied().collect();
+        r
+    }
+
+    fn close(a: f64, b: f64, within: f64) -> bool {
+        (a - b).abs() <= within
+    }
+
+    #[test]
+    fn takes_an_average_worker_about_a_game_year_to_learn_up_to_100_and_no_further() {
+        let year = TICKS_PER_GAME_YEAR;
+        assert_eq!((WORK_SKILL_MAX, CONSTRUCTION_SKILL_MAX), (100.0, 100.0));
+        assert!(close(work_learned(&worker(&[]), SkillName::Farming, 0.0) * year, 100.0, 1e-6));
+        assert!(close(construction_learned(&worker(&[]), 0.0) * year, 100.0, 1e-6));
+        assert_eq!(
+            work_learned(&worker(&[(SkillName::Farming, 100.0)]), SkillName::Farming, 0.0),
+            0.0
+        );
+        let almost = worker(&[(SkillName::Farming, 100.0 - 1e-6)]);
+        assert!(close(work_learned(&almost, SkillName::Farming, 0.0), 1e-6, 1e-9));
+        assert_eq!(construction_learned(&worker(&[(SkillName::Construction, 100.0)]), 0.0), 0.0);
+    }
+
+    /// `CONTEXT.md`: Training. Training a work skill to its maximum and then working beats
+    /// learning by doing by game day 420, the teacher's share counted.
+    #[test]
+    fn training_a_work_skill_and_then_working_beats_learning_by_doing_within_a_year() {
+        let teacher = worker(&[(SkillName::Mining, WORK_SKILL_MAX)]);
+        let (mut doer, mut trainee) = (worker(&[]), worker(&[]));
+        let (mut by_doing, mut by_training, mut teachers_share) = (0.0, 0.0, 0.0);
+        let mut tick = 0.0;
+        while tick < TICKS_PER_GAME_YEAR {
+            by_doing += work_output(&doer, Good::IronOre, SkillName::Mining, tick);
+            let learned = work_learned(&doer, SkillName::Mining, tick);
+            *doer.skills.entry(SkillName::Mining).or_insert(0.0) += learned;
+            let gain = training_gain(&trainee, &teacher, TrainingSubject::Mining, tick);
+            if gain > 0.0 {
+                *trainee.skills.entry(SkillName::Mining).or_insert(0.0) += gain;
+                // The teacher gives up a master's work, shared by a full ground.
+                teachers_share += work_output(&teacher, Good::IronOre, SkillName::Mining, tick)
+                    / TRAINING_GROUND_MAX_TRAINEES;
+            } else {
+                by_training += work_output(&trainee, Good::IronOre, SkillName::Mining, tick);
+            }
+            tick += 1.0;
+        }
+        // In game days of an unskilled worker's output.
+        let unskilled_day = WORK_OUTPUT_PER_DAY.get(Good::IronOre.name()).expect("ore is worked");
+        assert!(close(by_doing / unskilled_day, 630.0, 0.5));
+        assert!(close(by_training / unskilled_day, 700.0, 0.5));
+        assert!(close(teachers_share / unskilled_day, 70.0 / 3.0, 0.5));
+        assert!(by_training - teachers_share > by_doing);
+    }
+}

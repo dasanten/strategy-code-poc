@@ -2,8 +2,9 @@ import { BUILDING_KINDS } from '@csp/balance'
 import { buildingWork, WorldMirror } from '@csp/lang-wasm'
 import type { Building, BuildingKind } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
-import { buildingAt } from './shared/building.js'
-import { Terrain } from './shared/terrain.js'
+import { SHARES_A_TILE } from './building.js'
+import { covers } from './footprint.js'
+import { Terrain } from './terrain.js'
 
 /**
  * The Rust rules as WebAssembly (ADR 0045, T122.1): they answer what the TypeScript copy answers,
@@ -43,7 +44,7 @@ describe('the world mirror', () => {
       entities: buildings.map(seen),
     })
 
-  it('finds the building on a tile as the TypeScript copy does, across the map’s join too', () => {
+  it('finds the building whose footprint covers a tile, roads aside, across the map’s join too', () => {
     const buildings = [
       building('b1', 'farm', 10, 10),
       building('b2', 'storage', 62, 63),
@@ -58,7 +59,7 @@ describe('the world mirror', () => {
         expect([x, y, mirror.buildingAt(x, y)]).toEqual([
           x,
           y,
-          buildingAt({ buildings }, x, y, SIZE)?.id,
+          buildings.find((b) => covers(b, x, y, SIZE) && !SHARES_A_TILE.includes(b.kind))?.id,
         ])
       }
     }

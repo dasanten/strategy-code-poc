@@ -1,6 +1,6 @@
 import type { Equipment, GearCondition, Good, PieceCondition, Stock } from '@csp/shared-types'
-import { WEAPON_ATTACK } from './shared/narrowed.js'
-import { GOODS, PROTECTION_KINDS } from './shared/world.js'
+import { WEAPON_ATTACK } from './narrowed.js'
+import { GOODS, PROTECTION_KINDS } from './world.js'
 import { GOOD_LABELS } from './goods-grid.js'
 
 /** A resident's three equipment slots as a card shows them (`CONTEXT.md`: Equipment). */

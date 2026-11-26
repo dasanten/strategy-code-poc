@@ -12,7 +12,8 @@ import {
   type CreativeResident,
 } from './creative-section.js'
 import { SKILL_LABELS, STAT_LABELS } from './Residents.js'
-import { HORSE_STAT_NAMES, SKILL_NAMES, STAT_NAMES } from './shared/world.js'
+import { HORSE_STAT_NAMES, STAT_NAMES } from '@csp/shared-types'
+import { SKILL_NAMES } from './world.js'
 
 const HORSE_STAT_LABELS: Record<(typeof HORSE_STAT_NAMES)[number], string> = {
   speed: 'Speed',

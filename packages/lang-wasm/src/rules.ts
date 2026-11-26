@@ -7,11 +7,9 @@ import type {
   Building,
   KeptBreeding,
   SwapQuote,
-  TraderPrice,
   BuildingKind,
   BuildLine,
   Carriage,
-  City,
   Offer,
   OfferQuote,
   OrderRequest,
@@ -20,14 +18,9 @@ import type {
   TradeSide,
   Directive,
   DirectiveGoal,
-  MercenaryContract,
-  Realm,
   CarriedFeeBy,
-  ClientFirstDayLine,
-  FirstDayLine,
   Good,
   Horse,
-  HorseStats,
   LoadLevel,
   NpcCityPrice,
   PricedGood,
@@ -132,11 +125,6 @@ export function workFactor(kind: BuildingKind, under?: number): number {
   return rule('workFactor', kind, under)
 }
 
-/** How much `work` of a resident counts on a building of `kind` over `under`. */
-export function siteWorkOf(work: number, kind: BuildingKind, under?: number): number {
-  return rule('siteWorkOf', work, kind, under)
-}
-
 /** Whether a workplace has more than one recipe, so its workers say what they make. */
 export function hasChoice(kind: BuildingKind): boolean {
   return rule('hasChoice', kind)
@@ -198,19 +186,6 @@ export function rebuildWork(kind: BuildingKind): number {
   return rule('rebuildWork', kind)
 }
 
-/**
- * The north-west tiles a building of `kind` could stand at to cover (x, y): every corner whose
- * footprint holds the tile.
- */
-export function cornersCovering(
-  kind: BuildingKind,
-  x: number,
-  y: number,
-  size: number,
-): [number, number][] {
-  return rule('cornersCovering', kind, x, y, size)
-}
-
 // Carrying: weights, loads, food for the way (`CONTEXT.md`: Carriage, Caravan).
 
 /** What goods weigh, in kg (`GOOD_WEIGHT`). */
@@ -223,30 +198,12 @@ export function loadLevel(load: Stock, capacity: number): LoadLevel {
   return rule('loadLevel', load, capacity)
 }
 
-/** The most Food a caravan with `escorts` escorts takes along (`CARAVAN_FOOD`). */
-export function caravanFoodFor(escorts: number): number {
-  return rule('caravanFoodFor', escorts)
-}
-
-/**
- * The Food a carriage with `escorts` takes for a way of `tiles` with `stops` stops, with a margin,
- * never more than `caravanFoodFor`.
- */
-export function foodForWay(escorts: number, tiles: number, stops = 0): number {
-  return rule('foodForWay', escorts, tiles, stops)
-}
-
 /**
  * How many of a carried good a resident puts away unless asked for an exact amount: all of it,
  * but Food only beyond their own food (`OWN_FOOD`, or `ownFood`).
  */
 export function putAwayUnits(good: Good, carried: number, ownFood?: number): number {
   return rule('putAwayUnits', good, carried, ownFood)
-}
-
-/** Whether a carriage can go onto terrain `terrain` at all (`CARRIAGE_SPEED` above 0). */
-export function carriageCanEnter(terrain: number): boolean {
-  return rule('carriageCanEnter', terrain)
 }
 
 // Prices and fees (`CONTEXT.md`: Warehouse prices, Transfer, Trader, NPC city prices).
@@ -256,39 +213,14 @@ export function priceFor(good: PricedGood, stock: number, floor: number): Price 
   return rule('priceFor', good, stock, floor)
 }
 
-/** A trader's price for one good from what it carries. */
-export function traderPriceFor(good: PricedGood, stock: number): Price {
-  return rule('traderPriceFor', good, stock)
-}
-
-/** An NPC city's price for one good from its stock, its reserve and its swing. */
-export function npcPriceFor(good: PricedGood, stock: number, reserve: Stock, swing: number): Price {
-  return rule('npcPriceFor', good, stock, reserve, swing)
-}
-
 /** What a Trade Org delivery of `kg` over `tiles` costs, in coins. */
 export function deliveryFee(kg: number, tiles: number): number {
   return rule('deliveryFee', kg, tiles)
 }
 
-/** What a Trade Org transfer of `kg` over `tiles` costs, in coins. */
-export function transferFee(kg: number, tiles: number): number {
-  return rule('transferFee', kg, tiles)
-}
-
-/** What of a fee is paid at pick-up: all but the unloading's share, rounded for the unloading. */
-export function feeAtPickUp(fee: number, unloadShare = 0): number {
-  return rule('feeAtPickUp', fee, unloadShare)
-}
-
 /** How many units of a good one transfer load holds (`DELIVERY_LOAD`). */
 export function transferLoad(good: Good): number {
   return rule('transferLoad', good)
-}
-
-/** The loads a transfer of `goods` goes in, each at most `transferLoad` units of one good. */
-export function transferLoads(goods: Stock): { good: Good; units: number }[] {
-  return rule('transferLoads', goods)
 }
 
 /** What transferring `goods` over `tiles` costs, load by load. */
@@ -301,32 +233,7 @@ export function goodsToHandOver(goods: Partial<Record<Good, number>>, free: Stoc
   return rule('goodsToHandOver', goods, free)
 }
 
-/** Who pays which share of unloading carried goods, by who pays the fee. */
-export function carriedUnloadShares(feeBy: CarriedFeeBy): { sender: number; other: number } {
-  return rule('carriedUnloadShares', feeBy)
-}
-
-/** How a horse dealer's stock against what it wants moves its prices. */
-export function horseStockFactor(has: number, wanted: number): number {
-  return rule('horseStockFactor', has, wanted)
-}
-
 // NPC cities (`CONTEXT.md`: NPC city).
-
-/** How many soldiers an NPC city of `adults` grown residents keeps. */
-export function npcSoldierTarget(adults: number): number {
-  return rule('npcSoldierTarget', adults)
-}
-
-/** Game days an NPC city of `residents` takes to be full and found another. */
-export function npcFullDays(residents: number): number {
-  return rule('npcFullDays', residents)
-}
-
-/** How many residents an NPC city of `residents` sends to found another. */
-export function npcFoundingPartySize(residents: number): number {
-  return rule('npcFoundingPartySize', residents)
-}
 
 // Checks of what a Player sends.
 
@@ -350,16 +257,6 @@ export function queueStepsProblem(items: unknown): string | undefined {
   return opt(rule<string | null>('queueStepsProblem', items))
 }
 
-/** Whether `line` names a line of the first day card. */
-export function isFirstDayLine(line: unknown): line is FirstDayLine {
-  return rule('isFirstDayLine', line)
-}
-
-/** Whether `line` names a line of the first day card the client reports. */
-export function isClientFirstDayLine(line: unknown): line is ClientFirstDayLine {
-  return rule('isClientFirstDayLine', line)
-}
-
 /** Whether a value fits a `number` param: a whole number of zero or more. */
 export function isParamNumber(value: unknown): value is number {
   // JSON has no NaN or infinities; none of them is a whole number.
@@ -376,11 +273,6 @@ export function gameTime(tick: number): GameTime {
 /** The game time at a tick as the top bar shows it: `Year 1 · Day 3 · 08:15`. */
 export function formatGameTime(tick: number): string {
   return rule('formatGameTime', tick)
-}
-
-/** The number in an id (`city7` is 7). */
-export function idNumber(id: string): number {
-  return rule('idNumber', id)
 }
 
 /** Whether two tiles touch or are the same, straight or diagonally, across the map's joins. */
@@ -412,16 +304,6 @@ export function canHandle(
   goods: readonly string[],
 ): boolean {
   return rule('canHandle', resident.bornAt, tick, goods)
-}
-
-/** The Food a rider carries beyond their own food, for their horse. */
-export function riderSpareFood(rider: Pick<Resident, 'carried'>): number {
-  return rule('riderSpareFood', rider.carried)
-}
-
-/** What a trader has to trade of its carriage's `load`: all but its escorts' Food for the way. */
-export function traderStock(t: Pick<Trader, 'escortIds'>, load: Stock): Stock {
-  return rule('traderStock', t.escortIds.length, load)
 }
 
 /**
@@ -458,34 +340,6 @@ export function addWaypointProblem(
   size: number,
 ): string | undefined {
   return opt(rule<string | null>('addWaypointProblem', held, x, y, name, size))
-}
-
-/** Why the waypoint `id` can't be renamed `name`, if it can't. */
-export function renameWaypointProblem(
-  held: readonly Waypoint[],
-  id: unknown,
-  name: unknown,
-): string | undefined {
-  return opt(rule<string | null>('renameWaypointProblem', held, id, name))
-}
-
-/** Why the waypoint `id` can't be taken away, if it can't. */
-export function removeWaypointProblem(held: readonly Waypoint[], id: unknown): string | undefined {
-  return opt(rule<string | null>('removeWaypointProblem', held, id))
-}
-
-/** Why an offer's terms won't do, if they won't: a good for a different good, in whole units. */
-export function offerTermsProblem(terms: {
-  gives: unknown
-  givesUnits: unknown
-  wants: unknown
-  wantsUnits: unknown
-  times: unknown
-}): string | undefined {
-  const { gives, givesUnits, wants, wantsUnits, times } = terms
-  return opt(
-    rule<string | null>('offerTermsProblem', { gives, givesUnits, wants, wantsUnits, times }),
-  )
 }
 
 /** Why `c` is no condition, if it is not (`CONTEXT.md`: Condition). */
@@ -579,11 +433,6 @@ export function repairable(
   return rule('repairable', asBuilding(b))
 }
 
-/** What a broken wall, gate or tower leaves (`BROKEN_MATERIALS_RETURNED` of its materials). */
-export function brokenReturns(b: Building): Stock {
-  return rule('brokenReturns', asBuilding(b))
-}
-
 /** Damage a wall, gate or tower takes before it falls, of wood or stone. */
 export function wallStrength(b: Building): number {
   return rule('wallStrength', asBuilding(b))
@@ -592,20 +441,6 @@ export function wallStrength(b: Building): number {
 /** Damage a wall, gate or tower still takes before it falls. */
 export function wallStrengthLeft(b: Building): number {
   return rule('wallStrengthLeft', asBuilding(b))
-}
-
-/** Whether (x, y) is in the inner ring around the Trade Org HQ's town hall `hall`. */
-export function inInnerRingAround(
-  hall: { kind: string; x: number; y: number },
-  at: { x: number; y: number },
-  size: number,
-): boolean {
-  return rule(
-    'inInnerRingAround',
-    asBuilding(hall as Pick<Building, 'kind' | 'x' | 'y'>),
-    [at.x, at.y],
-    size,
-  )
 }
 
 // Rules on one resident or horse (T122.5b): they go across whole, as a Player sees them or as the
@@ -681,21 +516,6 @@ function asHorse(h: object): object {
   }
 }
 
-/** How much a resident's age lets them do, from a child's share up to a grown one's 1. */
-export function ageFactor(resident: Resident, tick: number): number {
-  return rule('ageFactor', asResident(resident), tick)
-}
-
-/** Construction skill a resident gains per game day of building (`CONTEXT.md`: Skill). */
-export function constructionLearned(resident: Resident, tick: number): number {
-  return rule('constructionLearned', asResident(resident), tick)
-}
-
-/** How many times the Food of a day a resident eats on `terrain` (`CONTEXT.md`: Hunger). */
-export function foodUse(resident: Resident, terrain: number, tick: number): number {
-  return rule('foodUse', asResident(resident), terrain, tick)
-}
-
 /** How many of `good` a resident makes a game day at a workplace of `kind`. */
 export function madePerDay(
   resident: Resident,
@@ -704,11 +524,6 @@ export function madePerDay(
   tick: number,
 ): number {
   return rule('madePerDay', asResident(resident), kind, good, tick)
-}
-
-/** How much of `skill` a resident gains per game day of work using it. */
-export function workLearned(resident: Resident, skill: Skill, tick: number): number {
-  return rule('workLearned', asResident(resident), skill, tick)
 }
 
 /** A resident's value in a stat or skill a training ground teaches. */
@@ -749,30 +564,6 @@ export function horseSellerProblem(
   return opt(rule<string | null>('horseSellerProblem', asResident(resident), price, tick))
 }
 
-/** Food a resident eats a tick on `terrain`, with what their horse eats if they ride one. */
-export function foodPerTick(
-  r: Resident,
-  terrain: number,
-  tick: number,
-  horse?: { stats: HorseStats },
-): number {
-  return rule('foodPerTick', asResident(r), terrain, tick, horse?.stats)
-}
-
-/** How fast a rider goes on their horse over `terrain`, in tiles a tick. */
-export function rideSpeed(
-  rider: Resident,
-  horse: Pick<Horse, 'stats' | 'hunger'>,
-  terrain: number,
-): number {
-  return rule('rideSpeed', asResident(rider), asHorse(horse), terrain)
-}
-
-/** What a horse is worth, by its stats and age (`CONTEXT.md`: Horse market). */
-export function horseWorth(horse: Pick<Horse, 'stats' | 'bornAt'>, tick: number): number {
-  return rule('horseWorth', asHorse(horse), tick)
-}
-
 /** A horse's age in game years. */
 export function horseAgeInYears(horse: Pick<Horse, 'bornAt'>, tick: number): number {
   return rule('horseAgeInYears', asHorse(horse), tick)
@@ -801,53 +592,6 @@ export function workPace(
   return rule('workPace', asBuilding(b), workers.map(asResident), tick, under)
 }
 
-/** A contract as the module reads one, from what the caller has of it. */
-function asContract(c: object): object {
-  return {
-    id: '',
-    lenderId: '',
-    hirerId: '',
-    offeredBy: 'lender',
-    residentIds: [],
-    days: 0,
-    pricePerWeek: 0,
-    storageId: '',
-    startedAt: null,
-    paidWeeks: 0,
-    ...c,
-  }
-}
-
-/** Game weeks a contract runs, the last one maybe short; each is paid in full. */
-export function contractWeeks(c: Pick<MercenaryContract, 'days'>): number {
-  return rule('contractWeeks', asContract(c))
-}
-
-/** The tick a started contract ends. */
-export function contractEndsAt(c: MercenaryContract & { startedAt: number }): number {
-  return rule('contractEndsAt', asContract(c), c.startedAt)
-}
-
-/** The tick by which the contract's next unpaid week has to be paid; none once all are paid. */
-export function contractPayBy(c: MercenaryContract): number | null {
-  return rule('contractPayBy', asContract(c))
-}
-
-/** A realm as the module reads one, from what the caller has of it. */
-function asRealm(r: object): object {
-  return { id: '', userId: 0, leaderId: '', ...r }
-}
-
-/** When the realm sent the demands that still count against today's (`DEMANDS_PER_GAME_DAY`). */
-export function demandsCounted(realm: Pick<Realm, 'demandsSentAt'>, tick: number): number[] {
-  return rule('demandsCounted', asRealm(realm), tick)
-}
-
-/** How many more demands the realm may send today. */
-export function demandsLeft(realm: Pick<Realm, 'demandsSentAt'>, tick: number): number {
-  return rule('demandsLeft', asRealm(realm), tick)
-}
-
 /** A directive as the module reads one, from what the caller has of it. */
 function asDirective(d: object): object {
   return {
@@ -867,38 +611,6 @@ function asDirective(d: object): object {
 /** Whether one of a directive's goals is met (`CONTEXT.md`: Admin directive). */
 export function goalMet(d: Pick<Directive, 'soldiersKilled'>, goal: DirectiveGoal): boolean {
   return rule('goalMet', asDirective(d), goal)
-}
-
-/** Whether all of a directive's goals are met, so it ends. One without goals never ends. */
-export function goalsMet(d: Pick<Directive, 'goals' | 'soldiersKilled'>): boolean {
-  return rule('goalsMet', asDirective(d))
-}
-
-/** A name as sent, for the module to tell nothing sent from `null` sent. */
-function given(v: unknown): object {
-  return v === undefined ? {} : { v }
-}
-
-/** Why the Player of `realm` can't rename `target` to `name` now, if they can't. */
-export function renameProblem(
-  realm: Pick<Realm, 'id' | 'leaderId' | 'name'>,
-  target: Resident | undefined,
-  name: unknown,
-  realmName?: unknown,
-): string | undefined {
-  const t = target && asResident(target)
-  const p = rule<string | null>('renameProblem', asRealm(realm), t, given(name), given(realmName))
-  return opt(p)
-}
-
-/** Why the Player of `realm` can't rename `horse` to `name` now, if they can't. */
-export function horseRenameProblem(
-  realm: Pick<Realm, 'id'>,
-  horse: Pick<Horse, 'realmId'> | undefined,
-  name: unknown,
-): string | undefined {
-  const h = horse && asHorse(horse)
-  return opt(rule<string | null>('horseRenameProblem', asRealm(realm), h, given(name)))
 }
 
 /** What each side of a carried offer pays over its ways: the sender's and the other side's fee. */
@@ -1034,26 +746,6 @@ export function quoteOffer(
   return rule('quoteOffer', o, holderOf(holder), wanted, a)
 }
 
-/** A city as the module reads one, from what the caller has of it. */
-function asCity(c: object): object {
-  return { id: '', name: '', realmId: null, townHallId: '', occupation: null, ...c }
-}
-
-/** Why the Player of `realm` can't rename `city` to `name` now, if they can't. */
-export function cityRenameProblem(
-  realm: Pick<Realm, 'id'>,
-  city: City | undefined,
-  name: unknown,
-): string | undefined {
-  const c = city && asCity(city)
-  return opt(rule<string | null>('cityRenameProblem', asRealm(realm), c, given(name)))
-}
-
-/** How a city that was a Player's stands toward the Player now (`CONTEXT.md`: Former Player). */
-export function formerPlayerStanding(city: Pick<City, 'formerPlayer'>, tick: number): number {
-  return rule('formerPlayerStanding', asCity(city), tick)
-}
-
 /** Whether a queue step never ends on its own (`CONTEXT.md`: Queue). */
 export function neverEnds(order: OrderRequest): boolean {
   return rule('neverEnds', order)
@@ -1112,16 +804,6 @@ export function cutSwap(terms: SwapTerms): SwapQuote {
     wantPrices: prices(Math.min(wanted, spare), terms.wantPrice),
     givePrices: prices(Math.min(held, takes), terms.givePrice),
   })
-}
-
-/** A wandering trader's prices for every good but coins, from what it has to trade. */
-export function traderPrices(t: Pick<Trader, 'escortIds'>, carriage: Carriage): TraderPrice[] {
-  return rule('traderPrices', t.escortIds, asCarriage(carriage))
-}
-
-/** How many escorts a wandering trader walks with, one more for every few robberies. */
-export function traderEscortsWanted(trader: Pick<Trader, 'robberies'>): number {
-  return rule('traderEscortsWanted', [], trader.robberies)
 }
 
 /** The horses at a stable: those on its footprint. */

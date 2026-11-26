@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { describeGoal } from './shared/directive.js'
+import { describeGoal } from './directive.js'
 import type { DirectiveView, JoinRequestView, OrderRequest, StandingView } from '@csp/shared-types'
 import {
   formatStanding,
@@ -10,7 +10,7 @@ import {
 } from './standing-view.js'
 import { PanelHead } from './panel-head.js'
 import { relationshipClass } from './theme.js'
-import { aboutTime } from './shared/estimates.js'
+import { aboutTime } from './estimates.js'
 import { OUTWEIGH_HOLD_DAYS, TICKS_PER_GAME_DAY } from '@csp/balance'
 
 /**

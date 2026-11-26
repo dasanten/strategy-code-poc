@@ -1,5 +1,5 @@
-import { CARRYING_A_CHILD } from './shared/world.js'
-import { relocateProblem, relocateRoom } from './shared/relocate.js'
+import { CARRYING_A_CHILD } from '@csp/shared-types'
+import { relocateProblem, relocateRoom } from './relocate.js'
 import type { Building, City, Resident } from '@csp/shared-types'
 
 /**

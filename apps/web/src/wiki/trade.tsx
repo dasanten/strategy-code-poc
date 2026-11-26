@@ -73,7 +73,7 @@ import {
   WORK_OUTPUT_PER_DAY,
   NPC_FOOD_REFILL_DAYS,
 } from '@csp/balance'
-import { NPC_SMITHY_WEAPON } from '../shared/npc-trade.js'
+import { NPC_SMITHY_WEAPON } from '@csp/shared-types'
 import { GOOD_LABELS } from '../Residents.js'
 import { Table } from './parts.js'
 import { goodName } from './names.js'

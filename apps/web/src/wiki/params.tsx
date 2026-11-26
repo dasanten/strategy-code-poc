@@ -1,7 +1,7 @@
 import { CREW_FOOD, GET_FOOD_AT, GET_FOOD_TAKE } from '@csp/balance'
 import { PARAM_DESCRIPTIONS } from '@csp/lang-wasm'
-import { WORKPLACE_PARAM } from '../shared/default-scripts.js'
-import { SCRIPT_PARAM_TYPES } from '../shared/script-api.js'
+import { WORKPLACE_PARAM } from '@csp/shared-types'
+import { SCRIPT_PARAM_TYPES } from '@csp/shared-types'
 import { ScriptCode, Table } from './parts.js'
 import { foodEatenPerDay, num } from './wiki-view.js'
 import {

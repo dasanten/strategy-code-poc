@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { stepLine } from './shared/queue.js'
+import { stepLine } from '@csp/lang-wasm'
 import type { QueueStepRequest } from '@csp/shared-types'
 import { stepRow } from './queue-view.js'
 import { planRows, planSteps, stepCount, withIds, type PlanItem } from './plan-blocks.js'

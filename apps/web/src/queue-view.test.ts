@@ -1,5 +1,6 @@
 import { QUEUE_DEFAULT_STEP_MINUTES } from '@csp/balance'
-import { QUEUE_STEP_KINDS, neverEnds, queueSteps, queueStepsProblem } from './shared/queue.js'
+import { QUEUE_STEP_KINDS, queueSteps } from './queue.js'
+import { neverEnds, queueStepsProblem } from '@csp/lang-wasm'
 import type { OrderRequest, Queue } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {

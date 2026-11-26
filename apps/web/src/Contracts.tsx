@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { CONTRACT_MAX_DAYS, TRADE_ORG_ARMY } from '@csp/balance'
-import { TRADE_ORG } from './shared/trade-org.js'
+import { TRADE_ORG } from '@csp/shared-types'
 import type {
   Building,
   SeenCity,
@@ -12,8 +12,8 @@ import type {
   ScriptSummary,
   SeenResident,
 } from '@csp/shared-types'
-import { ageInYears } from './shared/stats.js'
-import { isAt } from './shared/footprint.js'
+import { ageInYears } from '@csp/lang-wasm'
+import { isAt } from './footprint.js'
 import {
   contractChip,
   contractStatus,

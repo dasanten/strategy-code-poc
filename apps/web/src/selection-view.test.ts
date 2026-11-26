@@ -29,20 +29,23 @@ import {
   PATCH_REST_DAYS,
   PATCH_REGROW_DAYS,
 } from '@csp/balance'
-import { rebuildWork } from './shared/decay.js'
-import { FOOTPRINT, footprintTiles } from './shared/footprint.js'
-import { MAX_WORKERS, NODE_GOOD, buildMenu } from './shared/building.js'
-import { TICKS_PER_GAME_HOUR } from './shared/time.js'
-import { aboutTime, timeLeft } from './shared/estimates.js'
+import { rebuildWork } from '@csp/lang-wasm'
+import { FOOTPRINT, footprintTiles } from './footprint.js'
+import { MAX_WORKERS } from './building.js'
+import { NODE_GOOD } from '@csp/shared-types'
+import { buildMenu } from '@csp/lang-wasm'
+import { TICKS_PER_GAME_HOUR } from '@csp/balance'
+import { aboutTime, timeLeft } from './estimates.js'
 import {
   BUILD_MATERIALS,
   BUILD_WORK,
   WORK_OUTPUT_PER_DAY,
   AVERAGE_HORSE_STATS,
-} from './shared/narrowed.js'
-import { NODE_WORKPLACE } from './shared/world.js'
-import { stockWeight } from './shared/stats.js'
-import { Terrain, UNEXPLORED } from './shared/terrain.js'
+} from './narrowed.js'
+import { NODE_WORKPLACE } from '@csp/shared-types'
+import { stockWeight } from '@csp/lang-wasm'
+import { Terrain } from './terrain.js'
+import { UNEXPLORED } from '@csp/shared-types'
 import type {
   Building,
   Carriage,

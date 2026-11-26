@@ -1,5 +1,6 @@
 import { TERRAIN_SPEED, TICKS_PER_GAME_YEAR, WALK_TICKS_PER_TILE } from '@csp/balance'
-import { Terrain, UNEXPLORED } from './shared/terrain.js'
+import { Terrain } from './terrain.js'
+import { UNEXPLORED } from '@csp/shared-types'
 import type { Building, ResidentOrder, ScriptSummary } from '@csp/shared-types'
 import { afterEach, describe, expect, it } from 'vitest'
 import { mirrorOf } from './test-mirror.js'

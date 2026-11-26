@@ -1,4 +1,4 @@
-import { drivenCarriageId } from '../shared/carriages.js'
+import { drivenCarriageId } from '../carriages.js'
 import type { SeenResident } from '@csp/shared-types'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 

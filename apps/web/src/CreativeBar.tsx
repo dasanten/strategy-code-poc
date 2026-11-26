@@ -10,7 +10,7 @@ import {
   skipLine,
   skipTicks,
 } from './creative-bar.js'
-import { formatGameTime } from './shared/time.js'
+import { formatGameTime } from '@csp/lang-wasm'
 
 /**
  * The Creative bar (`CONTEXT.md`: Creative mode): pause or resume the whole world, step one tick,

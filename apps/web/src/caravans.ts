@@ -1,4 +1,4 @@
-import { crewIdsOf } from './shared/carriages.js'
+import { crewIdsOf } from './carriages.js'
 import type { SeenCaravan, SeenCarriage, SeenResident } from '@csp/shared-types'
 
 /**

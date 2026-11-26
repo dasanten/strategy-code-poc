@@ -1,6 +1,6 @@
 import { RALLY_PACE } from '@csp/balance'
-import { FIRST_DAY_LINES } from './shared/first-day.js'
-import { aboutTime } from './shared/estimates.js'
+import { FIRST_DAY_LINES } from '@csp/shared-types'
+import { aboutTime } from './estimates.js'
 import type { FirstDay, FirstDayLine, TraderVisit } from '@csp/shared-types'
 import { isScreen, type OpenTab } from './hud-view.js'
 

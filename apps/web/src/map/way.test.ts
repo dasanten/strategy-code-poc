@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ResidentOrder } from '@csp/shared-types'
-import type { LineBuildOrder } from '../shared/building.js'
+import type { LineBuildOrder } from '../building.js'
 import type { Camera } from './camera.js'
 import { selectedWay, wayAhead, wayInView, wayLine, type Way } from './way.js'
 

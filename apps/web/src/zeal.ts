@@ -1,6 +1,6 @@
 import { TICK_MS, TICKS_PER_GAME_HOUR, ZEAL_CAP_HOURS, ZEAL_FILL_TICKS } from '@csp/balance'
 import type { Building, ResidentOrder } from '@csp/shared-types'
-import { WORKPLACE_SKILL } from './shared/narrowed.js'
+import { WORKPLACE_SKILL } from './narrowed.js'
 
 /** What the top bar's Zeal meter shows (`CONTEXT.md`: Zeal). */
 export interface ZealShown {

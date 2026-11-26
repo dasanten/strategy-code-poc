@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { FOOTPRINT } from '../shared/footprint.js'
-import { NODE_KINDS } from '../shared/chunks.js'
+import { FOOTPRINT } from '../footprint.js'
+import { NODE_KINDS } from '@csp/shared-types'
 import {
   ACTIVITY_ART,
   ART_FILES,

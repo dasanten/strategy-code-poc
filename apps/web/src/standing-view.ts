@@ -1,4 +1,4 @@
-import { TRADE_ORG, TRADE_ORG_NAME } from './shared/trade-org.js'
+import { TRADE_ORG, TRADE_ORG_NAME } from '@csp/shared-types'
 import type {
   City,
   RealmEvent,

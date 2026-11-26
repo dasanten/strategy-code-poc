@@ -1,5 +1,6 @@
 import type { LandRegion, LandWay, PlayerLand, RegionKind, WayKind } from '@csp/shared-types'
-import { CHUNK_SIZE, chunksAcross } from '../shared/terrain.js'
+import { CHUNK_SIZE } from '@csp/shared-types'
+import { chunksAcross } from '../terrain.js'
 import type { MapMark } from './preview-draw.js'
 
 /*

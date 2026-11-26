@@ -3,11 +3,10 @@ import {
   ADMIN_MAP_INFO_PATH,
   ADMIN_PLACES_PATH,
   ADMIN_TERRITORY_PATH,
-  adminInspectPath,
-  adminWorldPath,
-} from './shared/admin-map.js'
-import { ADMIN_TERRAIN_OVERVIEW_PATH, LAND_PATH } from './shared/terrain.js'
-import { FIRST_DAY_DISMISS_PATH, FIRST_DAY_PATH } from './shared/first-day.js'
+} from '@csp/shared-types'
+import { adminInspectPath, adminWorldPath } from './admin-paths.js'
+import { ADMIN_TERRAIN_OVERVIEW_PATH, LAND_PATH } from '@csp/shared-types'
+import { FIRST_DAY_DISMISS_PATH, FIRST_DAY_PATH } from '@csp/shared-types'
 import type {
   Account,
   AdminDirectiveView,

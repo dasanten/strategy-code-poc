@@ -6,7 +6,7 @@ import {
   HOUSING_ROOM,
   RECIPES,
   WORK_OUTPUT_PER_DAY,
-} from './shared/narrowed.js'
+} from './narrowed.js'
 import {
   FOOD_PER_DAY,
   MOUNTAIN_ROAD_WORK_FACTOR,
@@ -18,10 +18,11 @@ import {
   TICKS_PER_GAME_DAY,
   hungerFactor,
 } from '@csp/balance'
-import { aboutTime } from './shared/estimates.js'
-import { GOODS } from './shared/world.js'
-import { Terrain, UNEXPLORED } from './shared/terrain.js'
-import { teardownWork } from './shared/building.js'
+import { aboutTime } from './estimates.js'
+import { GOODS } from './world.js'
+import { Terrain } from './terrain.js'
+import { UNEXPLORED } from '@csp/shared-types'
+import { teardownWork } from '@csp/lang-wasm'
 import type { DrifterLine, Good, Pile, Resident, SeenBuilding } from '@csp/shared-types'
 import { describeTile, tileActions, tradesHere, type TileThings } from './selection-view.js'
 import { GOOD_LABELS } from './Residents.js'

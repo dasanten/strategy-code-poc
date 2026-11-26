@@ -1,4 +1,4 @@
-import { aboutTime } from './shared/estimates.js'
+import { aboutTime } from './estimates.js'
 import { describe, expect, it } from 'vitest'
 import { RALLY_PACE } from '@csp/balance'
 import { FIRST_DAY_RALLY_TIP } from './notices-view.js'

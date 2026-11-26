@@ -1,4 +1,4 @@
-import { buildingRealm } from './shared/city.js'
+import { buildingRealm } from './city.js'
 import type { Building, City, Good } from '@csp/shared-types'
 import { agoText } from './last-seen.js'
 

@@ -115,21 +115,3 @@ export function cityMembershipOf(
   })
   return out
 }
-
-/** For each of `tiles`, whether it lies in the area of any city (`citiesAt` not empty), asked in one call. */
-export function inAnyCityArea(
-  buildings: readonly AreaBuilding[],
-  tiles: readonly (readonly [number, number])[],
-  size: number,
-): boolean[] {
-  const numbers = new Map<string, number>()
-  const cityNumber = (c: string | null) => {
-    if (c === null) return -1
-    if (!numbers.has(c)) numbers.set(c, numbers.size)
-    return numbers.get(c)!
-  }
-  const flat = Int32Array.from(tiles.flatMap(([x, y]) => [x, y]))
-  return [...wasm.inAnyCityArea(encode(buildings, cityNumber, false), flat, size)].map(
-    (n) => n === 1,
-  )
-}

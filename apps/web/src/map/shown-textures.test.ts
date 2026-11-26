@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from 'vitest'
-import { chunksAcross } from '../shared/terrain.js'
+import { chunksAcross } from '../terrain.js'
 import { visibleChunks } from './camera.js'
 import { KEPT_TEXTURES, ShownTextures } from './shown-textures.js'
 

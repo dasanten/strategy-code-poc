@@ -1,6 +1,7 @@
-import { GOODS } from './shared/world.js'
-import { QUEUE_STEP_KINDS, queueSteps, queueStepsProblem, stepLine } from './shared/queue.js'
-import { freeHousing } from './shared/city.js'
+import { GOODS } from './world.js'
+import { QUEUE_STEP_KINDS, queueSteps } from './queue.js'
+import { queueStepsProblem, stepLine } from '@csp/lang-wasm'
+import { freeHousing } from './city.js'
 import type { Building, Condition, Queue, QueueStepRequest } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {

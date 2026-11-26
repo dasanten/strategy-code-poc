@@ -6,8 +6,8 @@
 
 use csp_lang::ParamInfo;
 use csp_shared::world::{
-    BuildingKind, CarriedFeeBy, Directive, DirectiveGoal, Good, HorseStats, MercenaryContract,
-    Realm, ResourceKind, SkillName, Stock, Task, TrainingSubject, WallMaterial, Waypoint,
+    BuildingKind, CarriedFeeBy, Directive, DirectiveGoal, Good, ResourceKind, Stock, Task,
+    TrainingSubject, WallMaterial, Waypoint,
 };
 use csp_shared::world::{Offer, OrderRequest, TradeSide};
 use serde::de::DeserializeOwned;
@@ -15,8 +15,8 @@ use serde_json::{json, Value};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use csp_sim::queries::{
-    building, building_info, carriages, city_area, combat, demand, direct_offer, horse_market,
-    npc_trade, people, residents, trader_trade, transfer, walls, warehouse, warehouse_trade,
+    building, building_info, carriages, combat, demand, direct_offer, npc_trade, people, residents,
+    transfer, walls, warehouse, warehouse_trade,
 };
 
 /// A tile as a rule takes it: (x, y).
@@ -81,43 +81,6 @@ fn carriage_arg(mut v: Value) -> Result<csp_shared::world::Carriage, String> {
         .map_err(|e| format!("a carriage: {e}"))
 }
 
-/// A name a Player sends, as the client passes it: `{ "v": value }`, with no `v` for none, so
-/// that nothing sent and `null` sent stay apart as `Given` keeps them.
-#[derive(serde::Deserialize)]
-struct Given {
-    #[serde(default, deserialize_with = "present")]
-    v: Option<Value>,
-}
-
-/// A field that is there, `null` or not, as `Some`.
-fn present<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Value>, D::Error> {
-    <Value as serde::Deserialize>::deserialize(d).map(Some)
-}
-
-impl Given {
-    fn given(&self) -> people::Given<'_> {
-        match &self.v {
-            None => people::Given::Missing,
-            Some(Value::String(s)) => people::Given::Text(s),
-            Some(_) => people::Given::NotText,
-        }
-    }
-}
-
-/// A city the client passes, as a Player sees it (`SeenCity`) or whole: what the rules read of
-/// it is the city's own fields.
-fn city_arg(mut v: Value) -> Result<csp_shared::world::City, String> {
-    if let Some(map) = v.as_object_mut() {
-        // What a Player sees of it besides the city, which these rules don't read.
-        for key in
-            ["is", "price", "wontSell", "refuses", "hire", "trade", "retaliatingAgainst", "horses"]
-        {
-            map.remove(key);
-        }
-    }
-    serde_json::from_value::<csp_shared::world::City>(v).map_err(|e| format!("a city: {e}"))
-}
-
 /// A trade holder as the client passes it: what it holds and the room it has left.
 #[derive(serde::Deserialize)]
 struct Holder {
@@ -155,23 +118,6 @@ fn trade_quote(q: warehouse_trade::TradeQuote) -> Value {
     out
 }
 
-/// A trader as the rules read one, from its escorts and the robberies on its way: what a Player
-/// sees of a trader (`SeenTrader`) read the way the world mirror reads one.
-fn trader_of(escort_ids: Vec<String>, robberies: f64) -> csp_shared::world::Trader {
-    let mut t = csp_sim::mirror::trader(csp_shared::protocol::SeenTrader {
-        id: String::new(),
-        post_id: String::new(),
-        carriage_id: String::new(),
-        driver_id: None,
-        escort_ids,
-        heading: csp_shared::world::Heading::Post,
-        standing: None,
-        prices: None,
-    });
-    t.robberies = robberies;
-    t
-}
-
 /// A price as the client has it.
 fn price(p: warehouse::Price) -> Value {
     json!({ "buy": p.buy, "sell": p.sell })
@@ -204,10 +150,6 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
         "workFactor" => {
             let (kind, under): (BuildingKind, Option<u8>) = args(name, json)?;
             json!(building::work_factor(kind, under))
-        }
-        "siteWorkOf" => {
-            let (work, kind, under): (f64, BuildingKind, Option<u8>) = args(name, json)?;
-            json!(building::site_work_of(work, kind, under))
         }
         "hasChoice" => {
             let (kind,): (BuildingKind,) = args(name, json)?;
@@ -252,14 +194,6 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
             let (kind,): (BuildingKind,) = args(name, json)?;
             json!(csp_sim::ruins::rebuild_work(kind))
         }
-        "cornersCovering" => {
-            let (kind, x, y, size): (BuildingKind, i32, i32, i32) = args(name, json)?;
-            json!(building::corners_covering(kind, x, y, size))
-        }
-        "roadLine" => {
-            let (from, to, size): ((i32, i32), (i32, i32), i32) = args(name, json)?;
-            json!(building::road_line(from, to, size))
-        }
         // Carrying: weights, loads, food for the way (`CONTEXT.md`: Carriage, Caravan).
         "stockWeight" => {
             let (stock,): (Stock,) = args(name, json)?;
@@ -269,59 +203,23 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
             let (load, capacity): (Stock, f64) = args(name, json)?;
             json!(carriages::load_level(&load, capacity))
         }
-        "caravanFoodFor" => {
-            let (escorts,): (f64,) = args(name, json)?;
-            json!(carriages::caravan_food_for(escorts))
-        }
-        "foodForWay" => {
-            let (escorts, tiles, stops): (f64, f64, f64) = args(name, json)?;
-            json!(csp_sim::caravans::food_for_way(escorts, tiles, stops))
-        }
         "putAwayUnits" => {
             let (good, carried, own_food): (Good, f64, Option<f64>) = args(name, json)?;
             let own_food = own_food.unwrap_or(csp_shared::balance::OWN_FOOD);
             json!(csp_shared::goods::put_away_units(good.name(), carried, own_food))
-        }
-        "carriageCanEnter" => {
-            let (terrain,): (u8,) = args(name, json)?;
-            json!(csp_shared::balance::carriage_can_enter(terrain))
         }
         // Prices and fees (`CONTEXT.md`: Warehouse, Transfer, Trader, NPC city prices).
         "priceFor" => {
             let (good, stock, floor): (Good, f64, f64) = args(name, json)?;
             price(warehouse::price_for(good, stock, floor))
         }
-        "traderPriceFor" => {
-            let (good, stock): (Good, f64) = args(name, json)?;
-            price(trader_trade::trader_price_for(good, stock))
-        }
-        "npcPriceFor" => {
-            let (good, stock, reserve, swing): (Good, f64, Stock, f64) = args(name, json)?;
-            price(npc_trade::npc_price_for(good, stock, &reserve, swing))
-        }
         "deliveryFee" => {
             let (kg, tiles): (f64, f64) = args(name, json)?;
             json!(warehouse_trade::delivery_fee(kg, tiles))
         }
-        "transferFee" => {
-            let (kg, tiles): (f64, f64) = args(name, json)?;
-            json!(transfer::transfer_fee(kg, tiles))
-        }
-        "feeAtPickUp" => {
-            let (fee, unload_share): (f64, f64) = args(name, json)?;
-            json!(transfer::fee_at_pick_up(fee, unload_share))
-        }
         "transferLoad" => {
             let (good,): (Good,) = args(name, json)?;
             json!(transfer::transfer_load(good))
-        }
-        "transferLoads" => {
-            let (goods,): (Stock,) = args(name, json)?;
-            let loads = demand::transfer_loads(&goods);
-            json!(loads
-                .iter()
-                .map(|(good, units)| json!({ "good": good, "units": units }))
-                .collect::<Vec<_>>())
         }
         "transferLoadsFee" => {
             let (goods, tiles): (Stock, f64) = args(name, json)?;
@@ -331,28 +229,7 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
             let (goods, free): (Stock, Stock) = args(name, json)?;
             json!(demand::goods_to_hand_over(&goods, &free))
         }
-        "carriedUnloadShares" => {
-            let (fee_by,): (CarriedFeeBy,) = args(name, json)?;
-            let (sender, other) = direct_offer::carried_unload_shares(fee_by);
-            json!({ "sender": sender, "other": other })
-        }
-        "horseStockFactor" => {
-            let (has, wanted): (f64, f64) = args(name, json)?;
-            json!(horse_market::horse_stock_factor(has, wanted))
-        }
         // NPC cities (`CONTEXT.md`: NPC city).
-        "npcSoldierTarget" => {
-            let (adults,): (f64,) = args(name, json)?;
-            json!(npc_trade::npc_soldier_target(adults))
-        }
-        "npcFullDays" => {
-            let (residents,): (f64,) = args(name, json)?;
-            json!(npc_trade::npc_full_days(residents))
-        }
-        "npcFoundingPartySize" => {
-            let (residents,): (f64,) = args(name, json)?;
-            json!(npc_trade::npc_founding_party_size(residents))
-        }
         // Checks of what a Player sends.
         "nameProblem" => {
             let (name_value, max_length): (Value, f64) = args(name, json)?;
@@ -370,14 +247,6 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
             let (items,): (Option<Value>,) = args(name, json)?;
             json!(csp_sim::queue::queue_steps_problem(items.as_ref()))
         }
-        "isFirstDayLine" => {
-            let (line,): (Value,) = args(name, json)?;
-            json!(line.as_str().is_some_and(people::is_first_day_line))
-        }
-        "isClientFirstDayLine" => {
-            let (line,): (Value,) = args(name, json)?;
-            json!(line.as_str().is_some_and(people::is_client_first_day_line))
-        }
         "isParamNumber" => {
             let (value,): (Value,) = args(name, json)?;
             json!(csp_sim::script_api::is_param_number(&value))
@@ -391,10 +260,6 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
         "formatGameTime" => {
             let (tick,): (f64,) = args(name, json)?;
             json!(csp_shared::time::format_game_time(tick))
-        }
-        "idNumber" => {
-            let (id,): (String,) = args(name, json)?;
-            json!(city_area::id_number(&id))
         }
         "inContact" => {
             let (size, a, b): (i32, (i32, i32), (i32, i32)) = args(name, json)?;
@@ -423,14 +288,6 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
                 None => residents::can_work(born_at, tick),
             })
         }
-        "riderSpareFood" => {
-            let (carried,): (Stock,) = args(name, json)?;
-            json!(csp_sim::queries::riding::rider_spare_food(&carried))
-        }
-        "traderStock" => {
-            let (escorts, load): (usize, Stock) = args(name, json)?;
-            json!(trader_trade::trader_stock(escorts, &load))
-        }
         "transferTiles" => {
             let (size, warehouse, from, to): (i32, Tile, Option<Tile>, Tile) = args(name, json)?;
             json!(transfer::transfer_tiles(size, warehouse, from, to))
@@ -456,19 +313,6 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
                 label.as_ref(),
                 size
             ))
-        }
-        "renameWaypointProblem" => {
-            let (held, id, label): (Vec<Waypoint>, Option<Value>, Option<Value>) =
-                args(name, json)?;
-            json!(csp_sim::waypoints::rename_waypoint_problem(&held, id.as_ref(), label.as_ref()))
-        }
-        "removeWaypointProblem" => {
-            let (held, id): (Vec<Waypoint>, Option<Value>) = args(name, json)?;
-            json!(csp_sim::waypoints::remove_waypoint_problem(&held, id.as_ref()))
-        }
-        "offerTermsProblem" => {
-            let (terms,): (serde_json::Map<String, Value>,) = args(name, json)?;
-            json!(csp_sim::queries::offers::offer_terms_problem(&terms))
         }
         "conditionProblem" => {
             let (c,): (Option<Value>,) = args(name, json)?;
@@ -529,33 +373,12 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
             json!(csp_sim::repair::condition_of(&b).map(|c| c.name()))
         }
         "repairable" => json!(csp_sim::repair::repairable(&one_building(name, json)?)),
-        "brokenReturns" => json!(walls::broken_returns(&one_building(name, json)?)),
         "wallStrength" => json!(walls::wall_strength(&one_building(name, json)?)),
         "wallStrengthLeft" => json!(walls::wall_strength_left(&one_building(name, json)?)),
-        "inInnerRingAround" => {
-            let (hall, at, size): (Value, Tile, i32) = args(name, json)?;
-            json!(csp_sim::queries::trade_org::in_inner_ring_around(&building_arg(hall)?, at, size))
-        }
         // Rules on one resident or horse (T122.5b): the client passes them.
-        "ageFactor" => {
-            let (r, tick): (Value, f64) = args(name, json)?;
-            json!(residents::age_factor(&resident_arg(r)?, tick))
-        }
-        "constructionLearned" => {
-            let (r, tick): (Value, f64) = args(name, json)?;
-            json!(csp_sim::queries::balance::construction_learned(&resident_arg(r)?, tick))
-        }
-        "foodUse" => {
-            let (r, terrain, tick): (Value, u8, f64) = args(name, json)?;
-            json!(residents::food_use(&resident_arg(r)?, terrain, tick))
-        }
         "madePerDay" => {
             let (r, kind, good, tick): (Value, BuildingKind, Good, f64) = args(name, json)?;
             json!(csp_sim::queries::balance::made_per_day(&resident_arg(r)?, kind, good, tick))
-        }
-        "workLearned" => {
-            let (r, skill, tick): (Value, SkillName, f64) = args(name, json)?;
-            json!(csp_sim::queries::balance::work_learned(&resident_arg(r)?, skill, tick))
         }
         "subjectValue" => {
             let (r, subject, tick): (Value, TrainingSubject, f64) = args(name, json)?;
@@ -587,20 +410,6 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
                 tick
             ))
         }
-        "foodPerTick" => {
-            let (r, terrain, tick, stats): (Value, u8, f64, Option<HorseStats>) = args(name, json)?;
-            let r = resident_arg(r)?;
-            json!(csp_sim::queries::estimates::food_per_tick(&r, terrain, tick, stats.as_ref()))
-        }
-        "rideSpeed" => {
-            let (rider, horse, terrain): (Value, Value, u8) = args(name, json)?;
-            let (rider, horse) = (resident_arg(rider)?, horse_arg(horse)?);
-            json!(csp_sim::queries::pace::ride_speed(&rider, &horse, terrain))
-        }
-        "horseWorth" => {
-            let (h, tick): (Value, f64) = args(name, json)?;
-            json!(horse_market::horse_worth(&horse_arg(h)?, tick))
-        }
         "horseAgeInYears" => {
             let (h, tick): (Value, f64) = args(name, json)?;
             json!(residents::horse_age_in_years(&horse_arg(h)?, tick))
@@ -620,49 +429,9 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
             let refs: Vec<&csp_shared::world::Resident> = workers.iter().collect();
             json!(building::work_pace(&b, &refs, tick, under))
         }
-        "contractWeeks" => {
-            let (c,): (MercenaryContract,) = args(name, json)?;
-            json!(csp_sim::queries::contract::contract_weeks(&c))
-        }
-        "contractEndsAt" => {
-            let (c, started_at): (MercenaryContract, f64) = args(name, json)?;
-            json!(csp_sim::queries::contract::contract_ends_at(&c, started_at))
-        }
-        "contractPayBy" => {
-            let (c,): (MercenaryContract,) = args(name, json)?;
-            json!(csp_sim::queries::contract::contract_pay_by(&c))
-        }
-        "demandsCounted" => {
-            let (realm, tick): (Realm, f64) = args(name, json)?;
-            json!(demand::demands_counted(&realm, tick))
-        }
-        "demandsLeft" => {
-            let (realm, tick): (Realm, f64) = args(name, json)?;
-            json!(demand::demands_left(&realm, tick))
-        }
         "goalMet" => {
             let (d, goal): (Directive, DirectiveGoal) = args(name, json)?;
             json!(csp_sim::directive::goal_met(&d, &goal))
-        }
-        "goalsMet" => {
-            let (d,): (Directive,) = args(name, json)?;
-            json!(csp_sim::directive::goals_met(&d))
-        }
-        "renameProblem" => {
-            let (realm, target, label, realm_name): (Realm, Option<Value>, Given, Given) =
-                args(name, json)?;
-            let target = target.map(resident_arg).transpose()?;
-            json!(people::rename_problem(
-                &realm,
-                target.as_ref(),
-                label.given(),
-                realm_name.given()
-            ))
-        }
-        "horseRenameProblem" => {
-            let (realm, h, label): (Realm, Option<Value>, Given) = args(name, json)?;
-            let h = h.map(horse_arg).transpose()?;
-            json!(people::horse_rename_problem(&realm, h.as_ref(), label.given()))
         }
         "carriedFeesOver" => {
             #[derive(serde::Deserialize)]
@@ -792,15 +561,6 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
             }
             out
         }
-        "cityRenameProblem" => {
-            let (realm, city, label): (Realm, Option<Value>, Given) = args(name, json)?;
-            let city = city.map(city_arg).transpose()?;
-            json!(people::city_rename_problem(&realm, city.as_ref(), label.given()))
-        }
-        "formerPlayerStanding" => {
-            let (city, tick): (Value, f64) = args(name, json)?;
-            json!(csp_sim::queries::standing::former_player_standing(&city_arg(city)?, tick))
-        }
         "neverEnds" => {
             let (order,): (OrderRequest,) = args(name, json)?;
             json!(csp_sim::queue::never_ends(&order))
@@ -857,19 +617,6 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
                 out["limit"] = json!(limit_name(limit));
             }
             out
-        }
-        "traderPrices" => {
-            let (escorts, carriage): (Vec<String>, Value) = args(name, json)?;
-            let trader = trader_of(escorts, 0.0);
-            let prices = trader_trade::trader_prices(&trader, &carriage_arg(carriage)?);
-            json!(prices
-                .iter()
-                .map(|p| json!({ "good": p.good, "stock": p.stock, "buy": p.buy, "sell": p.sell }))
-                .collect::<Vec<_>>())
-        }
-        "traderEscortsWanted" => {
-            let (_, robberies): (Vec<String>, f64) = args(name, json)?;
-            json!(csp_sim::caravans::trader_escorts_wanted(&trader_of(Vec::new(), robberies)))
         }
         "horsesIn" => {
             let (horses, stable): (Vec<Value>, Value) = args(name, json)?;

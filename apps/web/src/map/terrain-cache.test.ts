@@ -9,7 +9,7 @@ import {
   type CacheBackend,
   type KeptChunk,
 } from './terrain-cache.js'
-import { decodeExploredCounts } from '../shared/chunks.js'
+import { decodeExploredCounts } from './chunk-codec.js'
 
 /** Kept chunks in memory, as IndexedDB keeps them across page loads. */
 function memory() {

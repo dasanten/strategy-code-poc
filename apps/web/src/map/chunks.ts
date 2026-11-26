@@ -1,11 +1,6 @@
-import {
-  TERRAIN_BATCH_MAX,
-  TERRAIN_BATCH_PATH,
-  TERRAIN_LEVEL_MAX,
-  coarseChunkOf,
-  levelChunksAcross,
-} from '../shared/terrain.js'
-import { decodeChunk, decodeChunkBatch } from '../shared/chunks.js'
+import { TERRAIN_BATCH_MAX, TERRAIN_BATCH_PATH, TERRAIN_LEVEL_MAX } from '@csp/shared-types'
+import { coarseChunkOf, levelChunksAcross } from '../terrain.js'
+import { decodeChunk, decodeChunkBatch } from './chunk-codec.js'
 import type { TerrainChunk } from '@csp/shared-types'
 
 /** How many chunk requests (each a batch of chunks) may be in flight at once. */

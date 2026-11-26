@@ -17,8 +17,8 @@ import {
   takesWorkSettings,
   roadTiles,
   stoneOverAt,
-} from './shared/building.js'
-import { firstDayShown } from './shared/first-day.js'
+} from './building.js'
+import { firstDayShown } from './first-day.js'
 import {
   flipped,
   flipsControlMode,
@@ -48,15 +48,11 @@ import type {
   SeenResident,
   WallMaterial,
 } from '@csp/shared-types'
-import {
-  carriagePulledBy,
-  carriageOfResident,
-  drivenCarriageId,
-  seatsLeft,
-} from './shared/carriages.js'
-import { horseOfResident, riderOf } from './shared/horses.js'
-import { horsesInNeed } from './shared/reviving.js'
-import { isDown, NODE_WORKPLACE } from './shared/world.js'
+import { carriagePulledBy, carriageOfResident, drivenCarriageId, seatsLeft } from './carriages.js'
+import { horseOfResident, riderOf } from './horse-rules.js'
+import { horsesInNeed } from './reviving.js'
+import { isDown } from './world.js'
+import { NODE_WORKPLACE } from '@csp/shared-types'
 import {
   buildProblem,
   driveOffProblems,
@@ -67,15 +63,9 @@ import {
   rowOffProblem,
   type KnownGround,
 } from './world-rules.js'
-import {
-  isPassableTerrain,
-  isWater,
-  UNEXPLORED,
-  Terrain,
-  tileIndex,
-  wrap,
-} from './shared/terrain.js'
-import { isWallOrGate } from './shared/walls.js'
+import { isPassableTerrain, isWater, Terrain, tileIndex, wrap } from './terrain.js'
+import { UNEXPLORED } from '@csp/shared-types'
+import { isWallOrGate } from './walls.js'
 import { CreativeBar } from './CreativeBar.js'
 import { showsCreativeBar } from './creative-bar.js'
 import { CreativeSection } from './CreativeSection.js'
@@ -90,17 +80,11 @@ import {
   CreativeGroupMove,
   CreativeResidentActions,
 } from './CreativeResidents.js'
-import { cityIdsAt } from './shared/city.js'
-import { isAt, covers } from './shared/footprint.js'
-import { targetParam } from './shared/default-scripts.js'
+import { cityIdsAtTile } from '@csp/lang-wasm'
+import { isAt, covers } from './footprint.js'
+import { targetParam } from '@csp/lang-wasm'
 import { HORSE_GRANT_HORSES, PASSENGER_WEIGHT } from '@csp/balance'
-import {
-  besideVessel,
-  crewShort,
-  isVesselId,
-  vesselOfResident,
-  vesselRoom,
-} from './shared/vessels.js'
+import { besideVessel, crewShort, isVesselId, vesselOfResident, vesselRoom } from './vessels.js'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
 import { commandsSeen } from './alliance-army.js'
@@ -2151,8 +2135,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     [],
   )
   const arrivesIn =
-    world &&
-    arrivalOf({ size: world.map.size, buildings: world.buildings }, terrainAt)
+    world && arrivalOf({ size: world.map.size, buildings: world.buildings }, terrainAt)
   const onTile = <T extends { x: number; y: number }>(things: T[] | undefined) =>
     selected && things?.find((t) => t.x === selected.x && t.y === selected.y)
   // A road may share its tile with a building (`CONTEXT.md`: Road); a building is wherever its
@@ -3017,7 +3000,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 )
                 const offer = creativeOffer(tileBuilding, carriage, name, shared)
                 const cities = creativeCities(knownCities, world.home.realmId)
-                const areaIds = cityIdsAt({ buildings: knownBuildings }, x, y, world.map.size)
+                const areaIds = cityIdsAtTile(knownBuildings, x, y, world.map.size)
                 const tileCity = knownCities.find((c) => areaIds.includes(c.id))
                 const here = world.residents.filter(
                   (r) => Math.floor(r.x) === x && Math.floor(r.y) === y,

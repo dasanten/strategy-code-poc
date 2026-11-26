@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { formatGameTime } from './shared/time.js'
+import { formatGameTime } from '@csp/lang-wasm'
 import type { ScriptLogLine } from '@csp/shared-types'
 
 /**

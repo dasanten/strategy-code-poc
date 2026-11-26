@@ -1,5 +1,5 @@
-import { CHUNK_SIZE, TERRAIN_BATCH_PATH } from '../shared/terrain.js'
-import { encodeChunkBatch } from '../shared/chunks.js'
+import { CHUNK_SIZE, TERRAIN_BATCH_PATH } from '@csp/shared-types'
+import { encodeChunkBatch } from './chunk-codec.js'
 import { describe, expect, it } from 'vitest'
 import { ChunkStore, chunkByChunk, exploredChunkBatches, type ChunkSource } from './chunks.js'
 

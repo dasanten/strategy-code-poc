@@ -11,7 +11,7 @@ import {
   withIds,
   type PlanItem,
 } from './plan-blocks.js'
-import { queueSteps } from './shared/queue.js'
+import { queueSteps } from './queue.js'
 import { editPlan, EMPTY_PLAN, givePlan, planOf } from './queue-view.js'
 
 /** The planner clipboard (`CONTEXT.md`: Planner clipboard): pick, copy and paste steps. */

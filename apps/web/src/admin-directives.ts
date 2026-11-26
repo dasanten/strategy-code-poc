@@ -1,5 +1,5 @@
 import type { AdminDirectiveView, DirectiveGoal } from '@csp/shared-types'
-import { goalMet } from './shared/directive.js'
+import { goalMet } from '@csp/lang-wasm'
 
 /** How far a goal of a directive in force has come, as the admin panel's Directives tab shows it. */
 export interface GoalProgress {

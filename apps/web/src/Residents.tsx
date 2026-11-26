@@ -1,38 +1,21 @@
+import { BATCHES_PER_DAY, RECIPES, WORK_OUTPUT_PER_DAY, WORKPLACE_SKILL } from './narrowed.js'
+import { aboutTime, bornIn, foalLeft, grownIn, pairingTicksLeft, workLeft } from './estimates.js'
+import { horsesInNeed } from './reviving.js'
+import { isDown, GOODS, SKILL_NAMES } from './world.js'
+import { STAT_NAMES } from '@csp/shared-types'
+import { inContact } from '@csp/lang-wasm'
+import { isVesselId, vesselCapacity, vesselName } from './vessels.js'
+import { LINE_BUILDING, NODE_GOOD } from '@csp/shared-types'
+import { BUILDABLE, MAX_WORKERS, teacherAt, traineesOf, recipeGood, isStone } from './building.js'
 import {
-  BATCHES_PER_DAY,
-  RECIPES,
-  WORK_OUTPUT_PER_DAY,
-  WORKPLACE_SKILL,
-} from './shared/narrowed.js'
-import {
-  aboutTime,
-  bornIn,
-  foalLeft,
-  grownIn,
-  pairingTicksLeft,
-  workLeft,
-} from './shared/estimates.js'
-import { horsesInNeed } from './shared/reviving.js'
-import { isDown, GOODS, STAT_NAMES, SKILL_NAMES } from './shared/world.js'
-import { inContact } from './shared/combat.js'
-import { isVesselId, vesselCapacity, vesselName } from './shared/vessels.js'
-import {
-  LINE_BUILDING,
-  BUILDABLE,
   buildingWork,
   workFactor,
-  MAX_WORKERS,
-  NODE_GOOD,
-  teacherAt,
-  traineesOf,
   materialsNeeded,
-  recipeGood,
   teardownReturns,
   teardownWork,
-  isStone,
   materialsOfKind,
   workOfKind,
-} from './shared/building.js'
+} from '@csp/lang-wasm'
 import {
   CARRIAGE_CAPACITY,
   PASSENGER_WEIGHT,
@@ -56,12 +39,13 @@ import {
   STABLE_BREED_DAYS,
   EQUIP_TICKS,
 } from '@csp/balance'
-import { ageInYears, bestWeapon, canHandle, canWork, stockWeight } from './shared/stats.js'
-import { isAt } from './shared/footprint.js'
-import { wrapDelta, wrapDistance } from './shared/terrain.js'
-import { wallStrength, wallStrengthLeft } from './shared/walls.js'
-import { putAwayUnits } from './shared/goods.js'
-import { nameProblem } from './shared/names.js'
+import { ageInYears, canHandle, canWork, stockWeight } from '@csp/lang-wasm'
+import { bestWeapon } from './stats.js'
+import { isAt } from './footprint.js'
+import { wrapDelta, wrapDistance } from './terrain.js'
+import { wallStrength, wallStrengthLeft } from '@csp/lang-wasm'
+import { putAwayUnits } from '@csp/lang-wasm'
+import { nameProblem } from '@csp/lang-wasm'
 import type {
   Branch,
   Condition,
@@ -92,7 +76,8 @@ import type {
   WallMaterial,
   Waypoint,
 } from '@csp/shared-types'
-import { STABLE_BREED_TICKS, horsesIn, keptBreeding } from './shared/horses.js'
+import { STABLE_BREED_TICKS } from './horse-rules.js'
+import { horsesIn, keptBreeding } from '@csp/lang-wasm'
 import { breedProblem, keptPair } from './world-rules.js'
 import {
   Fragment,

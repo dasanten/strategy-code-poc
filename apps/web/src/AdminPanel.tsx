@@ -4,10 +4,10 @@ import {
   MAX_DIRECTIVE_GOALS,
   MAX_DIRECTIVE_REASON,
   MAX_DIRECTIVE_SOLDIERS,
-  describeGoal,
-} from './shared/directive.js'
+} from '@csp/shared-types'
+import { describeGoal } from './directive.js'
 import { goalProgress } from './admin-directives.js'
-import { formatGameTime } from './shared/time.js'
+import { formatGameTime } from '@csp/lang-wasm'
 import type {
   Account,
   AdminDirectives,

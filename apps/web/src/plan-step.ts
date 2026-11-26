@@ -1,10 +1,11 @@
 import { FEED_UNITS } from '@csp/balance'
-import { GOODS } from './shared/world.js'
-import { MAX_WORKERS, recipeGood } from './shared/building.js'
-import { RECIPES } from './shared/narrowed.js'
-import { buildingRealm, inCityArea } from './shared/city.js'
-import { isAt } from './shared/footprint.js'
-import { relocateRoom, type RelocateWorld } from './shared/relocate.js'
+import { GOODS } from './world.js'
+import { MAX_WORKERS, recipeGood } from './building.js'
+import { RECIPES } from './narrowed.js'
+import { nearCityAreaAll } from '@csp/lang-wasm'
+import { buildingRealm } from './city.js'
+import { isAt } from './footprint.js'
+import { relocateRoom, type RelocateWorld } from './relocate.js'
 import type {
   Building,
   BuildingKind,
@@ -596,7 +597,9 @@ export function planPickAt(
       // Its area as known, in sight or as last seen (`CONTEXT.md`: City area).
       const known = { buildings: [...w.buildings, ...w.lastSeen] }
       const c = w.cities.find(
-        (x) => x.realmId === w.realmId && inCityArea(known, x, at.x, at.y, w.size),
+        (x) =>
+          x.realmId === w.realmId &&
+          nearCityAreaAll(known.buildings, x.id, [[at.x, at.y]], 0, w.size)[0],
       )
       return c ? { ...tile, id: c.id } : 'no city of yours there'
     }

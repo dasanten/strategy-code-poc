@@ -1,10 +1,11 @@
-import { Terrain, UNEXPLORED, tileIndex } from './shared/terrain.js'
-import { aboutTime, timeLeft } from './shared/estimates.js'
+import { Terrain, tileIndex } from './terrain.js'
+import { UNEXPLORED } from '@csp/shared-types'
+import { aboutTime, timeLeft } from './estimates.js'
 import { worldMirror } from './world-mirror.js'
-import { drivenCarriageId } from './shared/carriages.js'
-import { isVesselId } from './shared/vessels.js'
-import { isDown } from './shared/world.js'
-import { roadTiles } from './shared/building.js'
+import { drivenCarriageId } from './carriages.js'
+import { isVesselId } from './vessels.js'
+import { isDown } from './world.js'
+import { roadTiles } from './building.js'
 import type {
   Building,
   City,
@@ -340,6 +341,10 @@ export function arrivalOf(
     const o = way ?? r.order
     const path = o && 'path' in o ? o.path : undefined
     if (!mirror || !path) return undefined
-    return mirror.arrivalTicks(r.id, way, Uint8Array.from(path, ([x, y]) => ground(x, y)))
+    return mirror.arrivalTicks(
+      r.id,
+      way,
+      Uint8Array.from(path, ([x, y]) => ground(x, y)),
+    )
   }
 }
