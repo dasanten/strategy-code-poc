@@ -14,9 +14,9 @@ import {
   tradeCoinWarehouse,
   tradingWarehouseAt,
 } from './warehouse.js'
-import { GOODS, type WorldState } from './world.js'
+import { GOODS } from './world.js'
 import { DELIVERY_LOAD, TRANSFER_FEE_FACTOR } from '@csp/balance'
-import type { Building, Good, Resident } from '@csp/shared-types'
+import type { Building, Good, Resident, WorldState } from '@csp/shared-types'
 
 /*
  * Transfers between realms (`CONTEXT.md`: Transfer): the Trade Organization carries goods or

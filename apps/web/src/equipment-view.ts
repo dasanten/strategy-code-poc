@@ -55,7 +55,9 @@ export function equipmentSlots(
  */
 export function equipmentLine(equipped: Equipment | undefined, condition?: GearCondition): string {
   const slots = equipmentSlots(equipped, condition)
-  const tools = condition?.tools ? ` · ${GOOD_LABELS.tools} (${CONDITION_WORDS[condition.tools]})` : ''
+  const tools = condition?.tools
+    ? ` · ${GOOD_LABELS.tools} (${CONDITION_WORDS[condition.tools]})`
+    : ''
   if (slots.every((s) => !s.item)) return `Nothing equipped${tools}`
   const named = (s: SlotView) => (s.condition ? `${s.item} (${s.condition})` : s.item)
   return slots.map((s) => named(s) ?? `no ${s.label.toLowerCase()}`).join(' · ') + tools

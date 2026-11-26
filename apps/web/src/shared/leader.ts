@@ -5,8 +5,7 @@ import { handedOverTo } from './alliance.js'
 import { inCityArea } from './city.js'
 import { contractOf } from './contract.js'
 import { canWork } from './stats.js'
-import { type WorldState } from './world.js'
-import type { Resident } from '@csp/shared-types'
+import type { Resident, WorldState } from '@csp/shared-types'
 
 /**
  * Whom a resident serves besides their own realm (`CONTEXT.md`: Leader, Leader handover): a

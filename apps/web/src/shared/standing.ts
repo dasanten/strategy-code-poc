@@ -4,7 +4,6 @@
 import { realmName } from './alliance.js'
 import { directiveAgainst } from './directive.js'
 import { TRADE_ORG, TRADE_ORG_NAME } from './trade-org.js'
-import { type WorldState } from './world.js'
 import {
   FORMER_PLAYER_STANDING,
   STANDING_DRIFT_PER_DAY,
@@ -14,7 +13,7 @@ import {
   TICKS_PER_GAME_DAY,
   TRADE_ORG_REFUSES_TRADE_BELOW,
 } from '@csp/balance'
-import type { City, StandingView } from '@csp/shared-types'
+import type { City, StandingView, WorldState } from '@csp/shared-types'
 
 /*
  * Standing (`CONTEXT.md`: Standing): how one Organization regards another, from

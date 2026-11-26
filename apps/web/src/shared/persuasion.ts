@@ -6,7 +6,6 @@ import { standingOf } from './standing.js'
 import { bestWeapon, isArmed, protectionValue } from './stats.js'
 import { wrapDistance } from './terrain.js'
 import { isWallOrGate, wallSide } from './walls.js'
-import { type WorldState } from './world.js'
 import {
   BLOW_BASE,
   COMBAT_SKILL_EFFECT,
@@ -16,7 +15,7 @@ import {
   SIGHT_RANGE,
   WEAPON_ATTACK,
 } from '@csp/balance'
-import type { City, JoinRequestView, Resident } from '@csp/shared-types'
+import type { City, JoinRequestView, Resident, WorldState } from '@csp/shared-types'
 
 /*
  * Respect and persuading a city (`CONTEXT.md`: Respect, Persuading a city). Queries here are the

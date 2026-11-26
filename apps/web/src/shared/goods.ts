@@ -6,9 +6,17 @@ import { covers } from './footprint.js'
 import { GOOD_WEIGHT } from './narrowed.js'
 import { stockWeight } from './stats.js'
 import { besideVessel } from './vessels.js'
-import { isDown, type WorldState } from './world.js'
+import { isDown } from './world.js'
 import { OWN_FOOD, carryCapacity } from '@csp/balance'
-import type { Building, Good, GoodsSpot, Pile, Resident, Stock } from '@csp/shared-types'
+import type {
+  Building,
+  Good,
+  GoodsSpot,
+  Pile,
+  Resident,
+  Stock,
+  WorldState,
+} from '@csp/shared-types'
 
 /** World queries about where goods are (ADR 0002: the game API orders and scripts share). */
 

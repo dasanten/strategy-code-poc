@@ -8,9 +8,8 @@ import { isStone, materialsOfKind } from './building.js'
 import { footprintTiles } from './footprint.js'
 import { isPassableTerrain, tileIndex, type TerrainMap, wrap, wrapDelta } from './terrain.js'
 import { TRADE_ORG } from './trade-org.js'
-import { type WorldState } from './world.js'
 import { BROKEN_MATERIALS_RETURNED, WALL_ENCLOSES_MAX } from '@csp/balance'
-import type { Building, Good, Resident, Stock } from '@csp/shared-types'
+import type { Building, Good, Resident, Stock, WorldState } from '@csp/shared-types'
 
 /** World queries about walls and gates (`CONTEXT.md`: Walls in combat; ADR 0002). */
 

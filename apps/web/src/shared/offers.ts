@@ -6,7 +6,7 @@ import { buildingRealm } from './city.js'
 import { covers, isAt } from './footprint.js'
 import { GOOD_WEIGHT } from './narrowed.js'
 import { canWork } from './stats.js'
-import { GOODS, type Offer, type WorldState } from './world.js'
+import { GOODS } from './world.js'
 import type {
   Building,
   Good,
@@ -15,6 +15,8 @@ import type {
   SeenOffer,
   Stock,
   TradeHolder,
+  Offer,
+  WorldState,
 } from '@csp/shared-types'
 
 /** What an offer wants for one unit it gives. */

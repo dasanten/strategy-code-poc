@@ -25,13 +25,7 @@ import {
   wrap,
   wrapDelta,
 } from './terrain.js'
-import {
-  CARRYING_A_CHILD,
-  NODE_WORKPLACE,
-  isTrainingSubject,
-  type LineOrder,
-  type WorldState,
-} from './world.js'
+import { CARRYING_A_CHILD, NODE_WORKPLACE, isTrainingSubject } from './world.js'
 import {
   MAP_SIZE,
   MOUNTAIN_ROAD_WORK_FACTOR,
@@ -53,6 +47,7 @@ import type {
   ResourceNode,
   Stock,
   WallMaterial,
+  WorldState,
 } from '@csp/shared-types'
 
 /** World queries about buildings and construction sites (ADR 0002: the game API orders and scripts share). */
@@ -870,14 +865,17 @@ export function roadLine(
   return out
 }
 
+/** A road line or wall line order, with its kind (`LineOrder` is what both hold). */
+export type LineBuildOrder = Extract<ResidentOrder, { kind: 'roadLine' | 'wallLine' }>
+
 /** What a line order builds on each of its tiles (`CONTEXT.md`: Road, Wall / Gate). */
-export const LINE_BUILDING: Record<LineOrder['kind'], 'road' | 'wall'> = {
+export const LINE_BUILDING: Record<LineBuildOrder['kind'], 'road' | 'wall'> = {
   roadLine: 'road',
   wallLine: 'wall',
 }
 
 /** Whether an order is one along a line, a road line or a wall line. */
-export function isLineOrder(o: ResidentOrder | null | undefined): o is LineOrder {
+export function isLineOrder(o: ResidentOrder | null | undefined): o is LineBuildOrder {
   return o?.kind === 'roadLine' || o?.kind === 'wallLine'
 }
 

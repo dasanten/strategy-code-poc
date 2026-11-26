@@ -7,7 +7,6 @@ import { WAREHOUSE_FLOOR } from './narrowed.js'
 import { tradeOrgRefuses } from './standing.js'
 import { canWork, stockWeight } from './stats.js'
 import { PRICED_GOODS, priceFor, quoteAtPrices, type Price } from './warehouse.js'
-import { type TraderPrice, type WorldState } from './world.js'
 import { TRADER_FLOOR_SHARE } from '@csp/balance'
 import type {
   Carriage,
@@ -20,6 +19,8 @@ import type {
   TradeSide,
   Trader,
   TraderVisit,
+  TraderPrice,
+  WorldState,
 } from '@csp/shared-types'
 
 /*
