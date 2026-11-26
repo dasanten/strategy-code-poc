@@ -102,6 +102,9 @@ importers:
 
   packages/lang-wasm:
     dependencies:
+      '@csp/balance':
+        specifier: workspace:*
+        version: link:../balance
       '@csp/shared-types':
         specifier: workspace:*
         version: link:../shared-types
