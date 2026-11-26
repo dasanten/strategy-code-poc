@@ -78,6 +78,26 @@ impl WorldMirror {
         csp_sim::queries::building::building_at(world, x, y, self.mirror.size())
             .map(|b| b.id.clone())
     }
+
+    /// Calls the check on the world `name` (`world_rules`) with `args`, a JSON array of its
+    /// arguments; answers its result as JSON, or an error for a rule it doesn't know or arguments
+    /// it can't read.
+    pub fn rule(&mut self, name: &str, args: &str) -> Result<String, String> {
+        let out = crate::world_rules::rule(&mut self.mirror, name, args)?;
+        Ok(out.to_string())
+    }
+
+    /// Many checks in one call, for a panel that asks many at once: `calls` is a JSON array of
+    /// `[name, args]`; answers the JSON array of their results, in order.
+    pub fn rules(&mut self, calls: &str) -> Result<String, String> {
+        let calls: Vec<(&str, &RawValue)> =
+            serde_json::from_str(calls).map_err(|e| e.to_string())?;
+        let out = calls
+            .into_iter()
+            .map(|(name, args)| crate::world_rules::rule(&mut self.mirror, name, args.get()))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(serde_json::Value::Array(out).to_string())
+    }
 }
 
 /// What is in sight, each read on its own.

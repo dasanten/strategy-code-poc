@@ -9,6 +9,7 @@
 pub mod area_rules;
 pub mod rules;
 pub mod value_rules;
+pub mod world_rules;
 
 use std::cell::OnceCell;
 use std::collections::HashMap;

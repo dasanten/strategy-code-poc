@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { buildProblem, buildingAt, buildingPile, cornersCovering, pileTile } from './building.js'
+import { buildingAt, buildingPile, cornersCovering, pileTile } from './building.js'
+import { mirrorOf } from '../test-mirror.js'
+import { buildProblem } from '../world-rules.js'
 import {
   FOOTPRINT,
   covers,
@@ -31,6 +33,20 @@ function world(buildings: Building[] = []): WorldState {
     cities: [],
     piles: [],
   } as unknown as WorldState
+}
+
+/** `buildProblem` on the rules module's mirror of `w`, with the terrain of `map()` and its nodes. */
+function placeProblem(w: WorldState, x: number, y: number, kind: Building['kind']) {
+  mirrorOf({ size: SIZE, buildings: w.buildings })
+  const terrain = map()
+  return buildProblem(kind, x, y, {
+    size: SIZE,
+    at: (tx, ty) => terrain.tiles[ty * SIZE + tx]!,
+    nodeAt: (tx, ty) => {
+      const n = w.nodes.find((n) => n.x === tx && n.y === ty)
+      return n && { kind: n.kind, x: n.x, y: n.y, richness: 'normal' }
+    },
+  })
 }
 
 const storage: Building = { id: 's', kind: 'storage', cityId: null, x: 4, y: 4 }
@@ -108,27 +124,25 @@ describe('footprints (`CONTEXT.md`: Footprint)', () => {
 })
 
 describe('where buildings go (`CONTEXT.md`: Where buildings go)', () => {
-  const terrain = map()
-
   it('needs every tile of the footprint free', () => {
     const w = world([{ id: 'w', kind: 'wall', cityId: null, x: 15, y: 16 }])
-    expect(buildProblem(w, 14, 15, 'smelter', terrain)).toBe('there is already a building there')
-    expect(buildProblem(w, 13, 15, 'smelter', terrain)).toBeUndefined()
+    expect(placeProblem(w, 14, 15, 'smelter')).toBe('there is already a building there')
+    expect(placeProblem(w, 13, 15, 'smelter')).toBeUndefined()
     // A road may share a tile with a building.
     w.buildings = [{ id: 'r', kind: 'road', cityId: null, x: 15, y: 16 }]
-    expect(buildProblem(w, 14, 15, 'smelter', terrain)).toBeUndefined()
+    expect(placeProblem(w, 14, 15, 'smelter')).toBeUndefined()
   })
 
   it('needs every tile passable and, for farms and stables, Plains; nothing but a workplace on a node', () => {
     const w = world()
-    expect(buildProblem(w, 19, 19, 'smelter', terrain)).toBe(
+    expect(placeProblem(w, 19, 19, 'smelter')).toBe(
       'a smelter goes off any resource node, and not on Mountain',
     )
-    expect(buildProblem(w, 7, 7, 'farm', terrain)).toBe(
+    expect(placeProblem(w, 7, 7, 'farm')).toBe(
       'a farm goes wholly on Plains, off any resource node',
     )
-    expect(buildProblem(w, 6, 6, 'farm', terrain)).toBeUndefined()
-    expect(buildProblem(w, 9, 9, 'smithy', terrain)).toBe(
+    expect(placeProblem(w, 6, 6, 'farm')).toBeUndefined()
+    expect(placeProblem(w, 9, 9, 'smithy')).toBe(
       'a smithy goes off any resource node, and not on Mountain',
     )
   })
@@ -136,18 +150,16 @@ describe('where buildings go (`CONTEXT.md`: Where buildings go)', () => {
   it('puts a training ground on any passable land but Mountain, every tile free (`CONTEXT.md`: Training ground)', () => {
     const w = world([storage])
     // 3×3 from (18, 18) covers the Mountain at (20, 20); from (17, 17) it stops short of it.
-    expect(buildProblem(w, 18, 18, 'trainingGround', terrain)).toBe(
+    expect(placeProblem(w, 18, 18, 'trainingGround')).toBe(
       'a trainingGround goes off any resource node, and not on Mountain',
     )
-    expect(buildProblem(w, 17, 17, 'trainingGround', terrain)).toBeUndefined()
+    expect(placeProblem(w, 17, 17, 'trainingGround')).toBeUndefined()
     // Forest is fine, a node under any tile is not.
-    expect(buildProblem(w, 11, 11, 'trainingGround', terrain)).toBeUndefined()
-    expect(buildProblem(w, 9, 9, 'trainingGround', terrain)).toBe(
+    expect(placeProblem(w, 11, 11, 'trainingGround')).toBeUndefined()
+    expect(placeProblem(w, 9, 9, 'trainingGround')).toBe(
       'a trainingGround goes off any resource node, and not on Mountain',
     )
-    expect(buildProblem(w, 3, 3, 'trainingGround', terrain)).toBe(
-      'there is already a building there',
-    )
+    expect(placeProblem(w, 3, 3, 'trainingGround')).toBe('there is already a building there')
   })
 
   it('takes a node’s workplace with the node on any tile of its footprint', () => {
@@ -159,12 +171,12 @@ describe('where buildings go (`CONTEXT.md`: Where buildings go)', () => {
       [9, 9],
     ])
     for (const [x, y] of cornersCovering('lumberCamp', 10, 10, SIZE)) {
-      expect(buildProblem(w, x, y, 'lumberCamp', terrain)).toBeUndefined()
+      expect(placeProblem(w, x, y, 'lumberCamp')).toBeUndefined()
     }
-    expect(buildProblem(w, 11, 10, 'lumberCamp', terrain)).toBe(
+    expect(placeProblem(w, 11, 10, 'lumberCamp')).toBe(
       'a lumberCamp goes with one tile on a fitting resource node',
     )
-    expect(buildProblem(w, 9, 9, 'quarry', terrain)).toBe(
+    expect(placeProblem(w, 9, 9, 'quarry')).toBe(
       'a quarry goes with one tile on a fitting resource node',
     )
   })

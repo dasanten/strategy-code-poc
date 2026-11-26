@@ -52,14 +52,21 @@ import {
   carriagePulledBy,
   carriageOfResident,
   drivenCarriageId,
-  driveOffProblem,
-  hitchOffProblem,
-  horseToSteal,
   seatsLeft,
 } from './shared/carriages.js'
-import { mountOffProblem, horseOfResident, riderOf } from './shared/horses.js'
+import { horseOfResident, riderOf } from './shared/horses.js'
 import { horsesInNeed } from './shared/reviving.js'
-import { isDown } from './shared/world.js'
+import { isDown, NODE_WORKPLACE } from './shared/world.js'
+import {
+  buildProblem,
+  driveOffProblems,
+  hitchOffProblems,
+  horseToSteal,
+  mountOffProblems,
+  nodeCorner,
+  rowOffProblem,
+  type KnownGround,
+} from './world-rules.js'
 import {
   isPassableTerrain,
   isWater,
@@ -91,7 +98,6 @@ import {
   besideVessel,
   crewShort,
   isVesselId,
-  rowOffProblem,
   vesselOfResident,
   vesselRoom,
 } from './shared/vessels.js'
@@ -290,13 +296,11 @@ import { pickPreview, previewPickOf, type PreviewWorld } from './pick-preview.js
 import { PHONE_QUERY } from './sheet-view.js'
 import { buildingNodeKind } from './building-info-view.js'
 import {
-  buildHereProblem,
   describeTile,
   escapeStep,
   hitchChoice,
   makeLeaderProblem,
   nameHeirProblem,
-  nodeFit,
   type ActionId,
   commandedCarriages,
   strangersCarriage,
@@ -1243,7 +1247,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         kind: 'drive',
         residentId: selected.id,
         carriageId: unhorsedHere.id,
-        horseId: horseToHitch.id,
+        horseId: horseToHitch,
         x,
         y,
       }
@@ -1356,17 +1360,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const buildProblemAt =
     (w: NonNullable<typeof world>, x: number, y: number) =>
     (kind: BuildingKind, material?: WallMaterial) =>
-      material === 'stone' && stoneOverAt(w, x, y, kind)
-        ? undefined
-        : buildHereProblem(
-            kind,
-            x,
-            y,
-            w,
-            (nx, ny) => nodeAt?.(nx, ny),
-            // Terrain not loaded counts as unexplored: nothing is laid out there.
-            { size: w.map.size, at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED },
-          )
+      buildProblem(kind, x, y, knownGround(w), material)
+  /** The terrain and nodes the Player explored, as the checks on where buildings go read them. */
+  const knownGround = (w: NonNullable<typeof world>): KnownGround => ({
+    size: w.map.size,
+    // Terrain not loaded counts as unexplored: nothing is laid out there.
+    at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED,
+    nodeAt: (nx, ny) => nodeAt?.(nx, ny),
+  })
   /**
    * Why a kind picked before its tile can't go on the tile (`CONTEXT.md`: Realm order), as the
    * Build menu there would say it: the placement rule, a node's workplace off its node.
@@ -2229,7 +2230,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         v.kind !== 'ship' && v.realmId !== world.home.realmId && besideVessel(v, selected, size),
     )
     if (!v) return undefined
-    return { id: v.id, problem: rowOffProblem(world, selected, v, world.home.realmId, size) }
+    return { id: v.id, problem: rowOffProblem(selected.id, v.id, world.home.realmId) }
   })()
   // Another organization's horses for the picked resident (`CONTEXT.md`: Stealing a carriage or
   // horse): a free one to mount, and one to pull the realm's own carriage that has none of its own.
@@ -2238,7 +2239,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   )
   const horseToHitch =
     world && selected && unhorsedHere
-      ? horseToSteal(world, selected, unhorsedHere, world.home.realmId)
+      ? horseToSteal(selected.id, unhorsedHere.id, world.home.realmId)
       : undefined
   const looseStrangers = onTile(
     world?.horses.filter(
@@ -2277,7 +2278,6 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
   const preview = (() => {
     if (!world || !pick || !pickAt) return undefined
-    const size = world.map.size
     const seen: PreviewWorld = {
       ...wayGround(world),
       ...planWorld(world),
@@ -2287,10 +2287,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         // A kind picked before its tile is judged as the Build menu there would (realm control).
         realmOrder?.step === 'where'
           ? realmBuildProblem(world, x, y, kind, realmOrder.material)
-          : buildHereProblem(kind, x, y, world, (nx, ny) => nodeAt?.(nx, ny), {
-              size,
-              at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED,
-            }),
+          : buildProblem(kind, x, y, knownGround(world)),
     }
     const what = previewPickOf(pick, {
       lineFrom: group.length > 1 ? groupLineFrom : lineFrom,
@@ -2980,9 +2977,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 nodeFit: (() => {
                   const node = nodeAt?.(selectedTile.x, selectedTile.y)
                   if (!node || !terrainAt) return undefined
-                  // Terrain not loaded counts as unexplored: nothing is laid out there.
-                  const at = (x: number, y: number) => terrainAt(x, y) ?? UNEXPLORED
-                  return nodeFit(node, world, nodeAt!, { size: world.map.size, at })
+                  return nodeCorner(node, NODE_WORKPLACE[node.kind], knownGround(world))
                 })(),
               },
               GOOD_LABELS,
@@ -3287,31 +3282,29 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
               {...(stealableHere && {
                 driveOff: {
-                  problem: driveOffProblem(
-                    world,
-                    selected,
-                    stealableHere,
-                    world.home.realmId,
-                    world.map.size,
-                  ),
+                  problem: driveOffProblems([selected.id], stealableHere.id, world.home.realmId)[0],
                 },
                 onDriveOff: () => setPicking((p) => (p === 'driveOff' ? false : 'driveOff')),
               })}
               {...(unhorsedHere &&
                 horseToHitch && {
                   hitchOff: {
-                    problem: hitchOffProblem(
-                      world,
-                      selected,
-                      { ...unhorsedHere, realmId: world.home.realmId },
-                      horseToHitch.id,
-                    ),
+                    problem: hitchOffProblems(
+                      [selected.id],
+                      unhorsedHere.id,
+                      world.home.realmId,
+                      horseToHitch,
+                    )[0],
                   },
                   onHitchOff: () => setPicking((p) => (p === 'hitchOff' ? false : 'hitchOff')),
                 })}
               {...(looseStrangers && {
                 stealHorse: {
-                  problem: mountOffProblem(world, selected, looseStrangers, world.home.realmId),
+                  problem: mountOffProblems(
+                    [selected.id],
+                    looseStrangers.id,
+                    world.home.realmId,
+                  )[0],
                 },
                 onStealHorse: () =>
                   void giveOrder(
@@ -3432,18 +3425,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 if (selected.owner !== world.home.realmId || selected.id === world.home.leaderId) {
                   return undefined
                 }
-                const seen = {
-                  tick: world.tick,
-                  diplomacy: world.diplomacy,
-                  cities: world.cities,
-                  buildings: world.buildings,
-                  mapSize: world.map.size,
-                }
                 const realm = { id: world.home.realmId, leaderId: world.home.leaderId }
                 return {
-                  problem: makeLeaderProblem(seen, realm, leader, selected),
+                  problem: makeLeaderProblem(world.diplomacy, realm, selected.id),
                   heir: {
-                    problem: nameHeirProblem(seen, realm, selected),
+                    problem: nameHeirProblem(world.diplomacy, realm, selected.id),
                     named: selected.id === heirId,
                   },
                 }

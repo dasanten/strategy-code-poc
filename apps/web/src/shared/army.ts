@@ -1,8 +1,6 @@
 // Ported from packages/shared/src/army.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { wrapDistance } from './terrain.js'
-import { HAUL_HORSE_FOOD } from '@csp/balance'
 import type { Army, Carriage, Resident, WorldState } from '@csp/shared-types'
 
 /** World queries about armies (ADR 0002: the game API orders and scripts share). */
@@ -27,30 +25,6 @@ export function armyDrivenTo(driver: Resident): string | undefined {
 }
 
 /**
- * Where an army is for a carriage at `from` that goes after it: the tile of its member nearest
- * `from`, on a map of `size` tiles. `armyId` may name a Trade Org punishment, whose soldiers are an
- * army too (`CONTEXT.md`: Trade Org debt). Undefined when the army is gone.
- */
-export function armySpot(
-  world: Pick<WorldState, 'armies' | 'residents' | 'punishments'>,
-  armyId: string,
-  from: { x: number; y: number },
-  size: number,
-): { x: number; y: number } | undefined {
-  const members =
-    world.armies.find((a) => a.id === armyId)?.memberIds ??
-    world.punishments.find((p) => p.id === armyId)?.members.map((m) => m.residentId)
-  if (!members) return undefined
-  let best: { at: { x: number; y: number }; d: number } | undefined
-  for (const r of world.residents) {
-    if (!members.includes(r.id)) continue
-    const d = wrapDistance(size, from, r)
-    if (!best || d < best.d) best = { at: { x: r.x, y: r.y }, d }
-  }
-  return best?.at
-}
-
-/**
  * The Food on a carriage that army members may take (`CONTEXT.md`: Refilling from a carriage):
  * all of it, except what a haul route keeps on board for the horse.
  */
@@ -62,21 +36,4 @@ export function spareFood(world: Pick<WorldState, 'residents'>, carriage: Carria
   const o = driver?.order
   const keep = o?.kind === 'haul' ? o.keepFood : 0
   return Math.max(0, (carriage.load.food ?? 0) - keep)
-}
-
-/**
- * The carriage a resident drives (a drive order or a haul route), and the Food on it they may
- * take as its driver (`CONTEXT.md`: Refilling from a carriage): all of it, except the horse's
- * share of what a haul route keeps on board (`HAUL_HORSE_FOOD`, at most its `keepFood`).
- */
-export function driversFood(
-  world: Pick<WorldState, 'carriages'>,
-  driver: Resident,
-): { carriage: Carriage; food: number } | undefined {
-  const o = driver.order
-  if (o?.kind !== 'drive' && o?.kind !== 'haul') return undefined
-  const carriage = world.carriages.find((k) => k.id === o.carriageId)
-  if (!carriage) return undefined
-  const keep = o.kind === 'haul' ? Math.min(o.keepFood, HAUL_HORSE_FOOD) : 0
-  return { carriage, food: Math.max(0, (carriage.load.food ?? 0) - keep) }
 }

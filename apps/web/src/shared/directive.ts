@@ -1,16 +1,9 @@
 // Ported from packages/shared/src/directive.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { isArmed } from './stats.js'
-import type {
-  DirectiveGoalView,
-  DirectiveView,
-  Resident,
-  Directive,
-  WorldState,
-} from '@csp/shared-types'
+import type { DirectiveGoalView } from '@csp/shared-types'
 
-export { goalMet, goalsMet } from '@csp/lang-wasm'
+export { goalMet } from '@csp/lang-wasm'
 
 export {
   MAX_DIRECTIVE_REASON,
@@ -23,67 +16,6 @@ export {
  * 0002). Every Player sees each directive's target, reason and goals; who gave it and how far its
  * goals have come stay with admins.
  */
-
-/**
- * The Organizations a directive names: its target, and with `withAlliance` every member of the
- * target's alliance as it stands now (`CONTEXT.md`: Alliance: at most one).
- */
-export function directiveTargets(
-  world: Pick<WorldState, 'alliances'>,
-  d: Pick<Directive, 'target' | 'withAlliance'>,
-): string[] {
-  if (!d.withAlliance) return [d.target]
-  const alliance = world.alliances.find((a) => a.members.some((m) => m.realmId === d.target))
-  return alliance ? alliance.members.map((m) => m.realmId) : [d.target]
-}
-
-/**
- * The directive that has the Trade Organization treat an Organization as one to punish, if any:
- * the oldest naming it.
- */
-export function directiveAgainst(
-  world: Pick<WorldState, 'directives' | 'alliances'>,
-  org: string,
-): Directive | undefined {
-  return world.directives.find((d) => directiveTargets(world, d).includes(org))
-}
-
-/**
- * The soldiers of the Organizations a directive names: armed residents of those realms, or of
- * those NPC cities (`CONTEXT.md`: Soldier).
- */
-export function directiveSoldiers(
-  world: Pick<WorldState, 'alliances' | 'residents'>,
-  d: Pick<Directive, 'target' | 'withAlliance'>,
-): Resident[] {
-  const orgs = directiveTargets(world, d)
-  return world.residents.filter((r) => orgs.includes(r.owner ?? r.cityId ?? '') && isArmed(r))
-}
-
-/** Every directive in force as a Player sees it, oldest first. */
-export function directivesFor(
-  world: Pick<WorldState, 'directives'>,
-  nameOf: (org: string) => string,
-): DirectiveView[] {
-  return world.directives.map((d) => ({
-    id: d.id,
-    target: d.target,
-    targetName: nameOf(d.target),
-    withAlliance: d.withAlliance,
-    reason: d.reason,
-    givenAt: d.givenAt,
-    goals: d.goals.map((g): DirectiveGoalView =>
-      g.kind === 'city'
-        ? { kind: 'city', city: g.city }
-        : {
-            kind: 'soldiers',
-            count: g.count,
-            ...(g.percent === undefined ? {} : { percent: g.percent }),
-          },
-    ),
-    price: d.price,
-  }))
-}
 
 /** A directive's goal in words, for the admin panel and Players. */
 export function describeGoal(goal: DirectiveGoalView): string {

@@ -199,3 +199,32 @@ readers for `City`, `Offer` and `OrderRequest`: the module is 570 KB gzipped (1,
 
 `cutSwap`, `traderPrices`, `traderEscortsWanted`, `horsesIn` and `keptBreeding` (#1634): the
 module is 574 KB gzipped (1,868 KB raw), from 570 KB. The mirror's update is not touched.
+
+## The checks on the world (T122.6)
+
+The checks that say whether something is allowed and why not, and read the world, are asked of
+the mirror: one entry, `WorldMirror.rule(name, args)` (`crates/csp-lang-wasm/src/world_rules.rs`),
+and `rules(calls)` for many in one call, which a card asks for each resident on a tile. The client
+calls them through `apps/web/src/world-rules.ts` by ids and coordinates; until a welcome went in,
+nothing is refused (the server checks the order). Something not in the mirror (gone in the
+message the client hasn't shown yet) gets the check's own "no such …".
+
+| Check                                                                   | What goes in besides ids                                                                              |
+| :---------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------- |
+| `buildProblem` (of a material too), `nodeCorner`                        | the explored terrain and nodes around the footprint, as a patch: the mirror holds no terrain or nodes |
+| `driveOffProblem`, `hitchOffProblem`, `horseToSteal`, `mountOffProblem` | the realm                                                                                             |
+| `rowOffProblem`, `boardVesselProblem`                                   | the realm; as crew                                                                                    |
+| `breedProblem`, `keptPair`                                              | the horses' owner                                                                                     |
+| `handOverProblem`, `heirProblem`                                        | who serves others, from `diplomacy`: the alliance's army, the realm's contracts and whether started   |
+
+What the client knows besides the mirror goes into its world for that one call and out again
+(`SightMirror::with_known`). The rest of the client's world-reading checks were asked by no view
+(trade, the horse market, transfers, offers, demands, debts, renaming): they are gone, and the
+server checks those orders. `relocateProblem` stays in TypeScript: it reads the cities and
+buildings the Player remembers out of sight (Last seen), which the mirror doesn't hold, so on the
+mirror every city out of sight would read as none of the realm's.
+
+The module is 584 KB gzipped (1,903 KB raw) after merging the epic tip with the last of #1634; these checks added 10 KB of it (542 to 552 KB before that merge). On a mirror of 4,450 buildings and 500
+residents in Node: `buildProblem` 0.28 ms for a house (its city area), 0.01 ms for a town hall,
+2 ms the first call after an update (the lookup by tile built again); a Build menu's 22 kinds
+0.4 ms; a tile's 5 thieves in one call 0.05 ms.

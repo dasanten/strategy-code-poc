@@ -204,6 +204,21 @@ export class WorldMirror {
     return this.mirror.buildingAt(x, y)
   }
 
+  /**
+   * Calls the check on the world `name` (`crates/csp-lang-wasm/src/world_rules.rs`) with `args`,
+   * which go across as JSON (`undefined` as `null`), and answers its JSON result. Throws for a
+   * rule the module doesn't have or arguments it can't read.
+   */
+  rule<T>(name: string, ...args: unknown[]): T {
+    return JSON.parse(this.mirror.rule(name, JSON.stringify(args.map((a) => a ?? null)))) as T
+  }
+
+  /** Many checks in one call, each `[name, args]`, answered in order (`rule`). */
+  rules<T>(calls: readonly (readonly [string, readonly unknown[]])[]): T[] {
+    const json = JSON.stringify(calls.map(([name, args]) => [name, args.map((a) => a ?? null)]))
+    return JSON.parse(this.mirror.rules(json)) as T[]
+  }
+
   /** Frees the module's memory for it. */
   free(): void {
     this.mirror.free()

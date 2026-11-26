@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildProblemOn as buildHereProblem,
+  mirrorOf,
+  nodeCornerOn as nodeFit,
+} from './test-mirror.js'
+import {
   CARRIAGE_CAPACITY,
   OCCUPATION_GAME_DAYS,
   MAP_SIZE,
@@ -58,13 +63,11 @@ import { BUILDING_NAMES } from './map/palette.js'
 import {
   ACTION_KEYS,
   actionForKey,
-  buildHereProblem,
   describeTile,
   escapeStep,
   keepRows,
-  makeLeaderProblem,
-  nameHeirProblem,
-  nodeFit,
+  makeLeaderProblem as handOverCheck,
+  nameHeirProblem as heirCheck,
   groupOrders,
   orderGroupOf,
   residentActions,
@@ -615,12 +618,31 @@ describe('whether a resident can be made Leader', () => {
       payBy: null,
     }) as ContractView
   const seen = (diplomacy: Partial<Pick<Diplomacy, 'alliance' | 'contracts'>> = {}) => ({
-    tick: 0,
-    diplomacy: { alliance: null, contracts: [], ...diplomacy },
-    cities: [city],
-    buildings: [building({ id: 'th', kind: 'townHall', cityId: 'c1', x: 10, y: 10 })],
-    mapSize: 256,
+    alliance: null,
+    contracts: [],
+    ...diplomacy,
   })
+  /** The mirror holds the city, its town hall and `residents` (`test-mirror.ts`). */
+  const inSight = (...residents: Resident[]) =>
+    mirrorOf({
+      size: 256,
+      cities: [city],
+      buildings: [building({ id: 'th', kind: 'townHall', cityId: 'c1', x: 10, y: 10 })],
+      residents,
+    })
+  const makeLeaderProblem = (
+    d: ReturnType<typeof seen>,
+    r: typeof realm,
+    lead: Resident,
+    target: Resident,
+  ) => {
+    inSight(lead, ...(target.id === lead.id ? [] : [target]))
+    return handOverCheck(d, r, target.id)
+  }
+  const nameHeirProblem = (d: ReturnType<typeof seen>, r: typeof realm, target: Resident) => {
+    inSight(...(target.id === leader.id ? [] : [leader]), target)
+    return heirCheck(d, r, target.id)
+  }
 
   it('can when both stand in the same city of the realm and the resident serves no one', () => {
     expect(makeLeaderProblem(seen(), realm, leader, ana)).toBeUndefined()
@@ -884,7 +906,14 @@ const things = (more: Partial<TileThings> = {}): TileThings => ({
   workers: () => 1,
   ...more,
 })
-const tile = (more: Partial<TileThings> = {}) => describeTile(things(more), GOOD_LABELS)
+/** The card for a tile, with the rules module's mirror holding what is on it (`test-mirror.ts`). */
+const tile = (more: Partial<TileThings> = {}) => {
+  const t = things(more)
+  const residents = [...(t.residents ?? [])]
+  for (const s of t.strangers) if (!residents.some((r) => r.id === s.id)) residents.push(s)
+  mirrorOf({ ...t, ...(t.mapSize === undefined ? {} : { size: t.mapSize }), residents }, true)
+  return describeTile(t, GOOD_LABELS)
+}
 
 describe('the card for a tower (CONTEXT.md: Tower)', () => {
   it('shows on every tile of it, saying what it is of', () => {
@@ -1983,12 +2012,20 @@ describe('the actions on a tile’s card', () => {
 
     it('greys it with the reason while it can’t be taken', () => {
       const reason = (...residents: SeenResident[]) => row(thing(residents))?.reason
-      const armed = person('st', { owner: 'them', equipped: { weapon: 'spear' } })
+      const armed = person('st', {
+        owner: 'them',
+        carried: { spear: 1 },
+        equipped: { weapon: 'spear' },
+      })
       expect(reason(person('ada'), armed)).toBe('an armed resident guards that carriage')
       expect(row(thing([person('ada'), armed]))?.disabled).toBe(true)
       // One of theirs armed there too lifts the guard.
       expect(
-        reason(person('ada'), armed, person('bo', { equipped: { weapon: 'sword' } })),
+        reason(
+          person('ada'),
+          armed,
+          person('bo', { carried: { sword: 1 }, equipped: { weapon: 'sword' } }),
+        ),
       ).toBeUndefined()
       expect(reason(person('ada'), person('st', { owner: 'them', aboard: 'k1' }))).toBe(
         'someone is aboard that carriage',
@@ -2004,8 +2041,13 @@ describe('the actions on a tile’s card', () => {
         'someone is driving that carriage',
       )
       expect(reason(person('kid', { bornAt: tick }))).toBe('children can’t steal')
-      const caravans = [{ carriageId: 'k1', driverId: 'drv', escortIds: ['esc'] }]
-      const crew = (id: string, equipped = {}) => person(id, { owner: null, equipped })
+      const caravans = [{ id: 'cv1', carriageId: 'k1', driverId: 'drv', escortIds: ['esc'] }]
+      const crew = (id: string, equipped: { weapon?: string } = {}) =>
+        person(id, {
+          owner: null,
+          equipped,
+          carried: equipped.weapon ? { [equipped.weapon]: 1 } : {},
+        })
       const offering = (...others: ReturnType<typeof person>[]) =>
         row(thing([person('ada'), ...others], { caravans }))?.reason
       expect(offering()).toBeUndefined()
@@ -2060,11 +2102,21 @@ describe('the actions on a tile’s card', () => {
 
       it('greys it with the reason while it can’t be taken', () => {
         const reason = (card: TileCard) => mount(card)?.reason
-        const armed = person('st', { owner: 'them', equipped: { weapon: 'spear' } })
+        const armed = person('st', {
+          owner: 'them',
+          carried: { spear: 1 },
+          equipped: { weapon: 'spear' },
+        })
         expect(reason(loose([person('ada'), armed]))).toBe('an armed resident guards that horse')
         expect(mount(loose([person('ada'), armed]))?.disabled).toBe(true)
         expect(
-          reason(loose([person('ada'), armed, person('bo', { equipped: { weapon: 'sword' } })])),
+          reason(
+            loose([
+              person('ada'),
+              armed,
+              person('bo', { carried: { sword: 1 }, equipped: { weapon: 'sword' } }),
+            ]),
+          ),
         ).toBeUndefined()
         const down = { ...horse, down: true as const }
         expect(reason(loose([person('ada')], { horses: [down] }))).toBe('that horse is Down')
@@ -2111,7 +2163,11 @@ describe('the actions on a tile’s card', () => {
       })
 
       it('greys it with the reason while the horse is guarded', () => {
-        const armed = person('st', { owner: 'them', equipped: { weapon: 'spear' } })
+        const armed = person('st', {
+          owner: 'them',
+          carried: { spear: 1 },
+          equipped: { weapon: 'spear' },
+        })
         expect(hitch(thing([person('ada'), armed], mine))?.reason).toBe(
           'an armed resident guards that horse',
         )
@@ -2372,7 +2428,8 @@ describe('where a node’s workplace fits on what the Player knows', () => {
       ),
     ).toEqual({ x: 9, y: 10 })
     const water = lookup((x, y) => (x === 9 && y === 11 ? Terrain.Lake : Terrain.Forest))
-    const boxed = { ...seen, buildings: [east, building({ kind: 'house', x: 9, y: 8 })] }
+    const west = building({ id: 'b-house-2', kind: 'house', x: 9, y: 8 })
+    const boxed = { ...seen, buildings: [east, west] }
     expect(nodeFit(forest, boxed, nodeAt, water)).toBeUndefined()
   })
 

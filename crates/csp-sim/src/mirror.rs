@@ -20,8 +20,9 @@ use csp_shared::protocol::{
 };
 use csp_shared::world::offers::SeenOffer;
 use csp_shared::world::{
-    Army, Caravan, CaravanStop, Carriage, Horse, Interrupted, Offer, Patch, Resident,
-    RunningScript, SiegeMachine, Trader, TraderStop, Vessel, WorldState,
+    Alliance, Army, Caravan, CaravanStop, Carriage, Horse, Interrupted, MercenaryContract, Offer,
+    Patch, Resident, ResourceNode, RunningScript, SiegeMachine, Trader, TraderStop, Vessel,
+    WorldState,
 };
 
 /// Down until when, for someone seen to be Down without being told until when: as long as it
@@ -45,6 +46,14 @@ enum Kind {
     Patch,
 }
 
+/// What a client knows besides what is in sight, for one rule (`SightMirror::with_known`).
+#[derive(Debug, Default)]
+pub struct Known {
+    pub nodes: Vec<ResourceNode>,
+    pub alliances: Vec<Alliance>,
+    pub contracts: Vec<MercenaryContract>,
+}
+
 /// What one Player sees, as a world the rules read.
 #[derive(Debug, Default)]
 pub struct SightMirror {
@@ -62,6 +71,21 @@ impl SightMirror {
     /// The world as far as the Player sees it.
     pub fn world(&self) -> &WorldState {
         &self.world
+    }
+
+    /// Answers `f` on the world with `known` put in for it: what the client knows besides what is
+    /// in sight, which the mirror doesn't keep (the nodes it explored, its alliance's army, its
+    /// contracts). Taken out again after, so the mirror holds only what is in sight.
+    pub fn with_known<R>(&mut self, known: Known, f: impl FnOnce(&WorldState) -> R) -> R {
+        let w = &mut self.world;
+        w.nodes = known.nodes;
+        w.alliances = known.alliances;
+        w.contracts = known.contracts;
+        let answer = f(w);
+        w.nodes.clear();
+        w.alliances.clear();
+        w.contracts.clear();
+        answer
     }
 
     /// The map's size, from the `welcome` message.

@@ -2,8 +2,8 @@
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
 import { GOOD_KINDS, GOOD_SPECS } from '@csp/balance'
-import type { Good, SkillName, TrainingSubject, Weapon } from '@csp/shared-types'
-import { STAT_NAMES, SKILL_NAMES as ALL_SKILL_NAMES } from '@csp/shared-types'
+import type { Good, SkillName, Weapon } from '@csp/shared-types'
+import { SKILL_NAMES as ALL_SKILL_NAMES } from '@csp/shared-types'
 
 export { STAT_NAMES, HORSE_STAT_NAMES, CARRYING_A_CHILD, NODE_WORKPLACE } from '@csp/shared-types'
 
@@ -12,14 +12,6 @@ export { STAT_NAMES, HORSE_STAT_NAMES, CARRYING_A_CHILD, NODE_WORKPLACE } from '
  * it was before the list came from Rust (decided overnight, Daniel to confirm: bug #1629).
  */
 export const SKILL_NAMES: readonly SkillName[] = ALL_SKILL_NAMES.filter((s) => s !== 'seafaring')
-
-/** Whether `x` names a stat or a skill, something a training ground can teach. */
-export function isTrainingSubject(x: unknown): x is TrainingSubject {
-  return (
-    (STAT_NAMES as readonly unknown[]).includes(x) ||
-    (SKILL_NAMES as readonly unknown[]).includes(x)
-  )
-}
 
 /**
  * Whether a resident or horse is Down (`CONTEXT.md`: Down), lying unconscious and doing nothing:

@@ -16,8 +16,6 @@ import {
   NODE_GOOD,
   teacherAt,
   traineesOf,
-  buildProblem,
-  nodeCorner,
   hasChoice,
   recipeFor,
   recipeGood,
@@ -27,7 +25,6 @@ import {
   isSiegeSite,
   materialsOfKind,
   workOfKind,
-  type TerrainLookup,
 } from './shared/building.js'
 import { CARRYING_A_CHILD, GOODS, isDown, NODE_WORKPLACE } from './shared/world.js'
 import {
@@ -55,19 +52,10 @@ import {
   carriageOfResident,
   horsesToHitch,
   carriagePulledBy,
-  driveOffProblem,
-  hitchOffProblem,
-  horseToSteal,
   unhitchProblem,
   drivenCarriageId,
 } from './shared/carriages.js'
-import {
-  riderOf,
-  mountOffProblem,
-  STABLE_BREED_TICKS,
-  breedersAt,
-  keptBreeding,
-} from './shared/horses.js'
+import { riderOf, STABLE_BREED_TICKS, breedersAt, keptBreeding } from './shared/horses.js'
 import {
   feedHorseProblem,
   feedProblem,
@@ -101,9 +89,7 @@ import type {
   Pile,
   Resident,
   Stock,
-  Alliance,
   Diplomacy,
-  MercenaryContract,
   SeenResident,
   SeenCaravan,
   SeenTrader,
@@ -129,9 +115,8 @@ import type {
 } from '@csp/shared-types'
 import { covers, FOOTPRINT, footprintTiles } from './shared/footprint.js'
 import { conditionLine, isRuin, repairable } from './shared/decay.js'
-import { wrap, Terrain, UNEXPLORED } from './shared/terrain.js'
+import { Terrain, UNEXPLORED } from './shared/terrain.js'
 import { fullAt, gatheredOn, isPickedOver, patchLeft } from './shared/patch.js'
-import { handOverProblem, heirProblem } from './shared/leader.js'
 import { aboutTime, workLeft } from './shared/estimates.js'
 import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
@@ -141,7 +126,17 @@ import { faresKnown, horseFaresKnown } from './seen.js'
 import { FEED_HORSE_HINT, horseDownLine, horseNeed } from './horses-view.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 import { describeOccupation, type OccupationView } from './city-view.js'
-import { besideVessel, boardBoatProblem, crewShort, vesselCapacity } from './shared/vessels.js'
+import { besideVessel, crewShort, vesselCapacity } from './shared/vessels.js'
+import {
+  boardVesselProblems,
+  driveOffProblems,
+  hitchOffProblems,
+  handOverProblem,
+  heirProblem,
+  horseToSteal,
+  mountOffProblems,
+  type Serving,
+} from './world-rules.js'
 import type { Picking } from './Residents.js'
 
 /**
@@ -825,13 +820,15 @@ export function keepRows<Id extends string>(
   return rows
 }
 
-/** What the Player knows that the handover check needs: their diplomacy and what is in sight. */
-export interface HandOverSeen {
-  tick: number
-  diplomacy: Pick<Diplomacy, 'alliance' | 'contracts'>
-  cities: City[]
-  buildings: Building[]
-  mapSize: number
+/** Who serves others as far as the Player knows, from their diplomacy (`Serving`). */
+function servingOf(diplomacy: Pick<Diplomacy, 'alliance' | 'contracts'>): Serving {
+  return {
+    army: diplomacy.alliance?.army.map((p) => p.id) ?? [],
+    contracts: diplomacy.contracts.map((c) => ({
+      residentIds: c.residents.map((r) => r.id),
+      started: c.startedAt !== null,
+    })),
+  }
 }
 
 /**
@@ -840,12 +837,11 @@ export interface HandOverSeen {
  * checks again when the order arrives.
  */
 export function makeLeaderProblem(
-  seen: HandOverSeen,
+  diplomacy: Pick<Diplomacy, 'alliance' | 'contracts'>,
   realm: { id: string; leaderId: string },
-  leader: Resident | undefined,
-  target: Resident,
+  targetId: string,
 ): string | undefined {
-  return handOverProblem(seenWorld(seen), realm, leader, target, seen.mapSize)
+  return handOverProblem(realm, targetId, servingOf(diplomacy))
 }
 
 /**
@@ -853,51 +849,11 @@ export function makeLeaderProblem(
  * the handover (`CONTEXT.md`: Heir). The server checks again when the order arrives.
  */
 export function nameHeirProblem(
-  seen: HandOverSeen,
+  diplomacy: Pick<Diplomacy, 'alliance' | 'contracts'>,
   realm: { id: string; leaderId: string },
-  target: Resident,
+  targetId: string,
 ): string | undefined {
-  return heirProblem(seenWorld(seen), realm, target)
-}
-
-/** The world the shared checks read, from what the Player sees. */
-function seenWorld(seen: HandOverSeen) {
-  const a = seen.diplomacy.alliance
-  const alliances: Alliance[] = a
-    ? [
-        {
-          id: a.id,
-          name: a.name,
-          leaderId: a.leaderId,
-          members: a.members.map((m) => ({
-            realmId: m.realmId,
-            joinedAt: m.joinedAt,
-            leaving: m.leavesAt === null ? null : { at: m.leavesAt, removed: false },
-          })),
-          invites: a.invites.map((i) => i.realmId),
-          army: a.army.map((p) => ({ is: p.is, id: p.id, recallAt: p.recallAt })),
-        },
-      ]
-    : []
-  const contracts: MercenaryContract[] = seen.diplomacy.contracts.map((c) => ({
-    id: c.id,
-    lenderId: c.lender.realmId,
-    hirerId: c.hirer.realmId,
-    offeredBy: c.offeredBy,
-    residentIds: c.residents.map((r) => r.id),
-    days: c.days,
-    pricePerWeek: c.pricePerWeek,
-    storageId: c.storage?.id ?? '',
-    startedAt: c.startedAt,
-    paidWeeks: c.paidWeeks,
-  }))
-  return {
-    tick: seen.tick,
-    alliances,
-    contracts,
-    cities: seen.cities,
-    buildings: seen.buildings,
-  }
+  return heirProblem(realm, targetId, servingOf(diplomacy))
 }
 
 /** The relationship of a carriage's or a resident's owner (ADR 0008), seen from the viewer. */
@@ -961,7 +917,7 @@ export interface TileCard {
   gate?: Building
   /**
    * A resource node with nothing built on it: its workplace, and the north-west tile where that
-   * fits (`nodeFit`), if anywhere.
+   * fits (`nodeCorner`), if anywhere.
    */
   buildHere?: { kind: BuildingKind; at: { x: number; y: number } | undefined }
   /** A city the card links to in the city inspector: an own town hall's. */
@@ -1260,53 +1216,8 @@ export interface TileThings {
   commandedCarriages?: ReadonlySet<string>
   /** The buildings the Player remembers out of sight, and the tick now (`CONTEXT.md`: Last seen). */
   lastSeen?: { buildings: LastSeenBuilding[]; tick: number }
-  /** Where the node's workplace fits on what the Player knows (`nodeFit`), if anywhere. */
+  /** Where the node's workplace fits on what the Player knows (`nodeCorner`), if anywhere. */
   nodeFit?: { x: number; y: number }
-}
-
-/**
- * Where the workplace of a resource node can be laid out, as far as the Player knows
- * (`nodeCorner`, `CONTEXT.md`: Where buildings go): the buildings they see, the nodes and terrain
- * they have explored. The server checks again when the order arrives.
- */
-export function nodeFit(
-  node: KnownNode,
-  seen: { buildings: Building[]; cities: City[] },
-  nodeAt: (x: number, y: number) => KnownNode | undefined,
-  terrain: TerrainLookup,
-): { x: number; y: number } | undefined {
-  // The nodes a footprint over this one could also cover.
-  const reach = FOOTPRINT[NODE_WORKPLACE[node.kind]] - 1
-  const nodes: KnownNode[] = []
-  for (let dy = -reach; dy <= reach; dy++) {
-    for (let dx = -reach; dx <= reach; dx++) {
-      const n = nodeAt(wrap(node.x + dx, terrain.size), wrap(node.y + dy, terrain.size))
-      if (n) nodes.push(n)
-    }
-  }
-  return nodeCorner({ ...seen, nodes }, terrain, node)
-}
-
-/**
- * Why a building of `kind` can't be laid out from (x, y), its footprint running east and south, as
- * far as the Player knows (`buildProblem`, `CONTEXT.md`: Where buildings go): the buildings and
- * cities they see, the nodes and terrain they have explored. The server checks again when the
- * order arrives.
- */
-export function buildHereProblem(
-  kind: BuildingKind,
-  x: number,
-  y: number,
-  seen: { buildings: Building[]; cities: City[] },
-  nodeAt: (x: number, y: number) => KnownNode | undefined,
-  terrain: TerrainLookup,
-): string | undefined {
-  const nodes: KnownNode[] = []
-  for (const [tx, ty] of footprintTiles({ kind, x, y }, terrain.size)) {
-    const n = nodeAt(tx, ty)
-    if (n) nodes.push(n)
-  }
-  return buildProblem({ ...seen, nodes }, x, y, kind, terrain)
 }
 
 /** A node's kind in words: "forest", "iron ore". */
@@ -1918,19 +1829,15 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     )
     const viewerRealm = t.viewer.realmId
     if (viewerRealm && vessel.realmId === viewerRealm) {
-      const board = mine
-        .filter(
-          (r) =>
-            r.aboard === undefined && besideVessel(vessel, r, t.mapSize ?? MAP_SIZE, t.buildings),
-        )
-        .map((r) => ({
-          id: r.id,
-          name: r.name,
-          problem: boardBoatProblem({ ...r, driving: !!drivenCarriageId(r) }, vessel, {
-            buildings: t.buildings,
-            size: t.mapSize ?? MAP_SIZE,
-          }),
-        }))
+      const beside = mine.filter(
+        (r) =>
+          r.aboard === undefined && besideVessel(vessel, r, t.mapSize ?? MAP_SIZE, t.buildings),
+      )
+      const problems = boardVesselProblems(
+        beside.map((r) => r.id),
+        vessel.id,
+      )
+      const board = beside.map((r, i) => ({ id: r.id, name: r.name, problem: problems[i] }))
       const getOff = mine
         .filter((r) => r.aboard === vessel.id)
         .map(({ id, name }) => ({ id, name }))
@@ -2013,31 +1920,24 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     (r) => !t.strangers.some((s) => s.id === r.id) && !isDown(r),
   )
   if (realmId && thieves.length > 0) {
-    const seen = {
-      tick: t.tick ?? 0,
-      residents: t.residents ?? [],
-      horses: t.horses,
-      carriages: t.carriages,
-      caravans: t.caravans ?? [],
-      traders: t.traders ?? [],
-    }
-    /** Each of them with why they can't, by `problem`. */
-    const each = (problem: (thief: (typeof thieves)[number]) => string | undefined) =>
-      thieves.map((r) => ({ id: r.id, name: r.name, problem: problem(r) }))
+    const seen = { residents: t.residents ?? [], carriages: t.carriages }
+    const ids = thieves.map((r) => r.id)
+    /** Each of them with why they can't, the checks asked of them all in one call. */
+    const each = (problems: (string | undefined)[]) =>
+      thieves.map((r, i) => ({ id: r.id, name: r.name, problem: problems[i] }))
     if (stealable) {
       driveOff = {
         carriageId: stealable.id,
-        residents: each((r) => driveOffProblem(seen, r, stealable, realmId, t.mapSize)),
+        residents: each(driveOffProblems(ids, stealable.id, realmId)),
       }
     }
     const own = here(t.carriages).find((k) => k.realmId === realmId && !k.horseId)
-    const hitched = own && horseToSteal(seen, thieves[0]!, own, realmId)
+    const hitched = own && horseToSteal(thieves[0]!.id, own.id, realmId)
     if (own && hitched) {
-      const carriage = { ...own, realmId }
       hitchOff = {
         carriageId: own.id,
-        horseId: hitched.id,
-        residents: each((r) => hitchOffProblem(seen, r, carriage, hitched.id)),
+        horseId: hitched,
+        residents: each(hitchOffProblems(ids, own.id, realmId, hitched)),
       }
     }
     // Only what's free: a hitched horse shows as its carriage, a ridden one as its rider.
@@ -2048,7 +1948,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     if (horse) {
       stealHorse = {
         horseId: horse.id,
-        residents: each((r) => mountOffProblem(seen, r, horse, realmId)),
+        residents: each(mountOffProblems(ids, horse.id, realmId)),
       }
     }
   }
