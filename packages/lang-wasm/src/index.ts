@@ -1,5 +1,6 @@
 import init, * as wasm from '../generated/csp_lang_wasm.js'
 import type { ScriptParamType } from './script-data.js'
+import type { BuildingKind } from '@csp/shared-types'
 
 /**
  * The editor's script checker (ADR 0030): `csp-lang`'s, the server's own, compiled to
@@ -166,4 +167,52 @@ export function tokenize(source: string): Token[] {
 /** A script's `param` lines, each with the `//` comment at its end; none for a syntax error. */
 export function scriptParams(source: string): ParamInfo[] {
   return JSON.parse(ready().scriptParams(source)) as ParamInfo[]
+}
+
+/**
+ * The game's rules, `csp-sim`'s own, from the same module (ADR 0045, T122.1). The first slice: a
+ * rule that needs no world, and a throwaway mirror of what the client sees that a world-reading
+ * rule asks by coordinates (`docs/wasm-rules.md`).
+ */
+
+/**
+ * Work a building of `kind` takes in ticks of one unskilled resident of average Strength, over the
+ * terrain `under` where known (`buildingWork`).
+ */
+export function buildingWork(kind: BuildingKind, under?: number): number {
+  return ready().buildingWork(kind, under)
+}
+
+/**
+ * What the client sees, kept in the module's memory: the server's `welcome` message goes in once,
+ * each `tick` message after it, as the JSON text the socket brought. Throwaway (T122.1): only the
+ * buildings in sight, for `buildingAt`; T122.4 brings the real mirror.
+ */
+export class WorldMirror {
+  private readonly mirror = new (ready().WorldMirror)()
+
+  /** Starts over from a `welcome` message's JSON. */
+  welcome(json: string): void {
+    this.mirror.welcome(json)
+  }
+
+  /** Takes in a `tick` message's JSON. */
+  tick(json: string): void {
+    this.mirror.tick(json)
+  }
+
+  /** How many buildings are in sight. */
+  get count(): number {
+    return this.mirror.count
+  }
+
+  /** The id of the building or construction site in sight whose footprint covers (x, y). */
+  buildingAt(x: number, y: number): string | undefined {
+    return this.mirror.buildingAt(x, y)
+  }
+
+  /** Frees the module's memory for it. */
+  free(): void {
+    this.mirror.free()
+  }
 }

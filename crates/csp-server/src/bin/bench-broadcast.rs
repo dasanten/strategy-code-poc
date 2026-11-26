@@ -5,7 +5,8 @@
 //! cargo run --release -p csp-server --bin bench-broadcast -- <village|villages|hq|save> [clients] [ticks]
 //! ```
 //!
-//! `save` reads the newest save of the database at `DB_PATH`, from a copy.
+//! `save` reads the newest save of the database at `DB_PATH`, from a copy. With `BENCH_DUMP` set to
+//! a folder, the first Player's messages are written there, one file each.
 use std::process::ExitCode;
 
 use csp_server::bench::{bench_broadcast, scene, SceneName};
