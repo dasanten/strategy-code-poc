@@ -140,6 +140,7 @@ export type UnitToken =
   | 'ship'
   | 'ram'
   | 'catapult'
+  | 'ballista'
   | 'army'
   | 'residents'
   | 'aside'
@@ -156,6 +157,7 @@ const UNIT_SIZE: Record<UnitToken, number> = {
   ship: 0.44,
   ram: 0.4,
   catapult: 0.4,
+  ballista: 0.4,
   army: 0.4,
   residents: 0.36,
   aside: 0.28,

@@ -38,6 +38,7 @@ impl BuildingKind {
             BuildingKind::Ship => &SHIP,
             BuildingKind::Ram => &RAM,
             BuildingKind::Catapult => &CATAPULT,
+            BuildingKind::Ballista => &BALLISTA,
         }
     }
 }
@@ -658,4 +659,23 @@ const KILN: BuildingSpec = BuildingSpec {
     }),
     housing_room: None,
     decay_days: Some(10800.0),
+};
+
+const BALLISTA: BuildingSpec = BuildingSpec {
+    label: "Ballista",
+    purpose: "A ballista is a siege machine built in the field like a ram.",
+    footprint: 1,
+    stands: Stands::OwnRule,
+    shares_a_tile: true,
+    keeps_goods: false,
+    build: Some(BuildSpec {
+        menu: BuildMenu::Siege,
+        menu_place: 3,
+        materials: Table(&[("wood", 30.0), ("iron", 3.0)]),
+        work: 2.0 * TICKS_PER_GAME_DAY,
+        stone: None,
+    }),
+    workplace: None,
+    housing_room: None,
+    decay_days: None,
 };

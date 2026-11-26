@@ -95,6 +95,7 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   ship: 0x6b5236,
   ram: 0x7a5a3a,
   catapult: 0x6e5a44,
+  ballista: 0x6e5a44,
   haven: 0x5f8fa8,
 }
 

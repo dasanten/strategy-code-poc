@@ -407,6 +407,21 @@ export const BUILDING_SPECS = {
       "place": 2
     },
     "processes": false
+  },
+  "ballista": {
+    "label": "Ballista",
+    "purpose": "A ballista is a siege machine built in the field like a ram.",
+    "footprint": 1,
+    "stands": "ownRule",
+    "inCityArea": false,
+    "onShore": false,
+    "sharesATile": true,
+    "keepsGoods": false,
+    "buildMenu": {
+      "group": "Siege",
+      "place": 3
+    },
+    "processes": false
   }
 } as const satisfies Record<BuildingKind, BuildingSpec>
 
@@ -591,11 +606,18 @@ export const MACHINE_SPECS = {
     "builtAs": "catapult",
     "crew": 3.0,
     "strength": 3000.0
+  },
+  "ballista": {
+    "label": "Ballista",
+    "name": "ballista",
+    "builtAs": "ballista",
+    "crew": 2.0,
+    "strength": 2000.0
   }
 } as const satisfies Record<SiegeMachineKind, MachineSpec>
 
 /** Every building kind, in the order of the specs. */
-export const BUILDING_KINDS = ['townHall', 'house', 'storage', 'warehouse', 'wall', 'gate', 'tower', 'farm', 'stable', 'mine', 'quarry', 'lumberCamp', 'smelter', 'mint', 'smithy', 'kiln', 'trainingGround', 'road', 'carriage', 'haven', 'boat', 'ship', 'ram', 'catapult'] as const satisfies readonly BuildingKind[]
+export const BUILDING_KINDS = ['townHall', 'house', 'storage', 'warehouse', 'wall', 'gate', 'tower', 'farm', 'stable', 'mine', 'quarry', 'lumberCamp', 'smelter', 'mint', 'smithy', 'kiln', 'trainingGround', 'road', 'carriage', 'haven', 'boat', 'ship', 'ram', 'catapult', 'ballista'] as const satisfies readonly BuildingKind[]
 
 /** Every good, in the order of the specs (`CONTEXT.md`: Good). */
 export const GOOD_KINDS = ['food', 'wood', 'stone', 'ironOre', 'iron', 'goldOre', 'coins', 'spear', 'sword', 'shield', 'armour', 'coal', 'steel', 'steelSword', 'steelShield', 'steelArmour', 'tools', 'bow', 'crossbow', 'arrows', 'rope'] as const satisfies readonly Good[]

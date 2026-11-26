@@ -767,6 +767,10 @@
       "wood": 30.0,
       "iron": 5.0,
       "stone": 10.0
+    },
+    "ballista": {
+      "wood": 30.0,
+      "iron": 3.0
     }
   },
   "BUILD_WORK": {
@@ -792,7 +796,8 @@
     "boat": 1440.0,
     "ship": 14400.0,
     "ram": 2880.0,
-    "catapult": 2880.0
+    "catapult": 2880.0,
+    "ballista": 2880.0
   },
   "STONE_BUILD_MATERIALS": {
     "wall": {
@@ -1238,6 +1243,7 @@
     "boat": 1,
     "ship": 1,
     "ram": 1,
-    "catapult": 1
+    "catapult": 1,
+    "ballista": 1
   }
 }

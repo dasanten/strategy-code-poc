@@ -32,6 +32,7 @@ export const BUILDING_ART: Record<BuildingKind, string> = {
   ship: 'ship.svg',
   ram: 'ram.svg',
   catapult: 'catapult.svg',
+  ballista: 'catapult.svg',
   haven: 'haven.svg',
 }
 
@@ -133,6 +134,7 @@ export const UNIT_ART = {
   ship: 'ship.svg',
   ram: 'ram.svg',
   catapult: 'catapult.svg',
+  ballista: 'catapult.svg',
   horse: 'horse.svg',
   caravan: 'caravan.svg',
   army: 'army-banner.svg',

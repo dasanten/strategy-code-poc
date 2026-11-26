@@ -53,7 +53,7 @@ pub struct Vessel {
 
 craft_kinds! {
     /// The kinds of siege machine (`CONTEXT.md`: Siege machine): a ram and a catapult.
-    SiegeMachineKind { Ram, Catapult }
+    SiegeMachineKind { Ram, Catapult, Ballista }
 }
 
 /// A siege machine (`CONTEXT.md`: Siege machine, ADR 0037): a machine of a realm, built in the

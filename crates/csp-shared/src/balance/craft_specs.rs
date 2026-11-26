@@ -23,6 +23,7 @@ impl SiegeMachineKind {
         match self {
             SiegeMachineKind::Ram => &RAM,
             SiegeMachineKind::Catapult => &CATAPULT,
+            SiegeMachineKind::Ballista => &BALLISTA,
         }
     }
 }
@@ -85,4 +86,14 @@ pub(super) const CATAPULT: SiegeMachineSpec = SiegeMachineSpec {
     // A tile of wooden wall falls to 5 in five minutes, one of stone to 20 in twenty, slower than
     // a ram at the wall but from out of reach.
     blow: 600.0,
+};
+
+pub(super) const BALLISTA: SiegeMachineSpec = SiegeMachineSpec {
+    name: "ballista",
+    built_as: BuildingKind::Ballista,
+    crew: 2.0,
+    strength: 2000.0,
+    reach: 12.0,
+    attack_ticks: 30.0,
+    blow: 200.0,
 };

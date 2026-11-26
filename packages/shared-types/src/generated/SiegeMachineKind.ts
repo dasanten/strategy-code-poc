@@ -3,4 +3,4 @@
 /**
  * The kinds of siege machine (`CONTEXT.md`: Siege machine): a ram and a catapult.
  */
-export type SiegeMachineKind = "ram" | "catapult";
+export type SiegeMachineKind = "ram" | "catapult" | "ballista";

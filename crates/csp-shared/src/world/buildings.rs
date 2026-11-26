@@ -42,6 +42,7 @@ pub enum BuildingKind {
     /// A catapult site (`CONTEXT.md`: Siege machine, Catapult): finished, it is gone and a catapult
     /// stands there.
     Catapult = "catapult",
+    Ballista = "ballista",
 }
 }
 

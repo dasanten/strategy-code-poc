@@ -874,6 +874,11 @@ export interface Balance {
       stone: number
       [key: string]: number
     }
+    ballista: {
+      wood: number
+      iron: number
+      [key: string]: number
+    }
     [key: string]: {
       wood: number
       stone: number
@@ -932,6 +937,7 @@ export interface Balance {
     ship: number
     ram: number
     catapult: number
+    ballista: number
     [key: string]: number
   }
   readonly STONE_BUILD_MATERIALS: {
@@ -1791,6 +1797,7 @@ export interface Balance {
     ship: number
     ram: number
     catapult: number
+    ballista: number
     [key: string]: number
   }
 }
