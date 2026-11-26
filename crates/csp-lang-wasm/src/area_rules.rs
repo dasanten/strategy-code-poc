@@ -25,15 +25,15 @@ thread_local! {
 
 /// A world of just these buildings, each of the city `"<n>"` its number names.
 fn world_of(buildings: &[i32]) -> Result<WorldState, String> {
-    if buildings.len() % 4 != 0 {
+    if !buildings.len().is_multiple_of(4) {
         return Err("buildings come four numbers each".into());
     }
-    let mut world = WorldState::default();
-    world.next_id = WORLDS.with(|n| {
+    let next_id = WORLDS.with(|n| {
         n.set(n.get() + 1);
         n.get()
     });
-    for (i, b) in buildings.chunks_exact(4).enumerate() {
+    let mut world = WorldState { next_id, ..WorldState::default() };
+    for (i, b) in buildings.as_chunks::<4>().0.iter().enumerate() {
         let kind = *usize::try_from(b[2])
             .ok()
             .and_then(|k| BuildingKind::ALL.get(k))
@@ -83,7 +83,9 @@ pub fn near_city_area(
     let world = world_of(buildings)?;
     let id = city.to_string();
     Ok(tiles
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|t| {
             let (x, y) = (f64::from(t[0]), f64::from(t[1]));
             u8::from(city_area::near_city_area(&world, &id, x, y, reach, size))
@@ -108,7 +110,9 @@ pub fn city_ids_at(buildings: &[i32], x: i32, y: i32, size: i32) -> Result<Vec<i
 pub fn in_any_city_area(buildings: &[i32], tiles: &[i32], size: i32) -> Result<Vec<u8>, String> {
     let world = world_of(buildings)?;
     Ok(tiles
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|t| {
             let ids = city_area::city_ids_at(&world, f64::from(t[0]), f64::from(t[1]), size);
             u8::from(!ids.is_empty())
