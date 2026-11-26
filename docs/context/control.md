@@ -192,7 +192,10 @@
   **Estimates:** the Doing line and every meter or countdown that shows progress also say about
   how long is left, in real time with game time in brackets ("about 3 min (half a game day)"),
   from the current pace (terrain, horse, hunger, skill), rounded to one coarse unit: walking,
-  driving and riding say when they arrive; breeding, building, tearing down, carrying a child,
+  driving and riding say when they arrive, and so do the orders that walk: to a siege machine to
+  crew it, to a road or wall line's next tile, and after a target to attack; rowing, sailing,
+  pushing a siege machine and a haul route by water say only the tiles to go until they have a
+  pace of their own (Daniel, 2026-11-25); breeding, building, tearing down, carrying a child,
   pairing and growing up say how long is left.
 - **Memory:** the small store a running script or order keeps between ticks. Roles are just
   something a script keeps there. A script can read, never change, the memory of its own

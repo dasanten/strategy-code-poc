@@ -218,6 +218,8 @@ impl RunningOrder for WaterHaulOrder {
             to: self.water.as_ref().map_or(To::Nowhere, To::tile),
             near: false,
             after: None,
+            // A haul route by water: no arrival estimate until rowing has a pace of its own
+            // (Daniel, 2026-11-25, #1621).
             estimated: false,
         })
     }

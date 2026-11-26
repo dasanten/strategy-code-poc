@@ -376,6 +376,36 @@ describe('doingLine', () => {
       'Working the mine: walking to 4, 5 · about 3 min (3 game hours)',
     )
   })
+
+  it('says about when a crew, line or attack order gets there, as a walk (#1621)', () => {
+    const soon = (r: DoingOf, arrives: number) => doingLine(r, { scripts, buildings, arrives })
+    const path: [number, number][] = [[4, 5]]
+    const crew: ResidentOrder = { kind: 'crew', machineId: 'm1', path, progress: 0 }
+    expect(soon({ order: crew }, 180)).toBe(
+      'Walking to the ram to crew it · about 3 min (3 game hours)',
+    )
+    const road: ResidentOrder = {
+      kind: 'roadLine',
+      tiles: [[4, 5]],
+      phase: 'walking',
+      path,
+      progress: 0,
+      siteId: null,
+    }
+    expect(soon({ order: road }, 180)).toBe(
+      'Walking to lay road at 4, 5 · about 3 min (3 game hours) · 1 road tile to go',
+    )
+    const attack: ResidentOrder = {
+      kind: 'attack',
+      targetId: 'r9',
+      path,
+      progress: 0,
+      strike: 0,
+      started: false,
+    }
+    expect(soon({ order: attack }, 60)).toBe('Going after their target · about 1 min (a game hour)')
+    expect(doingLine({ order: attack }, { scripts, buildings })).toBe('Going after their target')
+  })
 })
 
 describe('scriptLine', () => {
