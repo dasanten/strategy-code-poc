@@ -57,7 +57,6 @@ fn the_actions_named_unlike_their_order() {
     let unlike: Vec<_> =
         script_actions().filter(|(kind, a)| *kind != a.name).map(|(k, a)| (a.name, k)).collect();
     assert_eq!(unlike, [("loadShip", "load"), ("unloadShip", "load"), ("shoot", "attack")]);
-    // Left out until the bug is fixed (see `script_order_kinds`).
-    assert!(!script_order_kinds().contains(&"load"));
+    assert!(script_order_kinds().contains(&"load"));
     assert!(script_order_kinds().contains(&"attack"));
 }
