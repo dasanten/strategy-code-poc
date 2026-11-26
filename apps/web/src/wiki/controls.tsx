@@ -1,6 +1,6 @@
 import { WALK_TICKS_PER_TILE, aboutTime } from '@csp/balance'
-import { WHO_PAGE, WHO_SUGGESTS } from '../who-list-view.js'
-import { GROUP_SLOTS } from '../saved-groups.js'
+import { WHO_PAGE, WHO_SUGGESTS } from '../realm/who-list-view.js'
+import { GROUP_SLOTS } from '../residents/saved-groups.js'
 import { Table } from './parts.js'
 import { num } from './wiki-view.js'
 

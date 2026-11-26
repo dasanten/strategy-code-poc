@@ -61,7 +61,7 @@ import {
   carryCapacity,
 } from '@csp/balance'
 import type { Good } from '@csp/shared-types'
-import { GoodIcon } from '../GoodsGrid.js'
+import { GoodIcon } from '../ui/GoodsGrid.js'
 import { goods, goodName } from './names.js'
 import { Table } from './parts.js'
 import {

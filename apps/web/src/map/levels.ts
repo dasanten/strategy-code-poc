@@ -1,5 +1,5 @@
 import { CHUNK_SIZE, TERRAIN_LEVEL_MAX, UNEXPLORED } from '@csp/shared-types'
-import { chunksAcross, levelChunksAcross, wrap } from '../terrain.js'
+import { chunksAcross, levelChunksAcross, wrap } from '../world/terrain.js'
 import { tileToScreen, visibleTiles, type Camera, type Size } from './camera.js'
 import { TERRAIN_COLORS } from './palette.js'
 

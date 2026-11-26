@@ -15,7 +15,7 @@ reaches them through `@csp/lang-wasm` (`packages/lang-wasm/src/index.ts`).
 - `crates/csp-lang-wasm/src/rules.rs`: the world mirror and the rules that read it.
 - **The world mirror** (`WorldMirror`, around `csp_sim::mirror::SightMirror`) holds what the
   client sees in the module's memory, as a `WorldState` the rules read as the server's world. The
-  client (`apps/web/src/world-mirror.ts`, fed by `useWorld`) hands it the server's `welcome`
+  client (`apps/web/src/world/world-mirror.ts`, fed by `useWorld`) hands it the server's `welcome`
   message once and each `tick` message after it, as the JSON text the socket brought; nothing
   crosses back but answers. Rules that read the world are its methods, called with ids and
   coordinates. Everything in sight is kept in place in its list, found by id, in the server's order,
@@ -25,7 +25,7 @@ reaches them through `@csp/lang-wasm` (`packages/lang-wasm/src/index.ts`).
   stays a few lines of TypeScript beside its user, where a call into the module would cost more
   than the rule. Each is held to its Rust original: `crates/csp-sim/tests/client_twins.rs` asks the
   original on two fixture worlds as a realm is sent them and writes `client_twins.json`;
-  `apps/web/src/client-twins.test.ts` asks the twin the same and fails on any answer that differs.
+  `apps/web/src/world/client-twins.test.ts` asks the twin the same and fails on any answer that differs.
   ESLint's `csp/no-rule-copy` (`scripts/eslint-no-rule-copy.mjs`) refuses a top-level client
   function named after a `queries/` function that is not one of those twins. A new twin is one line
   in each test file; rewrite the answers with `CSP_WRITE_TWINS=1 cargo nextest run -p csp-sim
@@ -219,7 +219,7 @@ module is 574 KB gzipped (1,868 KB raw), from 570 KB. The mirror's update is not
 The checks that say whether something is allowed and why not, and read the world, are asked of
 the mirror: one entry, `WorldMirror.rule(name, args)` (`crates/csp-lang-wasm/src/world_rules.rs`),
 and `rules(calls)` for many in one call, which a card asks for each resident on a tile. The client
-calls them through `apps/web/src/world-rules.ts` by ids and coordinates; until a welcome went in,
+calls them through `apps/web/src/world/world-rules.ts` by ids and coordinates; until a welcome went in,
 nothing is refused (the server checks the order). Something not in the mirror (gone in the
 message the client hasn't shown yet) gets the check's own "no such …".
 

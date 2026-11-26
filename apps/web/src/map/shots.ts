@@ -1,6 +1,6 @@
 import { SHOT_REACH, WALL_SHOT_REACH_BONUS } from '@csp/balance'
 import type { SeenResident } from '@csp/shared-types'
-import { wrapDelta } from '../terrain.js'
+import { wrapDelta } from '../world/terrain.js'
 
 /** One shot on the map: an archer and the one they shoot at, by id. */
 export interface Shot {

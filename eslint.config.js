@@ -47,7 +47,7 @@ export default tseslint.config(
     // `world-rules.ts` is the module's front: each of its functions calls the module. Tests may
     // write an answer out by hand.
     files: ['apps/web/**/*.{ts,tsx}'],
-    ignores: ['apps/web/src/world-rules.ts', '**/*.test.ts'],
+    ignores: ['apps/web/src/world/world-rules.ts', '**/*.test.ts'],
     plugins: { csp: noRuleCopy },
     rules: { 'csp/no-rule-copy': 'error' },
   },

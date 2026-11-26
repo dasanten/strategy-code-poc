@@ -1,5 +1,5 @@
 import type { Graphics } from 'pixi.js'
-import { FOOTPRINT, covers } from '../footprint.js'
+import { FOOTPRINT, covers } from '../building/footprint.js'
 import type { Building, ResidentOrder, SeenCarriage, SeenResident } from '@csp/shared-types'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 import { LEADER_COLOR } from './palette.js'

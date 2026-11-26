@@ -1,6 +1,6 @@
 import { Container, Sprite, Texture } from 'pixi.js'
 import { TERRAIN_LEVEL_MAX } from '@csp/shared-types'
-import { chunksAcross, levelChunksAcross } from '../terrain.js'
+import { chunksAcross, levelChunksAcross } from '../world/terrain.js'
 import type { TerrainChunk } from '@csp/shared-types'
 import type { Camera, Size } from './camera.js'
 import { coarseTexels, levelChunkRect, levelChunkToScreen, squaresIn } from './levels.js'

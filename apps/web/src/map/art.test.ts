@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FOOTPRINT } from '../footprint.js'
+import { FOOTPRINT } from '../building/footprint.js'
 import { NODE_KINDS } from '@csp/shared-types'
 import {
   ACTIVITY_ART,

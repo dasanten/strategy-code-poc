@@ -4,8 +4,8 @@ import {
   QUEUE_MAX_DEPTH,
   QUEUE_MAX_REPEAT,
 } from '@csp/balance'
-import { realMinutes } from '../queue-view.js'
-import { DEFAULT_REPEAT } from '../plan-blocks.js'
+import { realMinutes } from '../queue/queue-view.js'
+import { DEFAULT_REPEAT } from '../queue/plan-blocks.js'
 import { num } from './wiki-view.js'
 
 export function QueuesSection() {

@@ -1,6 +1,6 @@
 import { CARRIAGE_SPEED, DIAGONAL_STEP, TERRAIN_SPEED } from '@csp/balance'
-import { Terrain, wrap, wrapDelta } from '../terrain.js'
-import { roadLine } from '../building.js'
+import { Terrain, wrap, wrapDelta } from '../world/terrain.js'
+import { roadLine } from '../building/building.js'
 
 /** A tile on the map. */
 export type Point = readonly [x: number, y: number]

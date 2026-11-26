@@ -1,8 +1,8 @@
 import { BUILDING_KINDS, BUILDING_SPECS } from '@csp/balance'
-import { Terrain } from '../terrain.js'
+import { Terrain } from '../world/terrain.js'
 import { UNEXPLORED } from '@csp/shared-types'
 import type { BuildingKind, ResourceKind } from '@csp/shared-types'
-import { THEME, hex, type Relationship } from '../theme.js'
+import { THEME, hex, type Relationship } from '../ui/theme.js'
 
 /** Roads, wide and light over the terrain (ADR 0008). */
 export const ROAD_COLOR = hex(THEME.terrain.road)

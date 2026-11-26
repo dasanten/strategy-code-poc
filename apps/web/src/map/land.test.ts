@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PlayerLand } from '@csp/shared-types'
-import { describeTile } from '../selection-view.js'
-import { GOOD_LABELS } from '../Residents.js'
+import { describeTile } from '../screen/selection-view.js'
+import { GOOD_LABELS } from '../residents/Residents.js'
 import {
   LAND_BRIDGE_MARK_COLOR,
   PASS_MARK_COLOR,

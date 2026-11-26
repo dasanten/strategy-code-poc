@@ -1,5 +1,5 @@
 import { TERRAIN_BATCH_MAX, TERRAIN_BATCH_PATH, TERRAIN_LEVEL_MAX } from '@csp/shared-types'
-import { coarseChunkOf, levelChunksAcross } from '../terrain.js'
+import { coarseChunkOf, levelChunksAcross } from '../world/terrain.js'
 import { decodeChunk, decodeChunkBatch } from './chunk-codec.js'
 import type { TerrainChunk } from '@csp/shared-types'
 

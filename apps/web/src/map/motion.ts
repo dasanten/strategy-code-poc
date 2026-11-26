@@ -1,5 +1,5 @@
 import { DIAGONAL_STEP, TICK_MS } from '@csp/balance'
-import { drivenCarriageId } from '../carriages.js'
+import { drivenCarriageId } from '../transport/carriages.js'
 import type { Resident, ResidentOrder } from '@csp/shared-types'
 import { residentActivity } from './figures.js'
 import type { MapWorld } from './map-world.js'
