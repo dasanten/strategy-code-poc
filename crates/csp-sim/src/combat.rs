@@ -174,11 +174,11 @@ fn wanted_at_home(world: &WorldState, org: &str, t: &Resident, size: i32) -> boo
 }
 
 /// Whether `a` striking `t` is a crime (`isAggression`): not when `a` fights back at someone who
-/// hit them, nor when `t` attacks someone of `a`'s Organization on their own account, or breaks or
-/// climbs one of its walls or gates. The Trade Org HQ's soldiers keep its inner ring clear, a
-/// trading post goes after a thief it knows of, and an Organization strikes those wanted in its
-/// own City area, none of it a crime. For `t` running their defence script, what it interrupted is
-/// what they are doing.
+/// hit them, nor when `t` attacks someone of `a`'s Organization on their own account, or breaks,
+/// rams, throws at or climbs one of its walls or gates. The Trade Org HQ's soldiers keep its inner
+/// ring clear, a trading post goes after a thief it knows of, and an Organization strikes those
+/// wanted in its own City area, none of it a crime. For `t` running their defence script, what it
+/// interrupted is what they are doing.
 fn is_aggression(world: &WorldState, a: &Resident, t: &Resident, size: i32) -> bool {
     if matches!(&a.order, Some(ResidentOrder::Attack(o)) if o.defending == Some(true)) {
         return false;
@@ -848,8 +848,6 @@ fn off_carriage(world: &mut WorldState, ti: usize) {
 /// back (`CONTEXT.md`: High ground), they flee home to their city's town hall, but a driver drives on and a passenger stays aboard a carriage being driven, and so a rower
 /// rows on and a passenger stays aboard a boat being rowed.
 fn react(world: &mut WorldState, ti: usize, ai: usize) {
-    // A blow ends the Leader's rally; it doesn't come back after the defence script.
-    crate::rally::end_when_struck(world, ti);
     let t = &world.residents[ti];
     // A climber climbs on, and someone swapping gear finishes the swap first (`CONTEXT.md`:
     // Equipment): they strike no blows meanwhile.

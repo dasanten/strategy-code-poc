@@ -358,7 +358,7 @@ export function CombatSection() {
         {duration(DEFEND_CALM_TICKS)} of a blow, ends the defence script and what it interrupted,
         and further blows don't undo it. One that ends by itself, like a walk or a drive to a
         target, stands until it is done or you replace it, however long that takes. What goes on
-        until stopped, like a haul route, working, a task, a script or a queue, holds until no blow
+        until stopped, like a haul route, working, rallying the crew, a task, a script or a queue, holds until no blow
         has landed for {duration(DEFEND_CALM_TICKS)}; after that the next blow runs the defence
         script as usual. An order given before the attack is interrupted as usual, and what a script
         or queue requests itself doesn't count as given by you.

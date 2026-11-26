@@ -6,11 +6,13 @@
 
 use std::sync::Arc;
 
-use csp_shared::balance::{RALLY_PACE, ZEAL_CAP_HOURS, ZEAL_PER_RALLIED_TICK, ZEAL_PER_TICK};
+use csp_shared::balance::{
+    DEFEND_CALM_TICKS, RALLY_PACE, ZEAL_CAP_HOURS, ZEAL_PER_RALLIED_TICK, ZEAL_PER_TICK,
+};
 use csp_shared::terrain::{Terrain, TerrainMap};
 use csp_shared::world::{
-    AttackOrder, BuildOrder, BuildingKind, ConstructionSite, Good, ResidentOrder, ResourceKind,
-    ResourceNode, Stock, Tile, WorldState,
+    AttackOrder, BuildOrder, BuildingKind, ConstructionSite, GivenUnderAttack, Good, Resident,
+    ResidentOrder, ResourceKind, ResourceNode, Stock, Tile, WorldState,
 };
 use serde_json::json;
 
@@ -309,9 +311,8 @@ fn it_ends_when_the_zeal_is_used_up() {
     assert_eq!(rally(&mut world, MARA), Ok(()));
 }
 
-#[test]
-fn a_blow_ends_it_and_it_doesnt_come_back_after_the_defence_script() {
-    let (mut world, t, _) = rallied_farm();
+/// Tobin's resident attacking the Leader.
+fn attacker() -> Resident {
     let mut foe = resident("foe", Some(&realm_id(TOBIN)), FARM.0, FARM.1);
     foe.order = Some(ResidentOrder::Attack(AttackOrder {
         target_id: LEADER.into(),
@@ -322,22 +323,66 @@ fn a_blow_ends_it_and_it_doesnt_come_back_after_the_defence_script() {
         defending: None,
         army: None,
     }));
-    world.residents.push(foe);
-    let health = live(&world, LEADER).health;
-    let mut ticks = 0;
-    while live(&world, LEADER).health >= health && ticks < 200 {
-        run(&mut world, &t, 1);
-        ticks += 1;
+    foe
+}
+
+/// Runs until the Leader is struck (their health restored each tick, so they never go Down):
+/// false if no blow landed within 200 ticks.
+fn until_struck(world: &mut WorldState, t: &TerrainMap) -> bool {
+    for _ in 0..200 {
+        let i = world.residents.iter().position(|r| r.id == LEADER).unwrap();
+        world.residents[i].health = 100.0;
+        run(world, t, 1);
+        if live(world, LEADER).health < 100.0 {
+            return true;
+        }
     }
-    assert!(live(&world, LEADER).health < health, "never struck");
+    false
+}
+
+#[test]
+fn a_blow_sets_it_aside_and_it_comes_back_after_the_defence_script() {
+    let (mut world, t, _) = rallied_farm();
+    world.residents.push(attacker());
+    assert!(until_struck(&mut world, &t), "never struck");
     assert!(!rallying(&world));
-    // What the defence script keeps aside to go back to is no rally.
+    // The defence script runs; the rally is what it keeps aside to go back to.
     let kept = live(&world, LEADER).interrupted.as_ref().and_then(|k| k.order.clone());
-    assert!(!matches!(kept, Some(ResidentOrder::Rally(_))), "{kept:?}");
+    assert!(matches!(kept, Some(ResidentOrder::Rally(_))), "{kept:?}");
     let i = world.residents.iter().position(|r| r.id == LEADER).unwrap();
     world.residents.retain(|r| r.id != "foe");
     crate::defence::resume_interrupted(&mut world, i);
+    assert!(rallying(&world));
+    run(&mut world, &t, 1);
+    assert!(rallying(&world));
+}
+
+#[test]
+fn given_under_attack_it_holds_until_calm() {
+    let (mut world, t) = setup();
+    worker(&mut world, "w1", MARA, "farm");
+    put(&mut world, LEADER, FARM);
+    world.residents.push(attacker());
+    assert!(until_struck(&mut world, &t), "never struck");
+    // Under attack, the Player rallies the crew: it holds until calm, not until done.
+    rally(&mut world, MARA).unwrap();
+    assert_eq!(live(&world, LEADER).given_under_attack, Some(GivenUnderAttack::UntilCalm));
+    // Further blows don't interrupt it.
+    for _ in 0..3 {
+        assert!(until_struck(&mut world, &t), "never struck again");
+        assert!(rallying(&world));
+    }
+    // No blow for the calm time: the next one runs the defence script, which keeps it aside.
+    let foe = world.residents.iter().position(|r| r.id == "foe").unwrap();
+    let foe = world.residents.remove(foe);
+    run(&mut world, &t, DEFEND_CALM_TICKS as usize + 1);
+    assert!(rallying(&world));
+    world.residents.push(foe);
+    assert!(until_struck(&mut world, &t), "never struck after the calm");
     assert!(!rallying(&world));
+    assert_eq!(live(&world, LEADER).given_under_attack, None);
+    let kept = live(&world, LEADER).interrupted.as_ref().and_then(|k| k.order.clone());
+    assert!(matches!(kept, Some(ResidentOrder::Rally(_))), "{kept:?}");
 }
 
 #[test]
@@ -451,4 +496,22 @@ fn invariant_only_a_living_leader_at_the_building_rallies() {
     }
     assert!(!sound(&world));
     let _ = t;
+}
+
+#[test]
+fn a_leader_aboard_a_carriage_gets_off_first_to_rally() {
+    let (mut world, _) = setup();
+    worker(&mut world, "w1", MARA, "farm");
+    put(&mut world, LEADER, FARM);
+    world.carriages.push(crate::movement_test_world::carriage(
+        "k1",
+        Some(&realm_id(MARA)),
+        FARM.0,
+        FARM.1,
+        None,
+    ));
+    world.residents.iter_mut().find(|r| r.id == LEADER).unwrap().aboard = Some("k1".into());
+    rally(&mut world, MARA).unwrap();
+    assert_eq!(live(&world, LEADER).aboard, None);
+    assert!(rallying(&world));
 }

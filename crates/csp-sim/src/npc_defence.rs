@@ -180,7 +180,7 @@ pub fn attackers_of(world: &WorldState, city: &City, size: i32) -> Vec<usize> {
         world.buildings.iter().any(|b| {
             b.id == id
                 && b.city_id.as_ref() == Some(&city.id)
-                && (b.kind == BuildingKind::Wall || b.kind == BuildingKind::Gate)
+                && matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate | BuildingKind::Tower)
         })
     };
     (0..world.residents.len())

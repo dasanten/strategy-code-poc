@@ -64,9 +64,11 @@
   drains only while somebody is being rallied, and doesn't fill while the order runs. The Leader
   does no work of their own meanwhile.
   Only work is faster: not walking, carrying, fetching, training or fighting. It ends when the
-  Player stops it or gives the Leader another order, when the Leader leaves the building, is
-  struck or goes Down, or when the Zeal is used up; whatever Zeal is left stays. The Leader's
-  Doing line says "Rallying the crew", and the building's card shows its owning Player that the
+  Player stops it or gives the Leader another order, when the Leader leaves the building or
+  goes Down, or when the Zeal is used up; whatever Zeal is left stays. It counts as going on
+  until stopped (A Player's order under attack; Daniel, 2026-11-25): a Leader struck while
+  rallying defends themself and takes the rally up again once no blow has landed for the calm
+  time, if still at the building; one given under attack holds until calm. The Leader's Doing line says "Rallying the crew", and the building's card shows its owning Player that the
   crew is rallied.
 - **Leader handover:** the Player makes another resident their Leader while the old one lives,
   so the realm passes to a younger one. The new Leader is an adult of the realm who isn't serving

@@ -1,5 +1,5 @@
-import { RALLY_PACE, ZEAL_CAP_HOURS } from '@csp/balance'
-import { num, zealFillRealHours, zealFullRealMinutes } from './wiki-view.js'
+import { DEFEND_CALM_TICKS, RALLY_PACE, ZEAL_CAP_HOURS } from '@csp/balance'
+import { duration, num, zealFillRealHours, zealFullRealMinutes } from './wiki-view.js'
 
 export function ZealSection() {
   return (
@@ -23,9 +23,11 @@ export function ZealSection() {
         long it lasts. Only work is faster: not walking, carrying, fetching, training or fighting.
       </p>
       <p>
-        It ends when you stop it or give your Leader another order, when they leave the building,
-        are struck or go Down, or when the Zeal is used up. Whatever Zeal is left stays. A blow ends
-        it for good: it doesn't come back after the defence script.
+        It ends when you stop it or give your Leader another order, when they leave the building or
+        go Down, or when the Zeal is used up. Whatever Zeal is left stays. It goes on until stopped:
+        struck, your Leader defends themself and takes the rally up again once no blow has landed
+        for {duration(DEFEND_CALM_TICKS)}, if still at the building. Given under attack, it holds
+        until then (see Under attack).
       </p>
       <p>
         It is given by hand only. No script can rally the crew and it can't be a queue step: the

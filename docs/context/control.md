@@ -134,9 +134,9 @@
   (their defence script runs, or a blow landed within the calm time Defend waits for) isn't
   interrupted by further blows. An order that ends by itself (a walk, a drive to a target, and
   the like) stands until it is done or replaced, however long that takes. What goes on until
-  stopped (a haul route, working, a task, a script, a queue) holds until no blow has landed for
-  the calm time; after that the next blow runs the defence script as usual. What a script or
-  queue requests itself doesn't count as given by the Player.
+  stopped (a haul route, working, rallying the crew, a task, a script, a queue) holds until no
+  blow has landed for the calm time; after that the next blow runs the defence script as usual.
+  What a script or queue requests itself doesn't count as given by the Player.
   **On a carriage under attack (Defend default):** an unarmed driver drives on where they were
   going instead of leaving the carriage, and an armed one fights back and then goes on. An unarmed
   passenger stays aboard while the carriage is being driven; on one standing still (no driver

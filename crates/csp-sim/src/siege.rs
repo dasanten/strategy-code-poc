@@ -434,6 +434,9 @@ pub fn ram_problem(
         Ok(w) => w,
         Err(e) => return Some(e.into()),
     };
+    if let Some(no) = crate::lent::refusal(world, r, &wall.id) {
+        return Some(no.into());
+    }
     let size = csp_shared::balance::MAP_SIZE;
     // Next to any tile of it: a tower is 2×2 (`CONTEXT.md`: Tower).
     if !near_footprint(placed(wall), (m.x as i32, m.y as i32), m.kind.spec().reach as i32, size) {
@@ -519,8 +522,8 @@ const RAM_ACTION: ScriptAction = ScriptAction {
 impl RunningOrder for RamOrder {
     in_place!();
     fn ties(&self) -> Ties<'_> {
-        // Not counted as striking at it (#1620).
-        Ties { falls_with: Some(&self.target_id), ..Ties::NONE }
+        // It strikes the wall's owner, as Attack and Climb do (`CONTEXT.md`: Walls in combat).
+        Ties { strikes: Some(&self.target_id), falls_with: Some(&self.target_id), ..Ties::NONE }
     }
     no_ties_mut!();
 }
@@ -664,6 +667,9 @@ pub fn throw_problem(
         Ok(w) => w,
         Err(e) => return Some(e.into()),
     };
+    if let Some(no) = crate::lent::refusal(world, r, &wall.id) {
+        return Some(no.into());
+    }
     if !near_footprint(placed(wall), (m.x as i32, m.y as i32), CATAPULT_REACH as i32, MAP_SIZE) {
         return Some("that is beyond the catapult’s reach".into());
     }
@@ -757,8 +763,8 @@ const THROW_ACTION: ScriptAction = ScriptAction {
 impl RunningOrder for ThrowOrder {
     in_place!();
     fn ties(&self) -> Ties<'_> {
-        // Not counted as striking at it (#1620).
-        Ties { falls_with: Some(&self.target_id), ..Ties::NONE }
+        // It strikes the wall's owner, as Attack and Climb do (`CONTEXT.md`: Walls in combat).
+        Ties { strikes: Some(&self.target_id), falls_with: Some(&self.target_id), ..Ties::NONE }
     }
     no_ties_mut!();
 }
