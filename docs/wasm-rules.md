@@ -152,6 +152,6 @@ rest of #1634 does not fit until #1637 is decided.
 
 The rules on one building, resident or horse (`materialsNeeded` to `feedProblem`, #1634) take
 the thing whole and read it the way the mirror does (`SeenBuilding`, `SeenResident`, `SeenHorse`
-and `csp_sim::mirror::{resident, horse}`). The module is 538 KB gzipped (1,718 KB raw), from
+and `csp_sim::mirror::{resident, horse}`). The module is 541 KB gzipped (1,727 KB raw) with #1586, from
 495 KB: over the 500 kB limit, which waits on #1637. The mirror's update is not touched (only
 `resident` and `horse` in `mirror.rs` became public), so its time stays as measured in T122.4.
