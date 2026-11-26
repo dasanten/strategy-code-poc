@@ -26,6 +26,8 @@ import type {
   WorldState,
 } from '@csp/shared-types'
 
+export { ALLIANCE_NAME_MAX_LENGTH } from '@csp/shared-types'
+
 /**
  * World queries about alliances (ADR 0002: the game API orders and scripts share). A member is
  * a Player's realm or an NPC city (`CONTEXT.md`: NPC city in an alliance), named by its id.
@@ -86,9 +88,6 @@ export function npcCityWantsOut(
       m.realmId !== cityId && standingOf(world, cityId, m.realmId) < NPC_ALLIANCE_LEAVE_STANDING,
   )
 }
-
-/** The longest an alliance's name may be. */
-export const ALLIANCE_NAME_MAX_LENGTH = 30
 
 /** The alliance whose army holds the resident or carriage `id` (`CONTEXT.md`: Alliance army). */
 export function handedOverTo(

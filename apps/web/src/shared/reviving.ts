@@ -6,6 +6,9 @@ import { canWork } from './stats.js'
 import { isDown } from './world.js'
 import { HORSE_FILL_PER_FOOD, MAX_HUNGER } from '@csp/balance'
 import type { Resident } from '@csp/shared-types'
+import { NO_CHILD_FEEDS, NO_FOOD_TO_FEED, HORSE_FULL } from '@csp/shared-types'
+
+export { NO_CHILD_FEEDS, NO_FOOD_TO_FEED, HORSE_FULL } from '@csp/shared-types'
 
 /**
  * Reviving and Feeding a horse (`CONTEXT.md`), shared by the server and the UI: who can Feed a
@@ -32,15 +35,6 @@ export interface FedHorse {
   y: number
   hunger?: number
 }
-
-/** Why a child can't Feed anyone (`CONTEXT.md`: Reviving: any grown resident). */
-export const NO_CHILD_FEEDS = 'children can’t feed others'
-
-/** Why a resident without Food in their hands can't Feed anyone. */
-export const NO_FOOD_TO_FEED = 'no Food in hand'
-
-/** Why a horse can't be Fed (`CONTEXT.md`: Feeding a horse: any horse that isn't full). */
-export const HORSE_FULL = 'that horse is full'
 
 /** What is wrong with the feeder, undefined when they can Feed someone within their reach. */
 function feederProblem(

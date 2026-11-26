@@ -2,30 +2,21 @@
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
 import type { FirstDay, FirstDayLine } from '@csp/shared-types'
+import { FIRST_DAY_LINES } from '@csp/shared-types'
 
 export { isFirstDayLine, isClientFirstDayLine } from '@csp/lang-wasm'
+
+export {
+  FIRST_DAY_LINES,
+  CLIENT_FIRST_DAY_LINES,
+  FIRST_DAY_PATH,
+  FIRST_DAY_DISMISS_PATH,
+} from '@csp/shared-types'
 
 /**
  * The first-day card (`CONTEXT.md`: First day): a checklist a new realm's HUD shows, kept per
  * Player rather than per realm.
  */
-
-/** The card's lines, in its order. */
-export const FIRST_DAY_LINES = ['claimHorses', 'pickResident', 'giveOrder', 'openWiki'] as const
-
-/**
- * The lines the client reports (`FIRST_DAY_PATH`); the server sees the others itself, as the
- * orders come in, and ignores a report of them.
- */
-export const CLIENT_FIRST_DAY_LINES = [
-  'pickResident',
-  'openWiki',
-] as const satisfies readonly FirstDayLine[]
-
-/** Where the client reports a line done (POST `{ line }`) and dismisses the card (POST). */
-export const FIRST_DAY_PATH = '/api/first-day'
-
-export const FIRST_DAY_DISMISS_PATH = '/api/first-day/dismiss'
 
 /** The card with `line` ticked too, its lines kept in the card's order. */
 export function tickFirstDay(card: FirstDay, line: FirstDayLine): FirstDay {

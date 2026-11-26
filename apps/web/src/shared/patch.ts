@@ -1,11 +1,12 @@
 // Gathering by hand and patches (`CONTEXT.md`: Gathering, Patch), as the server's `gathering.rs`
 // has them: what a tile's patch holds now and when it is full again.
 import { PATCH_REGROW_DAYS, PATCH_REST_DAYS, PATCH_SIZE, TICKS_PER_GAME_DAY } from '@csp/balance'
-import type { Good, SeenPatch } from '@csp/shared-types'
+import type { SeenPatch } from '@csp/shared-types'
 import { Terrain } from './terrain.js'
+import { GATHERED_GOODS } from '@csp/shared-types'
 
-/** The goods gathered by hand, in the order the game offers them. */
-export const GATHERED_GOODS = ['wood', 'food', 'stone'] as const satisfies readonly Good[]
+export { GATHERED_GOODS } from '@csp/shared-types'
+
 export type GatheredGood = (typeof GATHERED_GOODS)[number]
 
 /** The goods a tile of `terrain` gives by hand: Wood and Food in a forest, Stone in hills. */

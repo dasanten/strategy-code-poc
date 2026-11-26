@@ -4,6 +4,18 @@
 import { Terrain as TerrainCodes } from '@csp/balance'
 import type { Terrain as TerrainCode } from '@csp/shared-types'
 import { DIAGONAL_STEP } from '@csp/balance'
+import { CHUNK_SIZE } from '@csp/shared-types'
+
+export {
+  CHUNK_SIZE,
+  UNEXPLORED,
+  TERRAIN_BATCH_PATH,
+  TERRAIN_BATCH_MAX,
+  LAND_PATH,
+  TERRAIN_LEVEL_MAX,
+  OVERVIEW_SCALE,
+  ADMIN_TERRAIN_OVERVIEW_PATH,
+} from '@csp/shared-types'
 
 /**
  * The terrain codes by name, as the game stores them: `Terrain.Plains` is 0. The numbers are
@@ -130,40 +142,10 @@ export function isPassableTerrain(t: number): boolean {
   )
 }
 
-/** Terrain is served to clients in square chunks of this many tiles a side (ADR 0006). */
-export const CHUNK_SIZE = 32
-
-/** The byte for a tile in a served chunk that the Player hasn't explored. */
-export const UNEXPLORED = 254
-
 /** How many chunks fit across the map. Chunk `i` is at `(i % n, ⌊i / n⌋)`. */
 export function chunksAcross(size: number): number {
   return Math.ceil(size / CHUNK_SIZE)
 }
-
-/**
- * Where the client loads many chunks of explored terrain in one request: a `POST` whose JSON body
- * is `{ chunks: number[] }`, chunk indices as in `chunksAcross`, at most `TERRAIN_BATCH_MAX` of
- * them. The answer is `encodeChunkBatch`: the explored ones among them, unexplored ones left out.
- */
-export const TERRAIN_BATCH_PATH = '/api/terrain/chunks'
-
-/** The most chunks one `TERRAIN_BATCH_PATH` request may ask for. */
-export const TERRAIN_BATCH_MAX = 64
-
-/**
- * Where the client loads the land the Player knows (`PlayerLand`): a `POST` whose JSON body is
- * `{ chunks?: number[] }`, the chunks to send, or every chunk they explored part of without it.
- */
-export const LAND_PATH = '/api/land'
-
-/**
- * The coarsest level explored terrain is served at (ADR 0034). At level `k` one byte stands for a
- * square of `2^k × 2^k` tiles, the most common terrain the Player explored in it, and a chunk is
- * `CHUNK_SIZE × CHUNK_SIZE` squares; level 0 is one byte a tile. A `TERRAIN_BATCH_PATH` request
- * names its level as `level`, 0 if none.
- */
-export const TERRAIN_LEVEL_MAX = 5
 
 /**
  * How many chunks of `level` fit across a map `across` level-0 chunks wide. Chunk `i` of a level
@@ -186,12 +168,3 @@ export function coarseChunkOf(i: number, across: number, level: number): number 
 export function adminTerrainChunkPath(cx: number, cy: number): string {
   return `/api/admin/terrain/${cx}/${cy}`
 }
-
-/** Tiles a side that one byte of the admin terrain overview stands for. */
-export const OVERVIEW_SCALE = 8
-
-/**
- * Where an admin loads the whole map's terrain for the far zoom: `overviewAcross(size)`² bytes,
- * row-major, each the most common terrain of its `OVERVIEW_SCALE`² tiles.
- */
-export const ADMIN_TERRAIN_OVERVIEW_PATH = '/api/admin/terrain/overview'

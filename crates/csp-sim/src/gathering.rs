@@ -54,6 +54,10 @@ pub fn gathered_on(good: Good) -> Option<(Terrain, SkillName)> {
     }
 }
 
+/// The goods gathered by hand, in the order the game offers them (`GATHERED_GOODS`): those
+/// `gathered_on` names.
+pub const GATHERED_GOODS: [Good; 3] = [Good::Wood, Good::Food, Good::Stone];
+
 /// Whether a tile of this terrain has a patch at all: Forest and Hills.
 pub fn has_patch(terrain: u8) -> bool {
     terrain == Terrain::Forest as u8 || terrain == Terrain::Hills as u8

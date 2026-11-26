@@ -4,14 +4,11 @@
 import { organizationLabel } from './standing.js'
 import { TICKS_PER_GAME_DAY } from '@csp/balance'
 import type { ContractView, MercenaryContract, RealmLabel, WorldState } from '@csp/shared-types'
+import { GAME_DAYS_PER_WEEK, TICKS_PER_GAME_WEEK } from '@csp/shared-types'
 
 /** World queries about mercenary contracts (ADR 0002: the game API orders and scripts share). */
 
-/** Game days in a game week, the period a mercenary contract is paid for (`CONTEXT.md`). */
-export const GAME_DAYS_PER_WEEK = 7
-
-/** Ticks in one game week. */
-export const TICKS_PER_GAME_WEEK = GAME_DAYS_PER_WEEK * TICKS_PER_GAME_DAY
+export { GAME_DAYS_PER_WEEK, TICKS_PER_GAME_WEEK } from '@csp/shared-types'
 
 /** Game weeks the contract runs, the last one maybe short; each is paid in full. */
 export function contractWeeks(c: Pick<MercenaryContract, 'days'>): number {
