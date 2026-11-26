@@ -10,21 +10,11 @@ import { isDown } from './world.js'
 import {
   CARAVAN_ESCORTS,
   CARAVAN_ESCORTS_MAX,
-  CARAVAN_FOOD,
-  CARAVAN_FOOD_PER_ESCORT,
   CARAVAN_GUARD_RANGE,
   CARAVAN_ROBBERIES_PER_ESCORT,
-  CARRIAGE_HALF_LOAD,
-  CARRIAGE_LIGHT_LOAD,
-  FOOD_PER_DAY,
-  HORSE_FOOD_PER_DAY,
   MAP_SIZE,
   PASSENGER_WEIGHT,
-  TICKS_PER_GAME_DAY,
   TRADER_ESCORTS,
-  TRADER_STOP_TICKS,
-  WALK_TICKS_PER_TILE,
-  WAY_FOOD_MARGIN,
   carriageCapacityWith,
 } from '@csp/balance'
 import type {
@@ -35,7 +25,6 @@ import type {
   Good,
   GoodsSpot,
   Horse,
-  LoadLevel,
   Resident,
   Stock,
   Trader,
@@ -43,6 +32,8 @@ import type {
   SupplyWagon,
   WorldState,
 } from '@csp/shared-types'
+
+export { loadLevel, caravanFoodFor, foodForWay } from '@csp/lang-wasm'
 
 /** World queries about carriages (ADR 0002: the game API orders and scripts share). */
 
@@ -93,27 +84,6 @@ export function traderEscortsWanted(trader: Pick<Trader, 'robberies'>): number {
 function escortsAfter(escorts: number, robberies: number): number {
   const extra = Math.floor(robberies / CARAVAN_ROBBERIES_PER_ESCORT)
   return Math.min(CARAVAN_ESCORTS_MAX, escorts + extra)
-}
-
-/**
- * The Food a caravan keeps on board for a crew with `escorts` escorts (`CONTEXT.md`: Caravan):
- * `CARAVAN_FOOD`, and `CARAVAN_FOOD_PER_ESCORT` more for each escort beyond `CARAVAN_ESCORTS`.
- */
-export function caravanFoodFor(escorts: number): number {
-  return CARAVAN_FOOD + CARAVAN_FOOD_PER_ESCORT * Math.max(0, escorts - CARAVAN_ESCORTS)
-}
-
-/**
- * The Food a caravan or wandering trader with `escorts` escorts holds before it leaves the HQ
- * (`CONTEXT.md`: Waiting for Food): what its crew and horse eat on a way of `tiles` at walking pace,
- * the escort setting it, with `WAY_FOOD_MARGIN`, and on `stops` stops of `TRADER_STOP_TICKS`. Never
- * more than it keeps on board (`caravanFoodFor`), so a long way can't keep it waiting for more than
- * it would ever take.
- */
-export function foodForWay(escorts: number, tiles: number, stops = 0): number {
-  const ticks = tiles * WALK_TICKS_PER_TILE * WAY_FOOD_MARGIN + stops * TRADER_STOP_TICKS
-  const perDay = (1 + escorts) * FOOD_PER_DAY + HORSE_FOOD_PER_DAY
-  return Math.min(caravanFoodFor(escorts), Math.ceil((ticks / TICKS_PER_GAME_DAY) * perDay))
 }
 
 /** The carriages standing on a tile. */
@@ -612,13 +582,4 @@ export function seatsLeft(
   const room =
     carriageCapacity(world, carriage) - stockWeight(carriage.load) - passengers * PASSENGER_WEIGHT
   return Math.max(0, Math.floor(room / PASSENGER_WEIGHT + 1e-9))
-}
-
-/** How heavily a load looks, by its weight against what its carriage holds (`carriageCapacity`). */
-export function loadLevel(load: Stock, capacity: number): LoadLevel {
-  const share = stockWeight(load) / capacity
-  if (share <= 0) return 'empty'
-  if (share <= CARRIAGE_LIGHT_LOAD) return 'light'
-  if (share <= CARRIAGE_HALF_LOAD) return 'half'
-  return share < 1 - 1e-9 ? 'heavy' : 'full'
 }

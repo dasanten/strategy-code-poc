@@ -1,8 +1,9 @@
-//! The rules module's first slice (T122.1): a rule without a world, and the throwaway mirror of
-//! what the client sees, read by a world-reading rule. `apps/web/src/wasm-rules.test.ts` checks the
-//! same against the client's TypeScript copy, through the WebAssembly build.
+//! The rules module: the rules that take only values (T122.5), called by name, and the throwaway
+//! mirror of what the client sees, read by a world-reading rule (T122.1).
+//! `apps/web/src/wasm-rules.test.ts` checks the same through the WebAssembly build.
 
-use csp_lang_wasm::rules::{building_work, WorldMirror};
+use csp_lang_wasm::rules::WorldMirror;
+use csp_lang_wasm::value_rules::rule;
 use csp_shared::terrain::Terrain;
 use serde_json::json;
 
@@ -17,11 +18,21 @@ fn welcome(entities: Vec<serde_json::Value>) -> String {
 #[test]
 fn a_rule_without_a_world_answers_the_sims_own() {
     use csp_shared::world::BuildingKind;
-    let on = Some(Terrain::Mountain as u8);
+    let mountain = Terrain::Mountain as u8;
+    let on = Some(mountain);
     let sim = csp_sim::queries::building::building_work;
-    assert_eq!(building_work("road", on), sim(BuildingKind::Road, on));
-    assert_eq!(building_work("farm", None), sim(BuildingKind::Farm, None));
-    assert!(building_work("castle", None).is_nan());
+    let work = |args: &str| rule("buildingWork", args).unwrap().parse::<f64>().unwrap();
+    assert_eq!(work(&format!(r#"["road", {}, null]"#, mountain)), sim(BuildingKind::Road, on));
+    assert_eq!(work(r#"["farm", null, null]"#), sim(BuildingKind::Farm, None));
+}
+
+#[test]
+fn a_rule_it_does_not_know_or_arguments_it_cannot_read_are_errors() {
+    assert_eq!(rule("castleWork", "[]").unwrap_err(), "no rule castleWork");
+    assert!(rule("buildingWork", r#"["castle", null, null]"#)
+        .unwrap_err()
+        .starts_with("buildingWork: "));
+    assert!(rule("buildingWork", r#"["farm"]"#).is_err());
 }
 
 #[test]

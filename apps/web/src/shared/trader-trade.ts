@@ -6,7 +6,7 @@ import { caravanFoodFor, carriageCapacity } from './carriages.js'
 import { WAREHOUSE_FLOOR } from './narrowed.js'
 import { tradeOrgRefuses } from './standing.js'
 import { canWork, stockWeight } from './stats.js'
-import { PRICED_GOODS, priceFor, quoteAtPrices, type Price } from './warehouse.js'
+import { PRICED_GOODS, quoteAtPrices } from './warehouse.js'
 import { TRADER_FLOOR_SHARE } from '@csp/balance'
 import type {
   Carriage,
@@ -22,6 +22,9 @@ import type {
   TraderPrice,
   WorldState,
 } from '@csp/shared-types'
+import { traderPriceFor } from '@csp/lang-wasm'
+
+export { traderPriceFor } from '@csp/lang-wasm'
 
 /*
  * Trading with a wandering trader at a stop (`CONTEXT.md`: Trader stop). Queries here are the game
@@ -71,14 +74,6 @@ export function traderStock(t: Pick<Trader, 'escortIds'>, load: Stock): Stock {
 
 /** What a wandering trader prices a good from: a share of a warehouse's floor. */
 const traderFloor = (good: PricedGood) => WAREHOUSE_FLOOR[good] * TRADER_FLOOR_SHARE
-
-/**
- * A wandering trader's price for one unit of a good with `stock` of it to trade (`CONTEXT.md`:
- * Trader stop): as a warehouse's (`priceFor`), buying lower than it sells.
- */
-export function traderPriceFor(good: PricedGood, stock: number): Price {
-  return priceFor(good, stock, traderFloor(good))
-}
 
 /** A wandering trader's prices for every good but coins, from what it has to trade. */
 export function traderPrices(t: Pick<Trader, 'escortIds'>, carriage: Carriage): TraderPrice[] {

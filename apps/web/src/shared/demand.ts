@@ -3,17 +3,14 @@
 
 import { isAllianceCity, sharingSight } from './alliance.js'
 import { forSale } from './city.js'
-import { GOOD_WEIGHT } from './narrowed.js'
 import { freeStock, offerStorage } from './offers.js'
 import { cityStrength, respectSeenBy } from './persuasion.js'
 import { organizationLabel } from './standing.js'
 import { NO_CARAVANS, TRADE_ORG, tradeOrgHq } from './trade-org.js'
-import { pickUpTransferProblem, transferFee, transferLoad, transferWarehouses } from './transfer.js'
+import { pickUpTransferProblem, transferWarehouses } from './transfer.js'
 import { deliveryStorage } from './warehouse.js'
-import { GOODS } from './world.js'
 import {
   DEMANDS_PER_GAME_DAY,
-  DEMAND_NOTE_MAX_LENGTH,
   DEMAND_YIELD_RESPECT_MIN,
   DEMAND_YIELD_RESPECT_TIMES,
   OUTWEIGH_HOLD_DAYS,
@@ -30,26 +27,11 @@ import type {
   Realm,
   WorldState,
 } from '@csp/shared-types'
+import { goodsToHandOver } from '@csp/lang-wasm'
+
+export { transferLoads, transferLoadsFee, goodsToHandOver, demandNoteProblem } from '@csp/lang-wasm'
 
 /** World queries about demands (`CONTEXT.md`: Demand; ADR 0002: the API orders and scripts share). */
-
-/** Control characters but tab and line breaks: they mean nothing in a note and can garble a page. */
-// eslint-disable-next-line no-control-regex
-const CONTROL_CHARACTERS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/
-
-/**
- * What is wrong with a demand's note, if anything: it must be text, trimmed not empty, at most
- * `DEMAND_NOTE_MAX_LENGTH` characters and free of control characters. It is kept and shown as
- * plain text, so markup in it is only ever read as the words it is.
- */
-export function demandNoteProblem(note: unknown): string | undefined {
-  if (typeof note !== 'string' || note.trim() === '') return 'a demand needs a note'
-  if (note.trim().length > DEMAND_NOTE_MAX_LENGTH) {
-    return `a note is at most ${DEMAND_NOTE_MAX_LENGTH} characters`
-  }
-  if (CONTROL_CHARACTERS.test(note)) return 'a note can’t hold control characters'
-  return undefined
-}
 
 /** When the realm sent the demands that still count against `DEMANDS_PER_GAME_DAY`. */
 export function demandsCounted(realm: Pick<Realm, 'demandsSentAt'>, tick: number): number[] {
@@ -161,39 +143,6 @@ export function demandYieldNeeded(
   city: City,
 ): number {
   return Math.max(DEMAND_YIELD_RESPECT_MIN, DEMAND_YIELD_RESPECT_TIMES * cityStrength(world, city))
-}
-
-/**
- * What goes of the goods demanded from a storage holding `free` that isn't set aside already: as
- * many whole units of each as it holds, up to what was demanded (`CONTEXT.md`: Demand).
- */
-export function goodsToHandOver(goods: Partial<Record<Good, number>>, free: Stock): Stock {
-  const going: Stock = {}
-  for (const good of GOODS) {
-    const units = Math.min(goods[good] ?? 0, Math.floor(free[good] ?? 0))
-    if (units > 0) going[good] = units
-  }
-  return going
-}
-
-/** Goods sent by Transfer, as the Transfers they take: each good by itself, one load at a time. */
-export function transferLoads(goods: Stock): { good: Good; units: number }[] {
-  const loads: { good: Good; units: number }[] = []
-  for (const good of GOODS) {
-    const load = transferLoad(good)
-    for (let left = goods[good] ?? 0; left > 0; left -= load) {
-      loads.push({ good, units: Math.min(left, load) })
-    }
-  }
-  return loads
-}
-
-/** What the Transfers for these goods cost together, each over a whole way of `tiles`. */
-export function transferLoadsFee(goods: Stock, tiles: number): number {
-  return transferLoads(goods).reduce(
-    (fee, { good, units }) => fee + transferFee(units * GOOD_WEIGHT[good], tiles),
-    0,
-  )
 }
 
 /** The storage goods demanded would go from, for a hand-over named as an order takes it. */

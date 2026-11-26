@@ -32,6 +32,9 @@ import type {
   Offer,
   WorldState,
 } from '@csp/shared-types'
+import { carriedUnloadShares } from '@csp/lang-wasm'
+
+export { carriedUnloadShares } from '@csp/lang-wasm'
 
 /*
  * Direct offers (`CONTEXT.md`: Direct offer): in person, an offer at a storage of the sender's that
@@ -88,15 +91,6 @@ export type CarriedRequest = {
   fromCityId: unknown
   toCityId: unknown
   feeBy: unknown
-}
-
-/**
- * The part of the fee each of a carried Direct offer's two Transfers takes where it unloads
- * (`CONTEXT.md`: Direct offer). Paid by the sender, theirs all at its pick-up and the other side's
- * all on unloading at the sender's city; split, half of each at either end.
- */
-export function carriedUnloadShares(feeBy: CarriedFeeBy): { sender: number; other: number } {
-  return feeBy === 'sender' ? { sender: 0, other: 1 } : { sender: 0.5, other: 0.5 }
 }
 
 /** The way between two cities, undefined when a storage or warehouse is missing. */

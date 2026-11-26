@@ -14,15 +14,16 @@ import {
   HORSE_PRICE_AGE_FLOOR,
   HORSE_PRICE_AGE_PER_YEAR,
   HORSE_PRICE_BASE,
-  HORSE_PRICE_GLUT,
   HORSE_PRICE_PAID_SHARE,
   HORSE_PRICE_PER_STAT,
-  HORSE_PRICE_SCARCITY,
   HORSE_PRICE_STATS_FLOOR,
   HORSE_STAT_AVERAGE,
   NPC_HORSES_KEPT,
 } from '@csp/balance'
 import type { Building, City, Horse, NpcHorseOffer, Resident, WorldState } from '@csp/shared-types'
+import { horseStockFactor } from '@csp/lang-wasm'
+
+export { horseStockFactor } from '@csp/lang-wasm'
 
 /**
  * What a horse is worth for its stats and age (`CONTEXT.md`: Horse market), as a share of
@@ -41,16 +42,6 @@ export function horseWorth(horse: Pick<Horse, 'stats' | 'bornAt'>, tick: number)
     1 - HORSE_PRICE_AGE_PER_YEAR * horseAgeInYears(horse, tick),
   )
   return stats * age
-}
-
-/**
- * How an NPC city's stock of horses moves its price (`CONTEXT.md`: Horse market), as a share: 1 with
- * as many as it wants, up to `HORSE_PRICE_SCARCITY` more as it nears the pair it keeps
- * (`NPC_HORSES_KEPT`), and down to `HORSE_PRICE_GLUT` less with more than it wants.
- */
-export function horseStockFactor(has: number, wanted: number): number {
-  const short = (wanted - has) / Math.max(1, wanted - NPC_HORSES_KEPT)
-  return 1 + HORSE_PRICE_SCARCITY * Math.max(-HORSE_PRICE_GLUT, Math.min(1, short))
 }
 
 /** The horses an NPC city has, wherever they stand. */
