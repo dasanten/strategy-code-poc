@@ -8,11 +8,9 @@ import {
   type ReactNode,
 } from 'react'
 import {
-  BUILDABLE,
   holdersOf,
   isSiegeSite,
   KEEPS_GOODS,
-  MAX_WORKERS,
   SHARES_A_TILE,
   takesWorkSettings,
   roadTiles,
@@ -48,7 +46,12 @@ import type {
   SeenResident,
   WallMaterial,
 } from '@csp/shared-types'
-import { carriagePulledBy, carriageOfResident, drivenCarriageId, seatsLeft } from './transport/carriages.js'
+import {
+  carriagePulledBy,
+  carriageOfResident,
+  drivenCarriageId,
+  seatsLeft,
+} from './transport/carriages.js'
 import { horseOfResident, riderOf } from './transport/horse-rules.js'
 import { horsesInNeed } from './transport/reviving.js'
 import { isDown } from './world/world.js'
@@ -82,11 +85,17 @@ import {
 import { cityIdsAtTile, targetParam } from '@csp/lang-wasm'
 import { isAt, covers } from './building/footprint.js'
 import { HORSE_GRANT_HORSES, PASSENGER_WEIGHT } from '@csp/balance'
-import { besideVessel, crewShort, isVesselId, vesselOfResident, vesselRoom } from './transport/vessels.js'
+import {
+  besideVessel,
+  crewShort,
+  isVesselId,
+  vesselOfResident,
+  vesselRoom,
+} from './transport/vessels.js'
 import { AdminPage } from './admin/AdminPanel.js'
 import { AlliancePanel } from './diplomacy/Alliance.js'
 import { commandsSeen } from './army/alliance-army.js'
-import { ArmiesPanel, ArmyCard, type ArmyPick } from './army/Armies.js'
+import { ArmiesPanel, ArmyCard } from './army/Armies.js'
 import { ContractsPanel } from './diplomacy/Contracts.js'
 import { demandNoticeLine, demandSides } from './diplomacy/demand-view.js'
 import { DemandsPanel } from './diplomacy/Demands.js'
@@ -144,7 +153,12 @@ import { SideTab, Sidebar, useSidebar } from './screen/Sidebar.js'
 import type { Covered } from './map/camera.js'
 import { cardHidden, laneNotices, visitKey } from './screen/notices-view.js'
 import { ResidentsFullList } from './residents/ResidentsFullList.js'
-import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents/residents-view.js'
+import {
+  groupResidents,
+  rememberedTab,
+  rememberTab,
+  type CardSections,
+} from './residents/residents-view.js'
 import { groupHorses } from './transport/horses-view.js'
 import { HorsesList } from './transport/Horses.js'
 import { Founding, RealmEnded } from './realm/Founding.js'
@@ -169,7 +183,6 @@ import {
   planHorses,
   nextPick,
   pickCity,
-  pickInto,
   planAsk,
   planCities,
   planOrder,
@@ -184,12 +197,15 @@ import {
   groupRequests,
   type GroupOrder,
   type GroupSeen,
-  type Place,
   type Skipped,
 } from './residents/group-orders.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { BuildingOrders } from './building/BuildingOrders.js'
-import { buildingOrderRows, realmRequests, type BuildingGroupOrder } from './building/building-orders.js'
+import {
+  buildingOrderRows,
+  realmRequests,
+  type BuildingGroupOrder,
+} from './building/building-orders.js'
 import { VehicleOrders } from './transport/VehicleOrders.js'
 import {
   NO_STAND,
@@ -222,16 +238,12 @@ import {
   GOOD_LABELS,
   GroupCard,
   ResidentCard,
-  type GroupPicking,
-  type GroupPickWith,
   ResidentsList,
   type HaulSetup,
-  type Picking,
 } from './residents/Residents.js'
 import { arrivalOf, doingLine } from './residents/doing-view.js'
 import {
   CardSheet,
-  PickBanner,
   SelectionCard,
   TileCard,
   closeOpenPanel,
@@ -268,13 +280,12 @@ import {
   pickHint,
   picksWallLine,
   pickPrompt,
-  pickTap,
-  pickTarget,
   useMediaQuery,
   useTouchScreen,
   type RealmVehiclePick,
 } from './pick/pick-mode.js'
-import { pickPreview, previewPickOf, type PreviewWorld } from './pick/pick-preview.js'
+import { PickBanner } from './pick/PickBanner.js'
+import { usePick } from './pick/usePick.js'
 import { PHONE_QUERY } from './screen/sheet-view.js'
 import { buildingNodeKind } from './building/building-info-view.js'
 import {
@@ -314,7 +325,12 @@ import {
   type StartValues,
 } from './script/start-params.js'
 import { CustomiseContext } from './script/Customise.js'
-import { paramOnTile, paramPickAt, paramValueLabel, type ParamWorld } from './script/script-params-view.js'
+import {
+  paramOnTile,
+  paramPickAt,
+  paramValueLabel,
+  type ParamWorld,
+} from './script/script-params-view.js'
 import { faresKnown, loadKnown } from './residents/seen.js'
 import { useWorld } from './world/useWorld.js'
 import { useLand } from './world/useLand.js'
@@ -487,24 +503,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [cardSections, setCardSections] = useState<CardSections<ActionId>>(() => ({
     tab: rememberedTab(),
   }))
-  const [picking, setPicking] = useState<Picking>(false)
-  /** The siege machine the picked resident pushes once a tile is picked (`CONTEXT.md`: Siege machine). */
-  const [pushing, setPushing] = useState<string | undefined>()
-  const [haulSetup, setHaulSetup] = useState<HaulSetup>()
   const [orderError, setOrderError] = useState<string | undefined>()
-  const [armyPick, setArmyPick] = useState<ArmyPick>()
   const [armyError, setArmyError] = useState<string | undefined>()
   // The army whose card is in the command bar, opened from the Armies tab (`CONTEXT.md`: Army).
   const [openArmyId, setOpenArmyId] = useState<string>()
-  // The param of the picked resident's script whose value the map is waiting for (`CONTEXT.md`:
-  // Script parameter).
-  const [paramPick, setParamPick] = useState<ScriptParam>()
-  // The param of a workplace's Work settings whose value the map is waiting for (`CONTEXT.md`:
-  // Workplace settings).
-  const [workPick, setWorkPick] = useState<{ buildingId: string; param: ScriptParam }>()
-  // The step being planned with the queue planner's Add step (`CONTEXT.md`: Queue, Planning
-  // ahead): the map picks its places, then the card asks for what more it needs.
-  const [plan, setPlan] = useState<Plan>()
   // Whether the Add step palette is open; kept here so it stays open as a draft appears.
   const [paletteOpen, setPaletteOpen] = useState(false)
   // The planner's insert point, by whose planner it is (a resident's id, or the group's), kept
@@ -529,11 +531,6 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return next
     })
   const [starting, setStarting] = useState<Starting>()
-  // The param whose value the map is waiting for: of the running script, for the form, or of a
-  // workplace's Work settings.
-  const pickingParam = paramPick ?? starting?.picking ?? workPick?.param
-  // A group order waiting for a tile, the tile picked to build on, and what the last one did.
-  const [groupPicking, setGroupPicking] = useState<GroupPicking>(false)
   /**
    * Customise was tapped (`CONTEXT.md`: Before it starts): the next order opens the form. It waits
    * through what the order picks on the map first, and goes when that is cancelled.
@@ -570,21 +567,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               : realmOrder.step === 'walkTo' || realmOrder.step === 'relocate'
                 ? realmOrder.step
                 : undefined
-  const orderPicked =
-    picking !== false || groupPicking !== false || plan !== undefined || realmOrder !== undefined
-  useEffect(() => {
-    if (!orderPicked) customising.current = false
-  }, [orderPicked])
-  // What the group order being picked needs besides the tile, and a line's first end.
-  const [groupPickWith, setGroupPickWith] = useState<GroupPickWith>({})
-  const [groupLineFrom, setGroupLineFrom] = useState<{ x: number; y: number }>()
-  // The start picked for the picked resident's Build line, while they pick its end.
-  const [lineFrom, setLineFrom] = useState<{ x: number; y: number }>()
-  /** What a wall line is built of, picked on the banner while its ends are picked (`CONTEXT.md`: Wood or stone). */
-  const [wallMaterial, setWallMaterial] = useState<WallMaterial>('wood')
-  // Where a pick is previewed: the tile under the pointer, or the one tapped on a touch screen.
-  const [pickAt, setPickAt] = useState<{ x: number; y: number; tapped?: boolean }>()
-  const [groupBuildAt, setGroupBuildAt] = useState<{ x: number; y: number }>()
+  // What the last group order did.
   const [groupReport, setGroupReport] = useState<{ sent: number; of: number; skipped: Skipped[] }>()
   const [groupError, setGroupError] = useState<string>()
   // The residents the Player gives orders to: their own, less those handed over to their alliance's
@@ -606,6 +589,102 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     : []
   const group = selectedIds.flatMap((id) => own.filter((r) => r.id === id))
   const selected = group.length === 1 ? group[0] : undefined
+  // Picking on the map (`usePick`): what waits for a tile, its preview, what a pick then does.
+  const picker = usePick({
+    world,
+    group,
+    own,
+    formPick: starting?.picking,
+    realm:
+      realmOrder && realmPicking
+        ? {
+            ...(realmOrder.step === 'where'
+              ? {
+                  target: {
+                    building: realmOrder.building,
+                    ...(realmOrder.error ? { error: realmOrder.error } : {}),
+                  },
+                }
+              : realmOrder.step === 'walkTo'
+                ? { target: {} }
+                : realmOrder.step === 'vehiclePick'
+                  ? { target: { vehicle: realmOrder.pick } }
+                  : realmOrder.step === 'line'
+                    ? {
+                        line: {
+                          building: realmOrder.building,
+                          ...(realmOrder.from ? { from: realmOrder.from } : {}),
+                          ...(realmOrder.error ? { error: realmOrder.error } : {}),
+                        },
+                      }
+                    : {}),
+            onTile: (x, y) => {
+              if (realmOrder.step === 'where') return realmTile(x, y, realmOrder)
+              if (realmOrder.step === 'walkTo') return realmWalkTo(x, y)
+              if (realmOrder.step === 'line') return realmLineTile(x, y, realmOrder)
+              if (realmOrder.step === 'vehiclePick') return realmVehicleTile(x, y, realmOrder)
+            },
+          }
+        : undefined,
+    actions: {
+      giveOrder: (order, queued) => giveOrder(order, queued),
+      sendOrder,
+      sendGroup: (order) => sendGroup(order),
+      creativeMove,
+      setScriptParam,
+      setWorkSettings: (buildingId, params) => setWorkSettings(buildingId, params),
+      addPlanned: (planned) => addPlanned(planned),
+      formTile: (x, y) => {
+        // A value for the form before a script starts, which shows again.
+        const param = starting?.picking
+        if (!starting || !param || !world) return
+        const got = paramPickAt(paramWorld(world), param.type, { x, y })
+        setStarting({
+          ...starting,
+          picking: undefined,
+          ...(typeof got === 'string'
+            ? { error: got }
+            : { error: undefined, values: { ...starting.values, [param.name]: got.id } }),
+        })
+      },
+      paramSeen: paramWorld,
+      planSeen: (w) => planWorld(w, terrainAt),
+      here: () => ({
+        ownCarriage: ownCarriageHere,
+        boatToRow,
+        boatToSteal,
+        stealable: stealableHere,
+        unhorsed: unhorsedHere,
+        horseToHitch,
+      }),
+      tileMenu: (x, y, at) => {
+        setSelectedTile(undefined)
+        setTileMenu({ x, y, at })
+      },
+      cancelled: () => {
+        setStarting((s) => s && { ...s, picking: undefined })
+        // A realm order picking its place goes back to the realm bar.
+        setRealmOrder((o) =>
+          o?.step === 'where' ||
+          o?.step === 'walkTo' ||
+          o?.step === 'line' ||
+          o?.step === 'vehiclePick'
+            ? undefined
+            : o,
+        )
+      },
+      orderError: setOrderError,
+      armyError: setArmyError,
+      groupError: setGroupError,
+      groupReportCleared: () => setGroupReport(undefined),
+    },
+  })
+  const pick = picker.target
+  const plan = picker.plan.plan
+  const orderPicked = picker.ordering || realmOrder !== undefined
+  useEffect(() => {
+    if (!orderPicked) customising.current = false
+  }, [orderPicked])
   // The realm's carriages someone of the group stands on, to board with the seats left on each
   // (`CONTEXT.md`: Passenger).
   const groupCarriages = world
@@ -832,33 +911,6 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const touch = useTouchScreen()
   // Narrow or touch: cards are bottom sheets and the HUD folds into a menu button (ADR 0012).
   const phone = useMediaQuery(PHONE_QUERY)
-  const pick = pickTarget({
-    picking,
-    groupPicking,
-    isGroup: group.length > 1,
-    armyPick,
-    paramPick: pickingParam,
-    plan,
-    realm:
-      realmOrder?.step === 'where'
-        ? {
-            building: realmOrder.building,
-            ...(realmOrder.error ? { error: realmOrder.error } : {}),
-          }
-        : realmOrder?.step === 'walkTo'
-          ? {}
-          : realmOrder?.step === 'vehiclePick'
-            ? { vehicle: realmOrder.pick }
-            : undefined,
-    realmLine:
-      realmOrder?.step === 'line'
-        ? {
-            building: realmOrder.building,
-            ...(realmOrder.from ? { from: realmOrder.from } : {}),
-            ...(realmOrder.error ? { error: realmOrder.error } : {}),
-          }
-        : undefined,
-  })
   // The building the tile card is about: in sight, or as last seen.
   const tileBuilding =
     world && selectedTile
@@ -868,48 +920,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       : undefined
   // A step picking a city keeps the card open: it lists the realm's cities to pick from too.
   const picksCity = plan !== undefined && nextPick(plan)?.pick === 'city'
-  // A new pick (or none) previews nothing until the pointer or a tap shows where.
-  const pickKey = pick ? pickPrompt(pick, false) : ''
-  useEffect(() => setPickAt(undefined), [pickKey])
-  /**
-   * A tile clicked or tapped while picking (`pickTap`): a click picks it; a tap on a touch screen
-   * previews it first, and a second tap there or Confirm picks it. A right-click or long-press
-   * (`pressed`) with nothing picked and nobody to send opens the tile menu there instead.
-   */
-  const pickTile = (
-    x: number,
-    y: number,
-    tap?: { touch: boolean },
-    pressed?: { x: number; y: number },
-  ) => {
-    if (pressed && world && !pick && !starting?.picking && !selected && group.length <= 1) {
-      const size = world.map.size
-      setSelectedTile(undefined)
-      return setTileMenu({ x: wrap(x, size), y: wrap(y, size), at: pressed })
-    }
-    if (tap && pick) {
-      const next = pickTap(pickAt?.tapped ? pickAt : undefined, { x, y }, tap.touch)
-      if ('preview' in next) return setPickAt({ ...next.preview, tapped: true })
-    }
-    setPickAt(undefined)
-    void goTo(x, y)
-  }
   /** Leaves pick mode without giving the order; the card comes back as it was. */
-  const cancelPick = useCallback(() => {
-    setPicking(false)
-    setGroupPicking(false)
-    setArmyPick(undefined)
-    setParamPick(undefined)
-    setWorkPick(undefined)
-    setPlan(undefined)
-    setStarting((s) => s && { ...s, picking: undefined })
-    // A realm order picking its place goes back to the realm bar.
-    setRealmOrder((o) =>
-      o?.step === 'where' || o?.step === 'walkTo' || o?.step === 'line' || o?.step === 'vehiclePick'
-        ? undefined
-        : o,
-    )
-  }, [])
+  const cancelPick = picker.cancel
   /**
    * Switches the control mode (the HUD switch, Tab). Into realm control mode it drops a picked
    * resident, group or army, which are commanded in unit control mode only.
@@ -948,7 +960,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // Picking a resident, a group or an army some other way than a map click (the Residents list,
   // a saved group's key, the Armies tab, a notice) switches to unit control mode.
   const openArmy = world?.armies.find((a) => a.id === openArmyId)
-  const pickedArmy = armyPick !== undefined || openArmy !== undefined
+  const pickedArmy = picker.army.pick !== undefined || openArmy !== undefined
   // One card in the command bar at a time: a resident or group picked closes the army's.
   useEffect(() => {
     if (selectedIds.length > 0) setOpenArmyId(undefined)
@@ -994,7 +1006,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       }
       if (step === 'tile') return setSelectedTile(undefined)
       setSelectedIds([])
-      setPicking(false)
+      picker.resident.stop()
       setRealmOrder(undefined)
       setOpenArmyId(undefined)
     }
@@ -1034,16 +1046,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const select = (ids: string[]) => {
     setSelectedIds(ids)
     setSelectedTile(undefined)
-    setPicking(false)
-    setArmyPick(undefined)
-    setParamPick(undefined)
-    setWorkPick(undefined)
-    setPlan(undefined)
+    picker.dropAll()
     setGroupPlan(undefined)
     setStarting(undefined)
     setOrderError(undefined)
-    setGroupPicking(false)
-    setGroupBuildAt(undefined)
     setGroupReport(undefined)
     setGroupError(undefined)
   }
@@ -1129,154 +1135,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
 
   /**
-   * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
-   * carriage on their tile there, or, while picking a haul route's other stop, to haul between
-   * their tile and that one, or, while picking a road's or wall's two ends, to build it along the
-   * line between them with the Build line task (ADR 0002: the server checks it).
-   */
-  async function goTo(x: number, y: number) {
-    const mode = picking
-    setPicking(false)
-    if (realmOrder?.step === 'where') return realmTile(x, y, realmOrder)
-    if (realmOrder?.step === 'walkTo') return realmWalkTo(x, y)
-    if (realmOrder?.step === 'line') return realmLineTile(x, y, realmOrder)
-    if (realmOrder?.step === 'vehiclePick') return realmVehicleTile(x, y, realmOrder)
-    if (starting?.picking) {
-      // A value for the form before a script starts, which shows again.
-      const param = starting.picking
-      if (!world) return
-      const got = paramPickAt(paramWorld(world), param.type, { x, y })
-      setStarting({
-        ...starting,
-        picking: undefined,
-        ...(typeof got === 'string'
-          ? { error: got }
-          : { error: undefined, values: { ...starting.values, [param.name]: got.id } }),
-      })
-      return
-    }
-    if (paramPick) {
-      setParamPick(undefined)
-      if (!world) return
-      const picked = paramPickAt(paramWorld(world), paramPick.type, { x, y })
-      if (typeof picked === 'string') setOrderError(picked)
-      else await setScriptParam(paramPick.name, { targetId: picked.id })
-      return
-    }
-    if (workPick) {
-      setWorkPick(undefined)
-      if (!world) return
-      const picked = paramPickAt(paramWorld(world), workPick.param.type, { x, y })
-      if (typeof picked === 'string') setOrderError(picked)
-      else await setWorkSettings(workPick.buildingId, { [workPick.param.name]: picked.id })
-      return
-    }
-    if (armyPick) {
-      setArmyPick(undefined)
-      setArmyError(await sendOrder({ kind: armyPick.kind, armyId: armyPick.armyId, x, y }))
-      return
-    }
-    if (plan && nextPick(plan)) {
-      if (!world) return
-      const next = pickInto(planWorld(world, terrainAt), plan, { x, y })
-      if (nextPick(next) || planAsk(next)) setPlan(next)
-      else await addPlanned(next)
-      return
-    }
-    if (group.length > 1) {
-      await groupTile(x, y)
-      return
-    }
-    if (!selected) return
-    if (mode === 'creativeMove') {
-      setOrderError(await creativeMove([selected.id], x, y))
-      return
-    }
-    // One of a siege machine's crew pushes it there (`CONTEXT.md`: Siege machine).
-    if (mode === 'push' && pushing) {
-      const order = { kind: 'push', residentId: selected.id, machineId: pushing, x, y }
-      setOrderError(await giveOrder(order, false))
-      return
-    }
-    // One of a catapult's crew aims it at the wall on that tile (`CONTEXT.md`: Catapult).
-    if (mode === 'throw' && pushing) {
-      const order = { kind: 'throw', residentId: selected.id, machineId: pushing, x, y }
-      setOrderError(await giveOrder(order, false))
-      return
-    }
-    // Driving and hauling keep to the realm's; only Drive off takes another's (`CONTEXT.md`:
-    // Stealing a carriage or horse), whatever else stands on the tile.
-    const carriage = ownCarriageHere
-    const rowed = mode === 'row' ? boatToRow : mode === 'rowOff' ? boatToSteal : undefined
-    if (rowed) {
-      // To the water tile, or the free water beside a land tile (`CONTEXT.md`: Rowing); another
-      // organization's boat is stolen by it (Stealing a carriage or horse).
-      // A ship is sailed by one of its crew, to Sea or to a haven (`CONTEXT.md`: Sailing).
-      const kind = 'ship' in rowed && rowed.ship ? 'sail' : 'row'
-      const order = { kind, residentId: selected.id, vesselId: rowed.id, x, y }
-      setOrderError(await giveOrder(order))
-      return
-    }
-    const driven = mode === 'driveOff' ? stealableHere : mode === 'drive' ? carriage : undefined
-    if (driven) {
-      const order = { kind: 'drive', residentId: selected.id, carriageId: driven.id, x, y }
-      setOrderError(await giveOrder(order))
-      return
-    }
-    // Only this names a stranger's horse, so only this steals one to pull the realm's carriage.
-    if (mode === 'hitchOff' && unhorsedHere && horseToHitch) {
-      const order = {
-        kind: 'drive',
-        residentId: selected.id,
-        carriageId: unhorsedHere.id,
-        horseId: horseToHitch,
-        x,
-        y,
-      }
-      setOrderError(await giveOrder(order, false))
-      return
-    }
-    // With no carriage of theirs here, the boat beside them (`CONTEXT.md`: Haul route by water).
-    const hauled = carriage ?? boatToRow
-    if (mode === 'haul' && hauled && haulSetup) {
-      // The Haul task: they run the Player's Haul (default) script (`CONTEXT.md`: Default script).
-      const order = { kind: 'task', task: 'haul', residentId: selected.id, carriageId: hauled.id }
-      setOrderError(await giveOrder({ ...order, x, y, ...haulSetup }))
-      return
-    }
-    if (mode === 'roadFrom' || mode === 'wallFrom') {
-      // Then the line's other end.
-      setLineFrom({ x, y })
-      setPicking(mode === 'roadFrom' ? 'roadTo' : 'wallTo')
-      return
-    }
-    if ((mode === 'roadTo' || mode === 'wallTo') && lineFrom) {
-      // The Build line task: they run the Player's Build line (default) script (`CONTEXT.md`: Build line).
-      const building = mode === 'roadTo' ? 'road' : 'wall'
-      const order = {
-        kind: 'task',
-        task: 'buildLine',
-        residentId: selected.id,
-        building,
-        ...(building === 'wall' && wallMaterial === 'stone' ? { material: wallMaterial } : {}),
-      }
-      setLineFrom(undefined)
-      setOrderError(await giveOrder({ ...order, from: lineFrom, to: { x, y } }))
-      return
-    }
-    setOrderError(await giveOrder({ kind: 'walkTo', residentId: selected.id, x, y }))
-  }
-
-  /**
    * Starts planning a step with Add step (`CONTEXT.md`: Queue, Planning ahead): the map picks its
    * places first; one that needs neither is added at once.
    */
   async function startPlan(kind: PlanStepId, after?: number, extra?: Partial<Plan>) {
-    setPicking(false)
-    setGroupPicking(false)
-    setParamPick(undefined)
+    picker.plan.starting()
     const fresh: Plan = { kind, picked: [], ...(after === undefined ? {} : { after }), ...extra }
-    if (nextPick(fresh) || planAsk(fresh)) setPlan(fresh)
+    if (nextPick(fresh) || planAsk(fresh)) picker.plan.set(fresh)
     else await addPlanned(fresh)
   }
   /**
@@ -1286,7 +1151,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * or, with none open, onto each one's own queue (`CONTEXT.md`: Planning for a group).
    */
   async function addPlanned(planned: Plan, answer?: PlanAnswer) {
-    setPlan(undefined)
+    picker.plan.set(undefined)
     const step = planOrder(planned, answer)
     if (!step) return
     const { order, at } = step
@@ -1343,6 +1208,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     (w: NonNullable<typeof world>, x: number, y: number) =>
     (kind: BuildingKind, material?: WallMaterial) =>
       buildProblem(kind, x, y, knownGround(w), material)
+  /** The tile picked for the group to build on, with what the group card's Build menu needs of it. */
+  const groupBuildTile = (w: NonNullable<typeof world>, at: { x: number; y: number } | undefined) =>
+    at && {
+      ...at,
+      site: w.buildings.find((b) => b.kind !== 'road' && b.site && covers(b, at.x, at.y)),
+      node: nodeAt?.(at.x, at.y),
+      terrain: terrainAt?.(at.x, at.y),
+      problem: buildProblemAt(w, at.x, at.y),
+    }
   /** The terrain and nodes the Player explored, as the checks on where buildings go read them. */
   const knownGround = (w: NonNullable<typeof world>): KnownGround => ({
     size: w.map.size,
@@ -1440,7 +1314,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const size = world.map.size
     const at = { x: wrap(x, size), y: wrap(y, size) }
     if (!o.from) return setRealmOrder({ step: 'line', building: o.building, from: at })
-    const stone = o.building === 'wall' && wallMaterial === 'stone'
+    const stone = o.building === 'wall' && picker.wallMaterial === 'stone'
     const line: WhoLine = {
       kind: 'line',
       building: o.building,
@@ -1503,7 +1377,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   function startAbout(order: BuildingGroupOrder, target: Building) {
     const toWho = (o: BuildingGroupOrder) => {
       setSelectedTile(undefined)
-      setWorkPick(undefined)
+      picker.work.clear()
       setRealmOrder({ step: 'about', order: o, target })
     }
     const start = groupOrderStart(order)
@@ -1633,14 +1507,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         onStart={(kind, after) => void startPlan(kind, after)}
         open={paletteOpen}
         onOpen={setPaletteOpen}
-        onPlan={setPlan}
+        onPlan={picker.plan.set}
         conditionNames={{
           buildings: w.buildings,
           lastSeen: w.lastSeen.buildings,
           cities: knownCities,
         }}
         onAnswer={(answer) => plan && void addPlanned(plan, answer)}
-        onCancel={() => setPlan(undefined)}
+        onCancel={() => picker.plan.set(undefined)}
         scripts={scripts}
         buildTile={{
           node: tile && nodeAt?.(tile.x, tile.y),
@@ -1664,111 +1538,6 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     await sendToGroup(giveToAll(groupPlan, group), [])
   }
 
-  /**
-   * A tile picked for the group (`CONTEXT.md`: Group): walking there (also by right-click),
-   * working the workplace there, where to build, drive or haul to, a line's ends, the building to
-   * tear down, the place to store at or fetch from, whom to attack or the wall to climb.
-   */
-  async function groupTile(x: number, y: number) {
-    const mode = groupPicking
-    setGroupPicking(false)
-    if (!world) return
-    if (mode === 'creativeMove') {
-      setGroupError(
-        await creativeMove(
-          group.map((r) => r.id),
-          x,
-          y,
-        ),
-      )
-      return
-    }
-    if (mode === 'build') {
-      setGroupBuildAt({ x, y })
-      return
-    }
-    if (mode === 'roadFrom' || mode === 'wallFrom') {
-      // Then the line's other end.
-      setGroupLineFrom({ x, y })
-      setGroupPicking(mode === 'roadFrom' ? 'roadTo' : 'wallTo')
-      return
-    }
-    setGroupBuildAt(undefined)
-    setGroupReport(undefined)
-    const fail = (why: string) => setGroupError(why)
-    const name = (b: Building) => BUILDING_NAMES[b.kind].toLowerCase()
-    const realmId = world.home.realmId
-    // A storage, a stable, a haven or one of the realm's carriages, to store at or fetch from.
-    const place = (): Place | undefined => {
-      const at = storePlaceAt(world, realmId, x, y)
-      return at && { id: at.id, name: at.name }
-    }
-    // A wall or gate of another realm's city, or of none.
-    const foreignWall = world.buildings.find(
-      (b) =>
-        isWallOrGate(b) &&
-        covers(b, x, y) &&
-        world.cities.find((c) => c.id === b.cityId)?.realmId !== realmId,
-    )
-    switch (mode) {
-      case 'work': {
-        const workplace = world.buildings.find(
-          (b) =>
-            // A site of a workplace too: Work builds it first (`CONTEXT.md`: Working a site).
-            b.kind !== 'road' && covers(b, x, y) && MAX_WORKERS[b.kind] !== undefined,
-        )
-        if (!workplace) return fail('no workplace there')
-        // What a smithy makes is picked for each worker on their own card.
-        if (workplace.kind === 'smithy') return fail('pick what to make on each one’s card')
-        return sendGroup({ kind: 'work', workplace, name: name(workplace) })
-      }
-      case 'drive':
-        return sendGroup({ kind: 'drive', x, y })
-      case 'row':
-        return sendGroup({ kind: 'row', x, y })
-      case 'haul':
-        if (!groupPickWith.haul) return
-        return sendGroup({ kind: 'haul', x, y, ...groupPickWith.haul })
-      case 'roadTo':
-      case 'wallTo':
-        if (!groupLineFrom) return
-        setGroupLineFrom(undefined)
-        // Each gets the Build line task with the same line, so they share it (`CONTEXT.md`: Build line).
-        return sendGroup({
-          kind: 'line',
-          building: mode === 'roadTo' ? 'road' : 'wall',
-          from: groupLineFrom,
-          to: { x, y },
-          ...(mode === 'wallTo' && wallMaterial === 'stone' ? { material: wallMaterial } : {}),
-        })
-      case 'tearDown': {
-        // A building before a road sharing its tile.
-        const there = world.buildings.filter((b) => BUILDABLE.includes(b.kind) && covers(b, x, y))
-        const building = there.find((b) => b.kind !== 'road') ?? there[0]
-        if (!building) return fail('nothing to tear down there')
-        return sendGroup({ kind: 'tearDown', building, name: name(building) })
-      }
-      case 'storeAt':
-      case 'fetchFrom': {
-        const at = place()
-        if (!at) return fail('no storage, stable, haven, carriage or boat of yours there')
-        if (mode === 'storeAt') return sendGroup({ kind: 'store', to: at })
-        return sendGroup({ kind: 'fetch', good: groupPickWith.good ?? 'food', from: at })
-      }
-      case 'attack': {
-        const target =
-          world.residents.find((r) => r.x === x && r.y === y && !own.some((o) => o.id === r.id)) ??
-          foreignWall
-        if (!target) return fail('nobody of another realm there, and no wall or gate')
-        return sendGroup({ kind: 'attack', targetId: target.id })
-      }
-      case 'climb':
-        if (!foreignWall) return fail('no wall or gate of another realm there')
-        return sendGroup({ kind: 'climb', wall: foreignWall })
-      default:
-        return sendGroup({ kind: 'walkTo', x, y })
-    }
-  }
   /**
    * Gives each resident of the group the same order request (ADR 0002), skipping those who
    * can't take it, and says on the card who was skipped or turned down and why. One starting a
@@ -1815,7 +1584,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             ...(after ? { after } : {}),
           })
         : groupRequests(order, to, { ...ctx, queued })
-    if (order.kind === 'build') setGroupBuildAt(undefined)
+    if (order.kind === 'build') picker.group.built()
     await sendToGroup(
       requests.map((q) => q.order),
       skipped,
@@ -2217,8 +1986,6 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       (h) => h.realmId !== world.home.realmId && !carriagePulledBy(world, h) && !riderOf(world, h),
     ),
   )
-  // What the pick waiting for a tile would do under the pointer, or at the tile tapped on a touch
-  // screen (`CONTEXT.md`: Picking a target).
   /**
    * The ground a way is found on as the Player knows it, and the tiles it can't step onto: a way
    * doesn't cross a wall, nor a gate unless it is the realm's own or an ally's, or open
@@ -2247,48 +2014,23 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       },
     }
   }
-  const preview = (() => {
-    if (!world || !pick || !pickAt) return undefined
-    const seen: PreviewWorld = {
-      ...wayGround(world),
-      ...planWorld(world),
+  // What the pick waiting for a tile would do under the pointer, or at the tile tapped on a touch
+  // screen (`CONTEXT.md`: Picking a target).
+  const preview = picker.preview(
+    () => ({
+      ...wayGround(world!),
+      ...planWorld(world!),
       cityNames: knownCities,
       nodeAt: (x, y) => nodeAt?.(x, y),
       buildProblem: (kind, x, y) =>
         // A kind picked before its tile is judged as the Build menu there would (realm control).
         realmOrder?.step === 'where'
-          ? realmBuildProblem(world, x, y, kind, realmOrder.material)
-          : buildProblem(kind, x, y, knownGround(world)),
-    }
-    const what = previewPickOf(pick, {
-      lineFrom: group.length > 1 ? groupLineFrom : lineFrom,
-      plan,
-    })
-    // A drive or haul goes from those standing on a carriage of the realm.
-    const carriageAt = (r: Resident) =>
-      world.carriages.find(
-        (k) =>
-          k.x === r.x &&
-          k.y === r.y &&
-          (picking === 'driveOff' ? isStrangers(k) : k.realmId === world.home.realmId),
-      )
-    const going = what.kind === 'way' && what.goer === 'carriage'
-    const goers = group
-      .filter((r) => !going || carriageAt(r))
-      .map((r) => ({
-        from: r,
-        ticks: (path: readonly (readonly [number, number])[], goer: 'foot' | 'carriage') => {
-          const way = { target: pickAt, path: path.map(([x, y]) => [x, y] as [number, number]) }
-          const carriage = carriageAt(r)
-          const order =
-            goer === 'carriage' && carriage
-              ? { kind: 'drive' as const, carriageId: carriage.id, ...way, progress: 0 }
-              : { kind: 'walkTo' as const, ...way, progress: 0 }
-          return arrivesIn?.(r, order)
-        },
-      }))
-    return pickPreview(what, pickAt, seen, goers)
-  })()
+          ? realmBuildProblem(world!, x, y, kind, realmOrder.material)
+          : buildProblem(kind, x, y, knownGround(world!)),
+    }),
+    arrivesIn || undefined,
+    isStrangers,
+  )
   // Each resident's way to a realm order's target, by where they stand and the target: found
   // once, not again each tick while they stand still.
   const whoWays = useRef(new Map<string, WhoWay>())
@@ -2431,11 +2173,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               if (group.length > 1) setSelectedIds([])
               const size = world.map.size
               setSelectedTile({ x: ((x % size) + size) % size, y: ((y % size) + size) % size })
-              setPicking(false)
-              setArmyPick(undefined)
-              setParamPick(undefined)
-              setWorkPick(undefined)
-              setPlan(undefined)
+              picker.drop()
               setOrderError(undefined)
               // The realm order's Build menu or who-list gives way to the tile's card.
               setRealmOrder(undefined)
@@ -2445,18 +2183,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setOpenCityId(id)
               setOpenTab('cities')
             }}
-            picking={
-              picking !== false ||
-              armyPick !== undefined ||
-              pickingParam !== undefined ||
-              pick?.kind === 'plan' ||
-              (group.length > 1 && groupPicking !== false) ||
-              realmPicking
-            }
-            onPickTile={pickTile}
+            picking={picker.onMap}
+            onPickTile={picker.pickTile}
             preview={preview}
             // A tile tapped stays previewed until another is tapped.
-            onPointerTile={(tile) => setPickAt((at) => (at?.tapped ? at : tile))}
+            onPointerTile={picker.pointerTile}
             onNodesLoaded={onNodesLoaded}
             onTerrainLoaded={onTerrainLoaded}
             newRealm={isNewRealm(world.events, world.tick)}
@@ -2606,7 +2337,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onRename={(w, name) => sendOrder({ kind: 'renameWaypoint', waypointId: w.id, name })}
               onRemove={(w) => sendOrder({ kind: 'removeWaypoint', waypointId: w.id })}
               // A waypoint is a place like a tile: picked, it is its tile (`CONTEXT.md`: Waypoint).
-              onPick={pick ? (w) => pickTile(w.x, w.y) : undefined}
+              onPick={pick ? (w) => picker.pickTile(w.x, w.y) : undefined}
             />,
           )}
         {world &&
@@ -2825,10 +2556,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               prompt={pickPrompt(pick, touch)}
               hint={pickHint(pick)}
               material={
-                picksWallLine(pick) ? { value: wallMaterial, onChange: setWallMaterial } : undefined
+                picksWallLine(pick)
+                  ? { value: picker.wallMaterial, onChange: picker.setWallMaterial }
+                  : undefined
               }
               under={pick.kind === 'plan' && pick.error ? undefined : preview?.label}
-              onConfirm={pickAt?.tapped ? () => pickTile(pickAt.x, pickAt.y) : undefined}
+              onConfirm={
+                picker.pickAt?.tapped
+                  ? () => picker.pickTile(picker.pickAt!.x, picker.pickAt!.y)
+                  : undefined
+              }
               onWaypoints={
                 world && world.waypoints.length > 0 && openTab !== 'waypoints'
                   ? () => setOpenTab('waypoints')
@@ -2901,7 +2638,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       )}
       {!phone && <Dock onMount={setDock} />}
       {world && selectedTile && (
-        <CardSheet phone={phone} dock={dock} pinnedPeek={workPick !== undefined} hidden={hideCard}>
+        <CardSheet
+          phone={phone}
+          dock={dock}
+          pinnedPeek={picker.work.pick !== undefined}
+          hidden={hideCard}
+        >
           <TileCard
             card={describeTile(
               {
@@ -2961,20 +2703,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   label={(id) => paramValueLabel(paramWorld(world), id)}
                   waypoints={world.waypoints}
                   picking={
-                    workPick?.buildingId === tileBuilding.id ? workPick.param.name : undefined
+                    picker.work.pick?.buildingId === tileBuilding.id
+                      ? picker.work.pick.param.name
+                      : undefined
                   }
                   onScript={(scriptId) =>
                     void setWorkSettings(tileBuilding.id, undefined, scriptId)
                   }
-                  onPick={(param) => {
-                    setPicking(false)
-                    setParamPick(undefined)
-                    setWorkPick((now) =>
-                      now?.buildingId === tileBuilding.id && now.param.name === param.name
-                        ? undefined
-                        : { buildingId: tileBuilding.id, param },
-                    )
-                  }}
+                  onPick={(param) => picker.work.toggle(tileBuilding.id, param)}
                   onNumber={(name, value) =>
                     void setWorkSettings(tileBuilding.id, { [name]: value })
                   }
@@ -3063,24 +2799,22 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onBoard={(vesselId, residentId) => void boardCarriage(vesselId, residentId)}
             onDriveOff={(residentId) => {
               select([residentId])
-              setPicking('driveOff')
+              picker.resident.start('driveOff')
             }}
             onHitchOff={(residentId) => {
               select([residentId])
-              setPicking('hitchOff')
+              picker.resident.start('hitchOff')
             }}
             onCrew={(machineId, residentId) =>
               void giveOrder({ kind: 'crew', residentId, machineId }, false).then(setOrderError)
             }
             onPush={(machineId, residentId) => {
               select([residentId])
-              setPushing(machineId)
-              setPicking('push')
+              picker.resident.startMachine('push', machineId)
             }}
             onThrow={(machineId, residentId) => {
               select([residentId])
-              setPushing(machineId)
-              setPicking('throw')
+              picker.resident.startMachine('throw', machineId)
             }}
             onRam={(machineId, residentId, targetId) =>
               void giveOrder({ kind: 'ram', residentId, machineId, targetId }, false).then(
@@ -3105,7 +2839,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             orderError={orderError}
             onClose={() => {
               setSelectedTile(undefined)
-              setWorkPick(undefined)
+              picker.work.clear()
             }}
             onSendHere={async () => {
               if (!selected) return
@@ -3223,9 +2957,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                     resident={selected}
                     tick={world.tick}
                     move={{
-                      picking: picking === 'creativeMove',
-                      onPick: () =>
-                        setPicking((p) => (p === 'creativeMove' ? false : 'creativeMove')),
+                      picking: picker.resident.mode === 'creativeMove',
+                      onPick: () => picker.resident.toggle('creativeMove'),
                     }}
                   />
                 )
@@ -3234,8 +2967,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               leaderId={world.home.leaderId}
               cities={knownCities}
               tick={world.tick}
-              picking={picking}
-              onWalkTo={() => setPicking((p) => (p === 'walk' ? false : 'walk'))}
+              picking={picker.resident.mode}
+              onWalkTo={() => picker.resident.toggle('walk')}
               carriage={
                 onTile(world.carriages.filter(loadKnown).filter((k) => !isStrangers(k))) ??
                 onTile(world.carriages.filter(loadKnown))
@@ -3247,12 +2980,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   besideVessel(v, selected, world.map.size, world.buildings),
               )}
               carriageTheirs={!ownCarriageHere && !!stealableHere}
-              onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
+              onDriveTo={() => picker.resident.toggle('drive')}
               {...(stealableHere && {
                 driveOff: {
                   problem: driveOffProblems([selected.id], stealableHere.id, world.home.realmId)[0],
                 },
-                onDriveOff: () => setPicking((p) => (p === 'driveOff' ? false : 'driveOff')),
+                onDriveOff: () => picker.resident.toggle('driveOff'),
               })}
               {...(unhorsedHere &&
                 horseToHitch && {
@@ -3264,7 +2997,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                       horseToHitch,
                     )[0],
                   },
-                  onHitchOff: () => setPicking((p) => (p === 'hitchOff' ? false : 'hitchOff')),
+                  onHitchOff: () => picker.resident.toggle('hitchOff'),
                 })}
               {...(looseStrangers && {
                 stealHorse: {
@@ -3280,16 +3013,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                     false,
                   ).then(setOrderError),
               })}
-              onRoadTo={() =>
-                setPicking((p) => (p === 'roadFrom' || p === 'roadTo' ? false : 'roadFrom'))
-              }
-              onWallTo={() =>
-                setPicking((p) => (p === 'wallFrom' || p === 'wallTo' ? false : 'wallFrom'))
-              }
-              onHaulTo={(setup) => {
-                setHaulSetup(setup)
-                setPicking((p) => (p === 'haul' ? false : 'haul'))
-              }}
+              onRoadTo={() => picker.resident.toggle('roadFrom')}
+              onWallTo={() => picker.resident.toggle('wallFrom')}
+              onHaulTo={picker.resident.toggleHaul}
               onStop={stop}
               onRally={rally}
               zeal={world.zeal}
@@ -3316,10 +3042,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               )}
               onBoard={(id, asCrew) => void boardCarriage(id, undefined, asCrew)}
               {...(boatToRow ? { boatToRow } : {})}
-              onRowTo={() => setPicking((p) => (p === 'row' ? false : 'row'))}
+              onRowTo={() => picker.resident.toggle('row')}
               {...(boatToSteal && {
                 rowOff: { problem: boatToSteal.problem },
-                onRowOff: () => setPicking((p) => (p === 'rowOff' ? false : 'rowOff')),
+                onRowOff: () => picker.resident.toggle('rowOff'),
               })}
               carriageToUnhitch={onTile(
                 world.carriages.filter((k) => carriageOfResident(k, selected) && k.horseId),
@@ -3447,11 +3173,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                       selected,
                     )}
                     waypoints={world.waypoints}
-                    picking={paramPick?.name}
-                    onPick={(p) => {
-                      setPicking(false)
-                      setParamPick((now) => (now?.name === p.name ? undefined : p))
-                    }}
+                    picking={picker.param.name}
+                    onPick={picker.param.toggle}
                     onNumber={(name, value) => void setScriptParam(name, { value })}
                     onChoose={(p, value) =>
                       void setScriptParam(
@@ -3496,9 +3219,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               addStep={addStep(world)}
               onClose={() => {
                 setSelectedIds([])
-                setPicking(false)
-                setParamPick(undefined)
-                setPlan(undefined)
+                picker.cardClosed()
               }}
               collapsed={pick !== undefined && pick.kind !== 'army' && !picksCity}
             />
@@ -3523,9 +3244,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               showsCreativeBar(account) && (
                 <CreativeGroupMove
                   move={{
-                    picking: groupPicking === 'creativeMove',
-                    onPick: () =>
-                      setGroupPicking((p) => (p === 'creativeMove' ? false : 'creativeMove')),
+                    picking: picker.group.mode === 'creativeMove',
+                    onPick: picker.group.toggleCreativeMove,
                   }}
                 />
               )
@@ -3541,24 +3261,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             horses={world.horses}
             realmId={world.home.realmId}
             tick={world.tick}
-            picking={groupPicking}
-            onPicking={(p, with_) => {
-              setGroupPicking(p)
-              setGroupPickWith(with_ ?? {})
-              setGroupLineFrom(undefined)
-              setGroupBuildAt(undefined)
-            }}
-            buildAt={
-              groupBuildAt && {
-                ...groupBuildAt,
-                site: world.buildings.find(
-                  (b) => b.kind !== 'road' && b.site && covers(b, groupBuildAt.x, groupBuildAt.y),
-                ),
-                node: nodeAt?.(groupBuildAt.x, groupBuildAt.y),
-                terrain: terrainAt?.(groupBuildAt.x, groupBuildAt.y),
-                problem: buildProblemAt(world, groupBuildAt.x, groupBuildAt.y),
-              }
-            }
+            picking={picker.group.mode}
+            onPicking={picker.group.start}
+            buildAt={groupBuildTile(world, picker.group.buildAt)}
             // Picking a defence or Alarm script is never queued: it leaves what they do as it is.
             // Gather shows its form first, for the good (`CONTEXT.md`: Gather).
             onOrder={(order) => {
@@ -3596,7 +3301,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         // The army opened in the Armies tab, its card in the command bar as a resident's is.
         <CardSheet
           phone={phone}
-          pinnedPeek={armyPick !== undefined}
+          pinnedPeek={picker.army.pick !== undefined}
           bar
           keysOff={!besideTile.keys}
           hidden={hideCard}
@@ -3608,10 +3313,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             inSight={world.residents}
             carriages={world.carriages}
             realmId={world.home.realmId}
-            picking={armyPick}
+            picking={picker.army.pick}
             onPick={(p) => {
-              setArmyPick(p)
-              setPicking(false)
+              picker.army.set(p)
               setArmyError(undefined)
             }}
             pickError={armyError}
@@ -3622,7 +3326,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             onClose={() => {
               setOpenArmyId(undefined)
-              setArmyPick(undefined)
+              picker.army.clear()
             }}
           />
         </CardSheet>
@@ -3764,8 +3468,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           canStart={startValuesValid(starting.params, starting.values)}
           error={starting.error}
           onPick={(p) => {
-            setPicking(false)
-            setGroupPicking(false)
+            picker.formPicking()
             setStarting({ ...starting, picking: p, error: undefined })
           }}
           onChange={(name, value) =>
