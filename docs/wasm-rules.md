@@ -6,15 +6,21 @@ reaches them through `@csp/lang-wasm` (`packages/lang-wasm/src/index.ts`).
 
 ## How it fits together
 
-- `crates/csp-lang-wasm/src/rules.rs`: the functions the client calls, each a thin
-  `#[wasm_bindgen]` wrapper around `csp-sim`'s own (`csp_sim::queries::...`).
+- `crates/csp-lang-wasm/src/value_rules.rs` (T122.5): the rules that take only values (costs,
+  recipes, prices, fees, loads, names, checks of what a Player sends), all behind one entry,
+  `rule(name, args)`: the arguments go in as a JSON array, the answer comes back as JSON. A rule is
+  one arm there, calling `csp-sim`'s own function, and one function in
+  `packages/lang-wasm/src/rules.ts`, which the client imports. A call that doesn't fit its Rust
+  function throws: that is a bug in `rules.ts`.
+- `crates/csp-lang-wasm/src/rules.rs`: the world mirror and the rules that read it.
 - **The world mirror** (`WorldMirror`) holds what the client sees in the module's memory. The client
   hands it the server's `welcome` message once and each `tick` message after it, as the JSON text
   the socket brought. Rules that read the world are its methods, called with ids and coordinates.
   T122.1's mirror is throwaway and keeps only the buildings in sight; T122.4 brings the real one.
 - `pnpm wasm:build` (`scripts/wasm-build.mjs`) builds the module into
-  `packages/lang-wasm/generated/`. In the browser it loads on `loadLang()`; in Node and Vitest it
-  loads as `@csp/lang-wasm` is imported.
+  `packages/lang-wasm/generated/`. The client awaits `loadLang()` before its first render
+  (`apps/web/src/main.tsx`), since the rules are called as it renders; in Node and Vitest it loads
+  as `@csp/lang-wasm` is imported.
 
 ## What the browser lacks
 
@@ -68,3 +74,7 @@ How each was taken:
 
 The update is the tightest of the four: T122.4's mirror reads more than buildings, so it should
 keep a tick's cost to what the tick changed, as this one does, and measure again.
+
+## Size after T122.5
+
+The value rules add about 15 KB gzipped: the module is 402 KB gzipped (1,139 KB raw), from 388 KB.
