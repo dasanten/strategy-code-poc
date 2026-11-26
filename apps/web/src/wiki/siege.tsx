@@ -79,6 +79,12 @@ export function SiegeSection() {
         reach shoot them and anyone can strike them.
       </p>
       <p>
+        <b>Ramming and throwing attack the wall's owner</b>, as a blow at the wall or a climb does.
+        Striking a ram's or catapult's crew at your wall is no crime, an NPC city's soldiers fight
+        them as attackers, and residents hired from an NPC city won't ram or throw at its walls.
+        Pushing the machine up is no attack yet: nothing is struck.
+      </p>
+      <p>
         A ram shows on the map to whoever sees its tile, with whose it is and its crew, but Last
         seen doesn't keep it, as it moves. A ram of a realm that ends belongs to nobody. Scripts see
         the machines in sight with <code>machines()</code>, join a crew with{' '}

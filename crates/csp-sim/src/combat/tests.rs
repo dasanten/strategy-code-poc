@@ -18,7 +18,9 @@ use crate::game_test_world::Game;
 use crate::order_sender::OrderSender;
 use crate::queries::combat::protection;
 use crate::queries::residents::{best_weapon, is_armed};
-use crate::test_world::{add_city, empty_world, live, live_mut, realm, resident, run, until_hit};
+use crate::test_world::{
+    add_city, building, empty_world, live, live_mut, realm, resident, run, until_hit,
+};
 
 const SIZE: i32 = 256;
 const ME: u64 = 7;
@@ -610,4 +612,28 @@ fn of_two_equal_soldiers_the_one_with_a_steel_sword_wins_most_of_a_hundred_fight
         }
     }
     assert!(steel_wins > 75, "steel won {steel_wins} of 100");
+}
+
+#[test]
+fn striking_someone_who_rams_or_throws_at_your_wall_is_no_crime_but_one_pushing_up_is() {
+    let mut world = setup();
+    add_city(&mut world, "c1", Some("r1"), 5.0, 5.0, None);
+    building(&mut world, "w1", csp_shared::world::BuildingKind::Wall, Some("c1"), 12.0, 10.0);
+    let held = |kind: &str| -> ResidentOrder {
+        serde_json::from_value(match kind {
+            "push" => serde_json::json!({
+                "kind": "push", "machineId": "m1", "target": {"x": 11, "y": 10},
+                "path": null, "progress": 0,
+            }),
+            _ => serde_json::json!({
+                "kind": kind, "machineId": "m1", "targetId": "w1", "progress": 0,
+            }),
+        })
+        .expect("an order")
+    };
+    for (kind, crime) in [("ram", false), ("throw", false), ("push", true)] {
+        live_mut(&mut world, "b1").order = Some(held(kind));
+        let (a, t) = (live(&world, "a1").unwrap(), live(&world, "b1").unwrap());
+        assert_eq!(is_aggression(&world, a, t, SIZE), crime, "{kind}");
+    }
 }
