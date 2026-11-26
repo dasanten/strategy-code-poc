@@ -1,5 +1,5 @@
-import { PROTECTION, WEAPONS, isDown } from '../world.js'
-import { isLineOrder } from '../building.js'
+import { PROTECTION, WEAPONS, isDown } from '../world/world.js'
+import { isLineOrder } from '../building/building.js'
 import type { Equipment, Good, Resident } from '@csp/shared-types'
 import { isLeader, rankedAs, type Leaders, type Relationship, type Tone } from './tokens.js'
 

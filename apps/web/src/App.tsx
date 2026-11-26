@@ -17,8 +17,8 @@ import {
   takesWorkSettings,
   roadTiles,
   stoneOverAt,
-} from './building.js'
-import { firstDayShown } from './first-day.js'
+} from './building/building.js'
+import { firstDayShown } from './realm/first-day.js'
 import {
   flipped,
   flipsControlMode,
@@ -28,7 +28,7 @@ import {
   REALM_BAR_ORDERS,
   type ControlMode,
   type RealmBarOrder,
-} from './control-mode.js'
+} from './realm/control-mode.js'
 import type {
   ClientFirstDayLine,
   Account,
@@ -48,10 +48,10 @@ import type {
   SeenResident,
   WallMaterial,
 } from '@csp/shared-types'
-import { carriagePulledBy, carriageOfResident, drivenCarriageId, seatsLeft } from './carriages.js'
-import { horseOfResident, riderOf } from './horse-rules.js'
-import { horsesInNeed } from './reviving.js'
-import { isDown } from './world.js'
+import { carriagePulledBy, carriageOfResident, drivenCarriageId, seatsLeft } from './transport/carriages.js'
+import { horseOfResident, riderOf } from './transport/horse-rules.js'
+import { horsesInNeed } from './transport/reviving.js'
+import { isDown } from './world/world.js'
 import { NODE_WORKPLACE, UNEXPLORED } from '@csp/shared-types'
 import {
   buildProblem,
@@ -62,36 +62,36 @@ import {
   nodeCorner,
   rowOffProblem,
   type KnownGround,
-} from './world-rules.js'
-import { isPassableTerrain, isWater, Terrain, tileIndex, wrap } from './terrain.js'
-import { isWallOrGate } from './walls.js'
-import { CreativeBar } from './CreativeBar.js'
-import { showsCreativeBar } from './creative-bar.js'
-import { CreativeSection } from './CreativeSection.js'
+} from './world/world-rules.js'
+import { isPassableTerrain, isWater, Terrain, tileIndex, wrap } from './world/terrain.js'
+import { isWallOrGate } from './building/walls.js'
+import { CreativeBar } from './creative/CreativeBar.js'
+import { showsCreativeBar } from './creative/creative-bar.js'
+import { CreativeSection } from './creative/CreativeSection.js'
 import {
   creativeCities,
   creativeOffer,
   creativeProblem,
   offersAnything,
-} from './creative-section.js'
+} from './creative/creative-section.js'
 import {
   CreativeAddSection,
   CreativeGroupMove,
   CreativeResidentActions,
-} from './CreativeResidents.js'
+} from './creative/CreativeResidents.js'
 import { cityIdsAtTile, targetParam } from '@csp/lang-wasm'
-import { isAt, covers } from './footprint.js'
+import { isAt, covers } from './building/footprint.js'
 import { HORSE_GRANT_HORSES, PASSENGER_WEIGHT } from '@csp/balance'
-import { besideVessel, crewShort, isVesselId, vesselOfResident, vesselRoom } from './vessels.js'
-import { AdminPage } from './AdminPanel.js'
-import { AlliancePanel } from './Alliance.js'
-import { commandsSeen } from './alliance-army.js'
-import { ArmiesPanel, ArmyCard, type ArmyPick } from './Armies.js'
-import { ContractsPanel } from './Contracts.js'
-import { demandNoticeLine, demandSides } from './demand-view.js'
-import { DemandsPanel } from './Demands.js'
-import { DirectOffersPanel } from './DirectOffers.js'
-import { incomingItems, incomingNoticeLine } from './incoming-view.js'
+import { besideVessel, crewShort, isVesselId, vesselOfResident, vesselRoom } from './transport/vessels.js'
+import { AdminPage } from './admin/AdminPanel.js'
+import { AlliancePanel } from './diplomacy/Alliance.js'
+import { commandsSeen } from './army/alliance-army.js'
+import { ArmiesPanel, ArmyCard, type ArmyPick } from './army/Armies.js'
+import { ContractsPanel } from './diplomacy/Contracts.js'
+import { demandNoticeLine, demandSides } from './diplomacy/demand-view.js'
+import { DemandsPanel } from './diplomacy/Demands.js'
+import { DirectOffersPanel } from './diplomacy/DirectOffers.js'
+import { incomingItems, incomingNoticeLine } from './diplomacy/incoming-view.js'
 import {
   NOTHING_SEEN,
   newestLine,
@@ -101,12 +101,12 @@ import {
   sentToRealm,
   unseenMarks,
   type SeenIds,
-} from './unseen-view.js'
-import { StandingPanel } from './Standing.js'
-import { TileMenu, WaypointsPanel } from './Waypoints.js'
-import { api } from './api.js'
+} from './screen/unseen-view.js'
+import { StandingPanel } from './diplomacy/Standing.js'
+import { TileMenu, WaypointsPanel } from './realm/Waypoints.js'
+import { api } from './world/api.js'
 import { clearTerrainCache } from './map/terrain-cache.js'
-import { CityInspector } from './CityInspector.js'
+import { CityInspector } from './city/CityInspector.js'
 import {
   goodsOldText,
   goodsPickCities,
@@ -123,8 +123,8 @@ import {
   type SideTabId,
   type GoodsPick,
   type OpenTab,
-} from './hud-view.js'
-import { cityPlace, cityScale } from './cities-tab-view.js'
+} from './screen/hud-view.js'
+import { cityPlace, cityScale } from './city/cities-tab-view.js'
 import {
   CentredDialog,
   DiplomacyTabs,
@@ -139,15 +139,15 @@ import {
   TopBar,
   mapCovered,
   useEscapeCloses,
-} from './Hud.js'
-import { SideTab, Sidebar, useSidebar } from './Sidebar.js'
+} from './screen/Hud.js'
+import { SideTab, Sidebar, useSidebar } from './screen/Sidebar.js'
 import type { Covered } from './map/camera.js'
-import { cardHidden, laneNotices, visitKey } from './notices-view.js'
-import { ResidentsFullList } from './ResidentsFullList.js'
-import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
-import { groupHorses } from './horses-view.js'
-import { HorsesList } from './Horses.js'
-import { Founding, RealmEnded } from './Founding.js'
+import { cardHidden, laneNotices, visitKey } from './screen/notices-view.js'
+import { ResidentsFullList } from './residents/ResidentsFullList.js'
+import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents/residents-view.js'
+import { groupHorses } from './transport/horses-view.js'
+import { HorsesList } from './transport/Horses.js'
+import { Founding, RealmEnded } from './realm/Founding.js'
 import {
   appendRequest,
   appendToEach,
@@ -160,11 +160,11 @@ import {
   storeAll,
   useShiftHeld,
   type QueuePlan,
-} from './queue-view.js'
-import { AddStep } from './AddStep.js'
-import { InsertPointContext, type InsertPoint } from './step-palette-view.js'
-import { GroupPlanner } from './GroupPlanner.js'
-import { type PlanItem } from './plan-blocks.js'
+} from './queue/queue-view.js'
+import { AddStep } from './queue/AddStep.js'
+import { InsertPointContext, type InsertPoint } from './queue/step-palette-view.js'
+import { GroupPlanner } from './queue/GroupPlanner.js'
+import { type PlanItem } from './queue/plan-blocks.js'
 import {
   planHorses,
   nextPick,
@@ -177,8 +177,8 @@ import {
   type PlanAnswer,
   type PlanStepId,
   type PlanWorld,
-} from './plan-step.js'
-import { useSavedGroups } from './saved-groups.js'
+} from './queue/plan-step.js'
+import { useSavedGroups } from './residents/saved-groups.js'
 import {
   groupOrderStart,
   groupRequests,
@@ -186,11 +186,11 @@ import {
   type GroupSeen,
   type Place,
   type Skipped,
-} from './group-orders.js'
+} from './residents/group-orders.js'
 import { BUILDING_NAMES } from './map/palette.js'
-import { BuildingOrders } from './BuildingOrders.js'
-import { buildingOrderRows, realmRequests, type BuildingGroupOrder } from './building-orders.js'
-import { VehicleOrders } from './VehicleOrders.js'
+import { BuildingOrders } from './building/BuildingOrders.js'
+import { buildingOrderRows, realmRequests, type BuildingGroupOrder } from './building/building-orders.js'
+import { VehicleOrders } from './transport/VehicleOrders.js'
 import {
   NO_STAND,
   mostNote,
@@ -203,21 +203,21 @@ import {
   vehicleSuggests,
   type OrderedVehicle,
   type VehicleGroupOrder,
-} from './vehicle-orders.js'
-import { Login } from './Login.js'
-import { MapView } from './MapView.js'
-import { isKitPath, isWikiPath, pageFor } from './pages.js'
-import { Wiki } from './Wiki.js'
-import { Kit } from './Kit.js'
-import { RealmLog } from './RealmLog.js'
+} from './transport/vehicle-orders.js'
+import { Login } from './screen/Login.js'
+import { MapView } from './screen/MapView.js'
+import { isKitPath, isWikiPath, pageFor } from './screen/pages.js'
+import { Wiki } from './wiki/Wiki.js'
+import { Kit } from './ui/Kit.js'
+import { RealmLog } from './realm/RealmLog.js'
 import {
   heirTakeover,
   realmEnded,
   rememberTakeoverSeen,
   rememberedTakeoverSeen,
-} from './realm-log.js'
+} from './realm/realm-log.js'
 import { isNewRealm } from './map/legend.js'
-import { MEND } from './equipment-view.js'
+import { MEND } from './residents/equipment-view.js'
 import {
   GOOD_LABELS,
   GroupCard,
@@ -227,8 +227,8 @@ import {
   ResidentsList,
   type HaulSetup,
   type Picking,
-} from './Residents.js'
-import { arrivalOf, doingLine } from './doing-view.js'
+} from './residents/Residents.js'
+import { arrivalOf, doingLine } from './residents/doing-view.js'
 import {
   CardSheet,
   PickBanner,
@@ -236,12 +236,12 @@ import {
   TileCard,
   closeOpenPanel,
   panelOpen,
-} from './SelectionCard.js'
-import { BuildMenu } from './BuildMenu.js'
-import { kindProblemOn } from './build-menu-view.js'
-import { WhoList } from './WhoList.js'
-import { Dock } from './Dock.js'
-import { barBesideTile } from './dock-view.js'
+} from './screen/SelectionCard.js'
+import { BuildMenu } from './building/BuildMenu.js'
+import { kindProblemOn } from './building/build-menu-view.js'
+import { WhoList } from './realm/WhoList.js'
+import { Dock } from './screen/Dock.js'
+import { barBesideTile } from './screen/dock-view.js'
 import {
   WHO_SUGGESTS,
   lineProblem,
@@ -254,15 +254,15 @@ import {
   type WhoOrder,
   type WhoPlaceOrder,
   type WhoWay,
-} from './who-list-view.js'
+} from './realm/who-list-view.js'
 import {
   paramsPlace,
   realmRelocateChoices,
   relocateAt,
   storePlaceAt,
   townHallAt,
-} from './realm-orders-view.js'
-import { RealmRelocateCard, RealmScriptCard, RealmTileOrders } from './RealmOrders.js'
+} from './realm/realm-orders-view.js'
+import { RealmRelocateCard, RealmScriptCard, RealmTileOrders } from './realm/RealmOrders.js'
 import { searchPath } from './map/path-preview.js'
 import {
   pickHint,
@@ -273,10 +273,10 @@ import {
   useMediaQuery,
   useTouchScreen,
   type RealmVehiclePick,
-} from './pick-mode.js'
-import { pickPreview, previewPickOf, type PreviewWorld } from './pick-preview.js'
-import { PHONE_QUERY } from './sheet-view.js'
-import { buildingNodeKind } from './building-info-view.js'
+} from './pick/pick-mode.js'
+import { pickPreview, previewPickOf, type PreviewWorld } from './pick/pick-preview.js'
+import { PHONE_QUERY } from './screen/sheet-view.js'
+import { buildingNodeKind } from './building/building-info-view.js'
 import {
   describeTile,
   escapeStep,
@@ -286,20 +286,20 @@ import {
   type ActionId,
   commandedCarriages,
   strangersCarriage,
-} from './selection-view.js'
+} from './screen/selection-view.js'
 import {
   groupRelocateActionProblem,
   groupRelocateChoices,
   knownOf,
   relocateActionProblem,
   relocateChoices,
-} from './relocate-view.js'
-import { ScriptLibrary, type ScriptToOpen } from './ScriptLibrary.js'
-import { ScriptLog } from './ScriptLog.js'
-import { ScriptMemoryTree } from './ScriptMemory.js'
-import { ScriptRunInfo } from './ScriptRun.js'
-import { ScriptParamFields, StartParamsForm } from './ScriptParams.js'
-import { WorkSettings } from './WorkSettings.js'
+} from './residents/relocate-view.js'
+import { ScriptLibrary, type ScriptToOpen } from './script/ScriptLibrary.js'
+import { ScriptLog } from './script/ScriptLog.js'
+import { ScriptMemoryTree } from './script/ScriptMemory.js'
+import { ScriptRunInfo } from './script/ScriptRun.js'
+import { ScriptParamFields, StartParamsForm } from './script/ScriptParams.js'
+import { WorkSettings } from './building/WorkSettings.js'
 import {
   canCustomise,
   groupStartValues,
@@ -312,14 +312,14 @@ import {
   startValues,
   startValuesValid,
   type StartValues,
-} from './start-params.js'
-import { CustomiseContext } from './Customise.js'
-import { paramOnTile, paramPickAt, paramValueLabel, type ParamWorld } from './script-params-view.js'
-import { faresKnown, loadKnown } from './seen.js'
-import { useWorld } from './useWorld.js'
-import { useLand } from './useLand.js'
+} from './script/start-params.js'
+import { CustomiseContext } from './script/Customise.js'
+import { paramOnTile, paramPickAt, paramValueLabel, type ParamWorld } from './script/script-params-view.js'
+import { faresKnown, loadKnown } from './residents/seen.js'
+import { useWorld } from './world/useWorld.js'
+import { useLand } from './world/useLand.js'
 import { landMarks, regionAt } from './map/land.js'
-import { Icon } from './Icon.js'
+import { Icon } from './ui/Icon.js'
 
 /**
  * The form shown before a script with params starts (`CONTEXT.md`: Script parameter, Before it

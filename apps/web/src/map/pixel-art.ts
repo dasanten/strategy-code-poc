@@ -1,5 +1,5 @@
 import type { BuildingKind, Good, ResourceKind } from '@csp/shared-types'
-import { FOOTPRINT } from '../footprint.js'
+import { FOOTPRINT } from '../building/footprint.js'
 import type { GearMarks } from './figures.js'
 import { PIXEL_SLICES } from './pixel-slices.js'
 

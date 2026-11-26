@@ -9,9 +9,9 @@ import {
   scriptParams,
 } from '@csp/lang-wasm'
 import { describe, expect, it } from 'vitest'
-import { scriptWarnings } from '../script-editor.js'
-import { paramNote } from '../script-params-view.js'
-import { WIKI_TOPICS, Wiki } from '../Wiki.js'
+import { scriptWarnings } from '../script/script-editor.js'
+import { paramNote } from '../script/script-params-view.js'
+import { WIKI_TOPICS, Wiki } from './Wiki.js'
 import {
   PARAM_CHOICE_EXAMPLE,
   PARAM_COMMENT_EXAMPLE,

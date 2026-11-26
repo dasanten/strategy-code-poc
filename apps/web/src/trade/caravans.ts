@@ -1,0 +1,34 @@
+import { crewIdsOf } from '../transport/carriages.js'
+import type { SeenCaravan, SeenCarriage, SeenResident } from '@csp/shared-types'
+
+/**
+ * What of the Trade Org's caravans or wandering traders is in sight (`CONTEXT.md`: Caravan, Wandering
+ * trader): their carriages and crew, by id.
+ */
+export interface CaravanParts {
+  carriages: Set<string>
+  crew: Set<string>
+}
+
+/** The carriages and crew of the caravans or traders in sight. */
+export function caravanParts(
+  caravans: readonly Pick<SeenCaravan, 'carriageId' | 'driverId' | 'escortIds'>[],
+): CaravanParts {
+  return {
+    carriages: new Set(caravans.map((c) => c.carriageId)),
+    crew: new Set(caravans.flatMap(crewIdsOf)),
+  }
+}
+
+/** Whether a caravan's carriage or one of its crew stands on tile (x, y), for the map's hover line. */
+export function caravanAt(
+  parts: CaravanParts,
+  world: { residents: readonly SeenResident[]; carriages: readonly SeenCarriage[] },
+  x: number,
+  y: number,
+): boolean {
+  return (
+    world.carriages.some((k) => k.x === x && k.y === y && parts.carriages.has(k.id)) ||
+    world.residents.some((r) => r.x === x && r.y === y && parts.crew.has(r.id))
+  )
+}

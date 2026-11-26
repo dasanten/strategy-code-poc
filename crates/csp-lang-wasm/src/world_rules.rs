@@ -2,7 +2,7 @@
 //! or hand over the realm, and why not, answered by `csp-sim`'s own functions on the world
 //! mirror. One entry, [`rule`], called by name with its arguments as a JSON array of ids,
 //! coordinates and values, answering JSON, so a check is one arm here and one function in
-//! `apps/web/src/world-rules.ts`. Things are found in the mirror by id; one that isn't in
+//! `apps/web/src/world/world-rules.ts`. Things are found in the mirror by id; one that isn't in
 //! sight (gone in the message the client hasn't shown yet) gets the check's own "no such" answer.
 
 use csp_shared::chunks::UNEXPLORED;

@@ -1,7 +1,7 @@
 import { RECIPES } from '@csp/balance'
 import type { BuildingKind, Good, Stock } from '@csp/shared-types'
 import { BUILDING_NAMES } from '../map/palette.js'
-import { GOOD_LABELS } from '../Residents.js'
+import { GOOD_LABELS } from '../residents/Residents.js'
 import { num } from './wiki-view.js'
 
 /** The smithy's recipe for `good` (`CONTEXT.md`: Smithy). */

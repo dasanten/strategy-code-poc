@@ -1,0 +1,858 @@
+import { FEED_UNITS } from '@csp/balance'
+import { GOODS } from '../world/world.js'
+import { MAX_WORKERS, recipeGood } from '../building/building.js'
+import { RECIPES } from '../world/narrowed.js'
+import { horsesIn, nearCityAreaAll } from '@csp/lang-wasm'
+import { buildingRealm } from '../city/city.js'
+import { isAt } from '../building/footprint.js'
+import { relocateRoom, type RelocateWorld } from '../residents/relocate.js'
+import type {
+  Building,
+  BuildingKind,
+  WallMaterial,
+  Carriage,
+  City,
+  Condition,
+  Good,
+  GoodsSpot,
+  OrderRequest,
+  SeenHorse,
+  SeenVessel,
+  Stock,
+  Task,
+  TrainingSubject,
+} from '@csp/shared-types'
+import type { HaulSetup } from '../residents/Residents.js'
+import { anyonesToWork } from '../script/script-params-view.js'
+import { NEW_DRAFT, type ConditionDraft } from './condition-view.js'
+
+/**
+ * The queue planner's Add step (`CONTEXT.md`: Queue, Planning ahead): every kind of step a queue
+ * can hold, the places each one picks on the map, what it asks for on the card after, and the
+ * order it becomes. A step acting on a place goes after a walk there (`appendRequest`'s `at`).
+ * The server checks the step again when its turn comes (ADR 0002).
+ */
+
+/** What a planned step picks on the map, one after another. */
+export type PlanPick =
+  | 'tile'
+  | 'spot'
+  | 'workplace'
+  | 'building'
+  | 'storage'
+  | 'stable'
+  | 'ground'
+  | 'carriage'
+  | 'vessel'
+  | 'shore'
+  | 'horse'
+  | 'city'
+  | 'toFeed'
+  | 'place'
+
+/** What a planned step asks for on the card once its places are picked. */
+export type PlanAsk =
+  | 'goods'
+  | 'buildingKind'
+  | 'makes'
+  | 'horses'
+  | 'horse'
+  | 'haul'
+  | 'script'
+  | 'subject'
+  | 'units'
+  | 'condition'
+  | 'gear'
+  | 'slot'
+
+export type PlanStepId =
+  | 'walk'
+  | 'work'
+  | 'build'
+  | 'tearDown'
+  | 'store'
+  | 'fetch'
+  | 'pickUp'
+  | 'drop'
+  | 'feedStable'
+  | 'feedStableOnce'
+  | 'breed'
+  | 'teach'
+  | 'train'
+  | 'haul'
+  | 'haulBoat'
+  | 'drive'
+  | 'road'
+  | 'wall'
+  | 'mount'
+  | 'dismount'
+  | 'board'
+  | 'boardBoat'
+  | 'boardCrew'
+  | 'row'
+  | 'sail'
+  | 'getOff'
+  | 'unhitch'
+  | 'hitch'
+  | 'relocate'
+  | 'feed'
+  | 'equip'
+  | 'takeOff'
+  | 'explore'
+  | 'gather'
+  | 'runScript'
+  | 'waitUntil'
+  | 'if'
+
+/** One kind of step Add step offers. */
+export interface PlanKind {
+  id: PlanStepId
+  label: string
+  /** Its icon in the Add step palette. */
+  icon: string
+  /**
+   * The kind of order it becomes (`planOrder`), and the task of a task step: the palette groups it
+   * by its kind's facts (`stepGroup`). None for an If block, which is no step.
+   */
+  makes: { kind: Exclude<OrderRequest['kind'], 'task'> | 'task'; task?: Task } | null
+  /** The places picked on the map, in order, each with what the banner asks for. */
+  picks: readonly { pick: PlanPick; prompt: string }[]
+  /** What the card asks for after the picks, if anything. */
+  ask?: PlanAsk
+}
+
+/**
+ * Every kind of step Add step offers, in the order the palette lists them: grouped as the Orders tab
+ * groups their orders (`PALETTE_GROUPS`), then Flow.
+ */
+export const PLAN_STEPS: readonly PlanKind[] = [
+  {
+    id: 'walk',
+    label: 'Walk to',
+    icon: '🚶',
+    makes: { kind: 'walkTo' },
+    picks: [{ pick: 'tile', prompt: 'where to walk' }],
+  },
+  {
+    id: 'explore',
+    label: 'Explore',
+    icon: '🧭',
+    makes: { kind: 'task', task: 'explore' },
+    picks: [],
+  },
+  {
+    id: 'relocate',
+    label: 'Relocate',
+    icon: '🏠',
+    makes: { kind: 'relocate' },
+    picks: [{ pick: 'city', prompt: 'the city of yours to relocate to' }],
+  },
+  {
+    id: 'mount',
+    label: 'Mount a horse',
+    icon: '🐎',
+    makes: { kind: 'mount' },
+    picks: [{ pick: 'horse', prompt: 'the horse to mount' }],
+  },
+  { id: 'dismount', label: 'Dismount', icon: '⏬', makes: { kind: 'dismount' }, picks: [] },
+  {
+    id: 'drive',
+    label: 'Drive the carriage',
+    icon: '🛞',
+    makes: { kind: 'drive' },
+    picks: [
+      { pick: 'carriage', prompt: 'the carriage to drive' },
+      { pick: 'tile', prompt: 'where to drive it' },
+    ],
+  },
+  {
+    id: 'board',
+    label: 'Board a carriage',
+    icon: '🚪',
+    makes: { kind: 'board' },
+    picks: [{ pick: 'carriage', prompt: 'the carriage to board' }],
+  },
+  {
+    id: 'boardBoat',
+    label: 'Board a boat',
+    icon: '⛵',
+    makes: { kind: 'board' },
+    picks: [
+      { pick: 'vessel', prompt: 'the boat to board' },
+      { pick: 'shore', prompt: 'the shore to board it from, beside where the boat will be' },
+    ],
+  },
+  {
+    id: 'boardCrew',
+    label: 'Board a ship as crew',
+    icon: '⚓',
+    makes: { kind: 'board' },
+    picks: [
+      { pick: 'vessel', prompt: 'the ship to crew' },
+      { pick: 'shore', prompt: 'the tile of the haven it is docked at to board it from' },
+    ],
+  },
+  {
+    id: 'row',
+    label: 'Row the boat',
+    icon: '🚣',
+    makes: { kind: 'row' },
+    picks: [
+      { pick: 'vessel', prompt: 'the boat to row' },
+      { pick: 'tile', prompt: 'where to row it: water, or the shore to land at' },
+    ],
+  },
+  {
+    id: 'sail',
+    label: 'Sail the ship',
+    icon: '🚢',
+    makes: { kind: 'sail' },
+    picks: [
+      { pick: 'vessel', prompt: 'the ship to sail' },
+      { pick: 'tile', prompt: 'where to sail it: the Sea, or a haven to dock at' },
+    ],
+  },
+  { id: 'getOff', label: 'Get off', icon: '⏏', makes: { kind: 'getOff' }, picks: [] },
+  {
+    id: 'hitch',
+    label: 'Hitch a horse',
+    icon: '🔗',
+    makes: { kind: 'hitch' },
+    picks: [{ pick: 'carriage', prompt: 'the carriage to hitch a horse to' }],
+    ask: 'horse',
+  },
+  {
+    id: 'unhitch',
+    label: 'Unhitch a horse',
+    icon: '✂',
+    makes: { kind: 'unhitch' },
+    picks: [{ pick: 'carriage', prompt: 'the carriage to unhitch the horse from' }],
+  },
+  {
+    id: 'haul',
+    label: 'Haul route',
+    icon: '🚚',
+    makes: { kind: 'task', task: 'haul' },
+    picks: [
+      { pick: 'carriage', prompt: 'the carriage to haul with' },
+      { pick: 'tile', prompt: 'where the haul route’s other stop is' },
+    ],
+    ask: 'haul',
+  },
+  {
+    // `CONTEXT.md`: Haul route by water: it starts on the shore beside the boat, a ship's on the
+    // haven it is docked at, and a ship's stops are havens.
+    id: 'haulBoat',
+    label: 'Haul route by boat or ship',
+    icon: '🛶',
+    makes: { kind: 'task', task: 'haul' },
+    picks: [
+      { pick: 'vessel', prompt: 'the boat or ship to haul with' },
+      {
+        pick: 'shore',
+        prompt:
+          'the first stop: the shore or haven beside where the boat will be (a ship: a haven)',
+      },
+      {
+        pick: 'tile',
+        prompt: 'the other stop: a shore tile or haven with water beside it (a ship: a haven)',
+      },
+    ],
+    ask: 'haul',
+  },
+  {
+    id: 'work',
+    label: 'Work',
+    icon: '⚒',
+    makes: { kind: 'task', task: 'work' },
+    picks: [{ pick: 'workplace', prompt: 'the workplace to work' }],
+  },
+  // Gathers by hand from where the step starts; the good is its Customise (`CONTEXT.md`: Gather).
+  { id: 'gather', label: 'Gather', icon: '🧺', makes: { kind: 'task', task: 'gather' }, picks: [] },
+  {
+    id: 'build',
+    label: 'Build',
+    icon: '🏗',
+    makes: { kind: 'task', task: 'build' },
+    picks: [{ pick: 'tile', prompt: 'where to build, or a site to join' }],
+    ask: 'buildingKind',
+  },
+  {
+    id: 'road',
+    label: 'Build line: road',
+    icon: '🛤',
+    makes: { kind: 'task', task: 'buildLine' },
+    picks: [
+      { pick: 'tile', prompt: 'where the road starts' },
+      { pick: 'tile', prompt: 'where the road ends' },
+    ],
+  },
+  {
+    id: 'wall',
+    label: 'Build line: wall',
+    icon: '🧱',
+    makes: { kind: 'task', task: 'buildLine' },
+    picks: [
+      { pick: 'tile', prompt: 'where the wall starts' },
+      { pick: 'tile', prompt: 'where the wall ends' },
+    ],
+  },
+  {
+    id: 'tearDown',
+    label: 'Tear down',
+    icon: '🪓',
+    makes: { kind: 'task', task: 'tearDown' },
+    picks: [{ pick: 'building', prompt: 'the building or site to tear down' }],
+  },
+  {
+    id: 'feedStable',
+    label: 'Feed the stable',
+    icon: '🌾',
+    makes: { kind: 'task', task: 'feedStable' },
+    picks: [{ pick: 'stable', prompt: 'the stable to feed' }],
+  },
+  {
+    // A single round (`CONTEXT.md`: Feeding the stable, Once): it ends once the stable is full.
+    id: 'feedStableOnce',
+    label: 'Feed the stable once',
+    icon: '🌾',
+    makes: { kind: 'task', task: 'feedStable' },
+    picks: [{ pick: 'stable', prompt: 'the stable to feed' }],
+  },
+  {
+    id: 'breed',
+    label: 'Breed horses',
+    icon: '🐴',
+    makes: { kind: 'task', task: 'breed' },
+    picks: [{ pick: 'stable', prompt: 'the stable to breed in' }],
+    ask: 'horses',
+  },
+  {
+    id: 'teach',
+    label: 'Teach',
+    icon: '📖',
+    makes: { kind: 'teach' },
+    picks: [{ pick: 'ground', prompt: 'the training ground to teach at' }],
+    ask: 'subject',
+  },
+  {
+    id: 'train',
+    label: 'Train',
+    icon: '🎯',
+    makes: { kind: 'task', task: 'train' },
+    picks: [{ pick: 'ground', prompt: 'the training ground to train at' }],
+  },
+  {
+    id: 'store',
+    label: 'Store what they carry',
+    icon: '📦',
+    makes: { kind: 'store' },
+    picks: [{ pick: 'storage', prompt: 'the storage, stable, carriage or boat to store at' }],
+  },
+  {
+    id: 'fetch',
+    label: 'Fetch',
+    icon: '📥',
+    makes: { kind: 'fetch' },
+    picks: [{ pick: 'storage', prompt: 'the storage, stable, carriage or boat to fetch from' }],
+    ask: 'goods',
+  },
+  {
+    id: 'pickUp',
+    label: 'Pick up',
+    icon: '✋',
+    makes: { kind: 'pickUp' },
+    picks: [{ pick: 'spot', prompt: 'where to pick goods up' }],
+    ask: 'goods',
+  },
+  {
+    id: 'drop',
+    label: 'Put down',
+    icon: '📤',
+    makes: { kind: 'drop' },
+    picks: [{ pick: 'spot', prompt: 'where to put goods down' }],
+    ask: 'goods',
+  },
+  {
+    id: 'feed',
+    label: 'Feed someone Down or a horse',
+    icon: '🍞',
+    makes: { kind: 'feed' },
+    picks: [{ pick: 'toFeed', prompt: 'the resident lying Down or the horse to feed' }],
+    ask: 'units',
+  },
+  {
+    // `CONTEXT.md`: Equipment: wherever they are when its turn comes.
+    id: 'equip',
+    label: 'Put on gear',
+    icon: '🛡',
+    makes: { kind: 'equip' },
+    picks: [],
+    ask: 'gear',
+  },
+  {
+    id: 'takeOff',
+    label: 'Take off gear',
+    icon: '🎒',
+    makes: { kind: 'takeOff' },
+    picks: [],
+    ask: 'slot',
+  },
+  {
+    id: 'runScript',
+    label: 'Run script',
+    icon: '📜',
+    makes: { kind: 'runScript' },
+    picks: [],
+    ask: 'script',
+  },
+  // Flow: its condition is set on the card, a place it asks about picked on the map (`nextPick`).
+  {
+    id: 'waitUntil',
+    label: 'Wait until',
+    icon: '⏳',
+    makes: { kind: 'waitUntil' },
+    picks: [],
+    ask: 'condition',
+  },
+  // Flow: an If block around the picked steps (`Plan.wrap`), or a block's condition (`blockId`).
+  { id: 'if', label: 'If', icon: '🔀', makes: null, picks: [], ask: 'condition' },
+]
+
+/** The task a kind of step gives, whose Customise (`CONTEXT.md`: Before it starts) it offers. */
+export const PLAN_TASKS: Partial<Readonly<Record<PlanStepId, Task>>> = Object.fromEntries(
+  PLAN_STEPS.flatMap((k) => (k.makes?.kind === 'task' ? [[k.id, k.makes.task]] : [])),
+)
+
+function planKind(id: PlanStepId): PlanKind {
+  return PLAN_STEPS.find((k) => k.id === id)!
+}
+
+/** A place picked on the map: the tile, and what was picked there. */
+export interface Picked {
+  x: number
+  y: number
+  /** The building, carriage or horse picked. */
+  id?: string
+  /** The building's kind, for a building picked or a construction site on the tile. */
+  building?: BuildingKind
+  /** Where goods go or come from on the tile, for a spot. */
+  spot?: GoodsSpot
+}
+
+/** A step being planned: its kind and the places picked so far. */
+export interface Plan {
+  kind: PlanStepId
+  picked: Picked[]
+  /** The step or block it goes after, set by the planner's insert point; at the end without. */
+  after?: number
+  /** Why the last tap picked nothing, said under the banner. */
+  error?: string
+  /** A Wait until's condition as the card's editor holds it, kept while the map picks a place. */
+  condition?: ConditionDraft
+  /** Whether the map is picking the place a Wait until's condition asks about. */
+  placing?: boolean
+  /** For an If: the steps and blocks it wraps, by id, as picked when it was started. */
+  wrap?: number[]
+  /** For an If: the block whose condition changes, rather than a new one. */
+  blockId?: number
+  /**
+   * With `blockId`: the block is a repeat block, and the condition set is what it repeats until
+   * (`CONTEXT.md`: Repeat block).
+   */
+  until?: boolean
+}
+
+/** The pick of the place a condition asks about (`CONTEXT.md`: Condition). */
+const PLACE_PICK = {
+  pick: 'place',
+  prompt: 'the storage, workplace or site of yours to ask about',
+} as const
+
+/** The next place the plan picks on the map, if it still needs one. */
+export function nextPick(plan: Plan): PlanKind['picks'][number] | undefined {
+  // A Wait until picks a place only when its editor asks for one.
+  if (plan.kind === 'waitUntil' || plan.kind === 'if') return plan.placing ? PLACE_PICK : undefined
+  return planKind(plan.kind).picks[plan.picked.length]
+}
+
+/**
+ * The plan with its condition's draft kept and the map set to pick the place it asks about:
+ * picked, the card's editor shows again with it.
+ */
+export function pickPlace(plan: Plan, condition: ConditionDraft): Plan {
+  const kept = { ...plan, condition, placing: true, picked: [] }
+  delete kept.error
+  return kept
+}
+
+/** What the card asks for once every place is picked; undefined when the step needs nothing. */
+export function planAsk(plan: Plan): PlanAsk | undefined {
+  const { ask } = planKind(plan.kind)
+  if (nextPick(plan)) return undefined
+  // A smithy says what to make; other workplaces make what they make.
+  if (plan.kind === 'work') return makesAt(plan.picked[0]!).length > 1 ? 'makes' : undefined
+  // A site to join is built as what it is.
+  if (plan.kind === 'build' && plan.picked[0]?.building) return undefined
+  return ask
+}
+
+/** The goods a picked workplace can make, more than one at a smithy. */
+export function makesAt(p: Picked): Good[] {
+  return (p.building && RECIPES[p.building]?.map(recipeGood)) ?? []
+}
+
+/** What picking places needs of the world: what is where and whose. */
+export interface PlanWorld {
+  buildings: readonly Building[]
+  /** The buildings the Player remembers out of sight (`CONTEXT.md`: Last seen). */
+  lastSeen: readonly Building[]
+  carriages: readonly Pick<Carriage, 'id' | 'x' | 'y' | 'realmId'>[]
+  /** The vessels in sight, to board, row or load the realm's (`CONTEXT.md`: Beside a vessel). */
+  vessels?: readonly Pick<SeenVessel, 'id' | 'x' | 'y' | 'realmId'>[]
+  /** Whether a tile is known to be water, where nobody stands to board (`CONTEXT.md`: Water). */
+  water?: (x: number, y: number) => boolean
+  horses: readonly Pick<SeenHorse, 'id' | 'x' | 'y' | 'realmId'>[]
+  cities: readonly Pick<City, 'id' | 'realmId'>[]
+  realmId: string
+  size: number
+  /** Residents in sight who are Down, of any realm, to Feed (`CONTEXT.md`: Reviving). */
+  toFeed?: readonly { id: string; x: number; y: number }[]
+}
+
+/**
+ * What a tap on the tile picks for `pick`, or why nothing, as a string: only that it could make
+ * sense (the place is there as last known, and the realm's where it must be: a workplace or site
+ * anyone may work can be anywhere in sight or last seen). Whether the step can start is checked
+ * when its turn comes.
+ */
+export function planPickAt(
+  w: PlanWorld,
+  pick: PlanPick,
+  at: { x: number; y: number },
+): Picked | string {
+  const tile = { x: at.x, y: at.y }
+  const on = (list: readonly Building[]) => list.filter((b) => isAt(at, b, w.size))
+  const inSight = on(w.buildings)
+  // Out of sight, what is there as last seen.
+  const here = inSight.length > 0 ? inSight : on(w.lastSeen)
+  const building = here.find((b) => b.kind !== 'road') ?? here[0]
+  const own = (b: Building) => buildingRealm(w, b) === w.realmId
+  const ownCarriage = w.carriages.find(
+    (k) => k.x === at.x && k.y === at.y && k.realmId === w.realmId,
+  )
+  const ownBoat = w.vessels?.find((v) => v.x === at.x && v.y === at.y && v.realmId === w.realmId)
+  const named = (b: Building): Picked => ({ ...tile, id: b.id, building: b.kind })
+  switch (pick) {
+    case 'tile':
+      return building?.site ? { ...tile, building: building.kind } : tile
+    case 'spot': {
+      // Loading a boat is Store and Fetch, which walk beside it themselves.
+      if (ownBoat) return 'a boat: Store or Fetch to load it'
+      if (ownCarriage) return { ...tile, spot: { kind: 'carriage', carriageId: ownCarriage.id } }
+      if (!building) return { ...tile, spot: { kind: 'ground' } }
+      if (building.site) return { ...tile, spot: { kind: 'site', siteId: building.id } }
+      if (['storage', 'stable', 'haven'].includes(building.kind))
+        return { ...tile, spot: { kind: 'storage', storageId: building.id } }
+      return { ...tile, spot: { kind: 'ground' } }
+    }
+    case 'workplace': {
+      // A site of a workplace too: Work builds it first (`CONTEXT.md`: Working a site).
+      const b = here.find((x) => MAX_WORKERS[x.kind] !== undefined)
+      return b ? named(b) : 'no workplace there'
+    }
+    case 'building':
+      return building && (own(building) || anyonesToWork(building))
+        ? named(building)
+        : 'no building of yours, workplace or site there'
+    case 'stable': {
+      const b = here.find((x) => x.kind === 'stable' && !x.site && own(x))
+      return b ? named(b) : 'no stable of yours there'
+    }
+    case 'ground': {
+      // Nobody owns a training ground: anyone's will do (`CONTEXT.md`: Training ground).
+      const b = here.find((x) => x.kind === 'trainingGround' && !x.site)
+      return b ? named(b) : 'no finished training ground there'
+    }
+    case 'storage': {
+      const b = here.find((x) => ['storage', 'stable', 'haven'].includes(x.kind) && !x.site)
+      if (b) return named(b)
+      if (ownBoat) return { ...tile, id: ownBoat.id }
+      return ownCarriage
+        ? { ...tile, id: ownCarriage.id }
+        : 'no storage, stable, haven, carriage or boat there'
+    }
+    case 'carriage':
+      return ownCarriage ? { ...tile, id: ownCarriage.id } : 'no carriage of yours there'
+    case 'vessel':
+      return ownBoat ? { ...tile, id: ownBoat.id } : 'no boat of yours there'
+    case 'shore':
+      // Whether the boat is beside it then is checked when the step's turn comes.
+      return w.water?.(at.x, at.y) ? 'that is water: pick the shore beside the boat' : tile
+    case 'horse': {
+      const h = w.horses.find((x) => x.x === at.x && x.y === at.y && x.realmId === w.realmId)
+      return h ? { ...tile, id: h.id } : 'no horse of yours there'
+    }
+    case 'city': {
+      // Its area as known, in sight or as last seen (`CONTEXT.md`: City area).
+      const known = { buildings: [...w.buildings, ...w.lastSeen] }
+      const c = w.cities.find(
+        (x) =>
+          x.realmId === w.realmId &&
+          nearCityAreaAll(known.buildings, x.id, [[at.x, at.y]], 0, w.size)[0],
+      )
+      return c ? { ...tile, id: c.id } : 'no city of yours there'
+    }
+    case 'toFeed': {
+      const r = w.toFeed?.find((x) => x.x === at.x && x.y === at.y)
+      return r ? { ...tile, id: r.id } : 'nobody to feed there'
+    }
+    case 'place': {
+      // What a condition asks about: a storage, workplace or site of the realm's own
+      // (`CONTEXT.md`: Condition), never another realm's.
+      const b = here.find(
+        (x) => own(x) && (x.site || STOCKED.includes(x.kind) || MAX_WORKERS[x.kind] !== undefined),
+      )
+      return b ? named(b) : 'no storage, workplace or site of yours there'
+    }
+  }
+}
+
+/** The kinds of building that keep a stock: what a condition calls a storage (as the server). */
+const STOCKED: readonly BuildingKind[] = ['storage', 'warehouse', 'stable', 'haven']
+
+/** A city of the realm as Add step lists it to pick (Relocate): its town hall's tile, if known. */
+export interface PlanCity {
+  id: string
+  name: string
+  /** Its free housing, less the residents already relocating there (`relocateRoom`). */
+  room: number
+  x: number
+  y: number
+}
+
+/**
+ * The realm's cities the Player knows, by name, for Add step to list for a step that picks a city
+ * (Relocate), each with its free housing as now: only a hint, as it is checked when the step's
+ * turn comes (`CONTEXT.md`: Relocate). One whose town hall is unknown is left out.
+ */
+export function planCities(seen: RelocateWorld, realmId: string): PlanCity[] {
+  return seen.cities
+    .filter((c) => c.realmId === realmId)
+    .flatMap((c) => {
+      const hall = seen.buildings.find((b) => b.cityId === c.id && b.kind === 'townHall')
+      if (!hall) return []
+      const room = Math.max(0, relocateRoom(seen, c))
+      return [{ id: c.id, name: c.name, room, x: hall.x, y: hall.y }]
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * The plan with a city of the realm picked from Add step's list instead of on the map, for a
+ * step that picks a city next (Relocate), at its town hall's tile.
+ */
+export function pickCity(plan: Plan, city: Pick<PlanCity, 'id' | 'x' | 'y'>): Plan {
+  if (nextPick(plan)?.pick !== 'city') return plan
+  return { ...plan, picked: [...plan.picked, { x: city.x, y: city.y, id: city.id }] }
+}
+
+/** The plan with a tap on the map picked into it, or why the tap picked nothing. */
+export function pickInto(w: PlanWorld, plan: Plan, at: { x: number; y: number }): Plan {
+  const next = nextPick(plan)
+  if (!next) return plan
+  const picked = planPickAt(w, next.pick, at)
+  if (typeof picked === 'string') return { ...plan, error: picked }
+  const kept = { ...plan }
+  delete kept.error
+  // The place a condition asks about goes into its draft, and the editor shows again.
+  if (next.pick === 'place') {
+    delete kept.placing
+    return { ...kept, condition: { ...(plan.condition ?? NEW_DRAFT), placeId: picked.id! } }
+  }
+  return { ...kept, picked: [...plan.picked, picked] }
+}
+
+/** What the card's ask answered: goods with units, a kind to build, two horses, and so on. */
+export type PlanAnswer =
+  | { ask: 'goods'; goods: Stock }
+  | { ask: 'buildingKind'; building: BuildingKind; material?: WallMaterial }
+  | { ask: 'makes'; makes: Good }
+  | { ask: 'horses'; horseIds: [string, string] }
+  | { ask: 'horse'; horseId: string }
+  | { ask: 'haul'; setup: HaulSetup }
+  | { ask: 'script'; scriptId: number }
+  | { ask: 'subject'; subject: TrainingSubject }
+  | { ask: 'units'; units: number }
+  | { ask: 'condition'; condition: Condition }
+  /** A good to put on, or the slot to take off (`CONTEXT.md`: Equipment). */
+  | { ask: 'gear'; good: Good }
+  | { ask: 'slot'; slot: 'weapon' | 'shield' | 'armour' }
+
+/** Where a step acts, for the walk put before it (`appendRequest`'s `at`). */
+type At = { x: number; y: number }
+
+/**
+ * The order a planned step becomes, and the tile it acts on when it needs the resident standing
+ * there; a walk there goes before it. Steps that go to their place themselves (walk, store,
+ * fetch, build, a Build line, relocate) have no `at`. Undefined while a place is still to be
+ * picked or the card's ask isn't answered.
+ */
+export function planOrder(
+  plan: Plan,
+  answer?: PlanAnswer,
+): { order: OrderRequest; at?: At } | undefined {
+  const ask = planAsk(plan)
+  if (nextPick(plan) || (ask && answer?.ask !== ask)) return undefined
+  const [p, q] = plan.picked as [Picked, Picked]
+  const at = { x: p?.x, y: p?.y }
+  const a = answer
+  switch (plan.kind) {
+    case 'walk':
+      return { order: { kind: 'walkTo', x: p.x, y: p.y } }
+    case 'drive':
+      return { order: { kind: 'drive', carriageId: p.id, x: q.x, y: q.y }, at }
+    case 'mount':
+      return { order: { kind: 'mount', horseId: p.id }, at }
+    case 'dismount':
+      return { order: { kind: 'dismount' } }
+    case 'board':
+      return { order: { kind: 'board', carriageId: p.id }, at }
+    case 'boardBoat':
+      // From beside it: a walk to the shore picked goes first (`CONTEXT.md`: Beside a vessel).
+      return { order: { kind: 'board', vesselId: p.id }, at: { x: q.x, y: q.y } }
+    case 'boardCrew':
+      // From its haven: a walk there goes first (`CONTEXT.md`: Docked, Crew).
+      return { order: { kind: 'board', vesselId: p.id, asCrew: true }, at: { x: q.x, y: q.y } }
+    case 'row':
+      // Aboard or beside it already, as a step before saw to (`CONTEXT.md`: Rowing).
+      return { order: { kind: 'row', vesselId: p.id, x: q.x, y: q.y } }
+    case 'sail':
+      // Aboard it as one of its crew already, as a step before saw to (`CONTEXT.md`: Sailing).
+      return { order: { kind: 'sail', vesselId: p.id, x: q.x, y: q.y } }
+    case 'getOff':
+      return { order: { kind: 'getOff' } }
+    case 'explore':
+      return { order: { kind: 'task', task: 'explore' } }
+    case 'gather':
+      return { order: { kind: 'task', task: 'gather' } }
+    case 'unhitch':
+      return { order: { kind: 'unhitch', carriageId: p.id }, at }
+    case 'hitch':
+      return {
+        order: { kind: 'hitch', carriageId: p.id, horseId: a?.ask === 'horse' ? a.horseId : null },
+        at,
+      }
+    case 'work': {
+      const makes = a?.ask === 'makes' ? { makes: a.makes } : {}
+      return { order: { kind: 'task', task: 'work', workplaceId: p.id, ...makes }, at }
+    }
+    case 'build': {
+      const building = a?.ask === 'buildingKind' ? a.building : p.building
+      const material = a?.ask === 'buildingKind' && a.material ? { material: a.material } : {}
+      return { order: { kind: 'task', task: 'build', building, at, ...material } }
+    }
+    case 'tearDown':
+      return { order: { kind: 'task', task: 'tearDown', buildingId: p.id }, at }
+    case 'road':
+    case 'wall': {
+      // The Build line task, as the card gives it; the builder walks to the line themselves.
+      const line = { building: plan.kind, from: at, to: { x: q.x, y: q.y } }
+      return { order: { kind: 'task', task: 'buildLine', ...line } }
+    }
+    case 'feedStable':
+      return { order: { kind: 'task', task: 'feedStable', stableId: p.id }, at }
+    case 'feedStableOnce':
+      return {
+        order: { kind: 'task', task: 'feedStable', stableId: p.id, params: { once: 1 } },
+        at,
+      }
+    case 'breed': {
+      const horseIds = a?.ask === 'horses' ? a.horseIds : []
+      return { order: { kind: 'task', task: 'breed', stableId: p.id, horseIds }, at }
+    }
+    case 'teach': {
+      const subject = a?.ask === 'subject' ? a.subject : null
+      return { order: { kind: 'teach', buildingId: p.id, subject }, at }
+    }
+    case 'train':
+      return { order: { kind: 'task', task: 'train', groundId: p.id }, at }
+    case 'store':
+      return { order: { kind: 'store', goods: [...GOODS], to: p.id } }
+    case 'fetch':
+      return { order: { kind: 'fetch', goods: a?.ask === 'goods' ? a.goods : {}, from: p.id } }
+    case 'pickUp':
+    case 'drop': {
+      const goods = a?.ask === 'goods' ? a.goods : {}
+      return { order: { kind: plan.kind, spot: p.spot, goods }, at }
+    }
+    case 'haul': {
+      const setup = a?.ask === 'haul' ? a.setup : {}
+      const order = { kind: 'task', task: 'haul', carriageId: p.id, x: q.x, y: q.y, ...setup }
+      return { order, at }
+    }
+    case 'haulBoat': {
+      // A walk to the first stop goes first; the boat is given as the Haul task's carriage.
+      const setup = a?.ask === 'haul' ? a.setup : {}
+      const to = plan.picked[2] as Picked
+      const order = { kind: 'task', task: 'haul', carriageId: p.id, x: to.x, y: to.y, ...setup }
+      return { order, at: { x: q.x, y: q.y } }
+    }
+    case 'relocate':
+      return { order: { kind: 'relocate', cityId: p.id } }
+    case 'feed': {
+      // A walk to their tile goes first.
+      const units = a?.ask === 'units' ? a.units : FEED_UNITS
+      return { order: { kind: 'feed', targetId: p.id, units }, at }
+    }
+    case 'equip':
+      return { order: { kind: 'equip', good: a?.ask === 'gear' ? a.good : null } }
+    case 'takeOff':
+      return { order: { kind: 'takeOff', slot: a?.ask === 'slot' ? a.slot : null } }
+    case 'runScript':
+      return { order: { kind: 'runScript', scriptId: a?.ask === 'script' ? a.scriptId : null } }
+    case 'waitUntil':
+      // They stand idle where they are until it holds (`CONTEXT.md`: Wait until).
+      return {
+        order: { kind: 'waitUntil', condition: a?.ask === 'condition' ? a.condition : null },
+      }
+    case 'if':
+      // No step: the planner puts the block in (`PlannerFlow.ifDone`).
+      return undefined
+    default: {
+      // Every kind of step is planned above: a new one fails typecheck until it is.
+      const unplanned: never = plan.kind
+      return unplanned
+    }
+  }
+}
+
+/** The realm's horses in sight standing in the stable picked (`horsesIn`), to pick two to breed. */
+export function ownHorsesIn(
+  w: Pick<PlanWorld, 'buildings' | 'realmId'>,
+  horses: readonly SeenHorse[],
+  stableId: string | undefined,
+): SeenHorse[] {
+  const stable = w.buildings.find((b) => b.id === stableId)
+  return stable
+    ? horsesIn(
+        horses.filter((h) => h.realmId === w.realmId),
+        stable,
+      )
+    : []
+}
+
+/**
+ * The horses the plan's card lists: for Hitch a horse the realm's in sight on the carriage's tile,
+ * any of them, as whether it can be hitched is checked when the step's turn comes; else those in
+ * the stable picked (`horsesIn`).
+ */
+export function planHorses(
+  w: Pick<PlanWorld, 'buildings' | 'size' | 'realmId'>,
+  horses: readonly SeenHorse[],
+  plan: Plan | undefined,
+): SeenHorse[] {
+  const at = plan?.picked[0]
+  if (plan?.kind !== 'hitch') return ownHorsesIn(w, horses, at?.id)
+  return horses.filter((h) => h.realmId === w.realmId && h.x === at?.x && h.y === at?.y)
+}

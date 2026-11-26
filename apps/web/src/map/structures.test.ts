@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Building, BuildingKind } from '@csp/shared-types'
 import { cityAreaTileList } from '@csp/lang-wasm'
-import { footprintKeys } from '../footprint.js'
+import { footprintKeys } from '../building/footprint.js'
 import { structuresOf } from './structures.js'
 
 const size = 100

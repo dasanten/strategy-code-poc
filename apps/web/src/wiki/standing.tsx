@@ -42,7 +42,7 @@ import {
   NPC_HUNTERS_PER_THIEF,
 } from '@csp/balance'
 import type { BuildingKind, CrimeKind } from '@csp/shared-types'
-import { fighterStrength } from '../persuasion.js'
+import { fighterStrength } from '../residents/persuasion.js'
 import { BUILDING_NAMES } from '../map/palette.js'
 import { Table } from './parts.js'
 import { COMBAT_SKILL_MAX, crimeForgotten, days, num, realSeconds, signed } from './wiki-view.js'

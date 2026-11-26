@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CHUNK_SIZE, TERRAIN_LEVEL_MAX, UNEXPLORED } from '@csp/shared-types'
-import { Terrain, chunksAcross, levelChunksAcross } from '../terrain.js'
+import { Terrain, chunksAcross, levelChunksAcross } from '../world/terrain.js'
 import { MAX_SCALE, minScale, visibleChunks } from './camera.js'
 import {
   LEVEL_SQUARE_PX,

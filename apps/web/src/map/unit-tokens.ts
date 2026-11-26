@@ -1,5 +1,5 @@
-import { SHARES_A_TILE } from '../building.js'
-import { isDown } from '../world.js'
+import { SHARES_A_TILE } from '../building/building.js'
+import { isDown } from '../world/world.js'
 import type {
   Army,
   Building,
@@ -12,7 +12,7 @@ import type {
   SeenVessel,
   SeenMachine,
 } from '@csp/shared-types'
-import { caravanParts } from '../caravans.js'
+import { caravanParts } from '../trade/caravans.js'
 import {
   ACTIVITY_ART,
   BASE_ART,

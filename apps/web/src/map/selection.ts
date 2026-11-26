@@ -1,6 +1,6 @@
-import { SHARES_A_TILE } from '../building.js'
-import { covers } from '../footprint.js'
-import { wrap } from '../terrain.js'
+import { SHARES_A_TILE } from '../building/building.js'
+import { covers } from '../building/footprint.js'
+import { wrap } from '../world/terrain.js'
 import type { Building, SeenCarriage, SeenHorse, SeenResident } from '@csp/shared-types'
 import type { Spot } from './unit-tokens.js'
 

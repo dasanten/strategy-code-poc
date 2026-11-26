@@ -21,9 +21,9 @@ import {
   TICKS_PER_GAME_DAY,
 } from '@csp/balance'
 import type { BuildingKind } from '@csp/shared-types'
-import { DECAY_DAYS } from '../decay.js'
+import { DECAY_DAYS } from '../building/decay.js'
 import { rebuildMaterials, rebuildWork, repairMaterials, repairWork } from '@csp/lang-wasm'
-import { WHO_SUGGESTS } from '../who-list-view.js'
+import { WHO_SUGGESTS } from '../realm/who-list-view.js'
 import { Table } from './parts.js'
 import { kindName, goods } from './names.js'
 import { buildCosts, stoneWallCosts, duration, num, pct, realTimeOf } from './wiki-view.js'

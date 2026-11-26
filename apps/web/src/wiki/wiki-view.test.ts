@@ -57,7 +57,7 @@ import {
   HOW_TO_TRADE_PATH,
   WIKI_PATH,
 } from './wiki-view.js'
-import { WIKI_TOPICS, Wiki } from '../Wiki.js'
+import { WIKI_TOPICS, Wiki } from './Wiki.js'
 
 const render = () => renderToStaticMarkup(createElement(Wiki))
 
@@ -207,10 +207,7 @@ describe('wiki page', () => {
     .filter((name) => !name.includes('.test.'))
     .map((name) => new URL(name, folder))
   /** The page shell, every topic and the pieces they share. */
-  const pageFiles = [
-    new URL('../Wiki.tsx', import.meta.url),
-    ...files.filter((f) => f.pathname.endsWith('.tsx')),
-  ]
+  const pageFiles = files.filter((f) => f.pathname.endsWith('.tsx'))
   const helperFiles = files.filter((f) => f.pathname.endsWith('.ts'))
 
   it('explains Zeal and rallying the crew with the balance numbers', () => {

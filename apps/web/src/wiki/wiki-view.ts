@@ -67,9 +67,9 @@ import {
   walkSpeed,
   workOutput,
 } from '@csp/balance'
-import { BUILDABLE, SITES_OF_MOVERS } from '../building.js'
+import { BUILDABLE, SITES_OF_MOVERS } from '../building/building.js'
 import { STAT_NAMES } from '@csp/shared-types'
-import { SKILL_NAMES } from '../world.js'
+import { SKILL_NAMES } from '../world/world.js'
 import type {
   TrainingSubject,
   BuildingKind,

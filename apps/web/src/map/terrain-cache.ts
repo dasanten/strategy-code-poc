@@ -1,4 +1,4 @@
-import { coarseChunkOf } from '../terrain.js'
+import { coarseChunkOf } from '../world/terrain.js'
 import type { ChunkSource } from './chunks.js'
 
 /*

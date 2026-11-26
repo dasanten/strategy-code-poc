@@ -1,6 +1,6 @@
 import type { Graphics } from 'pixi.js'
-import { FOOTPRINT } from '../footprint.js'
-import type { PickPreview } from '../pick-preview.js'
+import { FOOTPRINT } from '../building/footprint.js'
+import type { PickPreview } from '../pick/pick-preview.js'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 import { LEADER_COLOR, REFUSED_COLOR, ROAD_COLOR, WALL_COLOR } from './palette.js'
 import { GLYPH_COLOR } from './tokens.js'

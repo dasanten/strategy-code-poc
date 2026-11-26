@@ -1,5 +1,5 @@
 import { CHUNK_SIZE } from '@csp/shared-types'
-import { chunksAcross } from '../terrain.js'
+import { chunksAcross } from '../world/terrain.js'
 import type { RegionHolder, RegionMap } from '@csp/shared-types'
 import type { ZoomTier } from './camera.js'
 
