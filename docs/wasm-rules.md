@@ -141,3 +141,9 @@ The update is over its limit, and the download is close to its own. A tick of th
 about 400 residents, who move: reading their JSON is most of the update. The options (fewer fields
 per moving resident in a tick, `wasm-opt`, a binary tick message, other limits) are Daniel's
 call, in #1637.
+
+## Size after the first part of T122.5b
+
+The rules on a few fields of one thing (`ageInYears` to `isParamChoice`, #1634) add about 10 KB
+gzipped: the module is 495 KB gzipped (1,528 KB raw), from 485 KB, 5 KB under the limit. The
+rest of #1634 does not fit until #1637 is decided.

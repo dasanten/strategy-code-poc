@@ -17,6 +17,9 @@ use csp_sim::queries::{
     npc_trade, people, residents, trader_trade, transfer, warehouse, warehouse_trade,
 };
 
+/// A tile as a rule takes it: (x, y).
+type Tile = (f64, f64);
+
 /// The arguments of a call, read as the tuple the rule takes.
 fn args<T: DeserializeOwned>(name: &str, json: &str) -> Result<T, String> {
     serde_json::from_str(json).map_err(|e| format!("{name}: {e}"))
@@ -282,8 +285,7 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
             json!(trader_trade::trader_stock(escorts, &load))
         }
         "transferTiles" => {
-            let (size, warehouse, from, to): (i32, (f64, f64), Option<(f64, f64)>, (f64, f64)) =
-                args(name, json)?;
+            let (size, warehouse, from, to): (i32, Tile, Option<Tile>, Tile) = args(name, json)?;
             json!(transfer::transfer_tiles(size, warehouse, from, to))
         }
         "quoteTransfer" => {
