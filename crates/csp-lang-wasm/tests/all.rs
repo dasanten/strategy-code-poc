@@ -8,6 +8,8 @@
 //! own, so a helper is compiled once per file that uses it.
 #![allow(clippy::duplicate_mod)]
 
+#[path = "rules.rs"]
+mod rules;
 #[path = "script_data.rs"]
 mod script_data;
 #[path = "wasm_bindgen_version.rs"]

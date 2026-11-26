@@ -483,6 +483,31 @@ fn players_on(world: &mut WorldState, terrain: &TerrainMap, clients: usize) -> u
     remembered
 }
 
+/// The messages the first Player's socket gets, written one file each to the folder `BENCH_DUMP`
+/// names (`0000.json`, `0001.json`, ...), for measuring the client's side of them (T122.1:
+/// `scripts/wasm-rules-bench.mjs`). Nothing without it.
+struct Dump {
+    dir: Option<std::path::PathBuf>,
+    next: usize,
+}
+
+impl Dump {
+    fn from_env() -> Dump {
+        let dir = std::env::var_os("BENCH_DUMP").map(std::path::PathBuf::from);
+        if let Some(dir) = &dir {
+            std::fs::create_dir_all(dir).expect("the BENCH_DUMP folder can be made");
+        }
+        Dump { dir, next: 0 }
+    }
+
+    fn write(&mut self, text: &str) {
+        let Some(dir) = &self.dir else { return };
+        let path = dir.join(format!("{:04}.json", self.next));
+        std::fs::write(path, text).expect("a message can be written to BENCH_DUMP");
+        self.next += 1;
+    }
+}
+
 /// Steps the scene as `bench_sim` does with `clients` Players connected, one socket each, and
 /// times the Broadcast phase: what goes to every socket after the tick, Last seen with it
 /// (T99.7). The first Player remembers every building; the others only what they see.
@@ -543,6 +568,7 @@ pub fn bench_broadcast(
     let mut walking = Walking::new(Arc::clone(&terrain));
     let mut broadcast = Vec::with_capacity(ticks);
     let mut bytes = 0usize;
+    let mut dump = Dump::from_env();
     for i in 0..ticks {
         let mut finish =
             |timer: &csp_sim::tick::TickTimer, world: &mut WorldState, scratch: &mut Scratch| {
@@ -562,10 +588,13 @@ pub fn bench_broadcast(
             panic!("tick {i} failed");
         };
         broadcast.push(health.phases.get(TickPhase::Broadcast));
-        for rx in &mut sockets {
+        for (c, rx) in sockets.iter_mut().enumerate() {
             while let Ok(m) = rx.try_recv() {
                 if let Outgoing::Text(t) = m {
                     bytes += t.len();
+                    if c == 0 {
+                        dump.write(&t);
+                    }
                 }
             }
         }
