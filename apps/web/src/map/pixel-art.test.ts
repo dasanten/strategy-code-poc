@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GOODS } from '../shared/world.js'
 import { FOOTPRINT } from '../shared/footprint.js'
+import { SHARES_A_TILE } from '../shared/building.js'
 import { NODE_KINDS } from '../shared/chunks.js'
 import { BUILDING_NAMES } from './palette.js'
 import {
@@ -97,7 +98,8 @@ describe('pixel art registry', () => {
 
   it('has a slice for every building that isn’t a wall, gate, road or vehicle site', () => {
     const pieces = ['wall', 'gate', 'road']
-    const vehicles = ['carriage', 'boat', 'ship', 'ram', 'catapult']
+    // Roads and the sites of what moves off: a site's slice, but none of their own.
+    const vehicles: readonly string[] = SHARES_A_TILE
     for (const kind of Object.keys(BUILDING_NAMES) as (keyof typeof BUILDING_NAMES)[]) {
       const key = pixelBuilding(kind, false, false)
       if (pieces.includes(kind)) expect(key, kind).toBeUndefined()

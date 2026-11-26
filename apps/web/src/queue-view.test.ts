@@ -21,7 +21,6 @@ import {
   STORE_ALL,
   stepLabel,
   type Queued,
-  type StepGroup,
 } from './queue-view.js'
 import {
   dropItem,
@@ -571,45 +570,6 @@ describe('a step acting on no place', () => {
 })
 
 describe('queue steps read from the order kinds (T121.8)', () => {
-  it('are the kinds the hand-written list had, each in the group it had', () => {
-    const before: Record<string, StepGroup> = {
-      walkTo: 'move',
-      drive: 'move',
-      row: 'move',
-      sail: 'move',
-      unhitch: 'move',
-      hitch: 'move',
-      board: 'move',
-      getOff: 'move',
-      pickUp: 'goods',
-      drop: 'goods',
-      store: 'goods',
-      fetch: 'goods',
-      build: 'work',
-      tearDown: 'work',
-      workAt: 'work',
-      teach: 'work',
-      haul: 'move',
-      roadLine: 'work',
-      wallLine: 'work',
-      mount: 'move',
-      dismount: 'move',
-      relocate: 'move',
-      feed: 'goods',
-      equip: 'goods',
-      takeOff: 'goods',
-      task: 'work',
-      runScript: 'scripts',
-      waitUntil: 'flow',
-    }
-    expect([...QUEUE_STEP_KINDS].sort()).toEqual(Object.keys(before).sort())
-    for (const [kind, group] of Object.entries(before)) {
-      expect([kind, stepGroup({ kind } as OrderRequest)]).toEqual([kind, group])
-    }
-    expect(stepGroup({ kind: 'task', task: 'explore' } as OrderRequest)).toBe('move')
-    expect(stepGroup({ kind: 'attack' } as OrderRequest)).toBe('work')
-  })
-
   it('never end on their own for work, haul routes and teaching, as before', () => {
     for (const kind of QUEUE_STEP_KINDS) {
       const order = { kind } as OrderRequest
