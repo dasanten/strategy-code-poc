@@ -8,10 +8,13 @@
 import console from 'node:console'
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { performance } from 'node:perf_hooks'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { gzipSync } from 'node:zlib'
 
+// WebAssembly is a global of Node's, as in a browser.
+const { WebAssembly } = globalThis
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const dir = process.argv[2]
 if (!dir) {
