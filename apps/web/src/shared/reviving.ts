@@ -20,14 +20,6 @@ export { NO_CHILD_FEEDS, NO_FOOD_TO_FEED, HORSE_FULL } from '@csp/shared-types'
 /** What Feed needs to know of the resident who feeds. */
 export type Feeder = Pick<Resident, 'bornAt' | 'x' | 'y' | 'carried'>
 
-/** What Feed needs to know of the resident fed: from the world, or as a Player sees them. */
-export interface FeedTarget {
-  x: number
-  y: number
-  downUntil?: number
-  down?: true
-}
-
 /**
  * What Feed needs to know of the horse fed: from the world, or as a Player sees it. A Player sees
  * the hunger of only their own and their allies' horses (`SeenHorse`).

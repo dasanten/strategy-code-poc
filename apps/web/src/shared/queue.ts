@@ -19,11 +19,6 @@ export const QUEUE_STEP_KINDS: readonly string[] = ORDER_KINDS.filter((k) => k.q
   (k) => k.kind,
 )
 
-/** Steps that run a script (a task's default or the Player's own) rather than a built-in order. */
-export function runsScript(order: Pick<OrderRequest, 'kind'>): boolean {
-  return order.kind === 'task' || order.kind === 'runScript'
-}
-
 /**
  * A step that never ends on its own: working a workplace, a haul route, feeding a stable,
  * teaching or training. Feeding the stable once ends (`feedsOnce`).
@@ -76,34 +71,4 @@ export function queueSteps(items: readonly QueueItem[]): QueueStep[] {
 /** The current step's place among the queue's steps top to bottom, from 0; -1 if none. */
 export function currentIndex(q: Pick<Queue, 'items' | 'current'>): number {
   return queueSteps(q.items).findIndex((s) => s.id === q.current)
-}
-
-/** What a script sees of a queue (the `queue` script view): where it is and the current step. */
-export interface QueueView {
-  /** The current step, counted from 1 among the steps top to bottom. */
-  step: number
-  steps: number
-  loop: boolean
-  /** The current step's order kind, and the task or script it runs, if any. */
-  kind: string
-  task?: string
-  scriptId?: number
-  minutes?: number
-  startedAt?: number
-}
-
-export function queueView(q: Queue): QueueView {
-  const steps = queueSteps(q.items)
-  const at = Math.max(0, currentIndex(q))
-  const { order, minutes } = steps[at]!
-  return {
-    step: at + 1,
-    steps: steps.length,
-    loop: q.loop,
-    kind: order.kind,
-    ...(typeof order.task === 'string' ? { task: order.task } : {}),
-    ...(typeof order.scriptId === 'number' ? { scriptId: order.scriptId } : {}),
-    ...(minutes === undefined ? {} : { minutes }),
-    ...(q.startedAt === null ? {} : { startedAt: q.startedAt }),
-  }
 }

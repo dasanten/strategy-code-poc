@@ -1,22 +1,15 @@
 // Ported from packages/shared/src/warehouse.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { commandsCarriage } from './alliance.js'
-import { KEEPS_GOODS } from './building.js'
 import { townHallOf } from './city.js'
-import { covers, isAt } from './footprint.js'
 import { GOOD_WEIGHT, WAREHOUSE_FLOOR } from './narrowed.js'
-import { freeStock } from './offers.js'
-import { tradeOrgRefuses } from './standing.js'
-import { canWork, stockWeight } from './stats.js'
-import { NO_CARAVANS, tradeOrgHq } from './trade-org.js'
+import { stockWeight } from './stats.js'
 import { GOODS } from './world.js'
 import { DELIVERY_LOAD, HQ_FLOOR_FACTOR, HQ_FOOD_FLOOR_FACTOR, carryCapacity } from '@csp/balance'
 import type {
   Building,
   Carriage,
   DeliveryQuote,
-  DeliveryView,
   Good,
   PricedGood,
   Resident,
@@ -25,7 +18,6 @@ import type {
   TradeLimit,
   TradeQuote,
   TradeSide,
-  WarehousePrice,
   WorldState,
 } from '@csp/shared-types'
 import { HQ_COIN_WAREHOUSE } from '@csp/shared-types'
@@ -76,21 +68,6 @@ export function stockFloor(world: Pick<WorldState, 'cities' | 'buildings'>, b: B
 }
 
 /**
- * A Trade Org warehouse's prices (`CONTEXT.md`: Warehouse prices): every good it keeps but coins,
- * from its own stock. Empty for a building that is not one, and for the HQ's coin warehouse.
- */
-export function warehousePrices(
-  world: Pick<WorldState, 'cities' | 'buildings'>,
-  b: Building,
-): WarehousePrice[] {
-  const floor = stockFloor(world, b)
-  return PRICED_GOODS.filter((g) => floor[g] !== undefined).map((good) => {
-    const stock = b.stock?.[good] ?? 0
-    return { good, stock, ...priceFor(good, stock, floor[good]!) }
-  })
-}
-
-/**
  * Where a Trade Org warehouse's coins are when someone trades there (`CONTEXT.md`: Warehouse,
  * Trading with the Trade Organization): a trading post's own warehouse, at the HQ its coin
  * warehouse. Undefined for a building that prices nothing, or when the HQ's coin warehouse is
@@ -105,23 +82,6 @@ export function tradeCoinWarehouse(
   if (keeps.includes('coins')) return warehouse
   return world.buildings.find(
     (b) => b.cityId === warehouse.cityId && warehouseKeeps(world, b).includes('coins'),
-  )
-}
-
-/**
- * The Trade Org warehouse a resident on tile (x, y) can trade at (`CONTEXT.md`: Trading with the
- * Trade Organization, At a building): a finished one covering the tile that prices goods and has
- * its coins at hand
- * (`tradeCoinWarehouse`).
- */
-export function tradingWarehouseAt(
-  world: Pick<WorldState, 'cities' | 'buildings'>,
-  x: number,
-  y: number,
-): Building | undefined {
-  return world.buildings.find(
-    (b) =>
-      KEEPS_GOODS.includes(b.kind) && covers(b, x, y) && tradeCoinWarehouse(world, b) !== undefined,
   )
 }
 
@@ -215,152 +175,6 @@ export function quoteAtPrices(
     units = n
   }
   return limit ? { units, coins, limit } : { units, coins }
-}
-
-/**
- * Why a resident can't trade at a warehouse now, or undefined when they can (`CONTEXT.md`:
- * Trading with the Trade Organization): `realmId` is not refused (`CONTEXT.md`: Trade Org
- * reaction), and the resident is grown up, on a Trade Org warehouse's tile that prices the
- * good, `units` whole and positive, with some of the good to sell or coins to buy, in their hands
- * or on `carriageId`, a carriage on their tile that `realmId` commands. With `cityId`, a
- * delivery (`CONTEXT.md`: Delivery): the city is one of the realm's with a storage, which holds
- * some of the good for a pick-up, and the coins for a delivery come from hands or carriage as
- * usual.
- */
-export function tradeProblem(
-  world: WorldState,
-  realmId: string,
-  resident: Resident,
-  side: TradeSide,
-  good: unknown,
-  units: unknown,
-  carriageId: unknown,
-  cityId: unknown = undefined,
-): string | undefined {
-  if (tradeOrgRefuses(world, realmId)) return 'the Trade Organization won’t trade with you'
-  if (!canWork(resident, world.tick)) return 'children can’t trade'
-  const warehouse = tradingWarehouseAt(world, resident.x, resident.y)
-  if (!warehouse) return 'not at a Trade Org warehouse'
-  if (!(PRICED_GOODS as readonly unknown[]).includes(good)) return 'not a good warehouses trade'
-  if (stockFloor(world, warehouse)[good as PricedGood] === undefined) {
-    return 'this warehouse doesn’t trade that good'
-  }
-  if (!Number.isInteger(units) || (units as number) <= 0) return 'units must be a whole number'
-  let stock = resident.carried
-  if (carriageId !== null && carriageId !== undefined) {
-    const k = world.carriages.find((x) => x.id === carriageId)
-    if (!commandsCarriage(world, realmId, k)) return 'not one of your carriages'
-    if (!isAt(k, warehouse)) return 'that carriage is not at the warehouse'
-    stock = k.load
-  }
-  if (cityId !== null && cityId !== undefined) {
-    if (!tradeOrgHq(world)) return NO_CARAVANS
-    const city = world.cities.find((c) => c.id === cityId)
-    if (!city || city.realmId !== realmId) return 'not one of your cities'
-    const storage = deliveryStorage(world, city.id)
-    if (!storage) return 'that city has no storage'
-    if (side === 'sell') {
-      if (carriageId !== null && carriageId !== undefined) {
-        return 'a pick-up comes from the city’s storage, not a carriage'
-      }
-      stock = freeStock(world, storage)
-    }
-  }
-  if (side === 'sell' && !((stock[good as PricedGood] ?? 0) > 0)) return 'none of that good to sell'
-  if (side === 'buy' && !((stock.coins ?? 0) > 0)) return 'no coins to buy with'
-  return undefined
-}
-
-/**
- * Where the coins go when a directive is bought off on tile (x, y) (`CONTEXT.md`: Admin
- * directive): at any finished Trade Org warehouse there, the one that keeps its city's coins (at
- * the HQ its coin warehouse). Undefined off a Trade Org warehouse, or when the HQ's coin warehouse
- * is gone.
- */
-export function buyOffCoinWarehouseAt(
-  world: Pick<WorldState, 'cities' | 'buildings'>,
-  x: number,
-  y: number,
-): Building | undefined {
-  const here = world.buildings.find((b) => covers(b, x, y) && warehouseKeeps(world, b).length > 0)
-  if (!here) return undefined
-  if (warehouseKeeps(world, here).includes('coins')) return here
-  return tradeCoinWarehouse(world, here)
-}
-
-/**
- * Why a resident can't buy off a directive now, or undefined when they can (`CONTEXT.md`: Admin
- * directive): the directive names `realmId` as its target and an admin allows buying it off, and
- * the resident is grown up, on a Trade Org warehouse's tile (`buyOffCoinWarehouseAt`), with the
- * whole price in their hands or on `carriageId`, a carriage on their tile that `realmId`
- * commands. The Trade Organization takes the price even from those it otherwise refuses.
- */
-export function buyOffProblem(
-  world: WorldState,
-  realmId: string,
-  resident: Resident,
-  directiveId: unknown,
-  carriageId: unknown,
-): string | undefined {
-  const d = world.directives.find((x) => x.id === directiveId)
-  if (!d || d.target !== realmId) return 'no directive names your realm by that id'
-  if (d.price === null) return 'this directive can’t be bought off'
-  if (!canWork(resident, world.tick)) return 'children can’t pay'
-  const at = world.buildings.find(
-    (b) => covers(b, resident.x, resident.y) && warehouseKeeps(world, b).length > 0,
-  )
-  if (!at || !buyOffCoinWarehouseAt(world, resident.x, resident.y))
-    return 'not at a Trade Org warehouse'
-  let stock = resident.carried
-  if (carriageId !== null && carriageId !== undefined) {
-    const k = world.carriages.find((x) => x.id === carriageId)
-    if (!commandsCarriage(world, realmId, k)) return 'not one of your carriages'
-    if (!isAt(k, at)) return 'that carriage is not at the warehouse'
-    stock = k.load
-  }
-  if ((stock.coins ?? 0) < d.price) return `it costs ${d.price} coins`
-  return undefined
-}
-
-/** The Coins an Organization owes the Trade Organization (`CONTEXT.md`: Trade Org debt), or 0. */
-export function debtOf(world: Pick<WorldState, 'debts'>, org: string): number {
-  return world.debts.find((d) => d.org === org)?.coins ?? 0
-}
-
-/**
- * Why a resident can't pay `coins` of `realmId`'s Trade Org debt now, or undefined when they can
- * (`CONTEXT.md`: Trade Org debt): the realm owes it and the resident is grown up, on a Trade Org
- * warehouse's tile (`buyOffCoinWarehouseAt`), with a Coin at least in their hands or on `carriageId`,
- * a carriage on their tile that `realmId` commands. They pay what they hold, up to what is owed. The
- * Trade Organization takes it even from those it otherwise refuses.
- */
-export function payDebtProblem(
-  world: WorldState,
-  realmId: string,
-  resident: Resident,
-  coins: unknown,
-  carriageId: unknown,
-): string | undefined {
-  if (debtOf(world, realmId) <= 0) return 'your realm owes the Trade Organization nothing'
-  if (typeof coins !== 'number' || !Number.isInteger(coins) || coins <= 0) {
-    return 'pay a whole number of coins'
-  }
-  if (!canWork(resident, world.tick)) return 'children can’t pay'
-  const at = world.buildings.find(
-    (b) => covers(b, resident.x, resident.y) && warehouseKeeps(world, b).length > 0,
-  )
-  if (!at || !buyOffCoinWarehouseAt(world, resident.x, resident.y)) {
-    return 'not at a Trade Org warehouse'
-  }
-  let stock = resident.carried
-  if (carriageId !== null && carriageId !== undefined) {
-    const k = world.carriages.find((x) => x.id === carriageId)
-    if (!commandsCarriage(world, realmId, k)) return 'not one of your carriages'
-    if (!isAt(k, at)) return 'that carriage is not at the warehouse'
-    stock = k.load
-  }
-  if ((stock.coins ?? 0) < 1) return 'no coins to pay with'
-  return undefined
 }
 
 /**
@@ -465,27 +279,4 @@ export function quotePickUp(
     if (price > fee) best = { units: n, coins: price - fee, fee }
   }
   return best
-}
-
-/** A realm's deliveries and pick-ups not yet done, oldest first (`CONTEXT.md`: Delivery). */
-export function deliveriesFor(
-  world: Pick<WorldState, 'deliveries' | 'cities' | 'buildings'>,
-  realmId: string,
-): DeliveryView[] {
-  return world.deliveries
-    .filter((d) => d.realmId === realmId)
-    .map((d) => {
-      const w = world.buildings.find((b) => b.id === d.warehouseId)
-      return {
-        id: d.id,
-        kind: d.kind,
-        good: d.good,
-        units: d.units,
-        cityId: d.cityId,
-        city: world.cities.find((c) => c.id === d.cityId)?.name ?? '',
-        x: w?.x ?? 0,
-        y: w?.y ?? 0,
-        underway: d.caravanId !== null,
-      }
-    })
 }

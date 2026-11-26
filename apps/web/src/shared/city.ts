@@ -2,27 +2,17 @@
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
 import { allied } from './alliance.js'
-import { FOOTPRINT, footprintsNear, isAt, nearFootprint } from './footprint.js'
-import { CITY_PRICE_BY_BUILDING, HOUSING_ROOM } from './narrowed.js'
-import { freeStock } from './offers.js'
+import { FOOTPRINT, footprintsNear, isAt } from './footprint.js'
+import { HOUSING_ROOM } from './narrowed.js'
 import { standingOf } from './standing.js'
 import { isArmed } from './stats.js'
 import { wrap, wrapDelta, wrapDistance } from './terrain.js'
 import { TRADE_ORG } from './trade-org.js'
-import { isDown } from './world.js'
 import {
   CITY_BUILDING_REACH,
-  CITY_PRICE_PER_RESIDENT,
-  CITY_PRICE_STANDING_SWING,
-  FOOD_PER_DAY,
-  FOOD_SURPLUS_DAYS,
-  MAP_SIZE,
   NPC_CITY_REFUSES_STANDING,
-  NPC_CITY_WONT_SELL_STANDING,
   OCCUPATION_GAME_DAYS,
-  STANDING_RANGE,
   TICKS_PER_GAME_DAY,
-  hungerFactor,
 } from '@csp/balance'
 import type { Building, City, Resident, WorldState } from '@csp/shared-types'
 import { CITY_BUILDINGS } from '@csp/shared-types'
@@ -187,18 +177,6 @@ export function inCityArea(
   return nearCityAreaAll(world.buildings, city.id, [[x, y]], 0, size)[0]!
 }
 
-/** Whether a tile lies in a city's area or within `tiles` of it (`inCityArea`). */
-export function nearCityArea(
-  world: { buildings: readonly Building[] },
-  city: Pick<City, 'id'>,
-  x: number,
-  y: number,
-  tiles: number,
-  size: number,
-): boolean {
-  return nearCityAreaAll(world.buildings, city.id, [[x, y]], tiles, size)[0]!
-}
-
 /** The cities whose area the tile lies in; areas can overlap where cities meet. */
 export function citiesAt(
   world: Pick<WorldState, 'cities' | 'buildings'>,
@@ -249,51 +227,6 @@ export function isOutpostStorage(b: Building): boolean {
   return b.kind === 'storage' && !b.site && b.cityId === null
 }
 
-/**
- * Whether an outpost storage's stock is guarded (`CONTEXT.md`: Outpost storage): an armed, living
- * resident of its realm stands on or next to it, and nobody else's armed resident does. Only its
- * realm's residents can take from it then. `size` is the map's.
- */
-export function outpostStorageGuarded(
-  world: Pick<WorldState, 'residents'>,
-  b: Building,
-  size = MAP_SIZE,
-): boolean {
-  if (!isOutpostStorage(b) || !b.realmId) return false
-  return guardedBy(
-    world.residents,
-    (r) => nearFootprint(b, r, 1, size),
-    (r) => r.owner === b.realmId,
-    (r) => r.owner !== b.realmId,
-  )
-}
-
-/** What of a resident guarding looks at: all a Player sees of anyone in sight. */
-export type GuardResident = Pick<Resident, 'carried' | 'equipped'> & {
-  health?: number
-  downUntil?: number
-  down?: true
-}
-
-/**
- * Whether a place is guarded (`CONTEXT.md`: Outpost storage, Stealing a carriage or horse): of the
- * armed residents who are up and `here`, one `guards` it and none `breaks` the guard.
- */
-export function guardedBy<R extends GuardResident>(
-  residents: readonly R[],
-  here: (r: R) => boolean,
-  guards: (r: R) => boolean,
-  breaks: (r: R) => boolean,
-): boolean {
-  let guarded = false
-  for (const r of residents) {
-    if ((r.health ?? 1) <= 0 || isDown(r) || !isArmed(r) || !here(r)) continue
-    if (breaks(r)) return false
-    if (guards(r)) guarded = true
-  }
-  return guarded
-}
-
 /** A city's town hall, if it stands. */
 export function townHallOf(world: Pick<WorldState, 'buildings'>, city: City): Building | undefined {
   return world.buildings.find((b) => b.id === city.townHallId)
@@ -323,37 +256,6 @@ export function freeHousing(
   city: Pick<City, 'id'>,
 ): number {
   return housingRoom(world, city) - cityResidents(world, city).length
-}
-
-/**
- * Food in a city's storages, but for what is set aside for offers (`CONTEXT.md`: Offer). Food its
- * residents carry is not counted.
- */
-export function storedFood(world: WorldState, city: City): number {
-  return world.buildings
-    .filter((b) => b.cityId === city.id && b.kind === 'storage' && !b.site)
-    .reduce((food, b) => food + (freeStock(world, b).food ?? 0), 0)
-}
-
-/** Food all of a city's residents eat in `days` game days, by their Endurance. */
-export function cityFoodUse(world: WorldState, city: City, days: number): number {
-  return cityResidents(world, city).reduce(
-    (food, r) => food + FOOD_PER_DAY * hungerFactor(r, world.tick) * days,
-    0,
-  )
-}
-
-/** Food all of a city's residents eat in `FOOD_SURPLUS_DAYS` game days, by their Endurance. */
-export function surplusFoodLine(world: WorldState, city: City): number {
-  return cityFoodUse(world, city, FOOD_SURPLUS_DAYS)
-}
-
-/**
- * Whether a city has a food surplus (`CONTEXT.md`: Food surplus): its storages hold more Food
- * than all its residents eat in `FOOD_SURPLUS_DAYS` game days.
- */
-export function hasFoodSurplus(world: WorldState, city: City): boolean {
-  return storedFood(world, city) > surplusFoodLine(world, city)
 }
 
 /**
@@ -440,27 +342,6 @@ function occupationOf(
 }
 
 /**
- * Whether `r` is someone occupying `city`'s town hall (`CONTEXT.md`: Crime): armed, on its
- * footprint, and one who could hold it (`occupierOf`). A defender stepping onto the hall breaks
- * the occupation, but those still standing on it are the same occupiers.
- */
-export function standsOccupying(
-  world: Pick<WorldState, 'buildings' | 'alliances' | 'contracts' | 'punishments' | 'debts'>,
-  city: City,
-  r: Resident,
-  size: number,
-): boolean {
-  const hall = townHallOf(world, city)
-  if (!hall || !isArmed(r) || !isAt(r, hall, size) || defendsCity(world, city, r, size)) {
-    return false
-  }
-  const forTradeOrg = world.contracts.some(
-    (c) => c.startedAt !== null && c.hirerId === TRADE_ORG && c.residentIds.includes(r.id),
-  )
-  return !forTradeOrg && (r.owner !== null || cityTakers(world, city).has(r.id))
-}
-
-/**
  * The soldiers of the Trade Organization's army come to take `city` (`CONTEXT.md`: Trade Org debt):
  * on their way there or at it, for a debt the city's Organization still owes. Paid in full, they stop
  * occupying at once, so the debt can't be paid and the city lost in one tick.
@@ -511,90 +392,4 @@ export function npcCityRefuses(
   org: string,
 ): boolean {
   return forSale(city) && standingOf(world, city.id, org) < NPC_CITY_REFUSES_STANDING
-}
-
-/**
- * Whether an NPC city sells itself to a realm (`CONTEXT.md`: NPC city reaction): it is for sale
- * and its standing toward the realm is not below `NPC_CITY_WONT_SELL_STANDING`.
- */
-export function sellsTo(
-  world: Pick<WorldState, 'standings' | 'cities'>,
-  city: City,
-  realmId: string,
-): boolean {
-  return forSale(city) && standingOf(world, city.id, realmId) >= NPC_CITY_WONT_SELL_STANDING
-}
-
-/**
- * The price in Coins an NPC city names (`CONTEXT.md`: Buying a city), from what it is worth: its
- * residents (`CITY_PRICE_PER_RESIDENT`) and its finished buildings (`CITY_PRICE_BY_BUILDING`).
- * Named to a buyer, its standing toward them moves it (`CITY_PRICE_STANDING_SWING`): the better,
- * the lower.
- */
-export function cityPrice(
-  world: Pick<WorldState, 'residents' | 'buildings' | 'standings' | 'cities'>,
-  city: City,
-  buyerId?: string,
-): number {
-  const residents = world.residents.filter((r) => r.cityId === city.id).length
-  const buildings = world.buildings
-    .filter((b) => b.cityId === city.id && !b.site)
-    .reduce((sum, b) => sum + (CITY_PRICE_BY_BUILDING[b.kind] ?? 0), 0)
-  // Whole coins: a stretch of wall is worth less than one (`CITY_PRICE_BY_BUILDING`).
-  const worth = Math.round(residents * CITY_PRICE_PER_RESIDENT + buildings)
-  if (buyerId === undefined) return worth
-  const standing = standingOf(world, city.id, buyerId)
-  return Math.round(worth * (1 - (CITY_PRICE_STANDING_SWING * standing) / STANDING_RANGE))
-}
-
-/**
- * The realm's residents standing at a city's town hall (`CONTEXT.md`: Buying a city): the ones
- * whose coins count toward buying it. None when its town hall is gone.
- */
-export function buyersAtTownHall(
-  world: Pick<WorldState, 'residents' | 'buildings'>,
-  city: City,
-  realmId: string,
-): Resident[] {
-  const hall = townHallOf(world, city)
-  if (!hall) return []
-  return world.residents.filter((r) => r.owner === realmId && isAt(r, hall))
-}
-
-/** The coins the realm's residents carry on a city's town hall (`buyersAtTownHall`). */
-export function coinsAtTownHall(
-  world: Pick<WorldState, 'residents' | 'buildings'>,
-  city: City,
-  realmId: string,
-): number {
-  return buyersAtTownHall(world, city, realmId).reduce((n, r) => n + (r.carried.coins ?? 0), 0)
-}
-
-/**
- * Why the realm's resident `r` can't buy the city `cityId` now, if anything stops it
- * (`CONTEXT.md`: Buying a city): the city must be for sale to the realm (`sellsTo`), the resident
- * of the realm and standing on its town hall, and the realm's residents there must carry its
- * price to the realm in coins together.
- */
-export function buyProblem(
-  world: Pick<WorldState, 'residents' | 'buildings' | 'cities' | 'standings'>,
-  realmId: string,
-  r: Resident,
-  cityId: unknown,
-): string | undefined {
-  const city = world.cities.find((c) => c.id === cityId)
-  if (!city) return 'no such city'
-  if (city.tradeOrg) return 'the Trade Organization doesn’t sell its cities'
-  if (!forSale(city)) return 'only NPC cities are for sale'
-  if (!sellsTo(world, city, realmId))
-    return 'it won’t sell to you: it holds you in too low standing'
-  if (r.owner !== realmId) return 'only a resident of your own realm can buy a city'
-  const hall = townHallOf(world, city)
-  if (!hall || !isAt(r, hall)) return 'the resident must stand at its town hall'
-  const price = cityPrice(world, city, realmId)
-  const coins = coinsAtTownHall(world, city, realmId)
-  if (coins < price) {
-    return `it costs ${price} coins; your residents at its town hall carry ${coins}`
-  }
-  return undefined
 }

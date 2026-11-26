@@ -1,88 +1,28 @@
 // Ported from packages/shared/src/carriages.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { storageAt } from './goods.js'
-import { GOOD_WEIGHT } from './narrowed.js'
 import { canWork, stockWeight } from './stats.js'
 import { isDown } from './world.js'
-import {
-  CARAVAN_ESCORTS,
-  CARAVAN_ESCORTS_MAX,
-  CARAVAN_ROBBERIES_PER_ESCORT,
-  PASSENGER_WEIGHT,
-  TRADER_ESCORTS,
-  carriageCapacityWith,
-} from '@csp/balance'
+import { PASSENGER_WEIGHT, carriageCapacityWith } from '@csp/balance'
 import type {
   Caravan,
   Carriage,
   CarriageHorse,
   CarriagePlace,
-  Good,
-  GoodsSpot,
   Horse,
   Resident,
   Stock,
-  Trader,
-  WorldState,
 } from '@csp/shared-types'
 
 export { loadLevel, caravanFoodFor, foodForWay } from '@csp/lang-wasm'
 
 /** World queries about carriages (ADR 0002: the game API orders and scripts share). */
 
-/**
- * Everything the Trade Org runs with a carriage and a crew: its caravans and its wandering traders
- * (`CONTEXT.md`: Caravan, Wandering trader, Caravan crew lost).
- */
-export function convoysOf(world: Pick<WorldState, 'caravans' | 'traders'>): (Caravan | Trader)[] {
-  return [...world.caravans, ...world.traders]
-}
-
-/** The Trade Org caravan or wandering trader a resident drives or escorts, if any. */
-export function convoyOf(
-  world: Pick<WorldState, 'caravans' | 'traders'>,
-  residentId: string,
-): Caravan | Trader | undefined {
-  return convoysOf(world).find((c) => c.driverId === residentId || c.escortIds.includes(residentId))
-}
-
 /** Everyone on a caravan, by id: its driver, if it has one, and its escort. */
 export function crewIdsOf(caravan: Pick<Caravan, 'driverId' | 'escortIds'>): string[] {
   return caravan.driverId === null
     ? [...caravan.escortIds]
     : [caravan.driverId, ...caravan.escortIds]
-}
-
-/**
- * How many escorts the caravan on the route to trading post `postId` walks with (`CONTEXT.md`:
- * Caravan): `CARAVAN_ESCORTS`, and one more for every `CARAVAN_ROBBERIES_PER_ESCORT` times the
- * route was robbed, up to `CARAVAN_ESCORTS_MAX`.
- */
-export function caravanEscortsWanted(
-  world: Pick<WorldState, 'routeRobberies'>,
-  postId: string,
-): number {
-  return escortsAfter(CARAVAN_ESCORTS, world.routeRobberies[postId] ?? 0)
-}
-
-/**
- * How many escorts a wandering trader walks with (`CONTEXT.md`: Wandering trader): as for a caravan,
- * from `TRADER_ESCORTS`, by how often it was robbed.
- */
-export function traderEscortsWanted(trader: Pick<Trader, 'robberies'>): number {
-  return escortsAfter(TRADER_ESCORTS, trader.robberies)
-}
-
-/** `escorts`, and one more for every `CARAVAN_ROBBERIES_PER_ESCORT` robberies, up to the most. */
-function escortsAfter(escorts: number, robberies: number): number {
-  const extra = Math.floor(robberies / CARAVAN_ROBBERIES_PER_ESCORT)
-  return Math.min(CARAVAN_ESCORTS_MAX, escorts + extra)
-}
-
-/** The carriages standing on a tile. */
-export function carriagesAt(world: WorldState, x: number, y: number): Carriage[] {
-  return world.carriages.filter((k) => k.x === x && k.y === y)
 }
 
 /** The carriage a horse is hitched to, if it pulls one. */
@@ -181,27 +121,6 @@ export function standsStill(
 }
 
 /**
- * Whether a carriage's hitched horse lies Down (`CONTEXT.md`: Down): until it wakes or dies nobody
- * can drive the carriage, so the Trade Org's crews give no drive order and count no failed drive.
- */
-export function horseLiesDown(
-  world: { horses: readonly CarriageHorse[] },
-  carriage: Pick<Carriage, 'horseId'>,
-): boolean {
-  const horse = world.horses.find((h) => h.id === carriage.horseId)
-  return horse !== undefined && isDown(horse)
-}
-
-/**
- * Where a haul route's stop on tile (x, y) loads and unloads (`CONTEXT.md`: Haul route): the
- * storage there, a stable's included, or else the ground.
- */
-export function haulStopSpot(world: WorldState, x: number, y: number): GoodsSpot {
-  const storage = storageAt(world, x, y)
-  return storage ? { kind: 'storage', storageId: storage.id } : { kind: 'ground' }
-}
-
-/**
  * Most weight a carriage holds, in kg (`CONTEXT.md`: Horse stats): by the Strength of the horse
  * that pulls it (`horseFor`), or `CARRIAGE_CAPACITY` while it has none.
  */
@@ -210,43 +129,6 @@ export function carriageCapacity(
   carriage: CarriagePlace,
 ): number {
   return carriageCapacityWith(horseFor(world, carriage))
-}
-
-/** The residents aboard a carriage as its passengers (`CONTEXT.md`: Passenger). */
-export function passengersOf<R extends Pick<Resident, 'aboard'>>(
-  world: { residents: readonly R[] },
-  carriage: Pick<Carriage, 'id'>,
-): R[] {
-  return world.residents.filter((r) => r.aboard === carriage.id)
-}
-
-/**
- * What a carriage's goods and passengers weigh together, in kg (`CONTEXT.md`: Passenger): each
- * passenger counts as `PASSENGER_WEIGHT`.
- */
-export function carriageWeight(world: Pick<WorldState, 'residents'>, carriage: Carriage): number {
-  return stockWeight(carriage.load) + passengersOf(world, carriage).length * PASSENGER_WEIGHT
-}
-
-/**
- * How much weight of goods a carriage holds with its passengers aboard, in kg: what it holds
- * (`carriageCapacity`) less what its passengers count for (`CONTEXT.md`: Passenger).
- */
-export function goodsCapacity(world: WorldState, carriage: Carriage): number {
-  return carriageCapacity(world, carriage) - passengersOf(world, carriage).length * PASSENGER_WEIGHT
-}
-
-/**
- * How much more weight fits on a carriage, in kg: what it holds (`carriageCapacity`) less its
- * goods and passengers (`carriageWeight`).
- */
-export function carriageRoom(world: WorldState, carriage: Carriage): number {
-  return goodsCapacity(world, carriage) - stockWeight(carriage.load)
-}
-
-/** How many more whole units of a good fit on a carriage (`carriageRoom`). */
-export function unitsThatFitCarriage(world: WorldState, carriage: Carriage, good: Good): number {
-  return Math.max(0, Math.floor(carriageRoom(world, carriage) / GOOD_WEIGHT[good] + 1e-9))
 }
 
 /**

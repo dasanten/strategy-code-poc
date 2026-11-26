@@ -10,8 +10,8 @@ import {
   type BuildingSpec,
 } from '@csp/balance'
 import { RECIPES, WORKPLACE_MAX_WORKERS } from './narrowed.js'
-import { carriageCanEnter, type Recipe } from './stats.js'
-import { Terrain, terrainAt, tileIndex, type TerrainMap, wrap, wrapDelta } from './terrain.js'
+import { type Recipe } from './stats.js'
+import { tileIndex, wrap, wrapDelta } from './terrain.js'
 import { MAP_SIZE, buildWork } from '@csp/balance'
 import type {
   Building,
@@ -154,20 +154,6 @@ export function roadTiles(world: Pick<WorldState, 'buildings'>, size: number): S
     if (b.kind === 'road' && !b.site) out.add(tileIndex(size, b.x, b.y))
   }
   return out
-}
-
-/**
- * Whether a carriage, or a rider, can go onto (x, y) (`CONTEXT.md`: Carriage, Riding): passable
- * land, Mountain only where a finished road is.
- */
-export function carriageCanGoTo(
-  world: Pick<WorldState, 'buildings'>,
-  map: TerrainMap,
-  x: number,
-  y: number,
-): boolean {
-  const road = roadAt(world, x, y)
-  return carriageCanEnter(road && !road.site ? Terrain.Road : terrainAt(map, x, y))
 }
 
 /** Whether a building of `kind` of `material` is of stone: only a wall, gate or tower can be. */
