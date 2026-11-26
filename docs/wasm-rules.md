@@ -182,3 +182,9 @@ the thing whole and read it the way the mirror does (`SeenBuilding`, `SeenReside
 and `csp_sim::mirror::{resident, horse}`). The module is 541 KB gzipped (1,727 KB raw) with #1586, from
 495 KB: over the 500 kB limit, which waits on #1637. The mirror's update is not touched (only
 `resident` and `horse` in `mirror.rs` became public), so its time stays as measured in T122.4.
+
+## Size after the third part of T122.5b
+
+The rules on one contract, realm, directive or carriage, `workPace` and the rename problems
+(#1634) add readers for `MercenaryContract`, `Realm`, `Directive` and `SeenCarriage`: the module is
+557 KB gzipped (1,792 KB raw), from 541 KB. The mirror's update is not touched.

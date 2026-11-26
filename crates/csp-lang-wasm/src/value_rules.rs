@@ -6,8 +6,8 @@
 
 use csp_lang::ParamInfo;
 use csp_shared::world::{
-    BuildingKind, CarriedFeeBy, Good, HorseStats, ResourceKind, SkillName, Stock, Task,
-    TrainingSubject, WallMaterial, Waypoint,
+    BuildingKind, CarriedFeeBy, Directive, DirectiveGoal, Good, HorseStats, MercenaryContract,
+    Realm, ResourceKind, SkillName, Stock, Task, TrainingSubject, WallMaterial, Waypoint,
 };
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
@@ -68,6 +68,39 @@ fn horse_arg(mut v: Value) -> Result<csp_shared::world::Horse, String> {
     serde_json::from_value::<csp_shared::protocol::SeenHorse>(v)
         .map(csp_sim::mirror::horse)
         .map_err(|e| format!("a horse: {e}"))
+}
+
+/// A carriage the client passes, as a Player sees it or whole (`csp_sim::mirror::carriage`).
+fn carriage_arg(mut v: Value) -> Result<csp_shared::world::Carriage, String> {
+    if let Some(map) = v.as_object_mut() {
+        map.remove("is");
+    }
+    serde_json::from_value::<csp_shared::protocol::SeenCarriage>(v)
+        .map(csp_sim::mirror::carriage)
+        .map_err(|e| format!("a carriage: {e}"))
+}
+
+/// A name a Player sends, as the client passes it: `{ "v": value }`, with no `v` for none, so
+/// that nothing sent and `null` sent stay apart as `Given` keeps them.
+#[derive(serde::Deserialize)]
+struct Given {
+    #[serde(default, deserialize_with = "present")]
+    v: Option<Value>,
+}
+
+/// A field that is there, `null` or not, as `Some`.
+fn present<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Value>, D::Error> {
+    <Value as serde::Deserialize>::deserialize(d).map(Some)
+}
+
+impl Given {
+    fn given(&self) -> people::Given<'_> {
+        match &self.v {
+            None => people::Given::Missing,
+            Some(Value::String(s)) => people::Given::Text(s),
+            Some(_) => people::Given::NotText,
+        }
+    }
 }
 
 /// A price as the client has it.
@@ -508,6 +541,101 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
             let feeder = resident_arg(feeder)?;
             let target = target.map(resident_arg).transpose()?;
             json!(csp_sim::reviving::feed_problem(&feeder, target.as_ref(), tick, size))
+        }
+        // Rules on one contract, realm, directive or carriage (T122.5b): the client passes it.
+        "workPace" => {
+            let (b, workers, tick, under): (Value, Vec<Value>, f64, Option<u8>) = args(name, json)?;
+            let b = building_arg(b)?;
+            let workers =
+                workers.into_iter().map(resident_arg).collect::<Result<Vec<_>, String>>()?;
+            let refs: Vec<&csp_shared::world::Resident> = workers.iter().collect();
+            json!(building::work_pace(&b, &refs, tick, under))
+        }
+        "contractWeeks" => {
+            let (c,): (MercenaryContract,) = args(name, json)?;
+            json!(csp_sim::queries::contract::contract_weeks(&c))
+        }
+        "contractEndsAt" => {
+            let (c, started_at): (MercenaryContract, f64) = args(name, json)?;
+            json!(csp_sim::queries::contract::contract_ends_at(&c, started_at))
+        }
+        "contractPayBy" => {
+            let (c,): (MercenaryContract,) = args(name, json)?;
+            json!(csp_sim::queries::contract::contract_pay_by(&c))
+        }
+        "demandsCounted" => {
+            let (realm, tick): (Realm, f64) = args(name, json)?;
+            json!(demand::demands_counted(&realm, tick))
+        }
+        "demandsLeft" => {
+            let (realm, tick): (Realm, f64) = args(name, json)?;
+            json!(demand::demands_left(&realm, tick))
+        }
+        "goalMet" => {
+            let (d, goal): (Directive, DirectiveGoal) = args(name, json)?;
+            json!(csp_sim::directive::goal_met(&d, &goal))
+        }
+        "goalsMet" => {
+            let (d,): (Directive,) = args(name, json)?;
+            json!(csp_sim::directive::goals_met(&d))
+        }
+        "renameProblem" => {
+            let (realm, target, label, realm_name): (Realm, Option<Value>, Given, Given) =
+                args(name, json)?;
+            let target = target.map(resident_arg).transpose()?;
+            json!(people::rename_problem(
+                &realm,
+                target.as_ref(),
+                label.given(),
+                realm_name.given()
+            ))
+        }
+        "horseRenameProblem" => {
+            let (realm, h, label): (Realm, Option<Value>, Given) = args(name, json)?;
+            let h = h.map(horse_arg).transpose()?;
+            json!(people::horse_rename_problem(&realm, h.as_ref(), label.given()))
+        }
+        "carriedFeesOver" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Way {
+                sender_tiles: f64,
+                other_tiles: f64,
+            }
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Goods {
+                gives: Good,
+                gives_units: f64,
+                wants: Good,
+                wants_units: f64,
+                times: f64,
+            }
+            let (way, fee_by, g): (Way, CarriedFeeBy, Goods) = args(name, json)?;
+            let way = direct_offer::CarriedWay {
+                sender_tiles: way.sender_tiles,
+                other_tiles: way.other_tiles,
+            };
+            let goods = direct_offer::OfferGoods {
+                gives: g.gives,
+                gives_units: g.gives_units,
+                wants: g.wants,
+                wants_units: g.wants_units,
+                times: g.times,
+            };
+            let (sender, other) = direct_offer::carried_fees_over(&way, fee_by, goods);
+            json!({ "senderFee": sender, "otherFee": other })
+        }
+        "boarderProblem" => {
+            let (r, k): (Value, Value) = args(name, json)?;
+            let (r, k) = (resident_arg(r)?, carriage_arg(k)?);
+            json!(csp_sim::queries::driving::boarder_problem(&r, &k))
+        }
+        "unhitchProblem" => {
+            let (r, k, tick): (Value, Option<Value>, f64) = args(name, json)?;
+            let r = resident_arg(r)?;
+            let k = k.map(carriage_arg).transpose()?;
+            json!(csp_sim::queries::driving::unhitch_problem(&r, k.as_ref(), tick))
         }
         _ => return Err(format!("no rule {name}")),
     };

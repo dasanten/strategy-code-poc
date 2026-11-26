@@ -32,6 +32,9 @@ import type {
   SupplyWagon,
   WorldState,
 } from '@csp/shared-types'
+import { boarderProblem } from '@csp/lang-wasm'
+
+export { boarderProblem, unhitchProblem } from '@csp/lang-wasm'
 
 export { loadLevel, caravanFoodFor, foodForWay } from '@csp/lang-wasm'
 
@@ -494,22 +497,6 @@ function handlerProblem(
 }
 
 /**
- * Why a resident can't unhitch a carriage's horse now, or undefined when they can (`CONTEXT.md`:
- * Hitched horse): they must be able to handle it (`handlerProblem`), and a horse must be hitched.
- */
-export function unhitchProblem(
-  resident: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId' | 'bornAt'>,
-  carriage: Pick<Carriage, 'x' | 'y' | 'realmId' | 'cityId' | 'horseId'> | undefined,
-  tick: number,
-): string | undefined {
-  if (!carriage) return 'no such carriage'
-  const problem = handlerProblem(resident, carriage, tick, 'unhitch')
-  if (problem) return problem
-  if (!carriage.horseId) return 'no horse is hitched to that carriage'
-  return undefined
-}
-
-/**
  * Why a resident can't hitch the named horse to a carriage now, or undefined when they can
  * (`CONTEXT.md`: Hitched horse): they must be able to handle it (`handlerProblem`), and the horse
  * must be one that can be hitched (`horsesToHitch`). Only the realm's own: another organization's
@@ -548,25 +535,6 @@ export function boardProblem(
   const problem = boarderProblem(resident, carriage)
   if (problem) return problem
   if (carriageRoom(world, carriage) < PASSENGER_WEIGHT - 1e-9) return 'the carriage is full'
-  return undefined
-}
-
-/**
- * Why a resident can't board a carriage, room aside (`boardProblem`): what the group card checks
- * of each member before it hands out the seats left (`CONTEXT.md`: Group).
- */
-export function boarderProblem(
-  resident: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId' | 'order' | 'aboard' | 'riding'>,
-  carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>,
-): string | undefined {
-  if (resident.aboard === carriage.id) return 'already aboard that carriage'
-  if (resident.aboard !== undefined) return 'already aboard another carriage'
-  if (!carriageOfResident(carriage, resident)) return 'not a carriage of your realm'
-  if (carriage.x !== resident.x || carriage.y !== resident.y) {
-    return 'that carriage is not on the resident’s tile'
-  }
-  if (drivenCarriageId(resident) !== undefined) return 'the driver can’t board'
-  if (resident.riding !== undefined) return 'dismount first to board'
   return undefined
 }
 

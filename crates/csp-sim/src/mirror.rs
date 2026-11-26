@@ -316,7 +316,6 @@ pub fn resident(r: SeenResident) -> Resident {
 
 /// A horse as far as it is seen: a stranger's reads as full health and fed, and Down without an
 /// end.
-/// A horse as far as it is seen: a stranger's reads as fed and unhurt.
 pub fn horse(h: SeenHorse) -> Horse {
     Horse {
         id: h.id,
@@ -334,7 +333,7 @@ pub fn horse(h: SeenHorse) -> Horse {
 }
 
 /// A carriage: its load only when seen inside, else empty (its load level is sent, not kept).
-fn carriage(k: SeenCarriage) -> Carriage {
+pub fn carriage(k: SeenCarriage) -> Carriage {
     Carriage {
         id: k.id,
         realm_id: k.realm_id,

@@ -2,35 +2,14 @@
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
 import { organizationLabel } from './standing.js'
-import { TICKS_PER_GAME_DAY } from '@csp/balance'
 import type { ContractView, MercenaryContract, RealmLabel, WorldState } from '@csp/shared-types'
-import { GAME_DAYS_PER_WEEK, TICKS_PER_GAME_WEEK } from '@csp/shared-types'
+import { contractWeeks, contractEndsAt, contractPayBy } from '@csp/lang-wasm'
+
+export { contractWeeks, contractEndsAt, contractPayBy } from '@csp/lang-wasm'
 
 /** World queries about mercenary contracts (ADR 0002: the game API orders and scripts share). */
 
 export { GAME_DAYS_PER_WEEK, TICKS_PER_GAME_WEEK } from '@csp/shared-types'
-
-/** Game weeks the contract runs, the last one maybe short; each is paid in full. */
-export function contractWeeks(c: Pick<MercenaryContract, 'days'>): number {
-  return Math.ceil(c.days / GAME_DAYS_PER_WEEK)
-}
-
-/** The tick an accepted contract's time is up. */
-export function contractEndsAt(c: MercenaryContract & { startedAt: number }): number {
-  return c.startedAt + c.days * TICKS_PER_GAME_DAY
-}
-
-/**
- * The tick by which the contract's next unpaid week has to be paid: when that week ends, or when
- * the contract does if that is sooner. Null when it is only offered or every week is paid.
- */
-export function contractPayBy(c: MercenaryContract): number | null {
-  if (c.startedAt === null || c.paidWeeks >= contractWeeks(c)) return null
-  return Math.min(
-    c.startedAt + (c.paidWeeks + 1) * TICKS_PER_GAME_WEEK,
-    contractEndsAt({ ...c, startedAt: c.startedAt }),
-  )
-}
 
 /** The contract in force that rents out the resident, if any. */
 export function contractOf(
