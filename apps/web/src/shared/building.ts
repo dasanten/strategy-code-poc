@@ -41,6 +41,8 @@ import type {
 import { NODE_GOOD } from '@csp/shared-types'
 import { hasChoice, recipeFor, cornersCovering } from '@csp/lang-wasm'
 
+export { workingOn } from '@csp/lang-wasm'
+
 export { workPace } from '@csp/lang-wasm'
 
 export {
@@ -658,25 +660,6 @@ export function workProblem(
   }
   if (workersOf(world, here).length >= max) return `it already has ${max} workers`
   return undefined
-}
-
-/**
- * The residents working on a building or construction site now, standing on it: building it (a
- * build order or a line order on its site) or, with `tearingDown`, tearing it down.
- */
-export function workingOn(
-  b: Building,
-  residents: readonly Resident[],
-  tearingDown: boolean,
-  size = MAP_SIZE,
-): Resident[] {
-  return residents.filter((r) => {
-    const o = r.order
-    const on = tearingDown
-      ? o?.kind === 'tearDown' && o.buildingId === b.id
-      : (o?.kind === 'build' || (isLineOrder(o) && o.phase === 'building')) && o.siteId === b.id
-    return on && isAt(r, b, size)
-  })
 }
 
 /**

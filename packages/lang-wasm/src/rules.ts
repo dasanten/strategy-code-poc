@@ -6,7 +6,15 @@
 import type {
   Building,
   BuildingKind,
+  BuildLine,
   Carriage,
+  City,
+  Offer,
+  OfferQuote,
+  OrderRequest,
+  TradeHolder,
+  TradeQuote,
+  TradeSide,
   Directive,
   DirectiveGoal,
   MercenaryContract,
@@ -33,6 +41,7 @@ import type {
   Stock,
   WallMaterial,
 } from '@csp/shared-types'
+import { MAP_SIZE } from '@csp/balance'
 import * as wasm from '../generated/csp_lang_wasm.js'
 
 /** What one batch at a workplace uses up and makes (`RECIPES`). */
@@ -937,4 +946,122 @@ export function unhitchProblem(
 ): string | undefined {
   const k = carriage && asCarriage(carriage)
   return opt(rule<string | null>('unhitchProblem', asResident(resident), k, tick))
+}
+
+// The last rules on one thing (T122.5b): who works on a site, trade holders and quotes, a city's,
+// and a queue step's.
+
+/** The residents working on a building or site now, standing on it (`CONTEXT.md`: Construction). */
+export function workingOn<R extends Resident>(
+  b: Building,
+  residents: readonly R[],
+  tearingDown: boolean,
+  size = MAP_SIZE,
+): R[] {
+  // Only what the rule reads of each goes across: where they are and what they do.
+  const few = residents.map(({ id, x, y, order }) => asResident({ id, x, y, order }))
+  const ids = new Set(rule<string[]>('workingOn', asBuilding(b), few, tearingDown, size))
+  return residents.filter((r) => ids.has(r.id))
+}
+
+/** A resident's hands as a trade holder: what they carry and what more they could. */
+export function handsOf(resident: Resident, tick: number): TradeHolder {
+  return rule('handsOf', asResident(resident), tick)
+}
+
+/** A carriage as a trade holder: its load and the room left on it. */
+export function loadOf(carriage: Carriage, capacity: number): TradeHolder {
+  return rule('loadOf', asCarriage(carriage), capacity)
+}
+
+/** A trade holder as the module reads one. */
+function holderOf(h: TradeHolder): TradeHolder {
+  return { stock: h.stock, room: h.room }
+}
+
+/**
+ * What a trade of up to `wanted` units of a good would move with a side holding `stock` of it
+ * and `coinStock` coins, priced from `floor` (`CONTEXT.md`: Warehouse prices). Pure.
+ */
+export function quoteAtPrices(
+  stock: number,
+  floor: number,
+  coinStock: number,
+  holder: TradeHolder,
+  side: TradeSide,
+  good: PricedGood,
+  wanted: number,
+  owed = 0,
+  theirRoom = Infinity,
+): TradeQuote {
+  const room = Number.isFinite(theirRoom) ? theirRoom : null
+  const h = holderOf(holder)
+  return rule('quoteAtPrices', stock, floor, coinStock, h, side, good, wanted, owed, room)
+}
+
+/** What a trade of up to `wanted` units with a wandering trader would move (`CONTEXT.md`: Trader stop). */
+export function quoteTraderTrade(
+  t: Pick<Trader, 'escortIds'>,
+  load: Stock,
+  capacity: number,
+  holder: TradeHolder,
+  side: TradeSide,
+  good: PricedGood,
+  wanted: number,
+): TradeQuote {
+  const h = holderOf(holder)
+  return rule('quoteTraderTrade', t.escortIds.length, load, capacity, h, side, good, wanted)
+}
+
+/** An offer as the module reads one, from what the caller has of it. */
+function asOffer(o: object): object {
+  return { id: '', realmId: '', storageId: '', x: 0, y: 0, ...o }
+}
+
+/** What accepting an offer up to `wanted` times moves (`CONTEXT.md`: Offer). */
+export function quoteOffer(
+  offer: Pick<Offer, 'gives' | 'givesUnits' | 'wants' | 'wantsUnits' | 'times'>,
+  holder: TradeHolder,
+  wanted: number,
+  available = Infinity,
+): OfferQuote {
+  const { gives, givesUnits, wants, wantsUnits, times } = offer
+  const o = asOffer({ gives, givesUnits, wants, wantsUnits, times })
+  const a = Number.isFinite(available) ? available : null
+  return rule('quoteOffer', o, holderOf(holder), wanted, a)
+}
+
+/** A city as the module reads one, from what the caller has of it. */
+function asCity(c: object): object {
+  return { id: '', name: '', realmId: null, townHallId: '', occupation: null, ...c }
+}
+
+/** Why the Player of `realm` can't rename `city` to `name` now, if they can't. */
+export function cityRenameProblem(
+  realm: Pick<Realm, 'id'>,
+  city: City | undefined,
+  name: unknown,
+): string | undefined {
+  const c = city && asCity(city)
+  return opt(rule<string | null>('cityRenameProblem', asRealm(realm), c, given(name)))
+}
+
+/** How a city that was a Player's stands toward the Player now (`CONTEXT.md`: Former Player). */
+export function formerPlayerStanding(city: Pick<City, 'formerPlayer'>, tick: number): number {
+  return rule('formerPlayerStanding', asCity(city), tick)
+}
+
+/** Whether a queue step never ends on its own (`CONTEXT.md`: Queue). */
+export function neverEnds(order: OrderRequest): boolean {
+  return rule('neverEnds', order)
+}
+
+/** Whether a Feed the stable step feeds it once and ends. */
+export function feedsOnce(order: OrderRequest): boolean {
+  return rule('feedsOnce', order)
+}
+
+/** The line a Build line step builds, if it is one with its road or wall and two ends. */
+export function stepLine(order: OrderRequest): BuildLine | undefined {
+  return opt(rule<BuildLine | null>('stepLine', order))
 }
