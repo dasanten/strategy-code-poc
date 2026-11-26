@@ -4,7 +4,10 @@
 //! `packages/lang-wasm/src/rules.ts`. Each line calls `csp-sim`'s (or `csp-shared`'s) own function;
 //! where the client's shape differs, the line converts.
 
-use csp_shared::world::{BuildingKind, CarriedFeeBy, Good, ResourceKind, Stock, WallMaterial};
+use csp_lang::ParamInfo;
+use csp_shared::world::{
+    BuildingKind, CarriedFeeBy, Good, ResourceKind, Stock, Task, WallMaterial, Waypoint,
+};
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -13,6 +16,9 @@ use csp_sim::queries::{
     building, building_info, carriages, city_area, combat, demand, direct_offer, horse_market,
     npc_trade, people, residents, trader_trade, transfer, warehouse, warehouse_trade,
 };
+
+/// A tile as a rule takes it: (x, y).
+type Tile = (f64, f64);
 
 /// The arguments of a call, read as the tuple the rule takes.
 fn args<T: DeserializeOwned>(name: &str, json: &str) -> Result<T, String> {
@@ -246,6 +252,124 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
         "inContact" => {
             let (size, a, b): (i32, (i32, i32), (i32, i32)) = args(name, json)?;
             json!(combat::in_contact(size, a, b))
+        }
+        // Rules on a few fields of one thing (T122.5b): the client passes the fields.
+        // A resident seen without a birth (`SeenResident`) has no age: NaN, as the client had it.
+        "ageInYears" => {
+            let (born_at, tick): (Option<f64>, f64) = args(name, json)?;
+            let born_at = born_at.unwrap_or(f64::NAN);
+            json!(residents::age_in_years(born_at, tick))
+        }
+        "canWork" => {
+            let (born_at, tick): (Option<f64>, f64) = args(name, json)?;
+            let born_at = born_at.unwrap_or(f64::NAN);
+            json!(residents::can_work(born_at, tick))
+        }
+        "canHandle" => {
+            let (born_at, tick, goods): (Option<f64>, f64, Vec<Value>) = args(name, json)?;
+            let born_at = born_at.unwrap_or(f64::NAN);
+            // A word that is no good is no child's good either.
+            let goods: Option<Vec<Good>> =
+                goods.into_iter().map(|g| serde_json::from_value(g).ok()).collect();
+            json!(match goods {
+                Some(goods) => csp_sim::queries::goods::can_handle(born_at, tick, &goods),
+                None => residents::can_work(born_at, tick),
+            })
+        }
+        "riderSpareFood" => {
+            let (carried,): (Stock,) = args(name, json)?;
+            json!(csp_sim::queries::riding::rider_spare_food(&carried))
+        }
+        "traderStock" => {
+            let (escorts, load): (usize, Stock) = args(name, json)?;
+            json!(trader_trade::trader_stock(escorts, &load))
+        }
+        "transferTiles" => {
+            let (size, warehouse, from, to): (i32, Tile, Option<Tile>, Tile) = args(name, json)?;
+            json!(transfer::transfer_tiles(size, warehouse, from, to))
+        }
+        "quoteTransfer" => {
+            let (held, good, wanted, tiles, unload_share): (Stock, Good, f64, f64, f64) =
+                args(name, json)?;
+            let (units, fee) = transfer::quote_transfer(&held, good, wanted, tiles, unload_share);
+            json!({ "units": units, "fee": fee })
+        }
+        "addWaypointProblem" => {
+            let (held, x, y, label, size): (
+                Vec<Waypoint>,
+                Option<Value>,
+                Option<Value>,
+                Option<Value>,
+                i32,
+            ) = args(name, json)?;
+            json!(csp_sim::waypoints::add_waypoint_problem(
+                &held,
+                x.as_ref(),
+                y.as_ref(),
+                label.as_ref(),
+                size
+            ))
+        }
+        "renameWaypointProblem" => {
+            let (held, id, label): (Vec<Waypoint>, Option<Value>, Option<Value>) =
+                args(name, json)?;
+            json!(csp_sim::waypoints::rename_waypoint_problem(&held, id.as_ref(), label.as_ref()))
+        }
+        "removeWaypointProblem" => {
+            let (held, id): (Vec<Waypoint>, Option<Value>) = args(name, json)?;
+            json!(csp_sim::waypoints::remove_waypoint_problem(&held, id.as_ref()))
+        }
+        "offerTermsProblem" => {
+            let (terms,): (serde_json::Map<String, Value>,) = args(name, json)?;
+            json!(csp_sim::queries::offers::offer_terms_problem(&terms))
+        }
+        "conditionProblem" => {
+            let (c,): (Option<Value>,) = args(name, json)?;
+            json!(csp_sim::conditions::condition_of(c.as_ref()).err())
+        }
+        "npcSwapRates" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Line {
+                good: Good,
+                for_sale: f64,
+                wanted: f64,
+                buy: f64,
+                sell: f64,
+            }
+            let (lines,): (Vec<Line>,) = args(name, json)?;
+            let prices: Vec<npc_trade::NpcCityPrice> = lines
+                .into_iter()
+                .map(|l| npc_trade::NpcCityPrice {
+                    good: l.good,
+                    stock: 0.0,
+                    for_sale: l.for_sale,
+                    wanted: l.wanted,
+                    buy: l.buy,
+                    sell: l.sell,
+                })
+                .collect();
+            let rates = csp_sim::queries::trade_quotes::npc_swap_rates(&prices);
+            json!(rates
+                .iter()
+                .map(|r| json!({ "give": r.give, "gives": r.gives, "want": r.want, "units": r.units }))
+                .collect::<Vec<_>>())
+        }
+        "targetParam" => {
+            let (task,): (Option<Task>,) = args(name, json)?;
+            json!(csp_sim::default_scripts::target_param(task))
+        }
+        "isWorkScript" => {
+            let (params,): (Vec<ParamInfo>,) = args(name, json)?;
+            json!(csp_sim::default_scripts::is_work_script(&params))
+        }
+        "paramNeedsValue" => {
+            let (param,): (ParamInfo,) = args(name, json)?;
+            json!(csp_sim::default_scripts::param_needs_value(&param))
+        }
+        "isParamChoice" => {
+            let (param, value): (ParamInfo, Value) = args(name, json)?;
+            json!(csp_sim::script_api::is_param_choice(&param, &value))
         }
         _ => return Err(format!("no rule {name}")),
     };

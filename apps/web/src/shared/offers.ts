@@ -6,7 +6,6 @@ import { buildingRealm } from './city.js'
 import { covers, isAt } from './footprint.js'
 import { GOOD_WEIGHT } from './narrowed.js'
 import { canWork } from './stats.js'
-import { GOODS } from './world.js'
 import type {
   Building,
   Good,
@@ -18,6 +17,9 @@ import type {
   Offer,
   WorldState,
 } from '@csp/shared-types'
+import { offerTermsProblem } from '@csp/lang-wasm'
+
+export { offerTermsProblem } from '@csp/lang-wasm'
 
 /** What an offer wants for one unit it gives. */
 export const offerRate = (o: Pick<Offer, 'givesUnits' | 'wantsUnits'>) =>
@@ -96,8 +98,6 @@ export interface OfferTerms {
   times: unknown
 }
 
-const isGood = (g: unknown): g is Good => (GOODS as readonly unknown[]).includes(g)
-
 const isCount = (n: unknown): n is number => Number.isSafeInteger(n) && (n as number) > 0
 
 /**
@@ -112,18 +112,6 @@ export function timesToPost(
   times: number,
 ): number {
   return Math.min(times, Math.floor((freeStock(world, storage)[gives] ?? 0) / givesUnits))
-}
-
-/** Why an offer's terms won't do, or undefined: a good for a different good, in whole units. */
-export function offerTermsProblem(
-  terms: Pick<OfferTerms, 'gives' | 'givesUnits' | 'wants' | 'wantsUnits' | 'times'>,
-): string | undefined {
-  if (!isGood(terms.gives) || !isGood(terms.wants)) return 'gives and wants must be goods'
-  if (terms.gives === terms.wants) return 'an offer wants a different good than it gives'
-  if (!isCount(terms.givesUnits) || !isCount(terms.wantsUnits) || !isCount(terms.times)) {
-    return 'units and times must be whole numbers'
-  }
-  return undefined
 }
 
 /**
