@@ -101,7 +101,8 @@ pub fn apply_rally(world: &mut WorldState, order: &OrderRequest) {
 }
 
 pub(crate) static RALLY_META: OrderMeta =
-    OrderMeta::fns(RALLY, |w, s, o, _| validate_rally(w, s, o), |w, _, o, _| apply_rally(w, o));
+    OrderMeta::fns(RALLY, |w, s, o, _| validate_rally(w, s, o), |w, _, o, _| apply_rally(w, o))
+        .gets_off_first();
 
 impl RunningOrder for RallyOrder {
     in_place!();
