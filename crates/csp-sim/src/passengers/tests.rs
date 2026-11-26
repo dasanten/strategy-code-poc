@@ -243,3 +243,21 @@ fn the_driver_and_anyone_beside_a_parked_carriage_refill_from_it() {
     assert_eq!(food(&world, "p2"), HOME_FOOD_LOW, "a resident of the realm next to it");
     assert_eq!(food(&world, "s1"), 0.0, "nobody of another realm");
 }
+
+#[test]
+fn the_invariant_finds_a_passenger_running_an_order_that_gets_them_off_first() {
+    use csp_shared::world::{PayOrder, ResidentOrder};
+    let (mut world, map) = setup();
+    board(&mut world, &map, "p1").expect("aboard");
+    let aboard = |world: &WorldState| -> Vec<String> {
+        crate::invariants::check_all(world, &map)
+            .into_iter()
+            .filter(|v| v.invariant == "passengers-aboard")
+            .map(|v| v.message)
+            .collect()
+    };
+    assert_eq!(aboard(&world), Vec::<String>::new());
+    who_mut(&mut world, "p1").order =
+        Some(ResidentOrder::Pay(PayOrder { contract_id: "c1".into(), weeks: 1.0 }));
+    assert_eq!(aboard(&world), ["resident p1 runs pay aboard"]);
+}

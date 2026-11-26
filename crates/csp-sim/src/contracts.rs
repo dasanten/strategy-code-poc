@@ -496,7 +496,8 @@ impl OrderKind for Pay {
     }
 }
 
-pub(crate) static PAY_META: OrderMeta = OrderMeta::request("pay", &Pay).script(&[PAY_ACTION]);
+pub(crate) static PAY_META: OrderMeta =
+    OrderMeta::request("pay", &Pay).gets_off_first().script(&[PAY_ACTION]);
 
 const PAY_ACTION: ScriptAction = ScriptAction {
     name: "pay",
