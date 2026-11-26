@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Terrain } from '../shared/terrain.js'
+import { Terrain } from '../terrain.js'
 import { previewPath, searchPath } from './path-preview.js'
 
 const SIZE = 64

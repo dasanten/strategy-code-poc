@@ -4,7 +4,7 @@ import {
   QUEUE_MAX_REPEAT,
   QUEUE_MAX_STEPS,
 } from '@csp/balance'
-import { queueStepsProblem } from './shared/queue.js'
+import { queueStepsProblem } from '@csp/lang-wasm'
 import type { Condition, OrderRequest, Queue, QueueStepRequest } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {

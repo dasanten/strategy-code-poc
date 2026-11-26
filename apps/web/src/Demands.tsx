@@ -7,12 +7,12 @@ import {
   OUTWEIGH_HOLD_DAYS,
   TICKS_PER_GAME_DAY,
 } from '@csp/balance'
-import { GOODS } from './shared/world.js'
-import { TRADE_ORG } from './shared/trade-org.js'
-import { aboutTime } from './shared/estimates.js'
-import { citiesToCarryAt } from './shared/direct-offer.js'
-import { deliveryStorage } from './shared/warehouse.js'
-import { demandNoteProblem } from './shared/demand.js'
+import { GOODS } from './world.js'
+import { TRADE_ORG } from '@csp/shared-types'
+import { aboutTime } from './estimates.js'
+import { citiesToCarryAt } from './direct-offer.js'
+import { deliveryStorage } from './warehouse.js'
+import { demandNoteProblem } from '@csp/lang-wasm'
 import type {
   CarriedWay,
   DemandHandOver,

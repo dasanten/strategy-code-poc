@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { adminTerrainChunkPath } from './shared/terrain.js'
+import { adminTerrainChunkPath } from './terrain.js'
 import type {
   AdminInspectTarget,
   AdminLand,

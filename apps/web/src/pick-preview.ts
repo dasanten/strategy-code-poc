@@ -1,9 +1,9 @@
-import { FOOTPRINT, covers } from './shared/footprint.js'
-import { NODE_WORKPLACE } from './shared/world.js'
+import { FOOTPRINT, covers } from './footprint.js'
+import { NODE_WORKPLACE, UNEXPLORED } from '@csp/shared-types'
 import { ROAD_LINE_MAX_TILES } from '@csp/balance'
-import { UNEXPLORED, type Terrain } from './shared/terrain.js'
-import { aboutTime } from './shared/estimates.js'
-import { roadLine } from './shared/building.js'
+import type { Terrain } from './terrain.js'
+import { aboutTime } from './estimates.js'
+import { SHARES_A_TILE, roadLine } from './building.js'
 import type { BuildingKind, KnownNode, ScriptParamType } from '@csp/shared-types'
 import { BUILDING_NAMES, TERRAIN_NAMES } from './map/palette.js'
 import { previewPath, type Goer, type Point } from './map/path-preview.js'
@@ -216,10 +216,13 @@ export function pickPreview(
   }
 }
 
-/** The building on a tile, in sight or as last seen, roads aside. */
-function buildingAt(at: Tile, w: PreviewWorld) {
+/**
+ * The building on a tile, in sight or as last seen (`buildingAt`): not a road, carriage, boat,
+ * ship or siege machine site, which shares a tile with one (`SHARES_A_TILE`).
+ */
+export function buildingAt(at: Tile, w: Pick<PreviewWorld, 'buildings' | 'lastSeen' | 'size'>) {
   const on = (list: PreviewWorld['buildings']) =>
-    list.find((b) => b.kind !== 'road' && covers(b, at.x, at.y, w.size))
+    list.find((b) => covers(b, at.x, at.y, w.size) && !SHARES_A_TILE.includes(b.kind))
   return on(w.buildings) ?? on(w.lastSeen)
 }
 

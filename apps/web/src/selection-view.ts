@@ -8,25 +8,44 @@ import {
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
   HOUSING_ROOM,
-} from './shared/narrowed.js'
+} from './narrowed.js'
 import {
   BUILDABLE,
   SHARES_A_TILE,
   MAX_WORKERS,
-  NODE_GOOD,
   teacherAt,
   traineesOf,
-  hasChoice,
-  recipeFor,
   recipeGood,
-  teardownWork,
-  workFactor,
   isStone,
   isSiegeSite,
+} from './building.js'
+import {
+  NODE_GOOD,
+  CARRYING_A_CHILD,
+  NODE_WORKPLACE,
+  NO_CHILD_FEEDS,
+  NO_FOOD_TO_FEED,
+  UNEXPLORED,
+} from '@csp/shared-types'
+import {
+  hasChoice,
+  recipeFor,
+  teardownWork,
+  workFactor,
   materialsOfKind,
   workOfKind,
-} from './shared/building.js'
-import { CARRYING_A_CHILD, GOODS, isDown, NODE_WORKPLACE } from './shared/world.js'
+  unhitchProblem,
+  keptBreeding,
+  feedProblem,
+  horseAgeInYears,
+  trainingCeiling,
+  subjectValue,
+  canWork,
+  stockWeight,
+  madePerDay,
+  repairable,
+} from '@csp/lang-wasm'
+import { GOODS, isDown } from './world.js'
 import {
   HORSE_FOOD_PER_DAY,
   HORSE_HUNGRY_SHARE,
@@ -52,31 +71,13 @@ import {
   carriageOfResident,
   horsesToHitch,
   carriagePulledBy,
-  unhitchProblem,
   drivenCarriageId,
-} from './shared/carriages.js'
-import { riderOf, STABLE_BREED_TICKS, breedersAt, keptBreeding } from './shared/horses.js'
-import {
-  feedHorseProblem,
-  feedProblem,
-  horsesInNeed,
-  NO_CHILD_FEEDS,
-  NO_FOOD_TO_FEED,
-} from './shared/reviving.js'
-import {
-  horseAgeInYears,
-  trainingCeiling,
-  subjectValue,
-  canWork,
-  stockWeight,
-  madePerDay,
-  bestWeapon,
-  wornProtection,
-  isArmed,
-  type Geared,
-} from './shared/stats.js'
-import { richnessFactor } from './shared/richness.js'
-import { isOutpostStorage } from './shared/city.js'
+} from './carriages.js'
+import { riderOf, STABLE_BREED_TICKS, breedersAt } from './horse-rules.js'
+import { feedHorseProblem, horsesInNeed } from './reviving.js'
+import { bestWeapon, wornProtection, isArmed, type Geared } from './stats.js'
+import { richnessFactor } from './richness.js'
+import { isOutpostStorage } from './city.js'
 import type {
   BuildingKind,
   Richness,
@@ -113,11 +114,11 @@ import type {
   VeinWord,
   HaulOrder,
 } from '@csp/shared-types'
-import { covers, FOOTPRINT, footprintTiles } from './shared/footprint.js'
-import { conditionLine, isRuin, repairable } from './shared/decay.js'
-import { Terrain, UNEXPLORED } from './shared/terrain.js'
-import { fullAt, gatheredOn, isPickedOver, patchLeft } from './shared/patch.js'
-import { aboutTime, workLeft } from './shared/estimates.js'
+import { covers, FOOTPRINT, footprintTiles } from './footprint.js'
+import { conditionLine, isRuin } from './decay.js'
+import { Terrain } from './terrain.js'
+import { fullAt, gatheredOn, isPickedOver, patchLeft } from './patch.js'
+import { aboutTime, workLeft } from './estimates.js'
 import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
@@ -126,7 +127,7 @@ import { faresKnown, horseFaresKnown } from './seen.js'
 import { FEED_HORSE_HINT, horseDownLine, horseNeed } from './horses-view.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 import { describeOccupation, type OccupationView } from './city-view.js'
-import { besideVessel, crewShort, vesselCapacity } from './shared/vessels.js'
+import { besideVessel, crewShort, vesselCapacity } from './vessels.js'
 import {
   boardVesselProblems,
   driveOffProblems,
@@ -2515,7 +2516,7 @@ function gearText(r: Geared, labels: Record<string, string>): string | undefined
 }
 
 /** The army a resident's order is for, if it is one (`CONTEXT.md`: Army). */
-function armyOf(r: SeenResident): string | undefined {
+function orderArmy(r: SeenResident): string | undefined {
   return (r.order as { army?: string } | null)?.army
 }
 
@@ -2527,7 +2528,7 @@ function strangersLines(strangers: SeenResident[]): string[] {
   const armies = new Map<string, SeenResident[]>()
   const rest: SeenResident[] = []
   for (const r of strangers) {
-    const a = armyOf(r)
+    const a = orderArmy(r)
     if (a) armies.set(a, [...(armies.get(a) ?? []), r])
     else rest.push(r)
   }

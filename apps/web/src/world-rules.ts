@@ -1,6 +1,6 @@
 import type { BuildingKind, KnownNode, WallMaterial } from '@csp/shared-types'
-import { FOOTPRINT } from './shared/footprint.js'
-import { wrap } from './shared/terrain.js'
+import { FOOTPRINT } from './footprint.js'
+import { wrap } from './terrain.js'
 import { worldMirror } from './world-mirror.js'
 
 /**

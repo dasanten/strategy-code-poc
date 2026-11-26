@@ -13,9 +13,8 @@ pub mod value_rules;
 pub mod world_rules;
 
 use std::cell::OnceCell;
-use std::collections::HashMap;
 
-use csp_lang::{CheckEnv, CheckedGlobal, CheckedType, ParamType, KEYWORDS, PARAMS_SHAPE};
+use csp_lang::{CheckEnv, KEYWORDS, PARAMS_SHAPE};
 use csp_shared::world::Task;
 use csp_sim::default_scripts::{task_name, DEFAULT_SCRIPTS};
 use csp_sim::script_api::{Is, ScriptBinding, ARMY_SCRIPT_API, PARAM_DESCRIPTIONS, SCRIPT_API};
@@ -32,14 +31,6 @@ fn to_json(value: &impl serde::Serialize) -> String {
 #[wasm_bindgen(js_name = checkScript)]
 pub fn check_script(source: &str) -> String {
     to_json(&csp_lang::check_script(source))
-}
-
-/// The checker's warnings and reads (`checkNames`) against an env given as the TypeScript's
-/// `CheckEnv` in JSON ([`check_env_from_json`]).
-#[wasm_bindgen(js_name = checkNames)]
-pub fn check_names(source: &str, env: &str) -> String {
-    let env: Value = serde_json::from_str(env).expect("the env is JSON");
-    to_json(&csp_lang::check_names(source, &check_env_from_json(&env)))
 }
 
 thread_local! {
@@ -72,64 +63,6 @@ pub fn tokenize(source: &str) -> String {
 #[wasm_bindgen(js_name = scriptParams)]
 pub fn script_params(source: &str) -> String {
     to_json(&csp_lang::script_params(source))
-}
-
-fn checked_type(json: &Value) -> CheckedType {
-    if json == "unknown" {
-        return CheckedType::Unknown;
-    }
-    if let Some(item) = json.get("list") {
-        return CheckedType::list(checked_type(item));
-    }
-    if let Some(shape) = json.get("shape").and_then(Value::as_str) {
-        return CheckedType::shape(shape);
-    }
-    panic!("not a checked type: {json}");
-}
-
-/// A `CheckEnv` from the TypeScript's in JSON: `globals`, `shapes`, `paramTypes`, and
-/// `describedShapes` (a shape's words by name) for its `describeShape` function, which JSON
-/// can't carry.
-pub fn check_env_from_json(json: &Value) -> CheckEnv {
-    let map = |key: &str| json.get(key).and_then(Value::as_object).cloned().unwrap_or_default();
-    let globals = map("globals")
-        .into_iter()
-        .map(|(name, g)| {
-            let params = g.get("params").and_then(Value::as_array).map(|ps| {
-                ps.iter().map(|p| p.as_str().expect("a param name").to_string()).collect()
-            });
-            (name, CheckedGlobal { ty: checked_type(&g["type"]), params })
-        })
-        .collect();
-    let shapes = map("shapes")
-        .into_iter()
-        .map(|(shape, fields)| {
-            let fields = fields
-                .as_object()
-                .expect("fields")
-                .iter()
-                .map(|(f, t)| (f.clone(), checked_type(t)))
-                .collect();
-            (shape, fields)
-        })
-        .collect();
-    let param_types = map("paramTypes")
-        .into_iter()
-        .map(|(ty, t)| (ParamType::from_word(&ty).expect("a param type"), checked_type(&t)))
-        .collect();
-    let described: HashMap<String, String> = map("describedShapes")
-        .into_iter()
-        .map(|(s, d)| (s, d.as_str().expect("a description").to_string()))
-        .collect();
-    CheckEnv {
-        globals,
-        shapes,
-        param_types,
-        describe_shape: (!described.is_empty()).then(|| {
-            Box::new(move |s: &str| described.get(s).cloned().unwrap_or_else(|| format!("a {s}")))
-                as Box<dyn Fn(&str) -> String>
-        }),
-    }
 }
 
 /// A whole number as an integer, so the JSON reads `1`, not `1.0`.

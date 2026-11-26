@@ -1,7 +1,7 @@
 import { createElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { BATCHES_PER_DAY } from './shared/narrowed.js'
+import { BATCHES_PER_DAY } from './narrowed.js'
 import { MAX_HEALTH, MAX_HUNGER, TICKS_PER_GAME_YEAR } from '@csp/balance'
 import type { Building, GoodsSpot, Horse, Resident, SeenResident, Stock } from '@csp/shared-types'
 import { describeTile } from './selection-view.js'

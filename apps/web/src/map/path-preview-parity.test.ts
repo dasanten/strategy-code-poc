@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { CARRIAGE_SPEED, DIAGONAL_STEP, TERRAIN_SPEED } from '@csp/balance'
 import { describe, expect, it } from 'vitest'
-import { Terrain } from '../shared/terrain.js'
+import { Terrain } from '../terrain.js'
 import { searchPath, type Goer, type Point } from './path-preview.js'
 
 /**

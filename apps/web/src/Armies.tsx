@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { ARMY_NAME_MAX_LENGTH, armyDrivenTo, spareFood } from './shared/army.js'
+import { ARMY_NAME_MAX_LENGTH } from '@csp/shared-types'
+import { armyDrivenTo, spareFood } from './army.js'
 import type {
   Army,
   SeenCarriage,

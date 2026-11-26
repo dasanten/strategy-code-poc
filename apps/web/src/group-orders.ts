@@ -1,12 +1,10 @@
-import { CARRYING_A_CHILD, GOODS } from './shared/world.js'
-import { boarderProblem } from './shared/carriages.js'
-import { besideVessel } from './shared/vessels.js'
+import { CARRYING_A_CHILD, NO_FOOD_TO_FEED } from '@csp/shared-types'
+import { GOODS } from './world.js'
+import { boarderProblem, canHandle, canWork, inContact } from '@csp/lang-wasm'
+import { besideVessel } from './vessels.js'
 import { boardVesselProblems } from './world-rules.js'
-import { canHandle, canWork } from './shared/stats.js'
-import { covers, isAt } from './shared/footprint.js'
-import { inContact } from './shared/combat.js'
-import { NO_FOOD_TO_FEED } from './shared/reviving.js'
-import { wrap, wrapDelta } from './shared/terrain.js'
+import { covers, isAt } from './footprint.js'
+import { wrap, wrapDelta } from './terrain.js'
 import { groupSwapChoices, slotOf } from './equipment-view.js'
 import type {
   Building,

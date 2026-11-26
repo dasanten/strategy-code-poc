@@ -1,10 +1,8 @@
-import { GOODS } from './shared/world.js'
-import { buildingRealm } from './shared/city.js'
-import { carriageCapacity } from './shared/carriages.js'
-import { carriedFeesOver } from './shared/direct-offer.js'
-import { freeStock, offerOpenTo, quoteOffer, timesToPost, wantsNothing } from './shared/offers.js'
-import { handsOf, loadOf } from './shared/warehouse.js'
-import { transferLoad } from './shared/transfer.js'
+import { GOODS } from './world.js'
+import { buildingRealm } from './city.js'
+import { carriageCapacity } from './carriages.js'
+import { carriedFeesOver, quoteOffer, handsOf, loadOf, transferLoad } from '@csp/lang-wasm'
+import { freeStock, offerOpenTo, timesToPost, wantsNothing } from './offer-rules.js'
 import type {
   CarriedFeeBy,
   CarriedWay,

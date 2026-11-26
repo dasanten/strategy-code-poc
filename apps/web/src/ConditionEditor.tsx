@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { Condition } from '@csp/shared-types'
-import { GOODS } from './shared/world.js'
-import { CONDITION_KINDS, LAST_HOUR, conditionProblem } from './shared/condition.js'
+import { GOODS } from './world.js'
+import { CONDITION_KINDS, LAST_HOUR } from '@csp/shared-types'
+import { conditionProblem } from '@csp/lang-wasm'
 import { GOOD_LABELS } from './goods-grid.js'
 import {
   CONDITION_KIND_LABELS,

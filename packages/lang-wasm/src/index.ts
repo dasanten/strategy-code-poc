@@ -20,21 +20,6 @@ export interface Diagnostic {
   column: number
 }
 
-/** What the checker knows of a value: nothing, a list of something, or an object of a shape. */
-export type CheckedType = 'unknown' | { list: CheckedType } | { shape: string }
-
-/** The names and shapes a script is checked against. */
-export interface CheckEnv {
-  globals: Readonly<Record<string, { type: CheckedType; params?: readonly string[] }>>
-  shapes: Readonly<Record<string, Readonly<Record<string, CheckedType>>>>
-  /** What `params.name` holds for a `param` of each type; unknown without it. */
-  paramTypes?: Readonly<Partial<Record<ScriptParamType, CheckedType>>>
-  /** How a shape is named in a warning, like "a resident"; `a <name>` without it. */
-  describeShape?: (shape: string) => string
-  /** The same as words by shape name, as JSON carries them. */
-  describedShapes?: Readonly<Record<string, string>>
-}
-
 /** A field read from an object whose shape the checker was sure of. */
 export interface FieldRead {
   shape: string
@@ -132,24 +117,10 @@ export function checkScript(source: string): Diagnostic[] {
 }
 
 /**
- * Checks a script against the names and shapes it gets: warnings, and the fields it reads of
- * known shapes. A script with a syntax error gets none; that error is `checkScript`'s.
- */
-export function checkNames(source: string, env: CheckEnv): CheckResult {
-  const { describeShape, ...plain } = env
-  const described = describeShape
-    ? Object.fromEntries(Object.keys(env.shapes).map((s) => [s, describeShape(s)]))
-    : undefined
-  const json = JSON.stringify({
-    ...plain,
-    describedShapes: { ...described, ...env.describedShapes },
-  })
-  return JSON.parse(ready().checkNames(source, json)) as CheckResult
-}
-
-/**
- * `checkNames` against the game's names and views (`CONTEXT.md`: Script view): both APIs, `me` a
- * resident or an army; a default script (it has a task) gets the resident's API alone.
+ * Checks a script against the game's names and views (`CONTEXT.md`: Script view): warnings, and
+ * the fields it reads of known shapes. Both APIs, `me` a resident or an army; a default script (it
+ * has a task) gets the resident's API alone. A script with a syntax error gets none; that error is
+ * `checkScript`'s.
  */
 export function checkGameNames(source: string, defaultScript: boolean): CheckResult {
   return JSON.parse(ready().checkGameNames(source, defaultScript)) as CheckResult

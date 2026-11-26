@@ -1,6 +1,6 @@
 import { CONTRACT_MAX_DAYS } from '@csp/balance'
-import { TRADE_ORG, TRADE_ORG_NAME } from './shared/trade-org.js'
-import { formatGameTime } from './shared/time.js'
+import { TRADE_ORG, TRADE_ORG_NAME } from '@csp/shared-types'
+import { formatGameTime } from '@csp/lang-wasm'
 import type { Building, City, ContractView, RealmLabel } from '@csp/shared-types'
 
 /**

@@ -1,5 +1,5 @@
-import { SHARES_A_TILE } from '../shared/building.js'
-import { isDown } from '../shared/world.js'
+import { SHARES_A_TILE } from '../building.js'
+import { isDown } from '../world.js'
 import type {
   Army,
   Building,

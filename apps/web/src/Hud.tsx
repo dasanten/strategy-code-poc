@@ -7,7 +7,8 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { formatGameTime, formatGameTimeShort } from './shared/time.js'
+import { formatGameTime } from '@csp/lang-wasm'
+import { formatGameTimeShort } from './time.js'
 import { useMapDockHeight } from './Dock.js'
 import type { FirstDay, TraderVisit } from '@csp/shared-types'
 import { PanelStatus } from './panel-head.js'

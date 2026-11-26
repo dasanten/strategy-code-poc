@@ -1,17 +1,25 @@
-import { BUILDING_KINDS, BUILDING_SPECS } from '@csp/balance'
-import { SITES_OF_MOVERS } from './shared/building.js'
+import { BUILDING_KINDS, BUILDING_SPECS, TICKS_PER_GAME_DAY } from '@csp/balance'
+import { SITES_OF_MOVERS } from './building.js'
 import { offerStoragesOf } from './offers-view.js'
 import {
   deliveryStorage,
-  handsOf,
-  loadOf,
   quoteDelivery,
   quotePickUp,
   quoteTrade,
   tradeCoinWarehouse,
-} from './shared/warehouse.js'
-import { nearestWarehouse, quoteTransfer, transferTiles } from './shared/transfer.js'
-import { carriageCapacity } from './shared/carriages.js'
+} from './warehouse.js'
+import {
+  handsOf,
+  loadOf,
+  quoteTransfer,
+  transferTiles,
+  cutSwap,
+  npcSwapRates,
+  quoteTraderTrade,
+  canWork,
+} from '@csp/lang-wasm'
+import { nearestWarehouse } from './transfer.js'
+import { carriageCapacity } from './carriages.js'
 import type {
   CarriageHorse,
   Stock,
@@ -40,17 +48,14 @@ import type {
   TraderVisit,
   SeenBuilding,
 } from '@csp/shared-types'
-import { quoteSwap, cutSwap, noSwap, npcSwapRates } from './shared/swap.js'
-import { quoteTraderTrade } from './shared/trader-trade.js'
-import { wrapDistance } from './shared/terrain.js'
-import { canWork } from './shared/stats.js'
-import { aboutTime } from './shared/estimates.js'
-import { GOOD_WEIGHT } from './shared/narrowed.js'
-import { isAt } from './shared/footprint.js'
-import { occupationTicksLeft } from './shared/city.js'
-import { TICKS_PER_GAME_DAY } from '@csp/balance'
-import type { Shown } from './shared/protocol.js'
-import { TRADE_ORG, TRADE_ORG_NAME } from './shared/trade-org.js'
+import { quoteSwap, noSwap } from './swap.js'
+import { wrapDistance } from './terrain.js'
+import { aboutTime } from './estimates.js'
+import { GOOD_WEIGHT } from './narrowed.js'
+import { isAt } from './footprint.js'
+import { occupationTicksLeft } from './city.js'
+import type { Shown } from './protocol.js'
+import { TRADE_ORG, TRADE_ORG_NAME } from '@csp/shared-types'
 import { faresKnown, loadKnown } from './seen.js'
 
 /** What the city inspector says about a city in sight, from what the Player sees of it. */

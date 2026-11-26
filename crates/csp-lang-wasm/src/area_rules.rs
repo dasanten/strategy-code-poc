@@ -105,22 +105,6 @@ pub fn city_ids_at(buildings: &[i32], x: i32, y: i32, size: i32) -> Result<Vec<i
         .collect())
 }
 
-/// For each tile of `tiles` (`x, y` pairs), whether it lies in the area of any city among
-/// `buildings` (`citiesAt` not empty): 1 or 0.
-#[wasm_bindgen(js_name = inAnyCityArea)]
-pub fn in_any_city_area(buildings: &[i32], tiles: &[i32], size: i32) -> Result<Vec<u8>, String> {
-    let world = world_of(buildings)?;
-    Ok(tiles
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .map(|t| {
-            let ids = city_area::city_ids_at(&world, f64::from(t[0]), f64::from(t[1]), size);
-            u8::from(!ids.is_empty())
-        })
-        .collect())
-}
-
 /// Which city each of `buildings` belongs to (`cityMembership`, `CONTEXT.md`: City building): for
 /// each building, in order, the place in `city_ids` of its city, -1 for none. `city_ids` are the
 /// cities' ids, one per line, read for which city is older on a tie (`idNumber`); `halls` the place
@@ -218,7 +202,6 @@ mod tests {
         assert!(!ours.is_empty());
         assert_eq!(near_city_area(&b, 0, &[10, 10, 31, 31], 0.0, size).unwrap(), [1, 0]);
         assert_eq!(city_ids_at(&b, 31, 31, size).unwrap(), [1]);
-        assert_eq!(in_any_city_area(&b, &[31, 31, 50, 50], size).unwrap(), [1, 0]);
         // A site counts toward no area.
         assert!(city_area_tiles(&[12, 10, HOUSE, 1000], 0, size).unwrap().is_empty());
     }

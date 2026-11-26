@@ -1,4 +1,5 @@
-import { CHUNK_SIZE, chunksAcross } from '../shared/terrain.js'
+import { CHUNK_SIZE } from '@csp/shared-types'
+import { chunksAcross } from '../terrain.js'
 import type { RegionHolder, RegionMap } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {

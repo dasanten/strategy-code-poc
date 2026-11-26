@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react'
 import { DIRECT_OFFERS_TO_ONE_REALM } from '@csp/balance'
-import { TRADE_ORG } from './shared/trade-org.js'
-import { aboutTime } from './shared/estimates.js'
-import { citiesToCarryAt } from './shared/direct-offer.js'
-import { deliveryStorage } from './shared/warehouse.js'
+import { TRADE_ORG } from '@csp/shared-types'
+import { aboutTime } from './estimates.js'
+import { citiesToCarryAt } from './direct-offer.js'
+import { deliveryStorage } from './warehouse.js'
 import type {
   CarriedFeeBy,
   CarriedWay,

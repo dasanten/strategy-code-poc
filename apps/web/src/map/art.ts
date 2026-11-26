@@ -1,4 +1,4 @@
-import { FOOTPRINT } from '../shared/footprint.js'
+import { FOOTPRINT } from '../footprint.js'
 import type { BuildingKind, ResourceKind } from '@csp/shared-types'
 import type { Activity, Metal } from './figures.js'
 

@@ -5,7 +5,7 @@ import {
   WS_CLOSE_RELOAD,
   WS_CLOSE_TOO_MANY_REQUESTS,
   WS_CLOSE_UPDATED,
-} from './shared/protocol.js'
+} from '@csp/shared-types'
 
 /** A data frame as the browser hands it over (`binaryType` 'arraybuffer', or a Blob). */
 export type Frame = string | ArrayBuffer | Blob

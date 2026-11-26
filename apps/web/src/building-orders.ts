@@ -1,5 +1,5 @@
-import { BUILDABLE, MAX_WORKERS } from './shared/building.js'
-import { covers } from './shared/footprint.js'
+import { BUILDABLE, MAX_WORKERS } from './building.js'
+import { covers } from './footprint.js'
 import type { Building, OrderRequest } from '@csp/shared-types'
 import { appendRequest } from './queue-view.js'
 import { groupRequests, type GroupOrder, type GroupSeen, type GroupSend } from './group-orders.js'

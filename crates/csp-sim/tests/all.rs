@@ -30,6 +30,8 @@ mod carrying;
 mod carrying_output;
 #[path = "city_layout.rs"]
 mod city_layout;
+#[path = "client_twins.rs"]
+mod client_twins;
 #[path = "coin_sums.rs"]
 mod coin_sums;
 #[path = "creative.rs"]

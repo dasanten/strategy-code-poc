@@ -2,7 +2,7 @@ import { mirrorOf } from './test-mirror.js'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { GOODS } from './shared/world.js'
+import { GOODS } from './world.js'
 import { QUEUE_DEFAULT_STEP_MINUTES, TICKS_PER_GAME_YEAR } from '@csp/balance'
 import type { Building, Resident, Stock } from '@csp/shared-types'
 import {

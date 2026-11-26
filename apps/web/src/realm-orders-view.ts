@@ -1,6 +1,6 @@
-import { GOODS } from './shared/world.js'
-import { covers } from './shared/footprint.js'
-import { relocateRoom } from './shared/relocate.js'
+import { GOODS } from './world.js'
+import { covers } from './footprint.js'
+import { relocateRoom } from './relocate.js'
 import type {
   Building,
   Carriage,

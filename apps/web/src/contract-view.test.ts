@@ -1,4 +1,4 @@
-import { TRADE_ORG, TRADE_ORG_NAME } from './shared/trade-org.js'
+import { TRADE_ORG, TRADE_ORG_NAME } from '@csp/shared-types'
 import { CONTRACT_MAX_DAYS } from '@csp/balance'
 import type { ContractView, Diplomacy, RealmEvent } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'

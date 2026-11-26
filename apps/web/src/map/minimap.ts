@@ -1,14 +1,6 @@
-import {
-  CHUNK_SIZE,
-  TERRAIN_BATCH_MAX,
-  TERRAIN_LEVEL_MAX,
-  UNEXPLORED,
-  chunksAcross,
-  levelChunksAcross,
-  wrap,
-  wrapDelta,
-} from '../shared/terrain.js'
-import { cityAreaTiles } from '../shared/city.js'
+import { CHUNK_SIZE, TERRAIN_BATCH_MAX, TERRAIN_LEVEL_MAX, UNEXPLORED } from '@csp/shared-types'
+import { chunksAcross, levelChunksAcross, wrap, wrapDelta } from '../terrain.js'
+import { cityAreaTileList } from '@csp/lang-wasm'
 import type { Building, City } from '@csp/shared-types'
 import type { Camera, Size } from './camera.js'
 import { cityEmblems } from './far.js'
@@ -247,7 +239,8 @@ export function minimapDots(world: MapWorld, viewer: Viewer): MinimapDot[] {
 
   const ownArea = new Set<string>()
   for (const c of world.cities) {
-    if (c.realmId === viewer.realmId) for (const t of cityAreaTiles(world, c, size)) ownArea.add(t)
+    if (c.realmId === viewer.realmId)
+      for (const [x, y] of cityAreaTileList(world.buildings, c.id, size)) ownArea.add(`${x},${y}`)
   }
   const away = (p: { x: number; y: number }) => !ownArea.has(`${p.x},${p.y}`)
   for (const r of world.residents) {

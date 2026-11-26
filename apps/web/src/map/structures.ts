@@ -1,7 +1,7 @@
 import type { Building } from '@csp/shared-types'
 import { cityAreaTileArray } from '@csp/lang-wasm'
-import { footprintKeys } from '../shared/footprint.js'
-import { wrapDelta } from '../shared/terrain.js'
+import { footprintKeys } from '../footprint.js'
+import { wrapDelta } from '../terrain.js'
 
 /**
  * What the map draws buildings and city areas from, worked out once for each list of buildings

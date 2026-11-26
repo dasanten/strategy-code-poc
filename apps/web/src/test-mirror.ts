@@ -1,6 +1,6 @@
 import { MAP_SIZE } from '@csp/balance'
 import type { BuildingKind, KnownNode, WallMaterial } from '@csp/shared-types'
-import { NODE_WORKPLACE } from './shared/world.js'
+import { NODE_WORKPLACE } from '@csp/shared-types'
 import { mirrorWelcome } from './world-mirror.js'
 import { buildProblem, nodeCorner } from './world-rules.js'
 

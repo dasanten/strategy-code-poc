@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  CHUNK_SIZE,
-  TERRAIN_BATCH_MAX,
-  TERRAIN_LEVEL_MAX,
-  Terrain,
-  UNEXPLORED,
-  chunksAcross,
-} from '../shared/terrain.js'
+import { CHUNK_SIZE, TERRAIN_BATCH_MAX, TERRAIN_LEVEL_MAX, UNEXPLORED } from '@csp/shared-types'
+import { Terrain, chunksAcross } from '../terrain.js'
 import type { Building, BuildingKind, City, SeenCarriage, SeenResident } from '@csp/shared-types'
 import type { MapWorld } from './map-world.js'
 import {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { BUILD_GROUPS, BUILDING_PURPOSE } from './shared/building-info.js'
-import { buildingWork, materialsOfKind, workFactor } from './shared/building.js'
+import { BUILD_GROUPS, BUILDING_PURPOSE } from './building-info.js'
+import { buildingWork, materialsOfKind, workFactor } from '@csp/lang-wasm'
 import type { BuildingKind, ResourceNode, WallMaterial } from '@csp/shared-types'
 import {
   buildMenuGroups,

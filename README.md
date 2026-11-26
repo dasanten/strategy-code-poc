@@ -10,17 +10,17 @@ Design decisions live in `docs/adr/`; the domain glossary is
 
 The server is Rust (ADR 0030), the client TypeScript. One cargo workspace at the root:
 
-| Path                    | What it is                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------------ |
-| `crates/csp-shared`     | World types, balance numbers (`src/balance/`), the wire protocol and helpers               |
-| `crates/csp-lang`       | The script language: lexer, parser, checker, interpreter with the step budget              |
-| `crates/csp-lang-wasm`  | `csp-lang`'s checker built to WebAssembly for the editor                                   |
-| `crates/csp-sim`        | Everything in a tick: terrain, pathfinding, orders, the world step, NPC cities, invariants |
-| `crates/csp-server`     | The I/O shell: HTTP, WebSocket sync, accounts, SQLite, saves, monitoring, admin CLI        |
-| `apps/web`              | Vite + React client: PixiJS tile map and a CodeMirror script editor                        |
-| `packages/shared-types` | The client's types, generated from the crates (`pnpm types:rust`)                          |
-| `packages/balance`      | The balance numbers the client reads, generated (`pnpm balance:rust`)                      |
-| `packages/lang-wasm`    | The editor's checker (`pnpm wasm:build`) and the script tables (`pnpm script-data:rust`)   |
+| Path                    | What it is                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------- |
+| `crates/csp-shared`     | World types, balance numbers (`src/balance/`), the wire protocol and helpers                          |
+| `crates/csp-lang`       | The script language: lexer, parser, checker, interpreter with the step budget                         |
+| `crates/csp-lang-wasm`  | The checker and the game rules the client calls, built to WebAssembly (`docs/wasm-rules.md`)          |
+| `crates/csp-sim`        | Everything in a tick: terrain, pathfinding, orders, the world step, NPC cities, invariants            |
+| `crates/csp-server`     | The I/O shell: HTTP, WebSocket sync, accounts, SQLite, saves, monitoring, admin CLI                   |
+| `apps/web`              | Vite + React client: PixiJS tile map and a CodeMirror script editor                                   |
+| `packages/shared-types` | The client's types, generated from the crates (`pnpm types:rust`)                                     |
+| `packages/balance`      | The balance numbers the client reads, generated (`pnpm balance:rust`)                                 |
+| `packages/lang-wasm`    | The module as the client loads it (`pnpm wasm:build`) and the script tables (`pnpm script-data:rust`) |
 
 The TypeScript server, `packages/shared` and `packages/lang` were the frozen specification of the
 port and were deleted at the cutover (T88.6); the last commit with them is `21f7a29e`. The Rust
@@ -165,7 +165,6 @@ only aboard a vessel of their realm with room there; a wall never.
 thing as the admin map does, until you switch it off. It is kept by the server for your login
 session, never in the world: your sight and your scripts' stay as they are. Switching it reloads
 the game view.
-
 
 `npc_slow::game_year::the_new_world_runs_a_game_year_on_its_own` runs a generated world for a game
 year (about 50 min in release; ignored for time). It fails on the game day an NPC city starves out

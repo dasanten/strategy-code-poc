@@ -1,5 +1,6 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js'
-import { CHUNK_SIZE, chunksAcross, wrap } from '../shared/terrain.js'
+import { CHUNK_SIZE } from '@csp/shared-types'
+import { chunksAcross, wrap } from '../terrain.js'
 import type { TerrainChunk } from '@csp/shared-types'
 import { chunkToScreen, type Camera, type Size } from './camera.js'
 import { TERRAIN_MARK_ALPHA, TERRAIN_MARK_COLOR } from './palette.js'

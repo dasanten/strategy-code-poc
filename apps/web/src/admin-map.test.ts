@@ -1,7 +1,7 @@
 import { START_CITY_SIZE } from '@csp/balance'
 import { describe, expect, it } from 'vitest'
-import { ADMIN_VIEW_MAX_SIDE } from './shared/admin-map.js'
-import { OVERVIEW_SCALE, Terrain, chunksAcross } from './shared/terrain.js'
+import { ADMIN_VIEW_MAX_SIDE, OVERVIEW_SCALE } from '@csp/shared-types'
+import { Terrain, chunksAcross } from './terrain.js'
 import type { AdminEntity, AdminLand, AdminPlaces, AdminWorldView } from '@csp/shared-types'
 import {
   ADMIN_LINK_SCALE,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { PROTOCOL_VERSION, WS_PATH } from './shared/protocol.js'
+import { PROTOCOL_VERSION, WS_PATH } from '@csp/shared-types'
 import { inArrivalOrder, onClose } from './socket-frames.js'
 import type {
   SeenBuilding,
@@ -34,7 +34,7 @@ import type {
 import { api } from './api.js'
 import { appendEvents } from './realm-log.js'
 import { applyRegionMap, type RegionState } from './map/region.js'
-import { decodeExploredCounts } from './shared/chunks.js'
+import { decodeExploredCounts } from './map/chunk-codec.js'
 import { lastSeenByKind, type LastSeen } from './last-seen.js'
 import { feedMirror } from './world-mirror.js'
 
@@ -113,7 +113,7 @@ export interface ClientWorld {
 }
 
 /** Sorts what is in sight by kind, dropping the tag. */
-function byKind(entities: Iterable<SeenEntity>) {
+export function byKind(entities: Iterable<SeenEntity>) {
   const out = {
     residents: [] as SeenResident[],
     cities: [] as SeenCity[],

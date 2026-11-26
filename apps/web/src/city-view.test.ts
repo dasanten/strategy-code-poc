@@ -1,8 +1,8 @@
-import { PRICED_GOODS, deliveryFee, priceFor } from './shared/warehouse.js'
+import { PRICED_GOODS } from './warehouse.js'
+import { deliveryFee, priceFor, quoteTransfer, transferTiles } from '@csp/lang-wasm'
 import { OCCUPATION_GAME_DAYS, TICKS_PER_GAME_DAY } from '@csp/balance'
-import { OCCUPATION_TICKS } from './shared/city.js'
-import { transferFee, transferTiles } from './shared/transfer.js'
-import { WAREHOUSE_FLOOR } from './shared/narrowed.js'
+import { OCCUPATION_TICKS } from './city.js'
+import { WAREHOUSE_FLOOR } from './narrowed.js'
 import type {
   Building,
   City,
@@ -314,7 +314,12 @@ describe('trading at a warehouse in the inspector', () => {
     expect(takesTransfers(home, all, 'realm1')).toBe(false)
     expect(takesTransfers(post, all, 'realm1')).toBe(false)
     const [from] = deliveryCities(all, 'realm1')
-    const fee = transferFee(5, transferTiles(128, warehouse, storage, their))
+    const { fee } = quoteTransfer(
+      storage.stock,
+      'iron',
+      9,
+      transferTiles(128, warehouse, storage, their),
+    )
     expect(previewTransfer(all, from!, 'city3', 'iron', 9, 128)).toEqual({ units: 5, fee })
     // Without the recipient's storage in sight there is nothing to preview.
     expect(previewTransfer(all, from!, 'city4', 'iron', 9, 128)).toBe(undefined)

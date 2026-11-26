@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GOODS } from './shared/world.js'
+import { GOODS } from './world.js'
 import { OWN_FOOD } from '@csp/balance'
 import {
   GOOD_ART,

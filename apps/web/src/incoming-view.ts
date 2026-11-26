@@ -1,4 +1,4 @@
-import { wantsNothing } from './shared/offers.js'
+import { wantsNothing } from './offer-rules.js'
 import type { Diplomacy, DirectOfferView } from '@csp/shared-types'
 import { GOOD_LABELS } from './goods-grid.js'
 import { carriedLine, offerStands, offerTerms } from './offers-view.js'

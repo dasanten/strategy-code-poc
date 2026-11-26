@@ -1,4 +1,5 @@
-import { WORKPLACE_PARAM, isWorkScript } from './shared/default-scripts.js'
+import { WORKPLACE_PARAM } from '@csp/shared-types'
+import { isWorkScript } from '@csp/lang-wasm'
 import type { ScriptParam, ScriptSummary, WorkplaceSettings } from '@csp/shared-types'
 
 /**
