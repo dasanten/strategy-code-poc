@@ -10,7 +10,7 @@
 
 use std::cell::Cell;
 
-use csp_shared::world::{Building, BuildingKind, ConstructionSite, WorldState};
+use csp_shared::world::{Building, BuildingKind, City, ConstructionSite, WorldState};
 use csp_sim::queries::city_area;
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -140,10 +140,28 @@ pub fn city_membership(
         return Err("one town hall for each city".into());
     }
     for (id, &hall) in ids.iter().zip(halls) {
-        let city = serde_json::json!({
-            "id": id, "name": "", "realmId": null, "townHallId": format!("b{hall}"), "occupation": null,
+        // Built, not read: a reader of `City` would add about 15 KB to the module.
+        world.cities.push(City {
+            id: (*id).to_string(),
+            name: String::new(),
+            game_name: None,
+            realm_id: None,
+            town_hall_id: format!("b{hall}"),
+            trade_org: None,
+            workplace_ids: None,
+            scouted: None,
+            former_player: None,
+            occupation: None,
+            outsiders: None,
+            alarmed_attackers: None,
+            layout: None,
+            outweighed: None,
+            threats: None,
+            danger_places: None,
+            temperament: None,
+            stance: None,
+            retaliating: None,
         });
-        world.cities.push(serde_json::from_value(city).map_err(|e| e.to_string())?);
     }
     let members = city_area::city_membership(&world, size);
     Ok((0..world.buildings.len())
