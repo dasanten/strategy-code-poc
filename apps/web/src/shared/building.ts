@@ -24,7 +24,7 @@ import {
   wrapDelta,
 } from './terrain.js'
 import { CARRYING_A_CHILD, NODE_WORKPLACE, isTrainingSubject } from './world.js'
-import { MAP_SIZE, TRAINING_GROUND_MAX_TRAINEES, buildWork, carryCapacity } from '@csp/balance'
+import { MAP_SIZE, TRAINING_GROUND_MAX_TRAINEES, carryCapacity } from '@csp/balance'
 import type {
   BuildLine,
   Building,
@@ -39,7 +39,9 @@ import type {
   WorldState,
 } from '@csp/shared-types'
 import { NODE_GOOD } from '@csp/shared-types'
-import { siteWorkOf, hasChoice, recipeFor, cornersCovering } from '@csp/lang-wasm'
+import { hasChoice, recipeFor, cornersCovering } from '@csp/lang-wasm'
+
+export { workPace } from '@csp/lang-wasm'
 
 export {
   materialsNeeded,
@@ -675,19 +677,6 @@ export function workingOn(
       : (o?.kind === 'build' || (isLineOrder(o) && o.phase === 'building')) && o.siteId === b.id
     return on && isAt(r, b, size)
   })
-}
-
-/**
- * Work a building or construction site gets a tick from these residents, building it or tearing
- * it down, as the server counts it (`buildWork`, `siteWorkOf`); `under` is the terrain beneath.
- */
-export function workPace(
-  b: Building,
-  workers: readonly Resident[],
-  tick: number,
-  under?: number,
-): number {
-  return workers.reduce((sum, r) => sum + siteWorkOf(buildWork(r, tick), b.kind, under), 0)
 }
 
 /**

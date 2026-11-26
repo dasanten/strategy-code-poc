@@ -6,6 +6,11 @@
 import type {
   Building,
   BuildingKind,
+  Carriage,
+  Directive,
+  DirectiveGoal,
+  MercenaryContract,
+  Realm,
   CarriedFeeBy,
   ClientFirstDayLine,
   FirstDayLine,
@@ -770,4 +775,166 @@ export function feedProblem(
 ): string | undefined {
   const t = target && asResident(target)
   return opt(rule<string | null>('feedProblem', asResident(feeder), t, tick, size))
+}
+
+// Rules on one contract, realm, directive or carriage (T122.5b).
+
+/** Work a building or site gets a tick from these workers. */
+export function workPace(
+  b: Building,
+  workers: readonly Resident[],
+  tick: number,
+  under?: number,
+): number {
+  return rule('workPace', asBuilding(b), workers.map(asResident), tick, under)
+}
+
+/** A contract as the module reads one, from what the caller has of it. */
+function asContract(c: object): object {
+  return {
+    id: '',
+    lenderId: '',
+    hirerId: '',
+    offeredBy: 'lender',
+    residentIds: [],
+    days: 0,
+    pricePerWeek: 0,
+    storageId: '',
+    startedAt: null,
+    paidWeeks: 0,
+    ...c,
+  }
+}
+
+/** Game weeks a contract runs, the last one maybe short; each is paid in full. */
+export function contractWeeks(c: Pick<MercenaryContract, 'days'>): number {
+  return rule('contractWeeks', asContract(c))
+}
+
+/** The tick a started contract ends. */
+export function contractEndsAt(c: MercenaryContract & { startedAt: number }): number {
+  return rule('contractEndsAt', asContract(c), c.startedAt)
+}
+
+/** The tick by which the contract's next unpaid week has to be paid; none once all are paid. */
+export function contractPayBy(c: MercenaryContract): number | null {
+  return rule('contractPayBy', asContract(c))
+}
+
+/** A realm as the module reads one, from what the caller has of it. */
+function asRealm(r: object): object {
+  return { id: '', userId: 0, leaderId: '', ...r }
+}
+
+/** When the realm sent the demands that still count against today's (`DEMANDS_PER_GAME_DAY`). */
+export function demandsCounted(realm: Pick<Realm, 'demandsSentAt'>, tick: number): number[] {
+  return rule('demandsCounted', asRealm(realm), tick)
+}
+
+/** How many more demands the realm may send today. */
+export function demandsLeft(realm: Pick<Realm, 'demandsSentAt'>, tick: number): number {
+  return rule('demandsLeft', asRealm(realm), tick)
+}
+
+/** A directive as the module reads one, from what the caller has of it. */
+function asDirective(d: object): object {
+  return {
+    id: '',
+    target: '',
+    withAlliance: false,
+    reason: '',
+    givenBy: '',
+    givenAt: 0,
+    goals: [],
+    soldiersKilled: 0,
+    price: null,
+    ...d,
+  }
+}
+
+/** Whether one of a directive's goals is met (`CONTEXT.md`: Admin directive). */
+export function goalMet(d: Pick<Directive, 'soldiersKilled'>, goal: DirectiveGoal): boolean {
+  return rule('goalMet', asDirective(d), goal)
+}
+
+/** Whether all of a directive's goals are met, so it ends. One without goals never ends. */
+export function goalsMet(d: Pick<Directive, 'goals' | 'soldiersKilled'>): boolean {
+  return rule('goalsMet', asDirective(d))
+}
+
+/** A name as sent, for the module to tell nothing sent from `null` sent. */
+function given(v: unknown): object {
+  return v === undefined ? {} : { v }
+}
+
+/** Why the Player of `realm` can't rename `target` to `name` now, if they can't. */
+export function renameProblem(
+  realm: Pick<Realm, 'id' | 'leaderId' | 'name'>,
+  target: Resident | undefined,
+  name: unknown,
+  realmName?: unknown,
+): string | undefined {
+  const t = target && asResident(target)
+  const p = rule<string | null>('renameProblem', asRealm(realm), t, given(name), given(realmName))
+  return opt(p)
+}
+
+/** Why the Player of `realm` can't rename `horse` to `name` now, if they can't. */
+export function horseRenameProblem(
+  realm: Pick<Realm, 'id'>,
+  horse: Pick<Horse, 'realmId'> | undefined,
+  name: unknown,
+): string | undefined {
+  const h = horse && asHorse(horse)
+  return opt(rule<string | null>('horseRenameProblem', asRealm(realm), h, given(name)))
+}
+
+/** What each side of a carried offer pays over its ways: the sender's and the other side's fee. */
+export function carriedFeesOver(
+  way: { senderTiles: number; otherTiles: number },
+  feeBy: CarriedFeeBy,
+  goods: { gives: Good; givesUnits: number; wants: Good; wantsUnits: number; times: number },
+): { senderFee: number; otherFee: number } {
+  const { senderTiles, otherTiles } = way
+  const { gives, givesUnits, wants, wantsUnits, times } = goods
+  const g = { gives, givesUnits, wants, wantsUnits, times }
+  return rule('carriedFeesOver', { senderTiles, otherTiles }, feeBy, g)
+}
+
+/** What of a carriage the module reads (`SeenCarriage`). */
+const CARRIAGE_FIELDS = ['id', 'realmId', 'cityId', 'x', 'y', 'horseId', 'load']
+
+/** A carriage as the module reads one, from what the caller has of it. */
+function asCarriage(k: object): object {
+  const known = Object.fromEntries(Object.entries(k).filter(([f]) => CARRIAGE_FIELDS.includes(f)))
+  return {
+    id: '',
+    realmId: null,
+    cityId: null,
+    x: 0,
+    y: 0,
+    horseId: null,
+    loadLevel: 'empty',
+    passengerIds: [],
+    standsStill: false,
+    ...known,
+  }
+}
+
+/** Why a resident can't board a carriage as a passenger, if they can't. */
+export function boarderProblem(
+  resident: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId' | 'order' | 'aboard' | 'riding'>,
+  carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>,
+): string | undefined {
+  return opt(rule<string | null>('boarderProblem', asResident(resident), asCarriage(carriage)))
+}
+
+/** Why a resident can't unhitch a carriage's horse now, if they can't. */
+export function unhitchProblem(
+  resident: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId' | 'bornAt'>,
+  carriage: Pick<Carriage, 'x' | 'y' | 'realmId' | 'cityId' | 'horseId'> | undefined,
+  tick: number,
+): string | undefined {
+  const k = carriage && asCarriage(carriage)
+  return opt(rule<string | null>('unhitchProblem', asResident(resident), k, tick))
 }

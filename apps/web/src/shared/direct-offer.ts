@@ -2,7 +2,6 @@
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
 import { realmsKnownTo } from './demand.js'
-import { GOOD_WEIGHT } from './narrowed.js'
 import {
   offerTermsProblem,
   postOfferProblem,
@@ -12,27 +11,21 @@ import {
 } from './offers.js'
 import { organizationLabel, tradeOrgRefuses } from './standing.js'
 import { NO_CARAVANS, tradeOrgHq } from './trade-org.js'
-import {
-  feeAtPickUp,
-  nearestWarehouse,
-  pickUpTransferProblem,
-  transferFee,
-  transferTiles,
-} from './transfer.js'
+import { nearestWarehouse, pickUpTransferProblem, transferTiles } from './transfer.js'
 import { deliveryStorage } from './warehouse.js'
 import { DIRECT_OFFERS_TO_ONE_REALM } from '@csp/balance'
 import type {
-  CarriedFeeBy,
   CarriedOfferTerms,
   CarriedWay,
   DirectOfferTerms,
   DirectOfferView,
-  Good,
   RealmLabel,
   Offer,
   WorldState,
 } from '@csp/shared-types'
-import { carriedUnloadShares } from '@csp/lang-wasm'
+import { carriedFeesOver } from '@csp/lang-wasm'
+
+export { carriedFeesOver } from '@csp/lang-wasm'
 
 export { carriedUnloadShares } from '@csp/lang-wasm'
 
@@ -135,29 +128,6 @@ export function carriedWaysFor(
   return citiesToCarryAt(world, realmId).flatMap((own) =>
     [...others].flatMap((other) => carriedWay(world, size, own.id, other) ?? []),
   )
-}
-
-/**
- * What each side of a carried Direct offer pays on a way when all of its goods are taken: the
- * sender's goods over `senderTiles`, the other side's over `otherTiles`, each fee's parts as who
- * pays says (`carriedUnloadShares`).
- */
-export function carriedFeesOver(
-  way: Pick<CarriedWay, 'senderTiles' | 'otherTiles'>,
-  feeBy: CarriedFeeBy,
-  goods: Pick<Offer, 'gives' | 'givesUnits' | 'wants' | 'wantsUnits' | 'times'>,
-): { senderFee: number; otherFee: number } {
-  const fee = (good: Good, units: number, tiles: number) =>
-    transferFee(units * GOOD_WEIGHT[good], tiles)
-  const senders = fee(goods.gives, goods.givesUnits * goods.times, way.senderTiles)
-  const others = fee(goods.wants, goods.wantsUnits * goods.times, way.otherTiles)
-  const shares = carriedUnloadShares(feeBy)
-  const sendersAtPickUp = feeAtPickUp(senders, shares.sender)
-  const othersAtPickUp = feeAtPickUp(others, shares.other)
-  return {
-    senderFee: sendersAtPickUp + others - othersAtPickUp,
-    otherFee: senders - sendersAtPickUp + othersAtPickUp,
-  }
 }
 
 /** What each side pays for this offer between the two cities, undefined with a way missing. */

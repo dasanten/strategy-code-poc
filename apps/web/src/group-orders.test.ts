@@ -242,7 +242,9 @@ describe('group orders', () => {
       resident('away', 5, 4),
       child('b', 4, 4),
       resident('aboard', 4, 4, { aboard: 'k1' }),
-      resident('driver', 4, 4, { order: { kind: 'drive', carriageId: 'k1' } }),
+      resident('driver', 4, 4, {
+        order: { kind: 'drive', carriageId: 'k1', target: { x: 4, y: 4 }, path: null, progress: 0 },
+      }),
       resident('c', 4, 4),
       resident('d', 4, 4),
     ]

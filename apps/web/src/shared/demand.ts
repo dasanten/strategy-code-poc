@@ -10,7 +10,6 @@ import { NO_CARAVANS, TRADE_ORG, tradeOrgHq } from './trade-org.js'
 import { pickUpTransferProblem, transferWarehouses } from './transfer.js'
 import { deliveryStorage } from './warehouse.js'
 import {
-  DEMANDS_PER_GAME_DAY,
   DEMAND_YIELD_RESPECT_MIN,
   DEMAND_YIELD_RESPECT_TIMES,
   OUTWEIGH_HOLD_DAYS,
@@ -24,24 +23,15 @@ import type {
   RealmLabel,
   Stock,
   Demand,
-  Realm,
   WorldState,
 } from '@csp/shared-types'
 import { goodsToHandOver } from '@csp/lang-wasm'
 
+export { demandsCounted, demandsLeft } from '@csp/lang-wasm'
+
 export { transferLoads, transferLoadsFee, goodsToHandOver, demandNoteProblem } from '@csp/lang-wasm'
 
 /** World queries about demands (`CONTEXT.md`: Demand; ADR 0002: the API orders and scripts share). */
-
-/** When the realm sent the demands that still count against `DEMANDS_PER_GAME_DAY`. */
-export function demandsCounted(realm: Pick<Realm, 'demandsSentAt'>, tick: number): number[] {
-  return (realm.demandsSentAt ?? []).filter((at) => tick - at < TICKS_PER_GAME_DAY)
-}
-
-/** How many more demands the realm may send now. */
-export function demandsLeft(realm: Pick<Realm, 'demandsSentAt'>, tick: number): number {
-  return Math.max(0, DEMANDS_PER_GAME_DAY - demandsCounted(realm, tick).length)
-}
 
 /**
  * The other realms a realm knows of (`CONTEXT.md`: Demand): those it sees residents of

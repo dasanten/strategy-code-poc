@@ -3,13 +3,14 @@
 
 import { isArmed } from './stats.js'
 import type {
-  DirectiveGoal,
   DirectiveGoalView,
   DirectiveView,
   Resident,
   Directive,
   WorldState,
 } from '@csp/shared-types'
+
+export { goalMet, goalsMet } from '@csp/lang-wasm'
 
 export {
   MAX_DIRECTIVE_REASON,
@@ -57,19 +58,6 @@ export function directiveSoldiers(
 ): Resident[] {
   const orgs = directiveTargets(world, d)
   return world.residents.filter((r) => orgs.includes(r.owner ?? r.cityId ?? '') && isArmed(r))
-}
-
-/** Whether a directive's goal is met. */
-export function goalMet(d: Pick<Directive, 'soldiersKilled'>, goal: DirectiveGoal): boolean {
-  return goal.kind === 'city' ? goal.met : d.soldiersKilled >= goal.count
-}
-
-/**
- * Whether all of a directive's goals are met, so it ends (`CONTEXT.md`: Admin directive). One
- * with no goals ends only when an admin lifts it.
- */
-export function goalsMet(d: Pick<Directive, 'goals' | 'soldiersKilled'>): boolean {
-  return d.goals.length > 0 && d.goals.every((g) => goalMet(d, g))
 }
 
 /** Every directive in force as a Player sees it, oldest first. */
