@@ -9,6 +9,7 @@ import type { ScriptParamType } from './script-data.js'
  */
 export * from './script-data.js'
 export * from './rules.js'
+export * from './areas.js'
 
 /** A finding at a place in a script. */
 export interface Diagnostic {

@@ -6,6 +6,7 @@
 //! [`script_data`] is the other half: the game's script tables (views, API, default scripts) as
 //! the JSON `packages/lang-wasm/script-data.json`, written by the `script-data` binary.
 
+pub mod area_rules;
 pub mod rules;
 pub mod value_rules;
 
