@@ -1,6 +1,6 @@
 // `pnpm wasm:build` (T88.3, ADR 0030): builds the editor's script checker, `crates/csp-lang-wasm`,
 // to WebAssembly in `packages/lang-wasm/generated/` (not committed). Cargo decides whether the
-// crate changed; `wasm-bindgen` (and `wasm-opt`, where it is installed) run only when the wasm it
+// crate changed; `wasm-bindgen` and `wasm-opt` (binaryen, a dev dependency) run only when the wasm it
 // wrote is newer than the bindings, so a build with nothing to do takes about a second.
 //
 // Needs the `wasm32-unknown-unknown` target and `wasm-bindgen-cli` at the version of the
@@ -23,6 +23,7 @@ const outDir = join(root, 'packages/lang-wasm/generated')
 const bindings = join(outDir, 'csp_lang_wasm_bg.wasm')
 const target = process.env.CARGO_TARGET_DIR ?? join(root, 'target')
 const built = join(target, 'wasm32-unknown-unknown/wasm/csp_lang_wasm.wasm')
+const wasmOpt = join(root, 'node_modules/binaryen/bin/wasm-opt')
 
 const run = (cmd, args) => execFileSync(cmd, args, { cwd: root, stdio: 'inherit' })
 
@@ -72,30 +73,23 @@ if (!existsSync(bindings) || statSync(built).mtimeMs > statSync(bindings).mtimeM
     '--remove-producers-section',
     built,
   ])
-  let wasmOpt = true
-  try {
-    execFileSync('wasm-opt', ['--version'], { stdio: 'ignore' })
-  } catch {
-    wasmOpt = false
-  }
-  if (wasmOpt) {
-    run('wasm-opt', [
-      '-Oz',
-      '--enable-bulk-memory',
-      '--enable-nontrapping-float-to-int',
-      '--enable-sign-ext',
-      '--enable-mutable-globals',
-      '--enable-reference-types',
-      '--enable-multivalue',
-      bindings,
-      '-o',
-      bindings,
-    ])
-  } else {
-    console.log(
-      'wasm:build: wasm-opt is not installed; the wasm is as rustc and wasm-bindgen wrote it',
-    )
-  }
+  // binaryen's `wasm-opt` (#1637), from the pinned `binaryen` dev dependency: the same version on
+  // every machine and in the `Dockerfile`. The package is wasm-opt compiled to JavaScript, so it
+  // runs on Node wherever pnpm installed it, Windows included. The features are what rustc emits
+  // for wasm32-unknown-unknown; wasm-opt refuses a module that uses one it was not allowed.
+  run(process.execPath, [
+    wasmOpt,
+    '-Oz',
+    '--enable-bulk-memory',
+    '--enable-nontrapping-float-to-int',
+    '--enable-sign-ext',
+    '--enable-mutable-globals',
+    '--enable-reference-types',
+    '--enable-multivalue',
+    bindings,
+    '-o',
+    bindings,
+  ])
 }
 
 const bytes = readFileSync(bindings)
