@@ -174,3 +174,27 @@ fn a_collapse_ends_repair_orders_on_it_and_leaves_what_the_rebuild_had() {
         .floor();
     assert_eq!(world.piles[0].goods.get(&Good::Wood), Some(&(left + 3.0)));
 }
+
+/// Bug #1615: a tower decays like every finished building. Left unrepaired it turns to a ruin: no
+/// longer wall to be up on, so whoever was up on it is on the ground.
+#[test]
+fn a_neglected_tower_turns_to_a_ruin_and_those_up_on_it_are_down() {
+    let mut world = empty_world();
+    let mut scratch = Scratch::default();
+    add_city(&mut world, "c1", None, 10.0, 10.0, None);
+    building(&mut world, "t1", BuildingKind::Tower, Some("c1"), 4.0, 4.0);
+    let r = resident(&mut world, "a1", None, 4.0, 4.0);
+    world.residents[r].city_id = Some("c1".into());
+    world.residents[r].up = Some(csp_shared::world::UpSide::Inside);
+    let lasts = decay_days(BuildingKind::Tower).expect("a tower decays") as u64;
+
+    days(&mut world, &mut scratch, lasts - 1);
+    crate::wall_walk::step_wall_walk(&mut world);
+    assert!(crate::queries::walls::wall_or_tower_at(&world, 4.0, 4.0).is_some());
+    assert!(world.residents[r].up.is_some(), "still up on it while it stands");
+    days(&mut world, &mut scratch, 1);
+    assert!(is_ruin(b(&world, "t1")));
+    crate::wall_walk::step_wall_walk(&mut world);
+    assert!(crate::queries::walls::wall_or_tower_at(&world, 4.0, 4.0).is_none());
+    assert_eq!(world.residents[r].up, None);
+}

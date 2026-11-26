@@ -189,8 +189,8 @@ const TOWER: BuildingSpec = BuildingSpec {
     }),
     workplace: None,
     housing_room: None,
-    // Never decays, though the rules say every finished building does (#1615).
-    decay_days: None,
+    // As fast as a timber building (#1615), slower than a tile of wall.
+    decay_days: Some(4500.0),
 };
 
 const FARM: BuildingSpec = BuildingSpec {
