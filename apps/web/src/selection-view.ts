@@ -52,19 +52,10 @@ import {
   carriageOfResident,
   horsesToHitch,
   carriagePulledBy,
-  driveOffProblem,
-  hitchOffProblem,
-  horseToSteal,
   unhitchProblem,
   drivenCarriageId,
 } from './shared/carriages.js'
-import {
-  riderOf,
-  mountOffProblem,
-  STABLE_BREED_TICKS,
-  breedersAt,
-  keptBreeding,
-} from './shared/horses.js'
+import { riderOf, STABLE_BREED_TICKS, breedersAt, keptBreeding } from './shared/horses.js'
 import {
   feedHorseProblem,
   feedProblem,
@@ -138,7 +129,14 @@ import { faresKnown, horseFaresKnown } from './seen.js'
 import { FEED_HORSE_HINT, horseDownLine, horseNeed } from './horses-view.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 import { describeOccupation, type OccupationView } from './city-view.js'
-import { besideVessel, boardBoatProblem, crewShort, vesselCapacity } from './shared/vessels.js'
+import { besideVessel, crewShort, vesselCapacity } from './shared/vessels.js'
+import {
+  boardVesselProblems,
+  driveOffProblems,
+  hitchOffProblems,
+  horseToSteal,
+  mountOffProblems,
+} from './world-rules.js'
 import type { Picking } from './Residents.js'
 
 /**
@@ -1870,19 +1868,15 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     )
     const viewerRealm = t.viewer.realmId
     if (viewerRealm && vessel.realmId === viewerRealm) {
-      const board = mine
-        .filter(
-          (r) =>
-            r.aboard === undefined && besideVessel(vessel, r, t.mapSize ?? MAP_SIZE, t.buildings),
-        )
-        .map((r) => ({
-          id: r.id,
-          name: r.name,
-          problem: boardBoatProblem({ ...r, driving: !!drivenCarriageId(r) }, vessel, {
-            buildings: t.buildings,
-            size: t.mapSize ?? MAP_SIZE,
-          }),
-        }))
+      const beside = mine.filter(
+        (r) =>
+          r.aboard === undefined && besideVessel(vessel, r, t.mapSize ?? MAP_SIZE, t.buildings),
+      )
+      const problems = boardVesselProblems(
+        beside.map((r) => r.id),
+        vessel.id,
+      )
+      const board = beside.map((r, i) => ({ id: r.id, name: r.name, problem: problems[i] }))
       const getOff = mine
         .filter((r) => r.aboard === vessel.id)
         .map(({ id, name }) => ({ id, name }))
@@ -1965,31 +1959,24 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     (r) => !t.strangers.some((s) => s.id === r.id) && !isDown(r),
   )
   if (realmId && thieves.length > 0) {
-    const seen = {
-      tick: t.tick ?? 0,
-      residents: t.residents ?? [],
-      horses: t.horses,
-      carriages: t.carriages,
-      caravans: t.caravans ?? [],
-      traders: t.traders ?? [],
-    }
-    /** Each of them with why they can't, by `problem`. */
-    const each = (problem: (thief: (typeof thieves)[number]) => string | undefined) =>
-      thieves.map((r) => ({ id: r.id, name: r.name, problem: problem(r) }))
+    const seen = { residents: t.residents ?? [], carriages: t.carriages }
+    const ids = thieves.map((r) => r.id)
+    /** Each of them with why they can't, the checks asked of them all in one call. */
+    const each = (problems: (string | undefined)[]) =>
+      thieves.map((r, i) => ({ id: r.id, name: r.name, problem: problems[i] }))
     if (stealable) {
       driveOff = {
         carriageId: stealable.id,
-        residents: each((r) => driveOffProblem(seen, r, stealable, realmId, t.mapSize)),
+        residents: each(driveOffProblems(ids, stealable.id, realmId)),
       }
     }
     const own = here(t.carriages).find((k) => k.realmId === realmId && !k.horseId)
-    const hitched = own && horseToSteal(seen, thieves[0]!, own, realmId)
+    const hitched = own && horseToSteal(thieves[0]!.id, own.id, realmId)
     if (own && hitched) {
-      const carriage = { ...own, realmId }
       hitchOff = {
         carriageId: own.id,
-        horseId: hitched.id,
-        residents: each((r) => hitchOffProblem(seen, r, carriage, hitched.id)),
+        horseId: hitched,
+        residents: each(hitchOffProblems(ids, own.id, realmId, hitched)),
       }
     }
     // Only what's free: a hitched horse shows as its carriage, a ridden one as its rider.
@@ -2000,7 +1987,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     if (horse) {
       stealHorse = {
         horseId: horse.id,
-        residents: each((r) => mountOffProblem(seen, r, horse, realmId)),
+        residents: each(mountOffProblems(ids, horse.id, realmId)),
       }
     }
   }

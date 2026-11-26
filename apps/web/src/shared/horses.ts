@@ -1,22 +1,14 @@
 // Ported from packages/shared/src/horses.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { carriageCanGoTo } from './building.js'
-import {
-  carriagePulledBy,
-  drivenCarriageId,
-  takeProblem,
-  type StealingResident,
-} from './carriages.js'
+import { carriagePulledBy } from './carriages.js'
 import { covers, isAt } from './footprint.js'
 import { pileAt } from './goods.js'
-import { type TerrainMap, wrap } from './terrain.js'
-import { isDown } from './world.js'
+import { wrap } from './terrain.js'
 import { HORSE_REACH, STABLE_BREED_DAYS, STABLE_CAPACITY, TICKS_PER_GAME_DAY } from '@csp/balance'
 import type {
   BreedOrder,
   Building,
-  CarriageHorse,
   Horse,
   KeptBreeding,
   Resident,
@@ -213,73 +205,4 @@ export function horseOfResident(
 ): boolean {
   if (resident.owner !== null) return horse.realmId === resident.owner
   return horse.realmId === null && resident.cityId !== null && horse.cityId === resident.cityId
-}
-
-/** What of the world the checks on mounting a horse look at: all a Player sees of it. */
-interface MountWorld<R> {
-  tick: number
-  residents: readonly R[]
-  carriages: readonly { horseId: string | null }[]
-}
-
-/** Why a resident can't get on a horse, whoever's it is (`mountProblem`, `mountOffProblem`). */
-function mountingProblem<R extends StealingResident>(
-  world: MountWorld<R>,
-  resident: R,
-  horse: CarriageHorse,
-): string | undefined {
-  if (resident.riding === horse.id) return 'already riding that horse'
-  if (resident.riding !== undefined) return 'already riding another horse'
-  if (horse.x !== resident.x || horse.y !== resident.y) {
-    return 'that horse is not on the resident’s tile'
-  }
-  if (carriagePulledBy(world, horse)) return 'that horse is hitched to a carriage'
-  if (isDown(horse)) return 'that horse is Down'
-  if (riderOf(world, horse)) return 'someone else rides that horse'
-  if (drivenCarriageId(resident) !== undefined) return 'a driver can’t ride'
-  return undefined
-}
-
-/**
- * Why a resident can't steal another organization's horse for the realm `realmId` by mounting it
- * now, or undefined when they can (`CONTEXT.md`: Stealing a carriage or horse): what mounting asks
- * of any horse (`mountProblem`), and what taking asks of anything (`takeProblem`). The rider must
- * be of that realm, since a rider's horse is their own realm's (`horseOfResident`): someone on loan
- * to it steals none to ride.
- */
-export function mountOffProblem<R extends StealingResident>(
-  world: MountWorld<R>,
-  thief: R,
-  horse: CarriageHorse,
-  realmId: string,
-): string | undefined {
-  if (thief.owner !== realmId) return 'not a horse of your realm'
-  return mountingProblem(world, thief, horse) ?? takeProblem(world, thief, horse, realmId, 'horse')
-}
-
-/**
- * Why a resident can't mount a horse now, or undefined when they can (`CONTEXT.md`: Riding): the
- * horse must be of their realm and on their tile, pull no carriage, not be Down (`CONTEXT.md`:
- * Down), and nobody may ride it; the resident must ride no other horse and drive no carriage. A
- * horse left on Mountain whose road was torn down can't be ridden there (`CONTEXT.md`: Road).
- * With `commander`, the realm whose order it is, a horse of another organization may be stolen by
- * that (`mountOffProblem`); without one it is refused.
- */
-export function mountProblem(
-  world: WorldState,
-  resident: Resident,
-  horse: Horse | undefined,
-  terrain?: TerrainMap,
-  commander?: string | null,
-): string | undefined {
-  if (!horse) return 'no such horse'
-  const steals = !horseOfResident(horse, resident)
-  if (steals && !commander) return 'not a horse of your realm'
-  const problem = steals
-    ? mountOffProblem(world, resident, horse, commander!)
-    : mountingProblem(world, resident, horse)
-  if (problem) return problem
-  if (terrain && !carriageCanGoTo(world, terrain, horse.x, horse.y))
-    return 'a horse can’t be ridden on Mountain without a road'
-  return undefined
 }

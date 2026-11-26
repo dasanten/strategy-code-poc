@@ -52,15 +52,21 @@ import {
   carriagePulledBy,
   carriageOfResident,
   drivenCarriageId,
-  driveOffProblem,
-  hitchOffProblem,
-  horseToSteal,
   seatsLeft,
 } from './shared/carriages.js'
-import { mountOffProblem, horseOfResident, riderOf } from './shared/horses.js'
+import { horseOfResident, riderOf } from './shared/horses.js'
 import { horsesInNeed } from './shared/reviving.js'
 import { isDown, NODE_WORKPLACE } from './shared/world.js'
-import { buildProblem, nodeCorner, type KnownGround } from './world-rules.js'
+import {
+  buildProblem,
+  driveOffProblems,
+  hitchOffProblems,
+  horseToSteal,
+  mountOffProblems,
+  nodeCorner,
+  rowOffProblem,
+  type KnownGround,
+} from './world-rules.js'
 import {
   isPassableTerrain,
   isWater,
@@ -92,7 +98,6 @@ import {
   besideVessel,
   crewShort,
   isVesselId,
-  rowOffProblem,
   vesselOfResident,
   vesselRoom,
 } from './shared/vessels.js'
@@ -1242,7 +1247,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         kind: 'drive',
         residentId: selected.id,
         carriageId: unhorsedHere.id,
-        horseId: horseToHitch.id,
+        horseId: horseToHitch,
         x,
         y,
       }
@@ -2225,7 +2230,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         v.kind !== 'ship' && v.realmId !== world.home.realmId && besideVessel(v, selected, size),
     )
     if (!v) return undefined
-    return { id: v.id, problem: rowOffProblem(world, selected, v, world.home.realmId, size) }
+    return { id: v.id, problem: rowOffProblem(selected.id, v.id, world.home.realmId) }
   })()
   // Another organization's horses for the picked resident (`CONTEXT.md`: Stealing a carriage or
   // horse): a free one to mount, and one to pull the realm's own carriage that has none of its own.
@@ -2234,7 +2239,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   )
   const horseToHitch =
     world && selected && unhorsedHere
-      ? horseToSteal(world, selected, unhorsedHere, world.home.realmId)
+      ? horseToSteal(selected.id, unhorsedHere.id, world.home.realmId)
       : undefined
   const looseStrangers = onTile(
     world?.horses.filter(
@@ -3277,31 +3282,29 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
               {...(stealableHere && {
                 driveOff: {
-                  problem: driveOffProblem(
-                    world,
-                    selected,
-                    stealableHere,
-                    world.home.realmId,
-                    world.map.size,
-                  ),
+                  problem: driveOffProblems([selected.id], stealableHere.id, world.home.realmId)[0],
                 },
                 onDriveOff: () => setPicking((p) => (p === 'driveOff' ? false : 'driveOff')),
               })}
               {...(unhorsedHere &&
                 horseToHitch && {
                   hitchOff: {
-                    problem: hitchOffProblem(
-                      world,
-                      selected,
-                      { ...unhorsedHere, realmId: world.home.realmId },
-                      horseToHitch.id,
-                    ),
+                    problem: hitchOffProblems(
+                      [selected.id],
+                      unhorsedHere.id,
+                      world.home.realmId,
+                      horseToHitch,
+                    )[0],
                   },
                   onHitchOff: () => setPicking((p) => (p === 'hitchOff' ? false : 'hitchOff')),
                 })}
               {...(looseStrangers && {
                 stealHorse: {
-                  problem: mountOffProblem(world, selected, looseStrangers, world.home.realmId),
+                  problem: mountOffProblems(
+                    [selected.id],
+                    looseStrangers.id,
+                    world.home.realmId,
+                  )[0],
                 },
                 onStealHorse: () =>
                   void giveOrder(

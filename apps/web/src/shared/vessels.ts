@@ -9,11 +9,9 @@ import {
   SHIP_MIN_CREW,
 } from '@csp/balance'
 import type { Building, Resident, SeenVessel, VesselKind } from '@csp/shared-types'
-import type { StealingResident } from './carriages.js'
-import { guardedBy } from './city.js'
 import { inContact } from './combat.js'
 import { covers } from './footprint.js'
-import { canWork, stockWeight } from './stats.js'
+import { stockWeight } from './stats.js'
 
 /** Whether an id names a vessel: the server names each after its kind, as "boat12". */
 export function isVesselId(id: string | undefined): boolean {
@@ -77,66 +75,4 @@ export function vesselRoom(
 ): number | undefined {
   if (!v.load) return undefined
   return vesselCapacity(v.kind) - stockWeight(v.load) - v.passengerIds.length * PASSENGER_WEIGHT
-}
-
-/**
- * Why a resident can't board the vessel now, if so (`CONTEXT.md`: Beside a vessel, What vessels
- * carry, Docked, Crew): only beside it (a ship only docked, from its haven), a rider dismounts
- * first (no horse goes aboard), the driver can't, and it must have room for one more passenger.
- * As crew (`asCrew`), only a ship and only grown (`child` says they aren't), taking no room.
- */
-export function boardBoatProblem(
-  r: { x: number; y: number; riding?: string; aboard?: string; driving?: boolean },
-  v: Pick<SeenVessel, 'x' | 'y' | 'load' | 'passengerIds'> & {
-    kind?: VesselKind
-    dockedAt?: string
-  },
-  opts: { buildings?: Havens; size?: number; asCrew?: boolean; child?: boolean } = {},
-): string | undefined {
-  const name = vesselName(v)
-  if (r.aboard !== undefined) return 'already aboard'
-  if (opts.asCrew && v.kind !== 'ship') return 'only a ship takes a crew'
-  if (v.kind === 'ship' && v.dockedAt === undefined) return 'the ship is not docked at a haven'
-  if (!besideVessel(v, r, opts.size, opts.buildings))
-    return v.kind === 'ship' ? 'not at the haven the ship is docked at' : 'not beside the boat'
-  if (r.driving) return 'the driver can’t board'
-  if (r.riding !== undefined) return 'no horse goes aboard: dismount first'
-  if (opts.asCrew) return opts.child ? 'children can’t crew a ship' : undefined
-  const room = vesselRoom(v)
-  if (room !== undefined && room < PASSENGER_WEIGHT - 1e-9) return `the ${name} is full`
-  return undefined
-}
-
-/**
- * Why a resident can't row off in another organization's boat (or nobody's) for the realm
- * `realmId` now, or undefined when they can (`CONTEXT.md`: Stealing a carriage or horse, its
- * vessel part): grown, beside it and aboard nothing, on no horse and driving nothing; nobody may
- * row it or be aboard; and it mustn't be guarded: an armed resident of its owner beside it and none
- * of the thief's realm, the thief themselves included. `size` is the map's.
- */
-export function rowOffProblem<R extends StealingResident>(
-  world: { tick: number; residents: readonly R[] },
-  thief: R,
-  v: Pick<SeenVessel, 'id' | 'x' | 'y' | 'realmId' | 'passengerIds' | 'rowerId'> & {
-    kind?: VesselKind
-  },
-  realmId: string,
-  size = MAP_SIZE,
-): string | undefined {
-  // A ship is stolen by sailing it off with a crew, never rowed (`CONTEXT.md`: Sailing).
-  if (v.kind === 'ship') return 'a ship is sailed, not rowed'
-  if (!canWork(thief, world.tick)) return 'children can’t steal'
-  if (thief.aboard !== undefined) return 'aboard another carriage or boat'
-  if (!besideVessel(v, thief, size)) return 'that boat is not beside the resident'
-  if (thief.order?.kind === 'drive' || thief.order?.kind === 'haul') return 'the driver can’t row'
-  if (thief.riding !== undefined) return 'no horse goes aboard: dismount first'
-  if (v.rowerId !== undefined) return 'someone is rowing that boat'
-  if (v.passengerIds.length > 0) return 'someone is aboard that boat'
-  const guarded = guardedBy(
-    world.residents,
-    (r) => r.aboard !== v.id && besideVessel(v, r, size),
-    (r) => vesselOfResident(v, r),
-    (r) => r.id === thief.id || r.owner === realmId,
-  )
-  return guarded ? 'an armed resident guards that boat' : undefined
 }

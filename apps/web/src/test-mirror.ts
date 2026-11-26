@@ -178,8 +178,8 @@ function seen(is: string, thing: object): object {
   return out
 }
 
-/** The `welcome` message's text a Player sent `world` would get. */
-export function welcomeOf(world: TestWorld): string {
+/** What a welcome message carries of `world`, each as the server sends it. */
+function entitiesOf(world: TestWorld): object[] {
   const lists: [string, readonly object[] | undefined][] = [
     ['resident', world.residents],
     ['building', world.buildings],
@@ -191,7 +191,10 @@ export function welcomeOf(world: TestWorld): string {
     ['caravan', world.caravans],
     ['trader', world.traders],
   ]
-  const entities = lists.flatMap(([is, list]) => (list ?? []).map((t) => seen(is, t)))
+  return lists.flatMap(([is, list]) => (list ?? []).map((t) => seen(is, t)))
+}
+
+function welcome(world: TestWorld, entities: object[]): string {
   return JSON.stringify({
     type: 'welcome',
     tick: world.tick ?? 0,
@@ -200,9 +203,27 @@ export function welcomeOf(world: TestWorld): string {
   })
 }
 
-/** The mirror holds `world` (and nothing else) until the next call; none without a world. */
-export function mirrorOf(world?: TestWorld): void {
-  mirrorWelcome(world && welcomeOf(world))
+/** The `welcome` message's text a Player sent `world` would get. */
+export function welcomeOf(world: TestWorld): string {
+  return welcome(world, entitiesOf(world))
+}
+
+/**
+ * The mirror holds `world` (and nothing else) until the next call; none without a world. Throws
+ * for a thing the server would never send; `lenient` leaves such things out instead, for a test
+ * whose sketches of things none of the mirror's checks read.
+ */
+export function mirrorOf(world?: TestWorld, lenient = false): void {
+  if (!world || !lenient) return mirrorWelcome(world && welcomeOf(world))
+  const readable = entitiesOf(world).filter((e) => {
+    try {
+      mirrorWelcome(welcome(world, [e]))
+      return true
+    } catch {
+      return false
+    }
+  })
+  mirrorWelcome(welcome(world, readable))
 }
 
 /** What a test knows of the ground: its size and terrain. */

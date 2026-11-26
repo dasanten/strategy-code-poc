@@ -1,6 +1,7 @@
 import { CARRYING_A_CHILD, GOODS } from './shared/world.js'
 import { boarderProblem } from './shared/carriages.js'
-import { besideVessel, boardBoatProblem } from './shared/vessels.js'
+import { besideVessel } from './shared/vessels.js'
+import { boardVesselProblems } from './world-rules.js'
 import { canHandle, canWork } from './shared/stats.js'
 import { covers, isAt } from './shared/footprint.js'
 import { inContact } from './shared/combat.js'
@@ -420,13 +421,9 @@ export function groupSkip(
   }
   if (order.kind === 'boardBoat') {
     // Room is told by the seats left (`groupRequests`).
-    const driving = r.order?.kind === 'drive' || r.order?.kind === 'haul'
-    const boarder = { ...r, driving, ...(r.riding === undefined ? {} : { riding: r.riding }) }
-    return boardBoatProblem(
-      boarder,
-      { ...order.vessel, passengerIds: [] },
-      { size, ...(seen.buildings ? { buildings: seen.buildings } : {}), asCrew: !!order.asCrew },
-    )
+    const [why] = boardVesselProblems([r.id], order.vessel.id, !!order.asCrew)
+    if (why === 'the boat is full' || why === 'the ship is full') return undefined
+    return why === 'that boat is not beside the resident' ? 'not beside the boat' : why
   }
   if (order.kind === 'getOff' && r.aboard === undefined) return 'not aboard'
   if (order.kind === 'work' && !isAt(r, order.workplace, size))

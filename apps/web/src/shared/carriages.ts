@@ -1,18 +1,14 @@
 // Ported from packages/shared/src/carriages.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { guardedBy, type GuardResident } from './city.js'
 import { storageAt } from './goods.js'
 import { GOOD_WEIGHT } from './narrowed.js'
-import { canWork, isArmed, stockWeight } from './stats.js'
-import { wrapDistance } from './terrain.js'
+import { canWork, stockWeight } from './stats.js'
 import { isDown } from './world.js'
 import {
   CARAVAN_ESCORTS,
   CARAVAN_ESCORTS_MAX,
-  CARAVAN_GUARD_RANGE,
   CARAVAN_ROBBERIES_PER_ESCORT,
-  MAP_SIZE,
   PASSENGER_WEIGHT,
   TRADER_ESCORTS,
   carriageCapacityWith,
@@ -28,8 +24,6 @@ import type {
   Resident,
   Stock,
   Trader,
-  Punishment,
-  SupplyWagon,
   WorldState,
 } from '@csp/shared-types'
 
@@ -208,211 +202,6 @@ export function haulStopSpot(world: WorldState, x: number, y: number): GoodsSpot
 }
 
 /**
- * Why a resident can't drive a carriage now, or undefined when they can (`CONTEXT.md`:
- * Carriage): they must be grown up, on foot (`CONTEXT.md`: Riding) and on its tile, it must have
- * a horse to pull it that isn't Down (`CONTEXT.md`: Down), and nobody else may be driving it.
- */
-export function driveProblem<R extends Pick<Resident, 'order' | 'riding' | 'x' | 'y' | 'bornAt'>>(
-  world: {
-    tick: number
-    residents: readonly R[]
-    horses: readonly CarriageHorse[]
-    carriages: readonly CarriagePlace[]
-  },
-  resident: R,
-  carriage: CarriagePlace & Pick<Carriage, 'id'>,
-): string | undefined {
-  if (!canWork(resident, world.tick)) return 'children can’t drive'
-  if (resident.riding !== undefined) return 'dismount first to drive'
-  if (carriage.x !== resident.x || carriage.y !== resident.y) {
-    return 'that carriage is not on the resident’s tile'
-  }
-  const horse = horseFor(world, carriage)
-  if (!horse || horse.x !== carriage.x || horse.y !== carriage.y) {
-    return 'no horse here to pull that carriage'
-  }
-  if (isDown(horse)) return 'its horse is Down'
-  const driver = driverOf(world, carriage)
-  if (driver && driver !== resident) return 'someone else is driving that carriage'
-  return undefined
-}
-
-/** What of a resident the stealing checks look at: all a Player sees of anyone in sight. */
-export type StealingResident = GuardResident &
-  Pick<Resident, 'id' | 'x' | 'y' | 'owner' | 'cityId' | 'bornAt' | 'order' | 'riding' | 'aboard'>
-
-/**
- * Why a resident can't take the carriage or horse `thing` of another organization for the realm
- * `realmId` now, what has them all in common (`CONTEXT.md`: Stealing a carriage or horse): they
- * must be grown up and on its tile, and it mustn't be guarded: an armed resident of its owner
- * stands on the tile and none of the thief's realm does, the thief themselves included. `what`
- * names the thing in the reason.
- */
-export function takeProblem<R extends StealingResident>(
-  world: { tick: number; residents: readonly R[] },
-  thief: R,
-  thing: Pick<Carriage, 'x' | 'y' | 'realmId' | 'cityId'>,
-  realmId: string,
-  what: 'carriage' | 'horse',
-): string | undefined {
-  if (!canWork(thief, world.tick)) return 'children can’t steal'
-  if (thing.x !== thief.x || thing.y !== thief.y) {
-    return `that ${what} is not on the resident’s tile`
-  }
-  const guarded = guardedBy(
-    world.residents,
-    (r) => r.x === thing.x && r.y === thing.y,
-    (r) => carriageOfResident(thing, r),
-    (r) => r.id === thief.id || r.owner === realmId,
-  )
-  return guarded ? `an armed resident guards that ${what}` : undefined
-}
-
-/** What of the world the checks on driving off with something stolen look at: all a Player sees. */
-interface StealingWorld<R, H extends CarriageHorse = CarriageHorse> {
-  tick: number
-  residents: readonly R[]
-  horses: readonly H[]
-  carriages: readonly CarriagePlace[]
-}
-
-/**
- * The horse of another organization a driver of the realm `realmId` would steal by driving off in
- * the carriage (`CONTEXT.md`: Stealing a carriage or horse), which then is hitched: only with no
- * horse hitched and no free horse of the realm's on its tile, which comes first (`horseFor`). Of
- * the free ones there it is one they can take, the carriage's owner's first; `named` keeps to that
- * horse. Undefined when there is none.
- */
-export function horseToSteal<R extends StealingResident, H extends CarriageHorse>(
-  world: StealingWorld<R, H>,
-  driver: R,
-  carriage: CarriagePlace,
-  realmId: string,
-  named?: string,
-): H | undefined {
-  if (carriage.horseId) return undefined
-  if (horseFor(world, { ...carriage, realmId, cityId: null })) return undefined
-  const free = world.horses.filter(
-    (h) =>
-      (named === undefined || h.id === named) &&
-      h.x === carriage.x &&
-      h.y === carriage.y &&
-      h.realmId !== realmId &&
-      !carriagePulledBy(world, h) &&
-      !isDown(h) &&
-      !world.residents.some((r) => r.riding === h.id),
-  )
-  const open = free.filter((h) => !takeProblem(world, driver, h, realmId, 'horse'))
-  const sameOwner = (h: H) => h.realmId === carriage.realmId && h.cityId === carriage.cityId
-  return open.find(sameOwner) ?? open[0] ?? free[0]
-}
-
-/**
- * Why a resident can't drive a carriage of their realm `carriage.realmId` off, stealing the horse
- * to pull it if there is one to steal (`horseToSteal`), or undefined when they can (`CONTEXT.md`:
- * Stealing a carriage or horse). With a horse of the realm's there, that one pulls it and nothing
- * is stolen. `named` keeps to that horse.
- */
-export function hitchOffProblem<R extends StealingResident>(
-  world: StealingWorld<R>,
-  driver: R,
-  carriage: CarriagePlace & Pick<Carriage, 'id'> & { realmId: string },
-  named?: string,
-): string | undefined {
-  const horse = horseToSteal(world, driver, carriage, carriage.realmId, named)
-  if (!horse) return driveProblem(world, driver, carriage)
-  return (
-    takeProblem(world, driver, horse, carriage.realmId, 'horse') ??
-    driveProblem(world, driver, { ...carriage, horseId: horse.id })
-  )
-}
-
-/**
- * Why a caravan's or trader's crew keep its carriage from being taken, on a map of `size` tiles
- * (`CONTEXT.md`: Caravan crew lost): its driver or an armed escort is up and within `CARAVAN_GUARD_RANGE` of it.
- * They have to be beaten or gone, however many of the thief's realm stand there; one still walking
- * out doesn't count until they are that near. `what` names the carriage in the reason.
- */
-function crewHolds<R extends StealingResident>(
-  residents: readonly R[],
-  caravan: Pick<Caravan, 'driverId' | 'escortIds'>,
-  carriage: Pick<Carriage, 'x' | 'y'>,
-  size: number,
-  what: 'caravan’s carriage' | 'trader’s carriage' | 'supply wagon',
-): string | undefined {
-  const near = (id: string | null, armed: boolean) =>
-    residents.some(
-      (r) =>
-        r.id === id &&
-        (r.health ?? 1) > 0 &&
-        !isDown(r) &&
-        (!armed || isArmed(r)) &&
-        wrapDistance(size, r, carriage) <= CARAVAN_GUARD_RANGE,
-    )
-  if (near(caravan.driverId, false)) return `its driver is still with that ${what}`
-  if (caravan.escortIds.some((id) => near(id, true))) return `its escort guards that ${what}`
-  return undefined
-}
-
-/**
- * The crew of a Trade Org army's supply wagon (`CONTEXT.md`: Trade Org debt), robbed like a caravan's:
- * its driver, with the army's soldiers as its escort.
- */
-function wagonCrew(
-  world: {
-    supplyWagons?: readonly Pick<SupplyWagon, 'carriageId' | 'driverId' | 'punishmentId'>[]
-    punishments?: readonly Pick<Punishment, 'id' | 'members'>[]
-  },
-  carriage: Pick<Carriage, 'id'>,
-): Pick<Caravan, 'driverId' | 'escortIds'> | undefined {
-  const wagon = world.supplyWagons?.find((w) => w.carriageId === carriage.id)
-  if (!wagon) return undefined
-  const army = world.punishments?.find((p) => p.id === wagon.punishmentId)
-  return { driverId: wagon.driverId, escortIds: army?.members.map((m) => m.residentId) ?? [] }
-}
-
-/**
- * Why a resident can't drive off in another organization's carriage for the realm `realmId` now,
- * or undefined when they can (`CONTEXT.md`: Stealing a carriage or horse): nobody may drive it or
- * be aboard, a caravan's or trader's crew mustn't hold it (`crewHolds`), it mustn't be guarded
- * (`takeProblem`), and they must be able to drive it as if it were their realm's already, so with
- * its hitched horse, a free one of that realm on its tile, or else one they steal with it
- * (`hitchOffProblem`). `size` is the map's.
- */
-export function driveOffProblem<R extends StealingResident>(
-  world: {
-    tick: number
-    residents: readonly R[]
-    horses: readonly CarriageHorse[]
-    carriages: readonly CarriagePlace[]
-    caravans: readonly Pick<Caravan, 'carriageId' | 'driverId' | 'escortIds'>[]
-    traders: readonly Pick<Trader, 'carriageId' | 'driverId' | 'escortIds'>[]
-    supplyWagons?: readonly Pick<SupplyWagon, 'carriageId' | 'driverId' | 'punishmentId'>[]
-    punishments?: readonly Pick<Punishment, 'id' | 'members'>[]
-  },
-  thief: R,
-  carriage: CarriagePlace & Pick<Carriage, 'id'>,
-  realmId: string,
-  size = MAP_SIZE,
-): string | undefined {
-  if (driverOf(world, carriage)) return 'someone is driving that carriage'
-  if (passengersOf(world, carriage).length > 0) return 'someone is aboard that carriage'
-  const caravan = world.caravans.find((c) => c.carriageId === carriage.id)
-  const trader = world.traders.find((t) => t.carriageId === carriage.id)
-  const held =
-    (caravan && crewHolds(world.residents, caravan, carriage, size, 'caravan’s carriage')) ??
-    (trader && crewHolds(world.residents, trader, carriage, size, 'trader’s carriage'))
-  if (held) return held
-  const wagon = wagonCrew(world, carriage)
-  const heldWagon = wagon && crewHolds(world.residents, wagon, carriage, size, 'supply wagon')
-  if (heldWagon) return heldWagon
-  return (
-    takeProblem(world, thief, carriage, realmId, 'carriage') ??
-    hitchOffProblem(world, thief, { ...carriage, realmId, cityId: null })
-  )
-}
-
-/**
  * Most weight a carriage holds, in kg (`CONTEXT.md`: Horse stats): by the Strength of the horse
  * that pulls it (`horseFor`), or `CARRIAGE_CAPACITY` while it has none.
  */
@@ -506,48 +295,6 @@ export function unhitchProblem(
   const problem = handlerProblem(resident, carriage, tick, 'unhitch')
   if (problem) return problem
   if (!carriage.horseId) return 'no horse is hitched to that carriage'
-  return undefined
-}
-
-/**
- * Why a resident can't hitch the named horse to a carriage now, or undefined when they can
- * (`CONTEXT.md`: Hitched horse): they must be able to handle it (`handlerProblem`), and the horse
- * must be one that can be hitched (`horsesToHitch`). Only the realm's own: another organization's
- * is stolen by driving or mounting (`CONTEXT.md`: Stealing a carriage or horse).
- */
-export function hitchProblem(
-  world: {
-    tick: number
-    horses: readonly CarriageHorse[]
-    carriages: readonly CarriagePlace[]
-    residents: readonly Pick<Resident, 'riding'>[]
-  },
-  resident: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId' | 'bornAt'>,
-  carriage: CarriagePlace | undefined,
-  horseId: unknown,
-): string | undefined {
-  if (!carriage) return 'no such carriage'
-  const problem = handlerProblem(resident, carriage, world.tick, 'hitch')
-  if (problem) return problem
-  const horse = world.horses.find((h) => h.id === horseId)
-  if (!horse) return 'no such horse'
-  return hitchHorseProblem(world, carriage, horse)
-}
-
-/**
- * Why a resident can't board a carriage now, or undefined when they can (`CONTEXT.md`:
- * Passenger): it must be of their realm and on their tile, with room for one more passenger;
- * they must be aboard no carriage, on foot (`CONTEXT.md`: Riding) and drive none.
- */
-export function boardProblem(
-  world: WorldState,
-  resident: Resident,
-  carriage: Carriage | undefined,
-): string | undefined {
-  if (!carriage) return 'no such carriage'
-  const problem = boarderProblem(resident, carriage)
-  if (problem) return problem
-  if (carriageRoom(world, carriage) < PASSENGER_WEIGHT - 1e-9) return 'the carriage is full'
   return undefined
 }
 
