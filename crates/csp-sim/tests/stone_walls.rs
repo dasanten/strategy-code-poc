@@ -163,7 +163,7 @@ fn strike(
     world.residents.push(new_resident("b9", Some("r2"), 4.0, 3.0));
     world.residents.last_mut().unwrap().order =
         Some(ResidentOrder::Attack(attack_order(id, false, false)));
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     for _ in 0..ticks {
         step_world(world, terrain, &mut scratch, Some(&mut walking), None);

@@ -58,7 +58,7 @@ impl Game {
         let scripts = DefaultScripts::new(terrain.clone(), &senders);
         let orders = OrderQueue::new(scripts.kinds.clone(), Some(terrain.clone()));
         // A clock that never runs out, so how far a way is found doesn't hang on the machine.
-        let walking = Walking::with_clock(terrain.clone(), Box::new(|| 0.0));
+        let walking = Walking::without_budget(terrain.clone());
         Game {
             world,
             terrain,

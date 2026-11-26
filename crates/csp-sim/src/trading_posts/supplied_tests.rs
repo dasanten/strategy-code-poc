@@ -80,7 +80,7 @@ fn hold_food_weapons_and_coins_over_many_game_days_and_their_people_do_not_starv
         h.stats.endurance = AVERAGE_HORSE_STATS.endurance;
     }
 
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     let people = |w: &csp_shared::world::WorldState| -> Vec<usize> {
         posts

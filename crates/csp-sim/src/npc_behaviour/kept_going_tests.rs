@@ -112,7 +112,7 @@ mod an_npc_resident_carrying_a_child {
         world.buildings[si].stock = Some(food(12.0));
         start_carrying(&mut world, 0, 1, 3.0);
         let a = world.residents[0].id.clone();
-        let mut walking = Walking::new(Arc::new(terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
         let mut scratch = Scratch::default();
         let me = |w: &WorldState| w.residents.iter().find(|r| r.id == a).cloned().expect("a");
         let mut t = 0;
@@ -161,7 +161,7 @@ mod an_npc_resident_carrying_a_child {
             .collect();
         assert!(!gates.is_empty());
         let a = world.residents[0].id.clone();
-        let mut walking = Walking::new(Arc::new(terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
         let mut scratch = Scratch::default();
         for _ in 0..6 * DAY {
             for &g in &gates {
@@ -186,7 +186,7 @@ mod an_npc_resident_carrying_a_child {
         world.buildings[si].stock = Some(Stock::new());
         start_carrying(&mut world, 0, 1, 0.0);
         let a = world.residents[0].id.clone();
-        let mut walking = Walking::new(Arc::new(terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
         let mut scratch = Scratch::default();
         for _ in 0..8 * DAY {
             step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);
@@ -309,7 +309,7 @@ fn realm_in_play() -> InPlay {
         storage,
         hall,
         runner,
-        walking: Walking::new(map),
+        walking: Walking::without_budget(map),
         scratch,
         rand: Mulberry32::new(5.0),
     }
@@ -577,7 +577,7 @@ mod residents_already_stuck_in_a_running_world {
         let mut saved: WorldState =
             serde_json::from_value(serde_json::to_value(&world).unwrap()).unwrap();
         assert!(npc_residents_kept_going(&saved).len() >= crew.len());
-        let mut walking = Walking::new(Arc::new(terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
         step_world(&mut saved, &terrain, &mut Scratch::default(), Some(&mut walking), None);
         for id in &crew {
             let now = saved.residents.iter().find(|r| &r.id == id).unwrap();

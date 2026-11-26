@@ -82,7 +82,7 @@ fn setup(s1: Stock) -> Setup {
         world.residents[i].carried.insert(Good::Spear, 1.0);
     }
     let hq = world.cities.iter().find(|c| c.id == hq).unwrap().clone();
-    let walking = Walking::new(Arc::new(terrain.clone()));
+    let walking = Walking::without_budget(Arc::new(terrain.clone()));
     Setup { world, terrain, hq, walking, scratch: Scratch::default() }
 }
 
@@ -867,7 +867,7 @@ fn reaches_the_farthest_city_on_a_real_size_map_and_gets_home_fed_with_no_food_b
     let hq_city = world.cities.iter().find(|c| c.id == hq).unwrap().clone();
     theft(&mut world, &hq_city, iron(10.0));
     let worth = TRADE_ORG_PUNISH.times * worth_of(&iron(10.0));
-    let mut walking = Walking::new(Arc::new(big.clone()));
+    let mut walking = Walking::without_budget(Arc::new(big.clone()));
     let mut scratch = Scratch::default();
     let mut step_until =
         |world: &mut WorldState, until: &dyn Fn(&WorldState) -> bool, most: usize| {

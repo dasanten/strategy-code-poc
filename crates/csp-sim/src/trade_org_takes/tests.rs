@@ -98,7 +98,7 @@ fn fixture(coins: f64, trips: f64) -> Fixture {
     st.insert(Good::Iron, 40.0);
     st.insert(Good::Coins, 300.0);
     let storage = world.buildings[si].id.clone();
-    let walking = Walking::new(Arc::new(terrain.clone()));
+    let walking = Walking::without_budget(Arc::new(terrain.clone()));
     Fixture { world, terrain, realm, leader, city, storage, walking, scratch: Scratch::default() }
 }
 

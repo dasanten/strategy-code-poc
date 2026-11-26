@@ -124,7 +124,7 @@ pub(crate) fn run_until(
     done: &dyn Fn(&WorldState) -> bool,
     ticks: usize,
 ) {
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     for _ in 0..ticks {
         if done(world) {
@@ -451,7 +451,7 @@ fn waits_at_a_post_for_the_food_its_next_leg_needs_and_takes_it_from_the_goods_w
     world.buildings[w].stock = Some(Stock::new());
     let storage = post_end(&world, &bound).storage.unwrap();
     world.buildings[storage].stock = Some(Stock::new());
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     for _ in 0..200 {
         step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);
@@ -502,7 +502,7 @@ fn tops_up_its_food_at_the_storage_first_then_goes_to_the_warehouse() {
     run_until(&mut world, &terrain, &|w| w.traders[0].stop == TraderStop::Warehouse, 200);
     assert_eq!(held(&world.carriages[carriage_of(&world, 0)].load, Good::Food), CARAVAN_FOOD);
     assert_eq!(held_in(world.buildings[s].stock.as_ref(), Good::Food), 200.0 - CARAVAN_FOOD);
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     step_world(&mut world, &terrain, &mut Scratch::default(), Some(&mut walking), None);
     let (wx, wy) = (world.buildings[w].x, world.buildings[w].y);
     let o = &world.residents[crew_of(&world, 0)[0]].order;
@@ -526,7 +526,7 @@ fn waits_at_the_hq_until_its_escort_is_armed_as_it_wont_be_back_there_soon() {
     let ki = carriage_of(&world, 0);
     world.carriages[ki].load = stock(&[(Good::Food, CARAVAN_FOOD)]);
     let crew = crew_of(&world, 0);
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     for _ in 0..10 {
         step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);
@@ -572,7 +572,7 @@ fn is_sent_from_the_hq_armed_goes_round_its_loop_the_hq_and_all_and_supplies_the
     let start = world.traders[0].post_id.clone();
     let ki = carriage_of(&world, 0);
     let mut reached: Vec<String> = Vec::new();
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     let mut farthest: f64 = 0.0;
     for t in 0..30_000 {
@@ -668,7 +668,7 @@ fn walks_to(world: &WorldState, ri: usize, x: f64, y: f64) -> bool {
 }
 
 fn step_once(world: &mut WorldState, terrain: &TerrainMap) {
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     step_world(world, terrain, &mut Scratch::default(), Some(&mut walking), None);
 }
 
@@ -785,7 +785,7 @@ fn goes_on_from_the_goods_warehouse_with_no_coins_to_move() {
     world.buildings[goods].stock = Some(stock(&[(Good::Wood, 10.0)]));
     world.buildings[coins].stock = Some(Stock::new());
     let mut stops = Vec::new();
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     for _ in 0..100 {
         if world.traders[0].post_id != hq {

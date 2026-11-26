@@ -108,7 +108,7 @@ fn setup() -> Setup {
     let shared = Arc::new(terrain.clone());
     let orders = OrderQueue::new(scripts.kinds.clone(), Some(shared.clone()));
     let queues = QueueRunner::new(Box::new(Host), scripts.kinds.clone(), Some(shared.clone()));
-    let walking = Walking::new(shared);
+    let walking = Walking::without_budget(shared);
     Setup { world, terrain, scripts, orders, queues, walking, scratch: Scratch::default() }
 }
 

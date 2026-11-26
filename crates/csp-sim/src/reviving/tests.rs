@@ -84,7 +84,7 @@ fn setup() -> Setup {
         world,
         orders: OrderQueue::new(order_kinds(), Some(terrain.clone())),
         queues: QueueRunner::new(Box::new(Host), order_kinds(), Some(terrain.clone())),
-        walking: Walking::new(terrain.clone()),
+        walking: Walking::without_budget(terrain.clone()),
         terrain,
         scratch: Scratch::default(),
     }

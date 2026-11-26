@@ -264,7 +264,7 @@ mod caravans_carrying_out_deliveries {
 
     /// Steps the world at least once and then until `done`, at most `ticks` times (`runUntil`).
     fn run_until(s: &mut Setup, done: impl Fn(&WorldState) -> bool, ticks: usize) {
-        let mut walking = Walking::new(Arc::new(s.terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(s.terrain.clone()));
         for t in 0..ticks {
             if t > 0 && done(&s.world) {
                 break;

@@ -112,7 +112,7 @@ fn with_no_node_in_reach_builds_nothing_and_its_warehouse_is_left_to_what_is_bro
 fn with_an_iron_node_in_reach_builds_a_mine_and_its_ore_goes_into_the_warehouse() {
     let (mut world, terrain, c) = post(true);
     let store = warehouse(&world, &c);
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     let storage = npc_home(&world, &c).unwrap().id.clone();
     plan_city(&mut world, &c, Some(&terrain), None, None);
@@ -188,7 +188,7 @@ fn res<'w>(world: &'w WorldState, id: &str) -> &'w Resident {
 
 /// Runs the world until `done`, checking the invariants as it goes.
 fn run_until(world: &mut WorldState, terrain: &TerrainMap, done: &dyn Fn(&WorldState) -> bool) {
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     for t in 0..400 {
         if done(world) {

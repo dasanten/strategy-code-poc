@@ -92,7 +92,7 @@ fn setup(map: TerrainMap, x: f64, y: f64) -> Setup {
     };
     world.carriages.push(k);
     let map = Arc::new(map);
-    Setup { world, walking: Walking::new(map.clone()), map, scratch: Scratch::default() }
+    Setup { world, walking: Walking::without_budget(map.clone()), map, scratch: Scratch::default() }
 }
 
 fn set_order(o: Value) -> Option<ResidentOrder> {

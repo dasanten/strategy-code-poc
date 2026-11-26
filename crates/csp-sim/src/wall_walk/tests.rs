@@ -89,7 +89,7 @@ fn ticks(t: f64) -> u32 {
 #[test]
 fn getting_up_takes_its_ticks_and_so_does_getting_down() {
     let (mut world, terrain) = setup();
-    let mut walking = Walking::new(terrain.clone());
+    let mut walking = Walking::without_budget(terrain.clone());
     let mut a1 = resident("a1", Some("r1"), 8.0, 6.0);
     walk_to(&mut a1, 8.0, 5.0);
     world.residents.push(a1);
@@ -109,7 +109,7 @@ fn getting_up_takes_its_ticks_and_so_does_getting_down() {
 #[test]
 fn along_the_walk_is_walking_and_goes_over_the_gate() {
     let (mut world, terrain) = setup();
-    let mut walking = Walking::new(terrain.clone());
+    let mut walking = Walking::without_budget(terrain.clone());
     let mut a1 = resident("a1", Some("r1"), 6.0, 11.0);
     a1.up = Some(UpSide::Inside);
     walk_to(&mut a1, 10.0, 11.0);
@@ -127,7 +127,7 @@ fn along_the_walk_is_walking_and_goes_over_the_gate() {
 #[test]
 fn only_the_walls_side_gets_up() {
     let (mut world, terrain) = setup();
-    let mut walking = Walking::new(terrain.clone());
+    let mut walking = Walking::without_budget(terrain.clone());
     let mut b1 = resident("b1", Some("r2"), 8.0, 4.0);
     walk_to(&mut b1, 8.0, 5.0);
     world.residents.push(b1);
@@ -241,7 +241,7 @@ fn the_invariants_catch_someone_up_off_a_wall_or_on_another_sides_wall_but_a_cli
 #[test]
 fn up_stays_true_to_the_walls_while_residents_come_and_go() {
     let (mut world, terrain) = setup();
-    let mut walking = Walking::new(terrain.clone());
+    let mut walking = Walking::without_budget(terrain.clone());
     for (i, (x, y, tx, ty)) in
         [(8.0, 6.0, 8.0, 5.0), (9.0, 4.0, 9.0, 5.0), (6.0, 7.0, 7.0, 14.0)].into_iter().enumerate()
     {
@@ -265,7 +265,7 @@ fn break_tile(world: &mut WorldState, terrain: &Arc<TerrainMap>, wall_id: &str, 
     let mut b9 = resident("b9", Some("r2"), from.0, from.1);
     b9.order = Some(ResidentOrder::Attack(crate::combat::attack_order(wall_id, false, false)));
     world.residents.push(b9);
-    let mut walking = Walking::new(terrain.clone());
+    let mut walking = Walking::without_budget(terrain.clone());
     let mut scratch = Scratch::default();
     for _ in 0..20 {
         step_world(world, terrain, &mut scratch, Some(&mut walking), None);

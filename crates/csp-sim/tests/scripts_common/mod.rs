@@ -181,7 +181,7 @@ impl Game {
         let t = Arc::new(terrain.clone());
         let orders = OrderQueue::new(scripts.kinds.clone(), Some(t.clone()));
         let queues = scripts.queue_runner();
-        let walking = Walking::new(t);
+        let walking = Walking::without_budget(t);
         Game {
             world,
             terrain,

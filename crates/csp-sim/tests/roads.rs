@@ -93,7 +93,7 @@ fn run(world: &mut WorldState, map: &TerrainMap, ticks: usize, walking: Option<&
 
 /// Ticks until w1's walk or drive order is done.
 fn ticks_to_arrive(world: &mut WorldState, map: &TerrainMap) -> usize {
-    let mut walking = Walking::new(Arc::new(map.clone()));
+    let mut walking = Walking::without_budget(Arc::new(map.clone()));
     let mut t = 0;
     while world.residents[0].order.is_some() && t < 5000 {
         run(world, map, 1, Some(&mut walking));
@@ -503,7 +503,7 @@ mod pathfinding_with_roads {
         let (mut world, _) = setup(&map, 1.0, 5.0);
         lay_road(&mut world);
         world.residents[0].order = Some(serde_json::from_value(walk_to(9.0, 5.0)).unwrap());
-        let mut walking = Walking::new(Arc::new(map.clone()));
+        let mut walking = Walking::without_budget(Arc::new(map.clone()));
         let mut visited = std::collections::HashSet::new();
         let mut t = 0;
         while world.residents[0].order.is_some() && t < 5000 {

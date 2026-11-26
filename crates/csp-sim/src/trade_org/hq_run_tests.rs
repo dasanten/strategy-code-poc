@@ -47,7 +47,7 @@ fn left_alone_keeps_itself_fed_over_seven_game_weeks() {
     let mut m = Mulberry32::new(7.0);
     let city = found_trade_org_hq(&mut world, &terrain, MID, MID, &mut || m.next());
 
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     let people: Vec<String> = world.residents.iter().map(|r| r.id.clone()).collect();
     for _ in 0..49 * TICKS_PER_GAME_DAY as usize {

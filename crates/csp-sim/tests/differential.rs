@@ -73,7 +73,7 @@ fn differential(name: &str, ticks: &[u64]) -> Option<String> {
 /// every world invariant holds on the way.
 fn stepped(name: &str, ticks: &[u64], compare: bool) -> Option<String> {
     let (mut world, terrain) = load(&format!("{name}-0"));
-    let mut walking = Unhurried(Walking::new(terrain.clone()));
+    let mut walking = Unhurried(Walking::without_budget(terrain.clone()));
     let mut scratch = Scratch::default();
     let all = world_invariants();
     for &at in ticks {

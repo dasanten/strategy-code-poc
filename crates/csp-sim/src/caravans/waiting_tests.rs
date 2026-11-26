@@ -59,7 +59,7 @@ fn a_waiting_horse_doesnt_go_down_nor_the_hqs_people_go_hungry_for_it() {
     w.buildings[storage].stock = Some(Stock::from([(Good::Food, keep)]));
 
     // No Food in the warehouse, so they stand and wait, on what the farms bring.
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     for _ in 0..6 * TICKS_PER_GAME_DAY as usize {
         step_world(&mut w, &terrain, &mut scratch, Some(&mut walking), None);
@@ -138,7 +138,7 @@ fn its_carriages_wait_then_leave_with_enough_nobody_goes_down_on_the_first_legs_
     let hq_city = w.cities.iter().find(|c| c.id == hq).unwrap().clone();
     let hall = middle_of(placed(town_hall_of(&w, &hq_city).unwrap()), SIZE);
     let mut seen: std::collections::HashMap<String, f64> = Default::default();
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     for _day in 1..=15 {
         for _ in 0..TICKS_PER_GAME_DAY as usize {

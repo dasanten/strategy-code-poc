@@ -36,7 +36,7 @@ fn carry_stock_from_the_hq_to_the_post_and_back_evening_out_with_the_escort_alon
     found_trade_org_hq(&mut world, &terrain, 128, 128, &mut || m.next());
     let post = found_trading_post(&mut world, &terrain, 320, 320, None, &mut || m.next());
     place_caravans(&mut world);
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     let post_wh = route_end(&world, &post, Heading::Post).warehouse.unwrap();
     let hq_wh = route_end(&world, &post, Heading::Hq).warehouse.unwrap();

@@ -96,7 +96,7 @@ fn run(
 ) -> bool {
     let (home_x, home_y) = (w1(world).x, w1(world).y);
     let mut runner = task_runner(terrain, task);
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     let mut left = false;
     for _ in 0..ticks {

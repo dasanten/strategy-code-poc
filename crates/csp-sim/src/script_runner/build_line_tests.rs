@@ -86,7 +86,7 @@ fn setup_on(terrain: TerrainMap, stock: Value) -> Setup {
     let terrain = Arc::new(terrain);
     let scripts = DefaultScripts::new(terrain.clone(), &[me()]);
     let orders = OrderQueue::new(scripts.kinds.clone(), Some(terrain.clone()));
-    let walking = Walking::new(terrain.clone());
+    let walking = Walking::without_budget(terrain.clone());
     Setup { world, terrain, scripts, orders, walking, scratch: Scratch::default() }
 }
 

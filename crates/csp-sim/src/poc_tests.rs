@@ -204,7 +204,7 @@ fn scenario() -> Scenario {
     let terrain_arc = Arc::new(terrain.clone());
     Scenario {
         queue: OrderQueue::new(order_kinds(), Some(terrain_arc.clone())),
-        walking: Walking::new(terrain_arc),
+        walking: Walking::without_budget(terrain_arc),
         scratch: Scratch::default(),
         requests: 0,
         storage: world.buildings[si].id.clone(),

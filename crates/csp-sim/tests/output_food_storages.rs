@@ -100,7 +100,7 @@ fn run(
     task: Task,
 ) {
     let mut runner = task_runner(terrain, task);
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     for _ in 0..800 {
         if done(world) {
