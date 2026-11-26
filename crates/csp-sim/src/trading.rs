@@ -19,6 +19,7 @@ use crate::goods_deps::{
 };
 use crate::holders::{holder_id, move_between, total, Holder};
 use crate::mending::leaving_shares;
+use crate::order_meta::OrderMeta;
 use crate::queries::carriages::caravan_food_for;
 use crate::queries::city::npc_city_refuses;
 use crate::queries::command::{commander_of_resident, commands, commands_carriage};
@@ -38,6 +39,9 @@ use crate::queries::warehouse_trade::{
     delivery_storage, hands_of, load_of, owed_by, quote_delivery, quote_pick_up, quote_trade,
     trade_problem, trading_warehouse_at, TradeHolder,
 };
+use crate::running::{in_place, no_ties, RunningOrder};
+use crate::script_actions::{arg, arg_as, place, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
 
 fn resident_named(world: &WorldState, id: Option<&Value>) -> Option<usize> {
@@ -92,6 +96,47 @@ pub fn apply_trade(
     }));
 }
 
+pub(crate) static TRADE_META: OrderMeta = OrderMeta::not_requested("trade").npc_city();
+
+impl RunningOrder for TradeOrder {
+    in_place!();
+    no_ties!();
+}
+
+pub(crate) static SELL_META: OrderMeta = OrderMeta::fns(
+    "sell",
+    |w, s, o, _| validate_trade(w, s, o, TradeSide::Sell),
+    |w, s, o, _| apply_trade(w, s, o, TradeSide::Sell),
+)
+.gets_off_first()
+.script(&[SELL_ACTION]);
+
+const SELL_ACTION: ScriptAction = ScriptAction {
+    name: "sell",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("good"), arg("units"), arg_as("carriageId?", "carriageId"), arg_as("cityId?", "cityId")]),
+    cost: 10.0,
+    description: "On a Trade Org warehouse, an NPC city’s storage or the tile of a wandering trader standing at a stop, sell up to `units` of a good at its prices from my hands, or from my carriage there. At a warehouse, with `cityId` (and no carriage), a caravan picks them up from that city’s storage and pays there, less a fee.",
+    returns: ScriptType::String,
+};
+
+pub(crate) static BUY_META: OrderMeta = OrderMeta::fns(
+    "buy",
+    |w, s, o, _| validate_trade(w, s, o, TradeSide::Buy),
+    |w, s, o, _| apply_trade(w, s, o, TradeSide::Buy),
+)
+.gets_off_first()
+.script(&[BUY_ACTION]);
+
+const BUY_ACTION: ScriptAction = ScriptAction {
+    name: "buy",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("good"), arg("units"), arg_as("carriageId?", "carriageId"), arg_as("cityId?", "cityId")]),
+    cost: 10.0,
+    description: "On a Trade Org warehouse, an NPC city’s storage or the tile of a wandering trader standing at a stop, buy up to `units` of a good at its prices with the coins in my hands, or on my carriage there. At a warehouse, with `cityId`, one of my realm’s cities, a caravan delivers them to its storage for a fee.",
+    returns: ScriptType::String,
+};
+
 /// Checks a swap order (`swap.validate`).
 pub fn validate_swap(
     world: &WorldState,
@@ -130,6 +175,25 @@ pub fn apply_swap(world: &mut WorldState, _sender: &OrderSender, order: &OrderRe
     }));
 }
 
+pub(crate) static SWAP_META: OrderMeta =
+    OrderMeta::fns("swap", |w, s, o, _| validate_swap(w, s, o), |w, s, o, _| apply_swap(w, s, o))
+        .gets_off_first()
+        .script(&[SWAP_ACTION]);
+
+const SWAP_ACTION: ScriptAction = ScriptAction {
+    name: "swap",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("give"), arg("want"), arg("units"), arg_as("carriageId?", "carriageId")]),
+    cost: 10.0,
+    description: "On a Trade Org warehouse or an NPC city’s storage, get up to `units` of the good `want` for as much of the good `give` as pays for them at its prices, rounded up, from my hands, or from my carriage there. What is over comes back in Coins as far as it holds them. An NPC city swaps only its surplus for what it is short of.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for SwapOrder {
+    in_place!();
+    no_ties!();
+}
+
 /// Checks a buy horse order (`buyHorse.validate`).
 pub fn validate_buy_horse(
     world: &WorldState,
@@ -165,9 +229,48 @@ pub fn apply_buy_horse(world: &mut WorldState, _sender: &OrderSender, order: &Or
     horse_order(world, order, true);
 }
 
+pub(crate) static BUY_HORSE_META: OrderMeta = OrderMeta::fns(
+    "buyHorse",
+    |w, s, o, _| validate_buy_horse(w, s, o),
+    |w, s, o, _| apply_buy_horse(w, s, o),
+)
+.gets_off_first()
+.script(&[BUY_HORSE_ACTION]);
+
+const BUY_HORSE_ACTION: ScriptAction = ScriptAction {
+    name: "buyHorse",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[place("horse", "horseId")]),
+    cost: 10.0,
+    description: "At an NPC city’s finished stable, buy a horse standing in it that it can spare, by it or its id, with the coins in my hands; they go into its storage, and the horse joins my realm where it stands. `city.horses` lists its horses with their prices and why it won’t sell one.",
+    returns: ScriptType::String,
+};
+
 /// Gives a sell horse order (`sellHorse.apply`).
 pub fn apply_sell_horse(world: &mut WorldState, _sender: &OrderSender, order: &OrderRequest) {
     horse_order(world, order, false);
+}
+
+pub(crate) static SELL_HORSE_META: OrderMeta = OrderMeta::fns(
+    "sellHorse",
+    |w, s, o, _| validate_sell_horse(w, s, o),
+    |w, s, o, _| apply_sell_horse(w, s, o),
+)
+.gets_off_first()
+.script(&[SELL_HORSE_ACTION]);
+
+const SELL_HORSE_ACTION: ScriptAction = ScriptAction {
+    name: "sellHorse",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[place("horse", "horseId")]),
+    cost: 10.0,
+    description: "At an NPC city’s finished stable, sell it a horse of my realm standing in it, by it or its id; the coins go into my hands, and it doesn’t go if I can’t carry them. The horse joins the city where it stands. `city.horsesToSell` lists my horses there with what it pays and why it won’t buy one.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for HorseTradeOrder {
+    in_place!();
+    no_ties!();
 }
 
 fn horse_order(world: &mut WorldState, order: &OrderRequest, buy: bool) {

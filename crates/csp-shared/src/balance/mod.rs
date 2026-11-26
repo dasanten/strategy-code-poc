@@ -3,10 +3,12 @@
 //!
 //! A new number is one declaration inside its domain file's `balance!` block: that defines the
 //! constant and puts it in the export (`balance_json`), under its own name and in the order of the
-//! declarations. Then run `pnpm balance:rust`. A number the client has no use for stands outside
-//! the block and says `Not exported` in its comment. All are read as `balance::NAME`, whichever
-//! file they are in. A few numbers sit in the file before or after their domain's (T120.3): there
-//! they keep their place in the export.
+//! declarations. Then run `pnpm balance:rust`. The numbers of a building kind, good, vessel kind
+//! or siege machine kind are in its spec (`building_specs.rs`, `good_specs.rs`, `craft_specs.rs`),
+//! which the tables and constants keyed by one are made from. A number the client has
+//! no use for stands outside the block and says `Not exported` in its comment. All are read as
+//! `balance::NAME`, whichever file they are in. A few numbers sit in the file before or after their
+//! domain's (T120.3): there they keep their place in the export.
 //!
 //! Work (eating, production, building, skill, spoilage, breeding) is counted in game days; social
 //! and political timers (memory, standing, persuasion, contracts, punishment, alliance delays) keep
@@ -45,12 +47,15 @@ macro_rules! balance {
 }
 
 mod armies;
+mod building_specs;
 mod buildings;
 mod cities;
+mod craft_specs;
 mod decay;
 mod demands;
 mod exploring;
 mod fighting;
+mod good_specs;
 mod goods;
 mod horses;
 mod land;
@@ -242,6 +247,10 @@ mod tests {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/balance");
         for entry in std::fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
+            // A spec's numbers reach the export through the tables and constants made from the specs.
+            if path.to_string_lossy().ends_with("_specs.rs") {
+                continue;
+            }
             let text = std::fs::read_to_string(&path).unwrap();
             let mut inside = false;
             let mut said = false;

@@ -94,7 +94,11 @@ importers:
         specifier: ^8.3.4
         version: 8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)
 
-  packages/balance: {}
+  packages/balance:
+    dependencies:
+      '@csp/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
 
   packages/lang-wasm:
     dependencies:

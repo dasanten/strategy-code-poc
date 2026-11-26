@@ -17,7 +17,9 @@ use serde_json::Value;
 use crate::events::record_event;
 use crate::goods_deps::{end_offer, new_id, realm_name, OrderSender};
 use crate::holders::{move_between, Holder};
+use crate::order_meta::OrderMeta;
 use crate::order_sender::commands;
+use crate::orders::map_size;
 use crate::queries::city::for_sale;
 use crate::queries::goods::{free_stock, units_that_fit, units_that_fit_carriage};
 use crate::queries::names::{good_of, held, placed};
@@ -31,6 +33,9 @@ use crate::queries::transfer::{
 };
 use crate::queries::warehouse::trade_coin_warehouse;
 use crate::queries::warehouse_trade::{debt_of, delivery_storage};
+use crate::running::{in_place, no_ties, RunningOrder};
+use crate::script_actions::{arg, arg_as, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
 
 fn realm_of(world: &WorldState, user_id: u64) -> Option<&csp_shared::world::Realm> {
@@ -175,6 +180,13 @@ pub fn apply_transfer(
     order_pick_up(world, size, &realm, &s("fromCityId"), &s("toCityId"), good, units);
 }
 
+pub(crate) static TRANSFER_META: OrderMeta = OrderMeta::fns(
+    "transfer",
+    |w, s, o, _| validate_transfer(w, s, o),
+    |w, s, o, t| apply_transfer(w, s, o, map_size(t)),
+)
+.gets_off_first();
+
 /// Checks a hand-in order (`handInOrder.validate`).
 pub fn validate_hand_in(
     world: &WorldState,
@@ -213,6 +225,28 @@ pub fn apply_hand_in(world: &mut WorldState, _sender: &OrderSender, order: &Orde
             to_city_id: o.get("toCityId").and_then(Value::as_str).unwrap_or_default().to_string(),
         }));
     }
+}
+
+pub(crate) static HAND_IN_META: OrderMeta = OrderMeta::fns(
+    "handIn",
+    |w, s, o, _| validate_hand_in(w, s, o),
+    |w, s, o, _| apply_hand_in(w, s, o),
+)
+.gets_off_first()
+.script(&[HAND_IN_ACTION]);
+
+const HAND_IN_ACTION: ScriptAction = ScriptAction {
+    name: "handIn",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("good"), arg("units"), arg("toCityId"), arg_as("carriageId?", "carriageId")]),
+    cost: 10.0,
+    description: "On a Trade Org warehouse, hand in up to `units` of a good (coins too) from my hands, or from my carriage there, with the fee, for a caravan to bring to the storage of `toCityId`, a city of another realm.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for HandInOrder {
+    in_place!();
+    no_ties!();
 }
 
 fn holder_stock(world: &WorldState, h: Holder) -> Stock {

@@ -7,7 +7,7 @@ use csp_shared::footprint::{covers, footprint_tiles};
 use csp_shared::terrain::{
     is_passable_terrain, terrain_at, touches_sea, touches_water, Terrain, TerrainMap,
 };
-use csp_shared::world::{BuildingKind, ResidentOrder, WorldState};
+use csp_shared::world::{BuildingKind, ResidentOrder, SiegeMachineKind, WorldState};
 
 use super::shared::{at_building, Out};
 use super::{invariant, js_number, violation, Invariant};
@@ -78,7 +78,7 @@ pub fn buildings_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
             if b.stock.is_some() {
                 fail(&b.id, "is a road with a stock".into());
             }
-        } else if matches!(b.kind, BuildingKind::Ram | BuildingKind::Catapult) {
+        } else if SiegeMachineKind::built_as(b.kind).is_some() {
             // `CONTEXT.md`: Siege machine: a site in the field, where a carriage could stand.
             if b.site.is_none() {
                 fail(&b.id, format!("is a finished {kind} site"));

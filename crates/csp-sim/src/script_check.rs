@@ -106,7 +106,7 @@ pub fn script_check_env(default_script: bool) -> CheckEnv {
     };
     let army_api: &[ScriptBinding] = if default_script { &[] } else { ARMY_SCRIPT_API };
     let mut globals = HashMap::new();
-    for b in SCRIPT_API {
+    for b in SCRIPT_API.iter() {
         let g = match army_api.iter().find(|a| a.name == b.name) {
             Some(a) => merged(b, a),
             None => entry(b),

@@ -3,41 +3,45 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::named_enum::named_enum;
+
 use super::{KeptBreeding, Stock};
 
+named_enum! {
+// What a kind is and does is its `spec`.
 /// The kinds of building (`BuildingKind`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
 pub enum BuildingKind {
-    TownHall,
-    House,
-    Storage,
-    Warehouse,
-    Wall,
-    Gate,
+    TownHall = "townHall",
+    House = "house",
+    Storage = "storage",
+    Warehouse = "warehouse",
+    Wall = "wall",
+    Gate = "gate",
     /// A 2×2 tower of wood or stone, part of the wall walk (`CONTEXT.md`: Tower).
-    Tower,
-    Farm,
-    Stable,
-    Mine,
-    Quarry,
-    LumberCamp,
-    Smelter,
-    Mint,
-    Smithy,
-    TrainingGround,
-    Road,
-    Carriage,
-    Haven,
+    Tower = "tower",
+    Farm = "farm",
+    Stable = "stable",
+    Mine = "mine",
+    Quarry = "quarry",
+    LumberCamp = "lumberCamp",
+    Smelter = "smelter",
+    Mint = "mint",
+    Smithy = "smithy",
+    TrainingGround = "trainingGround",
+    Road = "road",
+    Carriage = "carriage",
+    Haven = "haven",
     /// A boat site (`CONTEXT.md`: Building a boat): finished, it is gone and a boat floats.
-    Boat,
+    Boat = "boat",
     /// A ship site (`CONTEXT.md`: Building a ship): finished, it is gone and a ship floats on Sea.
-    Ship,
+    Ship = "ship",
     /// A ram site (`CONTEXT.md`: Siege machine, Ram): finished, it is gone and a ram stands there.
-    Ram,
+    Ram = "ram",
     /// A catapult site (`CONTEXT.md`: Siege machine, Catapult): finished, it is gone and a catapult
     /// stands there.
-    Catapult,
+    Catapult = "catapult",
+}
 }
 
 /// A building or construction site (`Building`).

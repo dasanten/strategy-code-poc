@@ -1,6 +1,5 @@
 import { DIAGONAL_STEP, TICK_MS } from '@csp/balance'
 import { drivenCarriageId } from '../shared/carriages.js'
-import { isLineOrder } from '../shared/building.js'
 import type { Resident, ResidentOrder } from '@csp/shared-types'
 import { residentActivity } from './figures.js'
 import type { MapWorld } from './map-world.js'
@@ -243,6 +242,30 @@ export class Motion {
   }
 }
 
+/** The orders that go along a path. */
+type WithPath = Extract<ResidentOrder, { path: unknown }>
+
+/**
+ * Whether an order that goes along a path goes along it now: each such kind says, so a new one
+ * fails typecheck until it does (T121.8).
+ */
+const MOVES_NOW: { [K in WithPath['kind']]: (o: Extract<WithPath, { kind: K }>) => boolean } = {
+  walkTo: () => true,
+  drive: () => true,
+  relocate: () => true,
+  attack: () => true,
+  row: () => true,
+  sail: () => true,
+  crew: () => true,
+  push: () => true,
+  haul: (o) => o.phase === 'driving',
+  haulByWater: (o) => o.phase === 'driving',
+  store: (o) => o.phase === 'walking',
+  fetch: (o) => o.phase === 'walking',
+  roadLine: (o) => o.phase === 'walking',
+  wallLine: (o) => o.phase === 'walking',
+}
+
 /**
  * The way a resident's order goes along while they walk or drive it (`CONTEXT.md`: Motion on the
  * map): walk to, drive, haul, Store, Fetch, a road or wall line, going after someone.
@@ -250,11 +273,8 @@ export class Motion {
 export function goingOf(order: ResidentOrder | null | undefined): Going | undefined {
   const o = order
   if (!o || !('path' in o) || !o.path || o.path.length === 0) return undefined
-  if ((o.kind === 'haul' || o.kind === 'haulByWater') && o.phase !== 'driving') return undefined
-  if ((isLineOrder(o) || o.kind === 'store' || o.kind === 'fetch') && o.phase !== 'walking') {
-    return undefined
-  }
-  return { path: o.path, progress: o.progress }
+  const now = MOVES_NOW[o.kind] as (o: WithPath) => boolean
+  return now(o) ? { path: o.path, progress: o.progress } : undefined
 }
 
 /**

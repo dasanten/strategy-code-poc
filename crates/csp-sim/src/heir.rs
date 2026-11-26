@@ -3,11 +3,15 @@
 //! heir lapses, with a line in the realm log, once they no longer qualify. The orders are plain
 //! `validate`/`apply` pairs, like renaming (ADR 0002).
 
-use csp_shared::world::{HeirLapse, RealmEventWhat, WorldState};
+use csp_shared::world::{HeirLapse, OrderRequest, RealmEventWhat, WorldState};
 
 use crate::events::record_event;
+use crate::order_meta::OrderMeta;
+use crate::orders::str_field;
 use crate::queries::leader::{heir_problem, lives_in_realm, serves_others, ServesOthers};
 use crate::queries::residents::can_work;
+use crate::script_actions::{arg_as, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
 
 /// The input of a `nameHeir` or `clearHeir` order: `resident_id` is who asked, one of the realm's
@@ -54,6 +58,27 @@ pub fn apply_name_heir(world: &mut WorldState, user_id: u64, o: &HeirRequest) {
     world.realms[ri].heir_id = Some(heir_id.to_string());
 }
 
+fn heir_request(o: &OrderRequest) -> HeirRequest<'_> {
+    HeirRequest { resident_id: str_field(o, "residentId"), heir_id: str_field(o, "heirId") }
+}
+
+pub(crate) static NAME_HEIR_META: OrderMeta = OrderMeta::fns(
+    "nameHeir",
+    |w, s, o, _| validate_name_heir(w, s.user_id, &heir_request(o)),
+    |w, s, o, _| apply_name_heir(w, s.user_id, &heir_request(o)),
+)
+.keeps_script()
+.script(&[NAME_HEIR_ACTION]);
+
+const NAME_HEIR_ACTION: ScriptAction = ScriptAction {
+    name: "nameHeir",
+    group: ActionGroup::Ruling,
+    request: Request::Fields(&[arg_as("residentId", "heirId")]),
+    cost: 10.0,
+    description: "Name a resident my realm’s heir, in place of any before: an adult of my realm who lives in one of its cities, isn’t its Leader and serves no one else (no mercenary contract or offer, not in the alliance army). Free and at once, from anywhere. The heir lapses, with a line in the realm log, once they die, leave the realm, become homeless, are lent out or handed to the alliance army, or become the Leader.",
+    returns: ScriptType::String,
+};
+
 /// `clearHeir.validate`.
 pub fn validate_clear_heir(world: &WorldState, user_id: u64, o: &HeirRequest) -> Option<String> {
     match asker(world, user_id, o) {
@@ -72,6 +97,24 @@ pub fn apply_clear_heir(world: &mut WorldState, user_id: u64, o: &HeirRequest) {
         world.realms[ri].heir_id = None;
     }
 }
+
+pub(crate) static CLEAR_HEIR_META: OrderMeta = OrderMeta::fns(
+    "clearHeir",
+    |w, s, o, _| validate_clear_heir(w, s.user_id, &heir_request(o)),
+    |w, s, o, _| apply_clear_heir(w, s.user_id, &heir_request(o)),
+)
+.keeps_script()
+.script(&[CLEAR_HEIR_ACTION]);
+
+const CLEAR_HEIR_ACTION: ScriptAction = ScriptAction {
+    name: "clearHeir",
+    group: ActionGroup::Ruling,
+    request: Request::Fields(&[]),
+    cost: 10.0,
+    description:
+        "Clear my realm’s heir, so it has none: free and at once; refused while it has none.",
+    returns: ScriptType::String,
+};
 
 /// Why the realm at `ri`'s heir no longer qualifies, if they don't (`CONTEXT.md`: Heir).
 fn lapse_of(world: &WorldState, ri: usize) -> Option<HeirLapse> {

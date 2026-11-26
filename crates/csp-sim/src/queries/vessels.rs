@@ -4,17 +4,15 @@
 
 use std::collections::{HashSet, VecDeque};
 
-use csp_shared::balance::{
-    BOAT_CAPACITY, MAP_SIZE, PASSENGER_WEIGHT, SHIP_CAPACITY, SHIP_MIN_CREW,
-};
+use csp_shared::balance::{MAP_SIZE, PASSENGER_WEIGHT};
+use csp_shared::craft_spec::Waters;
 use csp_shared::footprint::{covers, footprint_tiles, near_footprint};
 use csp_shared::protocol::LoadLevel;
 use csp_shared::terrain::{
     is_passable_terrain, is_sea, is_water, terrain_at, wrap, wrap_distance, TerrainMap,
 };
 use csp_shared::world::{
-    Building, BuildingKind, Good, HaulPhase, Resident, ResidentOrder, Vessel, VesselKind,
-    WorldState,
+    Building, BuildingKind, Good, Resident, ResidentOrder, Vessel, VesselKind, WorldState,
 };
 
 use super::building::building_at;
@@ -24,6 +22,7 @@ use super::driving::carriage_of_resident;
 use super::guard::guarded_by;
 use super::names::placed;
 use super::residents::{can_work, good_weight, stock_weight};
+use crate::running::{moving, By, RunningOrder};
 use crate::walls::is_wall_or_gate;
 
 /// The eight tiles around one, the four straight ones first, so the nearest come first.
@@ -40,10 +39,7 @@ pub fn vessel_at(world: &WorldState, x: i32, y: i32) -> Option<&Vessel> {
 
 /// Most weight a vessel carries, in kg (`CONTEXT.md`: Boat, Ship).
 pub fn vessel_capacity(v: &Vessel) -> f64 {
-    match v.kind {
-        VesselKind::Boat => BOAT_CAPACITY,
-        VesselKind::Ship => SHIP_CAPACITY,
-    }
+    v.kind.spec().capacity
 }
 
 /// The vessel of an id (`CONTEXT.md`: Vessel).
@@ -86,18 +82,12 @@ pub fn vessel_crew<'w>(world: &'w WorldState, v: &Vessel) -> Vec<&'w Resident> {
 /// How many more crew a ship needs aboard to sail (`CONTEXT.md`: Crew: at least `SHIP_MIN_CREW`);
 /// 0 once it has them. A boat needs none: its rower moves it.
 pub fn crew_short(world: &WorldState, v: &Vessel) -> usize {
-    if v.kind != VesselKind::Ship {
-        return 0;
-    }
-    (SHIP_MIN_CREW as usize).saturating_sub(vessel_crew(world, v).len())
+    (v.kind.spec().min_crew as usize).saturating_sub(vessel_crew(world, v).len())
 }
 
 /// What a vessel is called in what the game says about it: "boat" or "ship".
 pub fn vessel_name(v: &Vessel) -> &'static str {
-    match v.kind {
-        VesselKind::Boat => "boat",
-        VesselKind::Ship => "ship",
-    }
+    v.kind.spec().name
 }
 
 /// The finished haven a ship is docked at (`CONTEXT.md`: Docked): one whose footprint its water
@@ -142,10 +132,9 @@ pub fn being_rowed(world: &WorldState, v: &Vessel) -> bool {
 /// The vessel a resident rows this moment, if any: by a row order, or on a haul route by water
 /// on its way to a stop (`CONTEXT.md`: Rowing, Haul route by water).
 pub fn rowing_now(r: &Resident) -> Option<&str> {
-    match &r.order {
-        Some(ResidentOrder::Row(o)) => Some(&o.vessel_id),
-        Some(ResidentOrder::HaulByWater(o)) if o.phase == HaulPhase::Driving => Some(&o.vessel_id),
-        _ => None,
+    match moving(r.order.as_ref())?.by {
+        By::Oars(id) => Some(id),
+        By::Sails(_) | By::Foot | By::Carriage { .. } | By::Machine(_) => None,
     }
 }
 
@@ -153,10 +142,9 @@ pub fn rowing_now(r: &Resident) -> Option<&str> {
 /// route by water whatever its phase, as a haul route's driver drives its carriage at a stop too
 /// (`CONTEXT.md`: Rowing, Sailing, Haul route by water).
 pub fn rowed_vessel_id(r: &Resident) -> Option<&str> {
-    match &r.order {
-        Some(ResidentOrder::Row(o) | ResidentOrder::Sail(o)) => Some(&o.vessel_id),
-        Some(ResidentOrder::HaulByWater(o)) => Some(&o.vessel_id),
-        _ => None,
+    match r.order.as_ref()?.going()?.by {
+        By::Oars(id) | By::Sails(id) => Some(id),
+        By::Foot | By::Carriage { .. } | By::Machine(_) => None,
     }
 }
 
@@ -402,9 +390,9 @@ pub fn haven_for(world: &WorldState, x: i32, y: i32, size: i32) -> Option<&Build
 /// Whether a vessel of this kind may be on terrain `t` (`CONTEXT.md`: Vessel, Ship): a boat on
 /// any water, a ship on Sea only.
 pub fn floats_on(kind: VesselKind, t: u8) -> bool {
-    match kind {
-        VesselKind::Boat => is_water(t),
-        VesselKind::Ship => is_sea(t),
+    match kind.spec().waters {
+        Waters::LakeAndSea => is_water(t),
+        Waters::SeaOnly => is_sea(t),
     }
 }
 

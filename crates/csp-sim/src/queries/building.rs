@@ -4,40 +4,28 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    carriage_can_enter, Recipe, BUILD_MATERIALS, BUILD_WORK, MAP_SIZE, MOUNTAIN_ROAD_WORK_FACTOR,
-    RECIPES, RICHER_NODE_REACH, STONE_BUILD_MATERIALS, STONE_BUILD_WORK,
+    carriage_can_enter, Recipe, MAP_SIZE, MOUNTAIN_ROAD_WORK_FACTOR, RICHER_NODE_REACH,
     TEARDOWN_MATERIALS_RETURNED, TEARDOWN_WORK_SHARE, TRAINING_GROUND_MAX_TRAINEES,
-    WORKPLACE_MAX_WORKERS,
 };
-use csp_shared::footprint::{covers, footprint_tiles, is_at, Placed, FOOTPRINT};
+use csp_shared::building_spec::{StoneBuild, Workplace};
+pub use csp_shared::building_spec::{
+    BUILDABLE, IN_CITY_AREA, KEEPS_GOODS, OFF_NODES, OFF_NODE_BUILDS, ON_NODE, ON_PLAINS, ON_SHORE,
+    PROCESSING, SHARES_A_TILE,
+};
+use csp_shared::footprint::{covers, footprint_tiles, is_at, Placed};
 use csp_shared::terrain::{
     is_passable_terrain, terrain_at, tile_index, touches_sea, touches_water, wrap, wrap_delta,
     Terrain, TerrainMap,
 };
 use csp_shared::world::{
     Building, BuildingKind, Good, LineOrder, LinePhase, Pile, Resident, ResidentOrder,
-    ResourceKind, ResourceNode, Stock, TrainingSubject, WallMaterial, WorldState,
+    ResourceKind, ResourceNode, SiegeMachineKind, Stock, TrainingSubject, WallMaterial, WorldState,
 };
 
 use super::balance::{build_work, carry_capacity};
 use super::names::{good_name, good_of, held, kind_name, placed};
 use super::residents::{can_work, good_weight, stock_weight};
 use crate::world_index::{building_indices_covering, building_indices_on};
-
-/// Kinds that may share a tile with a building (`SHARES_A_TILE`): roads, carriage sites, boat
-/// sites, ship sites, ram sites and catapult sites.
-pub const SHARES_A_TILE: [BuildingKind; 6] = [
-    BuildingKind::Road,
-    BuildingKind::Carriage,
-    BuildingKind::Boat,
-    BuildingKind::Ship,
-    BuildingKind::Ram,
-    BuildingKind::Catapult,
-];
-
-/// Kinds that keep goods (`KEEPS_GOODS`): storages, warehouses, stables and havens.
-pub const KEEPS_GOODS: [BuildingKind; 4] =
-    [BuildingKind::Storage, BuildingKind::Warehouse, BuildingKind::Stable, BuildingKind::Haven];
 
 /// Where in `world.buildings` the building or construction site whose footprint covers (x, y)
 /// stands, if one does (`buildingAt`): the first in the world's order, roads and carriage sites
@@ -137,6 +125,20 @@ pub fn road_tiles(world: &WorldState, size: i32) -> HashSet<usize> {
         .collect()
 }
 
+/// What a kind of workplace turns into what (`RECIPES[kind] ?? []`); empty for one that processes
+/// nothing.
+pub fn recipes_of(kind: BuildingKind) -> &'static [Recipe] {
+    match kind.spec().workplace {
+        Some(Workplace { processing: Some(p), .. }) => p.recipes,
+        _ => &[],
+    }
+}
+
+/// Whether a kind of workplace turns goods into other goods (`PROCESSING`).
+pub fn processes(kind: BuildingKind) -> bool {
+    !recipes_of(kind).is_empty()
+}
+
 /// The good a recipe makes (`recipeGood`): its first output.
 pub fn recipe_good(recipe: &Recipe) -> &'static str {
     recipe.output.0[0].0
@@ -147,7 +149,7 @@ pub fn recipe_good(recipe: &Recipe) -> &'static str {
 /// Steel (`CONTEXT.md`: Coal). A smithy has no such default: its workers always say which weapon
 /// or armour they make (`CONTEXT.md`: Smithy).
 pub fn recipe_for(kind: BuildingKind, makes: Option<&str>) -> Option<&'static Recipe> {
-    let recipes = RECIPES.get(kind_name(kind)).unwrap_or(&[]);
+    let recipes = recipes_of(kind);
     match makes {
         None if kind == BuildingKind::Smithy => None,
         None => recipes.first(),
@@ -163,78 +165,6 @@ pub const CARRYING_A_CHILD: &str = "carrying a child";
 
 /// Why a mine whose vein ran dry can't be worked (`CONTEXT.md`: Running dry).
 pub const VEIN_RAN_DRY: &str = "the vein ran dry";
-
-/// Kinds of building that can be built so far (`BUILDABLE`).
-pub const BUILDABLE: [BuildingKind; 22] = [
-    BuildingKind::LumberCamp,
-    BuildingKind::Quarry,
-    BuildingKind::Mine,
-    BuildingKind::Stable,
-    BuildingKind::Farm,
-    BuildingKind::House,
-    BuildingKind::Smelter,
-    BuildingKind::Mint,
-    BuildingKind::Smithy,
-    BuildingKind::TownHall,
-    BuildingKind::Storage,
-    BuildingKind::TrainingGround,
-    BuildingKind::Wall,
-    BuildingKind::Gate,
-    BuildingKind::Tower,
-    BuildingKind::Road,
-    BuildingKind::Carriage,
-    BuildingKind::Haven,
-    BuildingKind::Boat,
-    BuildingKind::Ship,
-    BuildingKind::Ram,
-    BuildingKind::Catapult,
-];
-
-/// Workplaces that turn goods into other goods (`PROCESSING`, the keys of `RECIPES`).
-pub const PROCESSING: [BuildingKind; 3] =
-    [BuildingKind::Smelter, BuildingKind::Mint, BuildingKind::Smithy];
-
-/// Kinds that go on passable land but Mountain, off any resource node (`OFF_NODES`).
-pub const OFF_NODES: [BuildingKind; 11] = [
-    BuildingKind::Smelter,
-    BuildingKind::Mint,
-    BuildingKind::Smithy,
-    BuildingKind::TownHall,
-    BuildingKind::House,
-    BuildingKind::Storage,
-    BuildingKind::Wall,
-    BuildingKind::Gate,
-    BuildingKind::Tower,
-    BuildingKind::TrainingGround,
-    BuildingKind::Haven,
-];
-
-/// Kinds that go on the shore, with a tile of their footprint touching Lake or Sea straight or
-/// diagonally (`ON_SHORE`, `CONTEXT.md`: Haven): havens.
-pub const ON_SHORE: [BuildingKind; 1] = [BuildingKind::Haven];
-
-/// Kinds that go wholly on Plains, off any resource node (`ON_PLAINS`): stables and farms.
-pub const ON_PLAINS: [BuildingKind; 2] = [BuildingKind::Stable, BuildingKind::Farm];
-
-/// Kinds that go only in a city's area, every tile of their footprint (`IN_CITY_AREA`).
-pub const IN_CITY_AREA: [BuildingKind; 1] = [BuildingKind::House];
-
-/// What a build menu offers off any resource node, in its order (`OFF_NODE_BUILDS`).
-pub const OFF_NODE_BUILDS: [BuildingKind; 13] = [
-    BuildingKind::TownHall,
-    BuildingKind::House,
-    BuildingKind::Storage,
-    BuildingKind::Wall,
-    BuildingKind::Gate,
-    BuildingKind::Tower,
-    BuildingKind::TrainingGround,
-    BuildingKind::Haven,
-    BuildingKind::Stable,
-    BuildingKind::Farm,
-    BuildingKind::Smelter,
-    BuildingKind::Mint,
-    BuildingKind::Smithy,
-];
 
 /// The workplace that goes on each kind of resource node (`NODE_WORKPLACE`).
 pub fn node_workplace(kind: ResourceKind) -> BuildingKind {
@@ -266,12 +196,12 @@ pub fn build_menu(node: Option<ResourceKind>) -> Vec<BuildingKind> {
 
 /// Whether a workplace has more than one recipe, so its workers say what they make (`hasChoice`).
 pub fn has_choice(kind: BuildingKind) -> bool {
-    RECIPES.get(kind_name(kind)).map_or(0, <[Recipe]>::len) > 1
+    recipes_of(kind).len() > 1
 }
 
 /// Most workers a kind of workplace takes (`MAX_WORKERS`), for the kinds residents can work.
 pub fn max_workers(kind: BuildingKind) -> Option<f64> {
-    WORKPLACE_MAX_WORKERS.get(kind_name(kind))
+    kind.spec().workplace.map(|w| w.max_workers)
 }
 
 /// Whether a realm can keep Workplace settings for the building (`takesWorkSettings`).
@@ -337,12 +267,8 @@ pub fn construction_index_at(
     kind: BuildingKind,
 ) -> Option<usize> {
     match kind {
-        BuildingKind::Road => road_index_at(world, x, y),
-        BuildingKind::Carriage
-        | BuildingKind::Boat
-        | BuildingKind::Ship
-        | BuildingKind::Ram
-        | BuildingKind::Catapult => first_of_kind_at(world, x, y, kind),
+        // A road, or the site of what moves off.
+        _ if kind.spec().shares_a_tile => first_of_kind_at(world, x, y, kind),
         // A wall or gate site first: one may stand over the wooden wall it upgrades.
         BuildingKind::Wall | BuildingKind::Gate => {
             wall_site_index_at(world, x, y).or_else(|| building_index_at(world, x, y, MAP_SIZE))
@@ -391,22 +317,26 @@ pub fn carriage_can_go_to(world: &WorldState, map: &TerrainMap, x: i32, y: i32) 
 
 /// The materials a kind of building takes (`BUILD_MATERIALS[kind] ?? {}`), in the table's order.
 pub fn build_materials(kind: BuildingKind) -> Stock {
-    BUILD_MATERIALS
-        .get(kind_name(kind))
-        .map(|t| t.0.iter().filter_map(|(g, n)| good_of(g).map(|g| (g, *n))).collect())
+    kind.spec()
+        .build
+        .map(|b| b.materials.0.iter().filter_map(|(g, n)| good_of(g).map(|g| (g, *n))).collect())
         .unwrap_or_default()
 }
 
 /// Work a kind of building takes (`BUILD_WORK[kind] ?? 0`).
 pub fn build_work_of(kind: BuildingKind) -> f64 {
-    BUILD_WORK.get(kind_name(kind)).unwrap_or(0.0)
+    kind.spec().build.map_or(0.0, |b| b.work)
+}
+
+/// What a kind takes built of stone, for those that can be: walls, gates and towers.
+fn stone_build(kind: BuildingKind) -> Option<StoneBuild> {
+    kind.spec().build.and_then(|b| b.stone)
 }
 
 /// Whether a building of `kind` of `material` is of stone (`CONTEXT.md`: Wall / Gate, Wood or
-/// stone): only a wall or gate can be.
+/// stone): only a wall, gate or tower can be.
 pub fn is_stone(kind: BuildingKind, material: Option<WallMaterial>) -> bool {
-    material == Some(WallMaterial::Stone)
-        && matches!(kind, BuildingKind::Wall | BuildingKind::Gate | BuildingKind::Tower)
+    material == Some(WallMaterial::Stone) && stone_build(kind).is_some()
 }
 
 /// The materials a building of `kind` of `material` takes: a stone wall's or gate's from
@@ -415,9 +345,8 @@ pub fn build_materials_of(kind: BuildingKind, material: Option<WallMaterial>) ->
     if !is_stone(kind, material) {
         return build_materials(kind);
     }
-    STONE_BUILD_MATERIALS
-        .get(kind_name(kind))
-        .map(|t| t.0.iter().filter_map(|(g, n)| good_of(g).map(|g| (g, *n))).collect())
+    stone_build(kind)
+        .map(|s| s.materials.0.iter().filter_map(|(g, n)| good_of(g).map(|g| (g, *n))).collect())
         .unwrap_or_default()
 }
 
@@ -425,7 +354,7 @@ pub fn build_materials_of(kind: BuildingKind, material: Option<WallMaterial>) ->
 /// `STONE_BUILD_WORK`, any other's from `BUILD_WORK`.
 pub fn build_work_for(kind: BuildingKind, material: Option<WallMaterial>) -> f64 {
     if is_stone(kind, material) {
-        STONE_BUILD_WORK.get(kind_name(kind)).unwrap_or(0.0)
+        stone_build(kind).map_or(0.0, |s| s.work)
     } else {
         build_work_of(kind)
     }
@@ -557,7 +486,7 @@ pub fn build_problem_for(
         }
         return None;
     }
-    if matches!(kind, BuildingKind::Ram | BuildingKind::Catapult) {
+    if SiegeMachineKind::built_as(kind).is_some() {
         // `CONTEXT.md`: Siege machine: laid out in the field, anywhere a carriage could stand.
         let name = kind_name(kind);
         if at(x, y).is_some_and(|t| !carriage_can_enter(t)) {
@@ -569,8 +498,9 @@ pub fn build_problem_for(
         if building_at(world, x, y, size).is_some() {
             return Some("there is already a building there".into());
         }
-        if first_of_kind_at(world, x, y, BuildingKind::Ram).is_some()
-            || first_of_kind_at(world, x, y, BuildingKind::Catapult).is_some()
+        if SiegeMachineKind::ALL
+            .iter()
+            .any(|m| first_of_kind_at(world, x, y, m.spec().built_as).is_some())
         {
             return Some("there is already a siege machine site on this tile".into());
         }
@@ -644,7 +574,7 @@ pub fn build_problem_for(
 /// The north-west tiles a footprint of `kind` may have so that it covers (x, y), the tile itself
 /// first (`cornersCovering`).
 pub fn corners_covering(kind: BuildingKind, x: i32, y: i32, size: i32) -> Vec<(i32, i32)> {
-    let side = FOOTPRINT.get(kind_name(kind)).unwrap_or(1);
+    let side = kind.spec().footprint;
     let mut out = Vec::new();
     for dy in 0..side {
         for dx in 0..side {
@@ -718,7 +648,7 @@ pub fn workplace_good(
         return Some(Good::Food);
     }
     max_workers(workplace.kind)?;
-    if RECIPES.get(kind_name(workplace.kind)).is_some() {
+    if processes(workplace.kind) {
         let recipe = recipe_for(workplace.kind, makes.map(good_name))?;
         return good_of(recipe_good(recipe));
     }
@@ -727,7 +657,7 @@ pub fn workplace_good(
 
 /// The resource node a node's workplace stands on, if any (`CONTEXT.md`: Resource node).
 pub fn workplace_node<'a>(world: &'a WorldState, workplace: &Building) -> Option<&'a ResourceNode> {
-    if workplace.kind == BuildingKind::Farm || RECIPES.get(kind_name(workplace.kind)).is_some() {
+    if workplace.kind == BuildingKind::Farm || processes(workplace.kind) {
         return None;
     }
     world.nodes.iter().find(|n| covers(placed(workplace), n.x as i32, n.y as i32, MAP_SIZE))
@@ -778,7 +708,7 @@ pub fn input_at(world: &WorldState, workplace: &Building) -> Stock {
     let mut out = Stock::new();
     let pile = building_pile(world, workplace);
     let mut goods: Vec<Good> = Vec::new();
-    for recipe in RECIPES.get(kind_name(workplace.kind)).unwrap_or(&[]) {
+    for recipe in recipes_of(workplace.kind) {
         for (g, _) in recipe_input(recipe) {
             if !goods.contains(&g) {
                 goods.push(g);

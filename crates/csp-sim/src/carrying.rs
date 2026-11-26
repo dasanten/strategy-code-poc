@@ -17,6 +17,7 @@ use crate::goods_deps::{
     rob_caravan, rob_trader, update_city_membership, OrderSender,
 };
 use crate::holders::{move_between, stock_of, Holder};
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::queries::building::materials_needed;
 use crate::queries::command::commander_of_resident;
 use crate::queries::goods::{
@@ -26,6 +27,9 @@ use crate::queries::goods::{
 use crate::queries::guard::outpost_storage_guarded;
 use crate::queries::names::{good_of, held};
 use crate::queries::vessels::{beside_vessel, units_that_fit_vessel};
+use crate::running::{in_place, no_ties_mut, Handles, RunningOrder, Ties};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::storing::carried_for_order;
 
 /// Whether an action takes goods from a spot or puts carried goods there.
@@ -172,6 +176,33 @@ pub fn apply_pick_up(world: &mut WorldState, _sender: &OrderSender, order: &Orde
     }
 }
 
+pub(crate) static PICK_UP_META: OrderMeta = OrderMeta::fns(
+    "pickUp",
+    |w, s, o, _| validate_pick_up(w, s, o),
+    |w, s, o, _| apply_pick_up(w, s, o),
+)
+.queue_step(StepGroup::Goods)
+.gets_off_first()
+.npc_city()
+.script(&[PICK_UP_ACTION]);
+
+const PICK_UP_ACTION: ScriptAction = ScriptAction {
+    name: "pickUp",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("spot"), arg("goods")]),
+    cost: 10.0,
+    description: "Take goods from a spot on my tile: {kind: \"ground\"}, {kind: \"storage\", storageId}, {kind: \"site\", siteId}, {kind: \"carriage\", carriageId}, a boat beside me, {kind: \"vessel\", vesselId}, or a Down resident lying there, {kind: \"resident\", residentId}; goods like {food: 3}.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for PickUpOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { handles: Handles::Stock(&self.goods), ..Ties::NONE }
+    }
+    no_ties_mut!();
+}
+
 /// Checks a drop order (`drop.validate`): one of the Player's residents puts down carried goods
 /// on their tile; at a construction site only what it still needs.
 pub fn validate_drop(
@@ -210,6 +241,30 @@ pub fn apply_drop(world: &mut WorldState, _sender: &OrderSender, order: &OrderRe
     if let Some(r) = world.residents.iter_mut().find(|x| Some(x.id.as_str()) == id) {
         r.order = Some(ResidentOrder::Drop(DropOrder { to, goods }));
     }
+}
+
+pub(crate) static DROP_META: OrderMeta =
+    OrderMeta::fns("drop", |w, s, o, _| validate_drop(w, s, o), |w, s, o, _| apply_drop(w, s, o))
+        .queue_step(StepGroup::Goods)
+        .gets_off_first()
+        .npc_city()
+        .script(&[DROP_ACTION]);
+
+const DROP_ACTION: ScriptAction = ScriptAction {
+    name: "drop",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("spot"), arg("goods")]),
+    cost: 10.0,
+    description: "Put carried goods down at a spot on my tile, or in a boat beside me ({kind: \"vessel\", vesselId}), as far as they fit.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for DropOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { handles: Handles::Stock(&self.goods), ..Ties::NONE }
+    }
+    no_ties_mut!();
 }
 
 /// Requests this tick's take and put actions from pick-up and drop orders (`requestCarrying`).

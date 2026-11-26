@@ -166,5 +166,6 @@ pub fn files() -> Vec<(String, String)> {
         (format!("{OUT_DIR}/balance.json"), json_text()),
         (format!("{OUT_DIR}/balance.d.ts"), dts_text()),
         (format!("{OUT_DIR}/src/constants.ts"), constants_text()),
+        (format!("{OUT_DIR}/src/specs.ts"), crate::spec_export::specs_text()),
     ]
 }

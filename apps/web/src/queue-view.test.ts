@@ -1,5 +1,5 @@
 import { QUEUE_DEFAULT_STEP_MINUTES } from '@csp/balance'
-import { queueSteps, queueStepsProblem } from './shared/queue.js'
+import { QUEUE_STEP_KINDS, neverEnds, queueSteps, queueStepsProblem } from './shared/queue.js'
 import type { OrderRequest, Queue } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
@@ -566,5 +566,24 @@ describe('a step acting on no place', () => {
       { kind: 'runScript', scriptId: 's' },
     ] as OrderRequest[])
       expect(appendRequest(idle, { ...order, residentId: 'w1' })?.steps).toEqual([{ order }])
+  })
+})
+
+describe('queue steps read from the order kinds (T121.8)', () => {
+  it('never end on their own for work, haul routes and teaching, as before', () => {
+    for (const kind of QUEUE_STEP_KINDS) {
+      const order = { kind } as OrderRequest
+      expect([kind, neverEnds(order)]).toEqual([kind, ['workAt', 'haul', 'teach'].includes(kind)])
+    }
+  })
+
+  it('each have a row text of their own', () => {
+    for (const kind of QUEUE_STEP_KINDS) {
+      if (kind === 'task') continue
+      expect(
+        stepLabel({ kind, x: 1, y: 2, to: { x: 1, y: 2 } } as OrderRequest, {}),
+        kind,
+      ).not.toBe(kind)
+    }
   })
 })

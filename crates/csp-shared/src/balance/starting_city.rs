@@ -1,6 +1,7 @@
 //! What a starting city has.
 
 use super::*;
+use crate::building_spec::spec_table;
 
 balance! {
 /// Tiles along each side of a starting city, wall included: 27×27 tiles inside the wall. An odd
@@ -11,8 +12,8 @@ pub const START_CITY_SIZE: f64 = 29.0;
 pub const START_RESIDENTS: f64 = 8.0;
 
 /// Residents each kind of building houses (`CONTEXT.md`: House, Free housing). Only houses so far;
-/// later housing buildings (a palace, a castle) add their room here.
-pub const HOUSING_ROOM: Table<f64> = Table(&[("house", 4.0)]);
+/// later housing buildings (a palace, a castle) say their room in their spec.
+pub const HOUSING_ROOM: Table<f64> = spec_table!(f64, |s| s.housing_room);
 
 /// Houses a starting city gets beyond what its residents need.
 pub const START_SPARE_HOUSES: f64 = 1.0;

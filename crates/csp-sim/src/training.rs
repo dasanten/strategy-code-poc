@@ -11,11 +11,15 @@ use csp_shared::world::{
     TrainingSubject, WorldState,
 };
 
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{npc_training_problem, ordered_resident, OrderSender};
 use crate::queries::balance::{skill_of, skill_value, subject_parts, training_gain};
 use crate::queries::building::{building_at, teacher_at, train_problem, trainees_of};
 use crate::queries::names::placed;
 use crate::queue::field_str as str_field;
+use crate::running::{in_place, no_ties_mut, RunningOrder, Ties};
+use crate::script_actions::{ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 
 /// Checks a train order (`train.validate`): a grown resident of the sender's trains at the
 /// finished training ground they stand on. Of the game's cities only a big one's soldiers train.
@@ -60,6 +64,31 @@ pub fn apply_train(world: &mut WorldState, order: &OrderRequest) {
     let learning = lesson(world, r, ground, MAP_SIZE).0;
     world.residents[ri].order =
         Some(ResidentOrder::Train(TrainOrder { building_id: building_id.to_string(), learning }));
+}
+
+pub(crate) static TRAIN_META: OrderMeta =
+    OrderMeta::fns("train", |w, s, o, _| validate_train(w, s, o), |w, _, o, _| apply_train(w, o))
+        .gets_off_first()
+        .adults_only()
+        .npc_city()
+        .goes_on_until_stopped()
+        .script(&[TRAIN_ACTION]);
+
+const TRAIN_ACTION: ScriptAction = ScriptAction {
+    name: "train",
+    group: ActionGroup::Work,
+    request: Request::ByHand(&[]),
+    cost: 10.0,
+    description: "Train at the training ground on my tile, while I stand there: I learn its subject while a teacher is there, never past the teacher. Room for 6 trainees per ground.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for TrainOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { refills_at: Some((&self.building_id, None)), ..Ties::NONE }
+    }
+    no_ties_mut!();
 }
 
 /// What a trainee at `ground` would learn this tick (`lesson`): the subject its teacher teaches

@@ -16,6 +16,7 @@ use serde_json::{Map, Value};
 use crate::events::record_event;
 use crate::goods_deps::new_id;
 use crate::invariants::InvariantViolation;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::alliance::{carriage_commander_of, commander_of};
@@ -34,6 +35,9 @@ use crate::queries::standing::{organization_label, TRADE_ORG};
 use crate::queries::trade_org::trade_org_hq;
 use crate::queries::transfer::{nearest_warehouse, transfer_load};
 use crate::queries::warehouse_trade::{delivery_storage, hands_of, load_of};
+use crate::running::{in_place, no_ties, RunningOrder};
+use crate::script_actions::{arg, arg_as, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::sight::{sight_of, Spot};
 use crate::standing::raise_standing_by_trade;
 use crate::world_index::WorldIndex;
@@ -187,6 +191,18 @@ impl OrderKind for PostOffer {
     }
 }
 
+pub(crate) static POST_OFFER_META: OrderMeta =
+    OrderMeta::request("postOffer", &PostOffer).keeps_script().script(&[POST_OFFER_ACTION]);
+
+const POST_OFFER_ACTION: ScriptAction = ScriptAction {
+    name: "postOffer",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("storageId"), arg("gives"), arg("givesUnits"), arg("wants"), arg("wantsUnits"), arg("times")]),
+    cost: 10.0,
+    description: "At a finished storage of my realm, wherever I am, post an offer: gives `givesUnits` of a good, wants `wantsUnits` of another (either may be \"coins\"), `times` over or as many times as goods not set aside there allow. Those goods are set aside at once.",
+    returns: ScriptType::String,
+};
+
 /// Whether the realm has anyone of `other_id`'s in sight (`seesResidentsOf`).
 fn sees_residents_of(world: &WorldState, realm_id: &str, other_id: &str, size: i32) -> bool {
     let index = WorldIndex::new(world, size);
@@ -301,6 +317,20 @@ impl OrderKind for SendDirectOffer {
         );
     }
 }
+
+pub(crate) static SEND_DIRECT_OFFER_META: OrderMeta =
+    OrderMeta::request("sendDirectOffer", &SendDirectOffer)
+        .keeps_script()
+        .script(&[SEND_DIRECT_OFFER_ACTION]);
+
+const SEND_DIRECT_OFFER_ACTION: ScriptAction = ScriptAction {
+    name: "sendDirectOffer",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("toId"), arg("storageId"), arg("gives"), arg("givesUnits"), arg("wants"), arg("wantsUnits"), arg("times")]),
+    cost: 10.0,
+    description: "Send a realm my realm knows of an offer at a finished storage of my realm, wherever I am, on the terms of `postOffer`. They see it at once wherever they are, and only they can accept it, on its storage’s tile, until it lapses.",
+    returns: ScriptType::String,
+};
 
 fn direct_offer_event(
     what: DirectOfferWhat,
@@ -417,6 +447,20 @@ impl OrderKind for SendCarriedOffer {
     }
 }
 
+pub(crate) static SEND_CARRIED_OFFER_META: OrderMeta =
+    OrderMeta::request("sendCarriedOffer", &SendCarriedOffer)
+        .keeps_script()
+        .script(&[SEND_CARRIED_OFFER_ACTION]);
+
+const SEND_CARRIED_OFFER_ACTION: ScriptAction = ScriptAction {
+    name: "sendCarriedOffer",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("toId"), arg("fromCityId"), arg("toCityId"), arg("gives"), arg("givesUnits"), arg("wants"), arg("wantsUnits"), arg("times"), arg("feeBy")]),
+    cost: 10.0,
+    description: "Send a realm my realm knows of an offer the Trade Organization carries, between a city of my realm and one of theirs whose storage my realm sees, on the terms of `postOffer` and within one load each way. `feeBy` is \"sender\" or \"split\". Nothing is set aside; only they can accept it, from anywhere, until it lapses.",
+    returns: ScriptType::String,
+};
+
 /// One of a carried offer's two Transfers, waiting for a caravan of the warehouse nearest its
 /// pick-up (`carriedTransfer`).
 #[allow(clippy::too_many_arguments)]
@@ -511,6 +555,20 @@ impl OrderKind for AcceptCarriedOffer {
     }
 }
 
+pub(crate) static ACCEPT_CARRIED_OFFER_META: OrderMeta =
+    OrderMeta::request("acceptCarriedOffer", &AcceptCarriedOffer)
+        .keeps_script()
+        .script(&[ACCEPT_CARRIED_OFFER_ACTION]);
+
+const ACCEPT_CARRIED_OFFER_ACTION: ScriptAction = ScriptAction {
+    name: "acceptCarriedOffer",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("offerId")]),
+    cost: 10.0,
+    description: "Accept a carried direct offer sent to my realm, whole, wherever I am: it becomes two Transfers.",
+    returns: ScriptType::String,
+};
+
 /// The decline order (`declineOffer`, `CONTEXT.md`: Direct offer): the realm it was sent to turns
 /// it down.
 pub struct DeclineOffer;
@@ -544,6 +602,19 @@ impl OrderKind for DeclineOffer {
         end_offer(world, offer_id.expect("checked"), OfferEnd::Declined);
     }
 }
+
+pub(crate) static DECLINE_OFFER_META: OrderMeta = OrderMeta::request("declineOffer", &DeclineOffer)
+    .keeps_script()
+    .script(&[DECLINE_OFFER_ACTION]);
+
+const DECLINE_OFFER_ACTION: ScriptAction = ScriptAction {
+    name: "declineOffer",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("offerId")]),
+    cost: 10.0,
+    description: "Decline a direct offer sent to my realm, wherever I am; its sender hears, and what it set aside is ordinary goods again.",
+    returns: ScriptType::String,
+};
 
 /// The offer `offer_id` if it is the sender's realm's (`ownOffer`).
 fn own_offer<'w>(
@@ -584,6 +655,20 @@ impl OrderKind for TakeDownOffer {
         }
     }
 }
+
+pub(crate) static TAKE_DOWN_OFFER_META: OrderMeta =
+    OrderMeta::request("takeDownOffer", &TakeDownOffer)
+        .keeps_script()
+        .script(&[TAKE_DOWN_OFFER_ACTION]);
+
+const TAKE_DOWN_OFFER_ACTION: ScriptAction = ScriptAction {
+    name: "takeDownOffer",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("offerId")]),
+    cost: 10.0,
+    description: "Take down an offer of my realm; what it set aside is ordinary goods again.",
+    returns: ScriptType::String,
+};
 
 /// The accept order (`acceptOffer`, `CONTEXT.md`: Offer): one of the side's residents, on the
 /// storage's tile, gets the order to take an offer up to `times` over, which happens this tick
@@ -627,6 +712,23 @@ impl OrderKind for AcceptOffer {
             carriage_id: text(f, "carriageId").map(str::to_string),
         }));
     }
+}
+
+pub(crate) static ACCEPT_OFFER_META: OrderMeta =
+    OrderMeta::request("acceptOffer", &AcceptOffer).gets_off_first().script(&[ACCEPT_OFFER_ACTION]);
+
+const ACCEPT_OFFER_ACTION: ScriptAction = ScriptAction {
+    name: "acceptOffer",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("offerId"), arg("times"), arg_as("carriageId?", "carriageId")]),
+    cost: 10.0,
+    description: "On the storage of another’s offer, accept it up to `times` times over, paying from and taking into my hands, or my carriage there, as many times as I can pay and carry. A direct offer only the realm it was sent to can accept.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for AcceptOfferOrder {
+    in_place!();
+    no_ties!();
 }
 
 /// One offer accepted this tick, with the goods of everyone in it before and after (`Accepted`).

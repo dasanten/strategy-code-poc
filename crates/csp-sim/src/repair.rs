@@ -4,7 +4,7 @@
 //! Blows from attackers are apart from this (`Building::damage`).
 
 use csp_shared::balance::{
-    DECAY_DAYS, DECAY_NEARLY_RUIN, DECAY_WORN, MAP_SIZE, REPAIR_MATERIALS_SHARE, REPAIR_WORK_SHARE,
+    DECAY_NEARLY_RUIN, DECAY_WORN, MAP_SIZE, REPAIR_MATERIALS_SHARE, REPAIR_WORK_SHARE,
 };
 use csp_shared::footprint::{covers, is_at};
 use csp_shared::terrain::{terrain_at, TerrainMap};
@@ -14,12 +14,16 @@ use csp_shared::world::{
     Stock, Tile, WorldState,
 };
 
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::queries::balance::{build_work, construction_learned, skill_of};
 use crate::queries::building::{build_materials, build_work_of, site_work_of, CARRYING_A_CHILD};
 use crate::queries::names::{held, held_in, kind_name, placed};
 use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
+use crate::running::{in_place, no_ties_mut, On, RunningOrder, Ties};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::world_index::{building_index, resident_index};
 
 /// How a building's condition reads (`CONTEXT.md`: Decay): good, worn, nearly a ruin.
@@ -47,7 +51,7 @@ impl Condition {
 /// Game days a building of `kind` takes to lose all its condition (`DECAY_DAYS`); `None` for a
 /// kind that never decays.
 pub fn decay_days(kind: BuildingKind) -> Option<f64> {
-    DECAY_DAYS.get(kind_name(kind))
+    kind.spec().decay_days
 }
 
 /// Whether `b` decays: a finished building of a kind that does.
@@ -412,6 +416,34 @@ pub fn apply_repair(world: &mut WorldState, order: &OrderRequest) {
             at: Tile { x: r.x, y: r.y },
         }));
     }
+}
+
+pub(crate) static REPAIR_META: OrderMeta = OrderMeta::fns(
+    "repair",
+    |w, s, o, _| validate_repair(w, s, o),
+    |w, _, o, _| apply_repair(w, o),
+)
+.gets_off_first()
+.adults_only()
+.npc_city()
+.blocked_carrying_child()
+.script(&[REPAIR_ACTION]);
+
+const REPAIR_ACTION: ScriptAction = ScriptAction {
+    name: "repair",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("buildingId")]),
+    cost: 10.0,
+    description: "Repair the worn building on my tile: what I carry of the materials it lacks goes in, then my work; once it has all of both it is good again. My order is \"repair\" until done.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for RepairOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { on: On::Repairs(&self.building_id), ..Ties::NONE }
+    }
+    no_ties_mut!();
 }
 
 #[cfg(test)]

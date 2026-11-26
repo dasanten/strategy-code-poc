@@ -10,6 +10,7 @@ use csp_shared::world::{
 
 use crate::cities::{dissolve_city, update_city_membership};
 use crate::crimes::{building_organization, commit_crime, CrimeAgainst};
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::queries::balance::{build_work, construction_learned, skill_of};
 use crate::queries::building::{
@@ -19,6 +20,9 @@ use crate::queries::building::{tear_down_problem, CARRYING_A_CHILD};
 use crate::queries::names::placed;
 use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
+use crate::running::{in_place, no_ties_mut, On, RunningOrder, Ties};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::survival::drop_goods;
 use crate::tick::Scratch;
 use crate::world_index::{building_index, resident_index};
@@ -137,12 +141,13 @@ pub fn resolve_tearing_down(
     // into a set each tick for the few on such an order (T89.6).
     let gone = |id: &str| building_index(world, id).is_none();
     let ends: Vec<usize> = (0..world.residents.len())
-        .filter(|&i| match &world.residents[i].order {
-            Some(ResidentOrder::TearDown(o)) => {
-                gone(&o.building_id) && crate::siege::machine_index(world, &o.building_id).is_none()
+        .filter(|&i| {
+            let on = world.residents[i].order.as_ref().map_or(On::Nothing, |o| o.ties().on);
+            match on {
+                On::TearsDown(id) => gone(id) && crate::siege::machine_index(world, id).is_none(),
+                On::Site(id) => gone(id),
+                On::Repairs(_) | On::Nothing => false,
             }
-            Some(ResidentOrder::Build(o)) => o.site_id.as_deref().is_some_and(gone),
-            _ => false,
         })
         .collect();
     for i in ends {
@@ -245,4 +250,30 @@ pub fn apply_tear_down(world: &mut WorldState, order: &OrderRequest) {
             at: Tile { x: r.x, y: r.y },
         }));
     }
+}
+
+pub(crate) static TEAR_DOWN_META: OrderMeta =
+    OrderMeta::fns("tearDown", validate_tear_down, |w, _, o, _| apply_tear_down(w, o))
+        .queue_step(StepGroup::Work)
+        .gets_off_first()
+        .adults_only()
+        .npc_city()
+        .blocked_carrying_child()
+        .script(&[TEAR_DOWN_ACTION]);
+
+const TEAR_DOWN_ACTION: ScriptAction = ScriptAction {
+    name: "tearDown",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("buildingId")]),
+    cost: 10.0,
+    description: "Tear down the building or site on my tile.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for TearDownOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { on: On::TearsDown(&self.building_id), ..Ties::NONE }
+    }
+    no_ties_mut!();
 }

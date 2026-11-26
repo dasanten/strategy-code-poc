@@ -4,17 +4,17 @@
 
 use csp_shared::balance::trained_cap;
 use csp_shared::balance::{
-    SkillValues, BATCHES_PER_DAY, BUILD_STRENGTH_AVERAGE, CARRY_BASE, CARRY_PER_STRENGTH,
-    CONSTRUCTION_SKILL_EFFECT, CONSTRUCTION_SKILL_LIMIT, CONSTRUCTION_SKILL_MAX,
-    CONSTRUCTION_SKILL_PER_DAY, INTELLECT_AVERAGE, RECIPES, SKILL_MAX, SKILL_PER_DAY,
-    TOOLS_WORK_BONUS, TRAIN_COMBAT_FACTOR, TRAIN_SKILL_FACTOR, TRAIN_STAT_PER_TICK,
-    WORKPLACE_SKILL, WORK_OUTPUT_PER_DAY, WORK_SKILL_EFFECT, WORK_SKILL_LIMIT, WORK_SKILL_MAX,
-    WORK_SKILL_PER_DAY, WORK_STRENGTH_AVERAGE,
+    SkillValues, BUILD_STRENGTH_AVERAGE, CARRY_BASE, CARRY_PER_STRENGTH, CONSTRUCTION_SKILL_EFFECT,
+    CONSTRUCTION_SKILL_LIMIT, CONSTRUCTION_SKILL_MAX, CONSTRUCTION_SKILL_PER_DAY,
+    INTELLECT_AVERAGE, SKILL_MAX, SKILL_PER_DAY, TOOLS_WORK_BONUS, TRAIN_COMBAT_FACTOR,
+    TRAIN_SKILL_FACTOR, TRAIN_STAT_PER_TICK, WORK_OUTPUT_PER_DAY, WORK_SKILL_EFFECT,
+    WORK_SKILL_LIMIT, WORK_SKILL_MAX, WORK_SKILL_PER_DAY, WORK_STRENGTH_AVERAGE,
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{BuildingKind, Good, Resident, SkillName, StatName, TrainingSubject};
 
-use super::names::{good_name, kind_name};
+use super::building::{processes, recipes_of};
+use super::names::good_name;
 use super::residents::{age_factor, stat_value};
 
 /// A resident's points in a skill: 0 for one they never learned (`skills[skill] ?? 0`).
@@ -22,14 +22,9 @@ pub fn skill_of(r: &Resident, skill: SkillName) -> f64 {
     r.skills.get(&skill).copied().unwrap_or(0.0)
 }
 
-/// The skill a TypeScript name names (`WORKPLACE_SKILL`'s values).
-pub fn skill_named(name: &str) -> Option<SkillName> {
-    serde_json::from_value(serde_json::Value::String(name.to_owned())).ok()
-}
-
 /// The skill working a workplace of `kind` uses and teaches (`WORKPLACE_SKILL`).
 pub fn workplace_skill(kind: BuildingKind) -> Option<SkillName> {
-    WORKPLACE_SKILL.get(kind_name(kind)).and_then(skill_named)
+    kind.spec().workplace.map(|w| w.skill)
 }
 
 /// A skill's value in a per-skill table (`SKILL_MAX`, `SKILL_PER_DAY`).
@@ -116,17 +111,18 @@ pub fn gather_output(r: &Resident, good: Good, skill: SkillName, tick: f64) -> f
 
 /// How much of a batch a worker gets through per tick at a processing workplace (`batchWork`).
 pub fn batch_work(r: &Resident, kind: BuildingKind, tick: f64) -> f64 {
-    match workplace_skill(kind) {
-        Some(skill) => pace_of(r, BATCHES_PER_DAY.get(kind_name(kind)).unwrap_or(0.0), skill, tick),
-        None => 0.0,
-    }
+    let Some(workplace) = kind.spec().workplace else { return 0.0 };
+    let batches = workplace.processing.map_or(0.0, |p| p.batches_per_day);
+    pace_of(r, batches, workplace.skill, tick)
 }
 
 /// How much of `good` a worker makes a game day at a workplace of `kind` (`madePerDay`).
 pub fn made_per_day(r: &Resident, kind: BuildingKind, good: Good, tick: f64) -> f64 {
-    if let Some(recipes) = RECIPES.get(kind_name(kind)) {
-        let yields =
-            recipes.iter().find_map(|recipe| recipe.output.get(good_name(good))).unwrap_or(0.0);
+    if processes(kind) {
+        let yields = recipes_of(kind)
+            .iter()
+            .find_map(|recipe| recipe.output.get(good_name(good)))
+            .unwrap_or(0.0);
         return batch_work(r, kind, tick) * yields * TICKS_PER_GAME_DAY;
     }
     match workplace_skill(kind) {

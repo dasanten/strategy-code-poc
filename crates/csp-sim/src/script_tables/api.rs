@@ -1,28 +1,25 @@
-//! The game API of a resident's script (ADR 0002), one file per domain.
+//! The game API of a resident's script (ADR 0002): the values, the queries, the actions that ask
+//! for an order, made from the orders (`script_actions`), and those that ask for none.
 
 mod control;
-mod fighting;
-mod movement;
 mod queries;
-mod ruling;
-mod trade;
 mod values;
-mod work;
 
-use super::{joined, total};
+use std::sync::LazyLock;
+
+use self::control::CONTROL;
+use crate::script_actions::{group_bindings, ActionGroup};
 use crate::script_api::ScriptBinding;
 
-/// The table's parts, in its order.
-const PARTS: &[&[ScriptBinding]] = &[
-    values::VALUES,
-    queries::QUERIES,
-    movement::MOVEMENT,
-    control::CONTROL,
-    work::WORK,
-    fighting::FIGHTING,
-    trade::TRADE,
-    ruling::RULING,
-];
-
 /// The game API of a resident's script (`SCRIPT_API`).
-pub static SCRIPT_API: &[ScriptBinding] = &joined::<_, { total(PARTS) }>(PARTS);
+pub static SCRIPT_API: LazyLock<Vec<ScriptBinding>> = LazyLock::new(|| {
+    let mut api = [values::VALUES, queries::QUERIES].concat();
+    api.extend(group_bindings(ActionGroup::Movement));
+    api.extend(group_bindings(ActionGroup::Control));
+    api.extend_from_slice(CONTROL);
+    api.extend(group_bindings(ActionGroup::Work));
+    api.extend(group_bindings(ActionGroup::Fighting));
+    api.extend(group_bindings(ActionGroup::Trade));
+    api.extend(group_bindings(ActionGroup::Ruling));
+    api
+});

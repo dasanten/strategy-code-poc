@@ -480,13 +480,13 @@ export interface Balance {
     ironOre: number
     iron: number
     goldOre: number
-    coal: number
-    steel: number
     coins: number
     spear: number
     sword: number
     shield: number
     armour: number
+    coal: number
+    steel: number
     steelSword: number
     steelShield: number
     steelArmour: number
@@ -505,12 +505,12 @@ export interface Balance {
     ironOre: number
     iron: number
     goldOre: number
-    coal: number
-    steel: number
     spear: number
     sword: number
     shield: number
     armour: number
+    coal: number
+    steel: number
     steelSword: number
     steelShield: number
     steelArmour: number
@@ -616,10 +616,10 @@ export interface Balance {
   readonly WEAR_BLOWS: {
     spear: number
     sword: number
-    steelSword: number
     shield: number
-    steelShield: number
     armour: number
+    steelSword: number
+    steelShield: number
     steelArmour: number
     [key: string]: number
   }
@@ -770,8 +770,34 @@ export interface Balance {
   readonly DIRECTIVE_PUNISH_WORTH: number
   readonly DIRECTIVE_BUY_OFF_PRICE: number
   readonly BUILD_MATERIALS: {
-    lumberCamp: Record<string, never>
-    quarry: {
+    townHall: {
+      wood: number
+      stone: number
+      [key: string]: number
+    }
+    house: {
+      wood: number
+      [key: string]: number
+    }
+    storage: {
+      wood: number
+      stone: number
+      [key: string]: number
+    }
+    wall: {
+      wood: number
+      [key: string]: number
+    }
+    gate: {
+      wood: number
+      [key: string]: number
+    }
+    tower: {
+      wood: number
+      [key: string]: number
+    }
+    farm: Record<string, never>
+    stable: {
       wood: number
       [key: string]: number
     }
@@ -780,10 +806,11 @@ export interface Balance {
       stone: number
       [key: string]: number
     }
-    stable: {
+    quarry: {
       wood: number
       [key: string]: number
     }
+    lumberCamp: Record<string, never>
     smelter: {
       stone: number
       wood: number
@@ -800,50 +827,23 @@ export interface Balance {
       iron: number
       [key: string]: number
     }
-    townHall: {
+    trainingGround: {
       wood: number
       stone: number
-      [key: string]: number
-    }
-    wall: {
-      wood: number
-      [key: string]: number
-    }
-    tower: {
-      wood: number
-      [key: string]: number
-    }
-    gate: {
-      wood: number
       [key: string]: number
     }
     road: {
       stone: number
       [key: string]: number
     }
-    house: {
+    carriage: {
       wood: number
-      [key: string]: number
-    }
-    storage: {
-      wood: number
-      stone: number
-      [key: string]: number
-    }
-    farm: Record<string, never>
-    trainingGround: {
-      wood: number
-      stone: number
+      iron: number
       [key: string]: number
     }
     haven: {
       wood: number
       stone: number
-      [key: string]: number
-    }
-    carriage: {
-      wood: number
-      iron: number
       [key: string]: number
     }
     boat: {
@@ -866,14 +866,14 @@ export interface Balance {
       stone: number
       [key: string]: number
     }
-    [key: string]: Record<string, never> | {
-      wood: number
-      [key: string]: number
-    } | {
+    [key: string]: {
       wood: number
       stone: number
       [key: string]: number
     } | {
+      wood: number
+      [key: string]: number
+    } | Record<string, never> | {
       stone: number
       wood: number
       [key: string]: number
@@ -901,24 +901,24 @@ export interface Balance {
     }
   }
   readonly BUILD_WORK: {
-    lumberCamp: number
-    quarry: number
-    mine: number
+    townHall: number
+    house: number
+    storage: number
+    wall: number
+    gate: number
+    tower: number
+    farm: number
     stable: number
+    mine: number
+    quarry: number
+    lumberCamp: number
     smelter: number
     mint: number
     smithy: number
-    townHall: number
-    wall: number
-    tower: number
-    gate: number
-    road: number
-    house: number
-    storage: number
-    farm: number
     trainingGround: number
-    haven: number
+    road: number
     carriage: number
+    haven: number
     boat: number
     ship: number
     ram: number
@@ -959,9 +959,9 @@ export interface Balance {
   readonly INTELLECT_AVERAGE: number
   readonly WORKPLACE_MAX_WORKERS: {
     farm: number
-    lumberCamp: number
-    quarry: number
     mine: number
+    quarry: number
+    lumberCamp: number
     smelter: number
     mint: number
     smithy: number
@@ -969,9 +969,9 @@ export interface Balance {
   }
   readonly WORKPLACE_WRECK_WORTH: {
     farm: number
-    lumberCamp: number
-    quarry: number
     mine: number
+    quarry: number
+    lumberCamp: number
     smelter: number
     mint: number
     smithy: number
@@ -979,9 +979,9 @@ export interface Balance {
   }
   readonly WORKPLACE_SKILL: {
     farm: string
-    lumberCamp: string
-    quarry: string
     mine: string
+    quarry: string
+    lumberCamp: string
     smelter: string
     mint: string
     smithy: string
@@ -1520,23 +1520,23 @@ export interface Balance {
   readonly TEARDOWN_WORK_SHARE: number
   readonly TEARDOWN_MATERIALS_RETURNED: number
   readonly DECAY_DAYS: {
-    road: number
+    townHall: number
+    house: number
+    storage: number
+    warehouse: number
     wall: number
     gate: number
     farm: number
-    house: number
     stable: number
-    lumberCamp: number
-    storage: number
-    trainingGround: number
-    haven: number
-    quarry: number
     mine: number
-    townHall: number
-    warehouse: number
+    quarry: number
+    lumberCamp: number
     smelter: number
     mint: number
     smithy: number
+    trainingGround: number
+    road: number
+    haven: number
     [key: string]: number
   }
   readonly DECAY_WORN: number
@@ -1720,29 +1720,29 @@ export interface Balance {
   readonly GAME_DAYS_PER_YEAR: number
   readonly DIAGONAL_STEP: number
   readonly FOOTPRINT: {
+    townHall: number
+    house: number
+    storage: number
+    warehouse: number
     wall: number
     gate: number
     tower: number
+    farm: number
+    stable: number
+    mine: number
+    quarry: number
+    lumberCamp: number
+    smelter: number
+    mint: number
+    smithy: number
+    trainingGround: number
     road: number
     carriage: number
+    haven: number
     boat: number
     ship: number
     ram: number
     catapult: number
-    house: number
-    storage: number
-    smelter: number
-    mint: number
-    smithy: number
-    mine: number
-    quarry: number
-    lumberCamp: number
-    townHall: number
-    warehouse: number
-    stable: number
-    trainingGround: number
-    haven: number
-    farm: number
     [key: string]: number
   }
 }

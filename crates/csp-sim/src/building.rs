@@ -6,11 +6,12 @@ use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::{terrain_at, TerrainMap};
 use csp_shared::world::{
     BuildOrder, Building, BuildingKind, Carriage, ConstructionSite, LinePhase, OrderRequest,
-    Resident, ResidentOrder, SiegeMachine, SkillName, Stock, Tile, Vessel, VesselKind,
-    WallMaterial, WorldState,
+    Resident, ResidentOrder, SiegeMachine, SiegeMachineKind, SkillName, Stock, Tile, Vessel,
+    VesselKind, WallMaterial, WorldState,
 };
 
 use crate::cities::update_city_membership;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::balance::{build_work, construction_learned, skill_of};
 use crate::queries::building::build_at_problem_of;
@@ -23,6 +24,9 @@ use crate::queries::names::{kind_of, placed};
 use crate::queries::vessels::launch_tile;
 use crate::queue::field_str as str_field;
 use crate::random::new_id;
+use crate::running::{in_place, On, RunningOrder, Ties, TiesMut};
+use crate::script_actions::{arg, arg_as, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::survival::gather_pile;
 
 /// Founds a city around the finished town hall `town_hall_id` (`foundCity` of `cities.ts`).
@@ -147,19 +151,10 @@ fn upgraded_by(world: &WorldState, site: usize) -> Option<usize> {
 /// a line goes on to its next tile and a builder's order is done as on any finished site.
 fn point_orders_at(world: &mut WorldState, from: &str, to: &str) {
     for r in &mut world.residents {
-        match r.order.as_mut() {
-            Some(ResidentOrder::Build(b)) if b.site_id.as_deref() == Some(from) => {
-                b.site_id = Some(to.to_string());
+        if let Some(place) = r.order.as_mut().and_then(|o| o.ties_mut().place) {
+            if *place == from {
+                *place = to.to_string();
             }
-            Some(ResidentOrder::RoadLine(l) | ResidentOrder::WallLine(l))
-                if l.site_id.as_deref() == Some(from) =>
-            {
-                l.site_id = Some(to.to_string());
-            }
-            Some(ResidentOrder::WorkAt(w)) if w.building_id == from => {
-                w.building_id = to.to_string();
-            }
-            _ => {}
         }
     }
 }
@@ -191,12 +186,7 @@ pub fn finish_site_by(
     if b.site.is_none() || work_needed(b) > 0.0 || !materials_needed(b).is_empty() {
         return false;
     }
-    let vessel = match b.kind {
-        BuildingKind::Boat => Some(VesselKind::Boat),
-        BuildingKind::Ship => Some(VesselKind::Ship),
-        _ => None,
-    };
-    if let Some(kind) = vessel {
+    if let Some(kind) = VesselKind::built_as(b.kind) {
         // `CONTEXT.md`: Building a boat, Building a ship: the site is gone, and an empty vessel of
         // the finisher's realm floats on the nearest free water tile next to it (Sea for a ship).
         let Some((x, y)) =
@@ -205,8 +195,7 @@ pub fn finish_site_by(
             return false;
         };
         world.buildings.remove(site);
-        let prefix = if kind == VesselKind::Ship { "ship" } else { "boat" };
-        let id = new_id(prefix, &mut world.next_id);
+        let id = new_id(kind.spec().name, &mut world.next_id);
         world.vessels.push(Vessel {
             id,
             kind,
@@ -219,7 +208,7 @@ pub fn finish_site_by(
         });
         return true;
     }
-    if let Some(kind) = crate::siege::machine_kind(b.kind) {
+    if let Some(kind) = SiegeMachineKind::built_as(b.kind) {
         // `CONTEXT.md`: Siege machine: the site is gone, and the machine of the finisher's realm
         // stands where it was, with no crew yet.
         let (x, y) = (b.x, b.y);
@@ -509,66 +498,31 @@ pub fn apply_build(world: &mut WorldState, order: &OrderRequest) {
     }
 }
 
-type Validate = fn(&WorldState, &OrderSender, &OrderRequest, Option<&TerrainMap>) -> Option<String>;
-type Apply = fn(&mut WorldState, &OrderRequest, Option<&TerrainMap>);
+pub(crate) static BUILD_META: OrderMeta =
+    OrderMeta::fns("build", validate_build, |w, _, o, _| apply_build(w, o))
+        .queue_step(StepGroup::Work)
+        .gets_off_first()
+        .adults_only()
+        .npc_city()
+        .blocked_carrying_child()
+        .script(&[BUILD_ACTION]);
 
-/// One of T86.6's order kinds for the order registry (`OrderKind`): its checks and what it sets.
-struct Kind {
-    validate: Validate,
-    apply: Apply,
-}
+const BUILD_ACTION: ScriptAction = ScriptAction {
+    name: "build",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("building"), arg_as("material?", "material")]),
+    cost: 10.0,
+    description: "Lay out or join a construction site of that kind on my tile. A wall or gate is of \"wood\" (by default) or \"stone\"; a stone one may be laid out on a wooden one of its kind, which stands until the stone one is finished.",
+    returns: ScriptType::String,
+};
 
-impl crate::orders::OrderKind for Kind {
-    fn validate(
-        &self,
-        world: &WorldState,
-        sender: &OrderSender,
-        order: &OrderRequest,
-        terrain: Option<&TerrainMap>,
-    ) -> Option<String> {
-        (self.validate)(world, sender, order, terrain)
+impl RunningOrder for BuildOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        let site = self.site_id.as_deref();
+        Ties { on: site.map_or(On::Nothing, On::Site), crew_of: site, ..Ties::NONE }
     }
-
-    fn apply(
-        &self,
-        world: &mut WorldState,
-        _sender: &OrderSender,
-        order: &OrderRequest,
-        terrain: Option<&TerrainMap>,
-    ) {
-        (self.apply)(world, order, terrain)
-    }
-}
-
-/// Adds the order kinds of building, tearing down, lines, work, teaching and training to the
-/// registry (`orderKinds`' `build`, `tearDown`, `roadLine`, `wallLine`, `workAt`, `teach`,
-/// `train`).
-pub fn add_building_orders(kinds: &mut crate::orders::OrderKinds) {
-    use crate::repair::{apply_repair, validate_repair};
-    use crate::road_line::{apply_line, validate_line, LineKind};
-    use crate::teaching::{apply_teach, validate_teach};
-    use crate::teardown::{apply_tear_down, validate_tear_down};
-    use crate::training::{apply_train, validate_train};
-    use crate::work::{apply_work_at, validate_work_at};
-    let kinds_of: [(&str, Validate, Apply); 8] = [
-        ("build", validate_build, |w, o, _| apply_build(w, o)),
-        ("tearDown", validate_tear_down, |w, o, _| apply_tear_down(w, o)),
-        ("repair", |w, s, o, _| validate_repair(w, s, o), |w, o, _| apply_repair(w, o)),
-        (
-            "roadLine",
-            |w, s, o, t| validate_line(LineKind::RoadLine, w, s, o, t),
-            |w, o, t| apply_line(LineKind::RoadLine, w, o, t),
-        ),
-        (
-            "wallLine",
-            |w, s, o, t| validate_line(LineKind::WallLine, w, s, o, t),
-            |w, o, t| apply_line(LineKind::WallLine, w, o, t),
-        ),
-        ("workAt", |w, s, o, _| validate_work_at(w, s, o), |w, o, _| apply_work_at(w, o)),
-        ("teach", |w, s, o, _| validate_teach(w, s, o), |w, o, _| apply_teach(w, o)),
-        ("train", |w, s, o, _| validate_train(w, s, o), |w, o, _| apply_train(w, o)),
-    ];
-    for (name, validate, apply) in kinds_of {
-        kinds.insert(name, Kind { validate, apply });
+    fn ties_mut(&mut self) -> TiesMut<'_> {
+        TiesMut { place: self.site_id.as_mut(), ..TiesMut::none() }
     }
 }

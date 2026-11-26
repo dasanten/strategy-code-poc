@@ -10,10 +10,14 @@ use csp_shared::world::{
     BuildingKind, OrderRequest, ResidentOrder, TeachOrder, TrainingSubject, WorldState,
 };
 
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{npc_training_problem, ordered_resident, OrderSender};
 use crate::queries::building::{building_at, teach_problem, teacher_at};
 use crate::queries::names::placed;
 use crate::queue::field_str as str_field;
+use crate::running::{in_place, no_ties_mut, RunningOrder, Ties};
+use crate::script_actions::{ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 
 /// The training subject an order's input names, if it names one (`isTrainingSubject`).
 pub fn subject_of(order: &OrderRequest) -> Option<TrainingSubject> {
@@ -64,6 +68,33 @@ pub fn apply_teach(world: &mut WorldState, order: &OrderRequest) {
     }
     world.residents[ri].order =
         Some(ResidentOrder::Teach(TeachOrder { building_id: building_id.to_string(), subject }));
+}
+
+pub(crate) static TEACH_META: OrderMeta =
+    OrderMeta::fns("teach", |w, s, o, _| validate_teach(w, s, o), |w, _, o, _| apply_teach(w, o))
+        .queue_step(StepGroup::Work)
+        .never_ends()
+        .gets_off_first()
+        .adults_only()
+        .npc_city()
+        .goes_on_until_stopped()
+        .script(&[TEACH_ACTION]);
+
+const TEACH_ACTION: ScriptAction = ScriptAction {
+    name: "teach",
+    group: ActionGroup::Work,
+    request: Request::ByHand(&["subject"]),
+    cost: 10.0,
+    description: "Teach a stat (\"strength\", \"endurance\", \"agility\", \"intellect\") or a skill (\"combat\", …) at the training ground on my tile, while I stand there. One teacher per ground.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for TeachOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { refills_at: Some((&self.building_id, None)), ..Ties::NONE }
+    }
+    no_ties_mut!();
 }
 
 /// Ends the teaching that no longer holds (`stepTeaching`): a teacher who has left the ground's

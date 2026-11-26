@@ -13,6 +13,7 @@ use csp_shared::world::{
 use serde_json::{json, Map, Value};
 
 use crate::default_scripts::{is_work_script, WORKPLACE_PARAM};
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{realm_of, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::alliance::commander_of;
@@ -344,6 +345,8 @@ impl OrderKind for SetWorkSettingsOrder {
         }
     }
 }
+
+pub static SET_WORK_SETTINGS_META: OrderMeta = OrderMeta::by_host("setWorkSettings");
 
 /// Drops Workplace settings that no longer name anything, once a tick (`stepWorkplaceSettings`):
 /// those of a realm that is gone, those of a building that is gone, and values naming a building

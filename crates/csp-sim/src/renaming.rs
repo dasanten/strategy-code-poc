@@ -4,11 +4,15 @@
 //! `validate`/`apply` functions for the order queue (T86.2) to wire.
 
 use csp_shared::balance::{CITY_NAME_MAX_LENGTH, HORSE_NAME_MAX_LENGTH, RESIDENT_NAME_MAX_LENGTH};
-use csp_shared::world::{Realm, WorldState};
+use csp_shared::world::{OrderRequest, Realm, WorldState};
 
+use crate::order_meta::OrderMeta;
+use crate::orders::{given_field, str_field};
 use crate::queries::people::{
     city_rename_problem, horse_rename_problem, js_trim, name_problem, rename_problem, Given,
 };
+use crate::script_actions::{arg, arg_as, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
 
 /// A rename order (`RenameRequest`, `RenameCityRequest`, `RenameHorseRequest`): `resident_id`
@@ -73,6 +77,34 @@ pub fn apply_rename(world: &mut WorldState, user_id: u64, o: &RenameRequest) {
     }
 }
 
+fn rename_request(o: &OrderRequest) -> RenameRequest<'_> {
+    RenameRequest {
+        resident_id: str_field(o, "residentId"),
+        target_id: str_field(o, "targetId"),
+        city_id: str_field(o, "cityId"),
+        horse_id: str_field(o, "horseId"),
+        name: given_field(o, "name"),
+        realm_name: given_field(o, "realmName"),
+    }
+}
+
+pub(crate) static RENAME_META: OrderMeta = OrderMeta::fns(
+    "rename",
+    |w, s, o, _| validate_rename(w, s.user_id, &rename_request(o)),
+    |w, s, o, _| apply_rename(w, s.user_id, &rename_request(o)),
+)
+.keeps_script()
+.script(&[RENAME_ACTION]);
+
+const RENAME_ACTION: ScriptAction = ScriptAction {
+    name: "rename",
+    group: ActionGroup::Ruling,
+    request: Request::Fields(&[arg_as("residentId", "targetId"), arg("name"), arg_as("realmName?", "realmName")]),
+    cost: 10.0,
+    description: "Give a resident of my realm, me or my Leader included, a new name: free and at once, from anywhere. Renaming the Leader of a realm with no realm name yet needs `realmName` too, which names the realm; a named realm keeps its name.",
+    returns: ScriptType::String,
+};
+
 /// `renameCity.validate`.
 pub fn validate_rename_city(world: &WorldState, user_id: u64, o: &RenameRequest) -> Option<String> {
     let realm = match asker(world, user_id, o) {
@@ -102,6 +134,23 @@ pub fn apply_rename_city(world: &mut WorldState, user_id: u64, o: &RenameRequest
     city.name = name;
 }
 
+pub(crate) static RENAME_CITY_META: OrderMeta = OrderMeta::fns(
+    "renameCity",
+    |w, s, o, _| validate_rename_city(w, s.user_id, &rename_request(o)),
+    |w, s, o, _| apply_rename_city(w, s.user_id, &rename_request(o)),
+)
+.keeps_script()
+.script(&[RENAME_CITY_ACTION]);
+
+const RENAME_CITY_ACTION: ScriptAction = ScriptAction {
+    name: "renameCity",
+    group: ActionGroup::Ruling,
+    request: Request::Fields(&[arg("cityId"), arg("name")]),
+    cost: 10.0,
+    description: "Give a city of my realm a new name: free and at once, from anywhere. Others go on knowing it by its old name until they see it again.",
+    returns: ScriptType::String,
+};
+
 /// `renameHorse.validate`.
 pub fn validate_rename_horse(
     world: &WorldState,
@@ -129,6 +178,23 @@ pub fn apply_rename_horse(world: &mut WorldState, user_id: u64, o: &RenameReques
         h.name = js_trim(name).to_string();
     }
 }
+
+pub(crate) static RENAME_HORSE_META: OrderMeta = OrderMeta::fns(
+    "renameHorse",
+    |w, s, o, _| validate_rename_horse(w, s.user_id, &rename_request(o)),
+    |w, s, o, _| apply_rename_horse(w, s.user_id, &rename_request(o)),
+)
+.keeps_script()
+.script(&[RENAME_HORSE_ACTION]);
+
+const RENAME_HORSE_ACTION: ScriptAction = ScriptAction {
+    name: "renameHorse",
+    group: ActionGroup::Ruling,
+    request: Request::Fields(&[arg("horseId"), arg("name")]),
+    cost: 10.0,
+    description: "Give a horse of my realm a new name: free and at once, from anywhere, like renaming a resident. Names need not be unique.",
+    returns: ScriptType::String,
+};
 
 fn names_well_formed<'a>(
     invariant: &str,

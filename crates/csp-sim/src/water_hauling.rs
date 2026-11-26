@@ -13,7 +13,7 @@
 //! other haven, docking there, while the rest of the crew stays aboard. It sails only with the
 //! fewest crew it takes, the captain among them.
 
-use csp_shared::balance::{GOOD_WEIGHT, SHIP_MIN_CREW};
+use csp_shared::balance::GOOD_WEIGHT;
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, TerrainMap};
 use csp_shared::world::{
     Good, GoodsSpot, HaulPhase, HaulStop, OrderRequest, Resident, ResidentOrder, Stock, Tile,
@@ -24,6 +24,7 @@ use serde_json::Value;
 use crate::carrying::CarryAction;
 use crate::hauling::{read_goods, stop_action, OnBoard, RouteGoods, CARRYING_A_CHILD};
 use crate::loading::move_straight;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{int_field, str_field};
 use crate::queries::carriages::driven_carriage_id;
@@ -37,6 +38,7 @@ use crate::queries::vessels::{
 };
 use crate::queries::warehouse_trade::is_integer;
 use crate::rowing::row_problem;
+use crate::running::{no_ties, Arrival, By, Going, GoingMut, RunningOrder, To};
 use crate::storing::end_order;
 
 /// The vessel a haul order names, if it names one: its `vesselId`, or a vessel's id given as its
@@ -150,7 +152,7 @@ fn route_problem(world: &WorldState, r: &Resident, v: &Vessel) -> Option<String>
     } else if r.riding.is_some() {
         "no horse goes aboard: dismount first".into()
     } else {
-        let short = (SHIP_MIN_CREW as usize).saturating_sub(captain_and_crew(world, v, r));
+        let short = (v.kind.spec().min_crew as usize).saturating_sub(captain_and_crew(world, v, r));
         if short == 0 {
             return None;
         }
@@ -201,6 +203,53 @@ pub fn apply_water_haul(
         progress: 0.0,
         moving: None,
     }));
+}
+
+pub(crate) static HAUL_BY_WATER_META: OrderMeta =
+    OrderMeta::not_requested("haulByWater").blocked_carrying_child().goes_on_until_stopped();
+
+impl RunningOrder for WaterHaulOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: self.phase == HaulPhase::Driving,
+            by: By::Oars(&self.vessel_id),
+            to: self.water.as_ref().map_or(To::Nowhere, To::tile),
+            near: false,
+            after: None,
+            estimated: false,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        self.phase = HaulPhase::Loading;
+        self.water = None;
+        GoingMut::new(&mut self.path, &mut self.progress).reset();
+        Arrival::GoesOn
+    }
+    fn resume(&mut self, world: &WorldState, r: &Resident) -> bool {
+        GoingMut::new(&mut self.path, &mut self.progress).reset_found();
+        // Rowing on needs its rower still at the oars (`CONTEXT.md`: Rowing); at a stop it goes on
+        // from where they stand, or ends there.
+        self.phase == HaulPhase::Loading
+            || world.vessels.iter().any(|v| {
+                v.id == self.vessel_id
+                    && v.rower_id.as_deref() == Some(r.id.as_str())
+                    && r.aboard.as_deref() == Some(v.id.as_str())
+            })
+    }
+    fn same(&self, kept: &Self) -> bool {
+        self.vessel_id == kept.vessel_id
+            && self.from == kept.from
+            && self.to == kept.to
+            && self.goods == kept.goods
+            && self.return_goods == kept.return_goods
+            && self.keep_food == kept.keep_food
+    }
+    no_ties!();
 }
 
 fn route_mut(world: &mut WorldState, ri: usize) -> &mut WaterHaulOrder {

@@ -3,10 +3,15 @@
 
 pub mod balance;
 pub mod balance_export;
+pub mod building_spec;
 pub mod chunks;
+pub mod craft_spec;
 pub mod footprint;
+pub mod good_spec;
 pub mod goods;
+mod named_enum;
 pub mod protocol;
+pub mod spec_export;
 pub mod terrain;
 pub mod time;
 pub mod ts_aliases;

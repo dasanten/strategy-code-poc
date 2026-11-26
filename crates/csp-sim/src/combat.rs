@@ -8,9 +8,11 @@ use csp_shared::balance::{MAP_SIZE, SIGHT_RANGE, STRIKE_TICKS, WALL_DEFENCE};
 use csp_shared::footprint::{is_at, near_footprint};
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::{
-    AttackOrder, Building, CrimeKind, DeathCause, Good, Realm, RealmEventWhat, Resident,
-    ResidentOrder, Struck, Task, Tile, WalkOrder, WorldState,
+    AttackOrder, Building, CrimeKind, DeathCause, Good, OrderRequest, Realm, RealmEventWhat,
+    Resident, ResidentOrder, Struck, Task, Tile, WalkOrder, WorldState,
 };
+
+use serde_json::Value;
 
 use crate::cities::update_city_membership;
 use crate::crimes::{
@@ -21,8 +23,10 @@ use crate::defence::{defends_by_script, end_hold_if_over, start_defence, Alarms}
 use crate::equipment::Slot;
 use crate::events::record_event;
 use crate::goods_made::GoodsMade;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::commands;
 use crate::order_sender::{ordered_resident, OrderSender};
+use crate::orders::text_field;
 use crate::queries::alliance::contract_of;
 use crate::queries::carriages::{driven_carriage_id, stands_still};
 use crate::queries::city::town_hall_of;
@@ -43,6 +47,11 @@ use crate::queries::walls::{
     wall_strength, wall_strength_left,
 };
 use crate::random::{hash_str, Mulberry32};
+use crate::running::{
+    same_when_equal, Arrival, By, Going, GoingMut, RunningOrder, Ties, TiesMut, To,
+};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::survival::{die_all, drop_goods};
 use crate::wear::wear_slot;
 
@@ -224,13 +233,9 @@ fn is_aggression(world: &WorldState, a: &Resident, t: &Resident, size: i32) -> b
             .find(|x| x.id == building_id)
             .is_some_and(|b| sides.contains(&building_organization(world, b)))
     };
-    let o = match o {
-        Some(ResidentOrder::Climb(c)) => return !ours(&c.wall_id),
-        Some(ResidentOrder::Attack(o)) if o.defending != Some(true) => o,
-        _ => return true,
-    };
-    match world.residents.iter().find(|x| x.id == o.target_id) {
-        None => !ours(&o.target_id),
+    let Some(target) = o.and_then(|o| o.ties().strikes) else { return true };
+    match world.residents.iter().find(|x| x.id == target) {
+        None => !ours(target),
         Some(their_target) => !sides.contains(&organization_of(their_target).map(str::to_string)),
     }
 }
@@ -384,6 +389,79 @@ pub fn apply_attack(world: &mut WorldState, order: &AttackRequest, size: Option<
         || size.is_some_and(|size| goes_after_occupier(world, r, target_id, size));
     world.residents[i].order =
         Some(ResidentOrder::Attack(attack_order(target_id, defending, defending || no_crime)));
+}
+
+fn attack_request(order: &OrderRequest) -> AttackRequest {
+    AttackRequest {
+        resident_id: text_field(order, "residentId"),
+        target_id: text_field(order, "targetId"),
+        shoot: order.fields.get("shoot").and_then(Value::as_bool).unwrap_or(false),
+    }
+}
+
+pub(crate) static ATTACK_META: OrderMeta = OrderMeta::fns(
+    "attack",
+    |w, s, o, t| validate_attack(w, s, &attack_request(o), t.map(|t| t.size)).map(str::to_string),
+    |w, _, o, t| apply_attack(w, &attack_request(o), t.map(|t| t.size)),
+)
+.gets_off_first()
+.npc_city()
+.script(&[ATTACK_ACTION, SHOOT_ACTION]);
+
+const ATTACK_ACTION: ScriptAction = ScriptAction {
+    name: "attack",
+    group: ActionGroup::Fighting,
+    request: Request::Fields(&[arg("targetId")]),
+    cost: 10.0,
+    description: "Go after a resident I see and strike them, or strike a wall or gate of another realm until it falls. With a Bow or Crossbow and Arrows I walk only until they are in my `reach` and shoot from there.",
+    returns: ScriptType::String,
+};
+
+const SHOOT_ACTION: ScriptAction = ScriptAction {
+    name: "shoot",
+    group: ActionGroup::Fighting,
+    request: Request::ByHand(&["targetId"]),
+    cost: 10.0,
+    description: "Shoot a resident I see who is in my `reach` now, with my Bow or Crossbow and an Arrow a shot, without a step. The order goes on as an attack: should they get out of reach I go after them, so `stop()` to stay where I am.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for AttackOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: true,
+            by: By::Foot,
+            to: To::Foe(&self.target_id),
+            near: true,
+            after: None,
+            estimated: false,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        GoingMut::new(&mut self.path, &mut self.progress).reset();
+        Arrival::GoesOn
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        GoingMut::new(&mut self.path, &mut self.progress).reset_found();
+        true
+    }
+    same_when_equal!();
+    fn ties(&self) -> Ties<'_> {
+        Ties {
+            army: self.army.as_deref(),
+            strikes: (self.defending != Some(true)).then_some(self.target_id.as_str()),
+            falls_with: Some(&self.target_id),
+            ..Ties::NONE
+        }
+    }
+    fn ties_mut(&mut self) -> TiesMut<'_> {
+        TiesMut { army: Some(&mut self.army), ..TiesMut::none() }
+    }
 }
 
 /// Requests this tick's blows from residents' attack orders (`requestStrikes`), on a map of
@@ -719,7 +797,7 @@ fn break_machine(
     }
     let against = CrimeAgainst {
         victim_org: world.siege_machines[mi].realm_id.clone(),
-        building: Some(crate::siege::site_kind(world.siege_machines[mi].kind)),
+        building: Some(world.siege_machines[mi].kind.spec().built_as),
         ..CrimeAgainst::default()
     };
     let attacker_id = world.residents[ai].id.clone();
@@ -774,7 +852,7 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
     let t = &world.residents[ti];
     // A climber climbs on, and someone swapping gear finishes the swap first (`CONTEXT.md`:
     // Equipment): they strike no blows meanwhile.
-    if matches!(t.order, Some(ResidentOrder::Climb(_) | ResidentOrder::Equip(_))) {
+    if t.order.as_ref().is_some_and(|o| o.ties().kept_when_struck) {
         return;
     }
     if defends_by_script(world, t) {

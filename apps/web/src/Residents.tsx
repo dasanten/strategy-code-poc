@@ -18,7 +18,6 @@ import { inContact } from './shared/combat.js'
 import { isVesselId, vesselCapacity, vesselName } from './shared/vessels.js'
 import {
   LINE_BUILDING,
-  isLineOrder,
   BUILDABLE,
   buildingWork,
   workFactor,
@@ -73,6 +72,7 @@ import type {
   Building,
   Carriage,
   City,
+  ResidentOrder,
   BuildingKind,
   GearCondition,
   Good,
@@ -1343,65 +1343,61 @@ function DurationChip({
   )
 }
 
+/** What `ORDER_DOING`'s texts read besides the order: how far the way is, how they go, the cities. */
+interface DoingContext {
+  /** What is left of a way: about how long, or tiles to go without an estimate. */
+  left: (path: readonly unknown[]) => string
+  /** "Walking", or "Riding" on a horse (`CONTEXT.md`: Riding). */
+  walking: string
+  cities: readonly Pick<City, 'id' | 'name'>[]
+}
+
+/** An order of one kind. */
+type OrderOf<K extends ResidentOrder['kind']> = Extract<ResidentOrder, { kind: K }>
+
 /**
- * What a resident's built-in order has them doing. A rider rides where others walk (`CONTEXT.md`:
- * Riding): "Riding to 4, 5 · about 3 min (3 game hours)", or tiles to go without an
- * estimate (`arrivalTicks`). A relocating resident names their new city from `cities`
- * (`CONTEXT.md`: Relocate).
+ * What each kind of order has a resident doing (T121.8): one entry per kind of `ResidentOrder`,
+ * so a new kind fails typecheck until it says.
  */
-export function orderDoing(
-  r: Pick<Resident, 'order' | 'riding'>,
-  arrives?: number,
-  cities: readonly Pick<City, 'id' | 'name'>[] = [],
-): string {
-  const left = (path: readonly unknown[]) =>
-    arrives === undefined ? `${path.length} tiles to go` : aboutTime(arrives)
-  const o = r.order
-  const walking = r.riding === undefined ? 'Walking' : 'Riding'
-  if (o?.kind === 'relocate') {
+const ORDER_DOING: { [K in ResidentOrder['kind']]: (o: OrderOf<K>, c: DoingContext) => string } = {
+  relocate: (o, { left, cities }) => {
     const city = cities.find((c) => c.id === o.cityId)?.name ?? 'another city'
     return o.path ? `Relocating to ${city} · ${left(o.path)}` : `Relocating to ${city}`
-  }
-  if (o?.kind === 'walkTo') {
+  },
+  walkTo: (o, { left, walking }) => {
     if (!o.path) return `Finding a way to ${o.target.x}, ${o.target.y}`
     return `${walking} to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
-  }
-  if (o?.kind === 'drive') {
+  },
+  drive: (o, { left }) => {
     if (!o.path) return `Finding a way for the carriage to ${o.target.x}, ${o.target.y}`
     return `Driving to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
-  }
-  if (o?.kind === 'row') {
+  },
+  row: (o, { left }) => {
     // `CONTEXT.md`: Rowing.
     if (!o.path) return `Finding a way over the water to ${o.target.x}, ${o.target.y}`
     return `Rowing to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
-  }
-  if (o?.kind === 'crew') {
+  },
+  crew: (o, { left, walking }) => {
     // `CONTEXT.md`: Siege machine.
     if (!o.path) return 'Finding a way to the ram to crew it'
     return `${walking} to the ram to crew it · ${left(o.path)}`
-  }
-  if (o?.kind === 'ram') {
-    // `CONTEXT.md`: Ram: its crew under its roof.
-    return 'Ramming with the crew'
-  }
-  if (o?.kind === 'throw') {
-    // `CONTEXT.md`: Catapult.
-    return 'Throwing Stone with the crew'
-  }
-  if (o?.kind === 'rally') {
-    // `CONTEXT.md`: Rallying the crew.
-    return 'Rallying the crew'
-  }
-  if (o?.kind === 'push') {
+  },
+  // `CONTEXT.md`: Ram: its crew under its roof.
+  ram: () => 'Ramming with the crew',
+  // `CONTEXT.md`: Catapult.
+  throw: () => 'Throwing Stone with the crew',
+  // `CONTEXT.md`: Rallying the crew.
+  rally: () => 'Rallying the crew',
+  push: (o, { left }) => {
     if (!o.path) return `Finding a way for the ram to ${o.target.x}, ${o.target.y}`
     return `Pushing the ram to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
-  }
-  if (o?.kind === 'sail') {
+  },
+  sail: (o, { left }) => {
     // `CONTEXT.md`: Sailing.
     if (!o.path) return `Finding a way over the Sea to ${o.target.x}, ${o.target.y}`
     return `Sailing to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
-  }
-  if (o?.kind === 'haul') {
+  },
+  haul: (o, { left }) => {
     const what = o.goods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
     const { x, y } = o[o.stop]
     if (o.phase === 'loading') {
@@ -1411,8 +1407,8 @@ export function orderDoing(
     const leg =
       o.stop === 'to' ? `Hauling ${what} to` : back ? `Hauling ${back} back to` : 'Driving back to'
     return o.path ? `${leg} ${x}, ${y} · ${left(o.path)}` : `${leg} ${x}, ${y}`
-  }
-  if (o?.kind === 'haulByWater') {
+  },
+  haulByWater: (o, { left }) => {
     // `CONTEXT.md`: Haul route by water.
     const what = o.goods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
     const { x, y } = o[o.stop]
@@ -1429,50 +1425,73 @@ export function orderDoing(
           ? `${doing} ${back} back to`
           : `${doing} back to`
     return o.path ? `${leg} ${x}, ${y} · ${left(o.path)}` : `${leg} ${x}, ${y}`
-  }
-  if (o?.kind === 'pickUp') return 'Picking up goods'
-  if (o?.kind === 'drop') return 'Putting down goods'
-  if (o?.kind === 'feed') return 'Feeding'
-  if (o?.kind === 'equip')
-    return o.good ? `Putting on ${GOOD_LABELS[o.good].toLowerCase()}` : `Taking off their ${o.slot}`
-  if (o?.kind === 'store') return o.phase === 'refilling' ? 'Taking food along' : 'Storing goods'
-  if (o?.kind === 'fetch') return 'Fetching goods'
-  if (o?.kind === 'tearDown') return 'Tearing down'
-  if (o?.kind === 'repair') return 'Repairing'
-  if (o?.kind === 'gather') return `Gathering ${GOOD_LABELS[o.good].toLowerCase()}`
-  if (o?.kind === 'breed') return 'Breeding horses'
-  if (o?.kind === 'build') {
+  },
+  pickUp: () => 'Picking up goods',
+  drop: () => 'Putting down goods',
+  feed: () => 'Feeding',
+  equip: (o) =>
+    o.good ? `Putting on ${GOOD_LABELS[o.good].toLowerCase()}` : `Taking off their ${o.slot}`,
+  store: (o) => (o.phase === 'refilling' ? 'Taking food along' : 'Storing goods'),
+  fetch: () => 'Fetching goods',
+  tearDown: () => 'Tearing down',
+  repair: () => 'Repairing',
+  gather: (o) => `Gathering ${GOOD_LABELS[o.good].toLowerCase()}`,
+  breed: () => 'Breeding horses',
+  build: (o) => {
     const what = BUILDING_NAMES[o.building].toLowerCase()
     return o.siteId === null ? `Laying out a ${what}` : `Building a ${what}`
-  }
-  if (o?.kind === 'workAt') {
+  },
+  workAt: (o) => {
     if (o.mends) return 'Mending worn gear'
     return o.makes ? `Making ${GOOD_LABELS[o.makes].toLowerCase()}` : 'Working'
-  }
-  if (o?.kind === 'teach') return `Teaching ${subjectLabel(o.subject)}`
-  if (o?.kind === 'train')
-    return o.learning ? `Training ${subjectLabel(o.learning)}` : 'Waiting to train'
-  if (o?.kind === 'pay') return 'Paying for mercenaries'
-  if (o?.kind === 'buyCity') return 'Buying a city'
-  if (o?.kind === 'buyOff') return 'Buying off a directive'
-  if (o?.kind === 'payDebt') return 'Paying the debt'
-  if (o?.kind === 'acceptOffer') return 'Accepting an offer'
-  if (o?.kind === 'trade')
-    return o.side === 'buy' ? 'Buying at a warehouse' : 'Selling at a warehouse'
-  if (o?.kind === 'swap') return `Swapping for ${GOOD_LABELS[o.want].toLowerCase()}`
-  if (o?.kind === 'buyHorse') return 'Buying a horse'
-  if (o?.kind === 'sellHorse') return 'Selling a horse'
-  if (o?.kind === 'attack') return o.path ? 'Going after their target' : 'Fighting'
-  if (o?.kind === 'climb') return `Climbing a wall · ${pct(o.progress)}`
-  if (isLineOrder(o)) {
-    const [x, y] = o.tiles[0]!
-    const what = LINE_BUILDING[o.kind]
-    const left = `${o.tiles.length} ${what} tile${o.tiles.length === 1 ? '' : 's'} to go`
-    return o.phase === 'walking'
-      ? `${walking} to lay ${what} at ${x}, ${y} · ${left}`
-      : `Building ${what} at ${x}, ${y} · ${left}`
-  }
-  return 'Idle'
+  },
+  teach: (o) => `Teaching ${subjectLabel(o.subject)}`,
+  train: (o) => (o.learning ? `Training ${subjectLabel(o.learning)}` : 'Waiting to train'),
+  pay: () => 'Paying for mercenaries',
+  buyCity: () => 'Buying a city',
+  buyOff: () => 'Buying off a directive',
+  payDebt: () => 'Paying the debt',
+  acceptOffer: () => 'Accepting an offer',
+  trade: (o) => (o.side === 'buy' ? 'Buying at a warehouse' : 'Selling at a warehouse'),
+  swap: (o) => `Swapping for ${GOOD_LABELS[o.want].toLowerCase()}`,
+  buyHorse: () => 'Buying a horse',
+  sellHorse: () => 'Selling a horse',
+  // As it always was: handing in a transfer had no text of its own (#BUG).
+  handIn: () => 'Idle',
+  attack: (o) => (o.path ? 'Going after their target' : 'Fighting'),
+  climb: (o) => `Climbing a wall · ${pct(o.progress)}`,
+  roadLine: (o, c) => lineDoing(o, c),
+  wallLine: (o, c) => lineDoing(o, c),
+}
+
+/** A road or wall order along its line. */
+function lineDoing(o: OrderOf<'roadLine' | 'wallLine'>, { walking }: DoingContext): string {
+  const [x, y] = o.tiles[0]!
+  const what = LINE_BUILDING[o.kind]
+  const left = `${o.tiles.length} ${what} tile${o.tiles.length === 1 ? '' : 's'} to go`
+  return o.phase === 'walking'
+    ? `${walking} to lay ${what} at ${x}, ${y} · ${left}`
+    : `Building ${what} at ${x}, ${y} · ${left}`
+}
+
+/**
+ * What a resident's built-in order has them doing (`ORDER_DOING`). A rider rides where others walk
+ * (`CONTEXT.md`: Riding): "Riding to 4, 5 · about 3 min (3 game hours)", or tiles to go without an
+ * estimate (`arrivalTicks`). A relocating resident names their new city from `cities`
+ * (`CONTEXT.md`: Relocate).
+ */
+export function orderDoing(
+  r: Pick<Resident, 'order' | 'riding'>,
+  arrives?: number,
+  cities: readonly Pick<City, 'id' | 'name'>[] = [],
+): string {
+  const o = r.order
+  if (!o) return 'Idle'
+  const left = (path: readonly unknown[]) =>
+    arrives === undefined ? `${path.length} tiles to go` : aboutTime(arrives)
+  const walking = r.riding === undefined ? 'Walking' : 'Riding'
+  const doing = ORDER_DOING[o.kind] as (o: ResidentOrder, c: DoingContext) => string
+  return doing(o, { left, walking, cities })
 }
 
 /**

@@ -1,7 +1,7 @@
 import { BUILD_GROUPS } from './shared/building-info.js'
 import { TICKS_PER_GAME_DAY } from '@csp/balance'
 import { TICKS_PER_GAME_HOUR } from './shared/time.js'
-import { buildMenu } from './shared/building.js'
+import { SITES_OF_MOVERS, buildMenu } from './shared/building.js'
 import type { BuildingKind, ResourceNode } from '@csp/shared-types'
 import { BUILDING_NAMES } from './map/palette.js'
 import { pixelBuilding, pixelSlice, type PixelSheet, type SliceRect } from './map/pixel-art.js'
@@ -44,11 +44,7 @@ export function buildMenuGroups(
 ): BuildMenuGroup[] {
   const offered: readonly BuildingKind[] = anywhere
     ? BUILD_GROUPS.flatMap((g) => g.kinds)
-    : [
-        ...buildMenu(node),
-        'road',
-        ...(node ? [] : (['carriage', 'boat', 'ship', 'ram', 'catapult'] as const)),
-      ]
+    : [...buildMenu(node), 'road', ...(node ? [] : SITES_OF_MOVERS)]
   return BUILD_GROUPS.map((group) => ({
     name: group.name,
     kinds: group.kinds.map((kind) => {

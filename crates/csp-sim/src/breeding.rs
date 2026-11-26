@@ -8,13 +8,15 @@ use csp_shared::balance::{
 use csp_shared::footprint::is_at;
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    BreedOrder, Building, Horse, HorseStats, KeptBreeding, RealmEventWhat, ResidentOrder, Tile,
-    WorldState,
+    BreedOrder, Building, Horse, HorseStats, KeptBreeding, OrderRequest, RealmEventWhat,
+    ResidentOrder, Tile, WorldState,
 };
 
 use crate::events::record_event;
 use crate::horses::horse_name;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
+use crate::orders::{ids_field, text_field};
 use crate::queries::breeding::{breed_problem, kept_breeding};
 use crate::queries::horses::{horses_in, HorseOwner};
 use crate::queries::js_round;
@@ -22,6 +24,9 @@ use crate::queries::names::placed;
 use crate::queries::people::CARRYING_A_CHILD;
 use crate::queries::residents::can_work;
 use crate::random::{hash_str, Mulberry32};
+use crate::running::{in_place, no_ties_mut, RunningOrder, Ties};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 
 /// Ticks of tending a foal takes (`STABLE_BREED_TICKS` of shared `horses.ts`).
 pub const STABLE_BREED_TICKS: f64 = STABLE_BREED_DAYS * TICKS_PER_GAME_DAY;
@@ -100,6 +105,42 @@ pub fn apply_breed(world: &mut WorldState, o: &BreedRequest) {
         at: Tile { x: r.x, y: r.y },
         progress,
     }));
+}
+
+fn breed_request(o: &OrderRequest) -> BreedRequest {
+    BreedRequest {
+        resident_id: text_field(o, "residentId"),
+        stable_id: text_field(o, "stableId"),
+        horse_ids: ids_field(o, "horseIds"),
+    }
+}
+
+pub(crate) static BREED_META: OrderMeta = OrderMeta::fns(
+    "breed",
+    |w, s, o, _| validate_breed(w, s, &breed_request(o)).map(str::to_string),
+    |w, _, o, _| apply_breed(w, &breed_request(o)),
+)
+.gets_off_first()
+.adults_only()
+.npc_city()
+.blocked_carrying_child()
+.script(&[BREED_ACTION]);
+
+const BREED_ACTION: ScriptAction = ScriptAction {
+    name: "breed",
+    group: ActionGroup::Work,
+    request: Request::Fields(&[arg("stableId"), arg("horseIds")]),
+    cost: 10.0,
+    description: "At the stable I stand at, tend two fed horses of mine in it, like [\"h1\", \"h2\"], until their foal is born.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for BreedOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        Ties { crew_of: Some(&self.stable_id), ..Ties::NONE }
+    }
+    no_ties_mut!();
 }
 
 /// Requests this tick's tending from residents' breed orders (`requestBreeding`).

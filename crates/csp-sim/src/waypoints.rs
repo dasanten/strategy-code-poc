@@ -10,9 +10,12 @@ use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{OrderRequest, Waypoint, WorldState};
 use serde_json::Value;
 
+use crate::order_meta::OrderMeta;
 use crate::order_sender::OrderSender;
-use crate::orders::{OrderKind, OrderKinds};
+use crate::orders::OrderKind;
 use crate::random::new_id;
+use crate::script_actions::{ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
 
 /// The waypoints the Player with account `user_id` holds, oldest first (`waypointsOf`).
@@ -131,6 +134,18 @@ impl OrderKind for AddWaypoint {
     }
 }
 
+pub(crate) static ADD_WAYPOINT_META: OrderMeta =
+    OrderMeta::request("addWaypoint", &AddWaypoint).keeps_script().script(&[ADD_WAYPOINT_ACTION]);
+
+const ADD_WAYPOINT_ACTION: ScriptAction = ScriptAction {
+    name: "addWaypoint",
+    group: ActionGroup::Ruling,
+    request: Request::ByHand(&["x", "y", "name"]),
+    cost: 10.0,
+    description: "Put a waypoint named `name` on tile (x, y) for my Player, after those they hold: free and at once, from anywhere. Refused once they hold 50, counting those this run added (one removed makes room from the next run), or for a name longer than 30 characters.",
+    returns: ScriptType::String,
+};
+
 /// The rename order (`renameWaypoint`): one of the Player's waypoints takes the new name, trimmed.
 pub struct RenameWaypoint;
 
@@ -168,6 +183,9 @@ impl OrderKind for RenameWaypoint {
     }
 }
 
+pub(crate) static RENAME_WAYPOINT_META: OrderMeta =
+    OrderMeta::request("renameWaypoint", &RenameWaypoint).keeps_script();
+
 /// The remove order (`removeWaypoint`): one of the Player's waypoints goes; a Player left with
 /// none has no entry.
 pub struct RemoveWaypoint;
@@ -202,12 +220,19 @@ impl OrderKind for RemoveWaypoint {
     }
 }
 
-/// Adds the waypoint order kinds (`waypointOrders`).
-pub fn add_waypoint_orders(kinds: &mut OrderKinds) {
-    kinds.insert("addWaypoint", AddWaypoint);
-    kinds.insert("renameWaypoint", RenameWaypoint);
-    kinds.insert("removeWaypoint", RemoveWaypoint);
-}
+pub(crate) static REMOVE_WAYPOINT_META: OrderMeta =
+    OrderMeta::request("removeWaypoint", &RemoveWaypoint)
+        .keeps_script()
+        .script(&[REMOVE_WAYPOINT_ACTION]);
+
+const REMOVE_WAYPOINT_ACTION: ScriptAction = ScriptAction {
+    name: "removeWaypoint",
+    group: ActionGroup::Ruling,
+    request: Request::ByHand(&["waypoint"]),
+    cost: 10.0,
+    description: "Remove one of my Player’s waypoints, by it or its id: free and at once.",
+    returns: ScriptType::String,
+};
 
 fn whole_on_map(v: f64, size: i32) -> bool {
     v.fract() == 0.0 && v >= 0.0 && v < size as f64

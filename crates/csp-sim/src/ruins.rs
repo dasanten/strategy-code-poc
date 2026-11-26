@@ -9,11 +9,12 @@ use csp_shared::balance::{
     COLLAPSE_MATERIALS_LEFT, REBUILD_MATERIALS_SHARE, REBUILD_WORK_SHARE, RUIN_COLLAPSE_DAYS,
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
-use csp_shared::world::{Building, BuildingKind, ResidentOrder, Stock, WorldState};
+use csp_shared::world::{Building, BuildingKind, Stock, WorldState};
 
 use crate::cities::{dissolve_city, update_city_membership};
 use crate::queries::building::{build_materials, build_work_of};
 use crate::repair::decays;
+use crate::running::{On, RunningOrder};
 use crate::survival::drop_goods;
 use crate::tick::Scratch;
 use crate::world_index::building_index;
@@ -116,11 +117,12 @@ fn collapse(world: &mut WorldState, i: usize, size: i32, scratch: &mut Scratch) 
 fn end_orders_on_gone(world: &mut WorldState) {
     let gone = |w: &WorldState, id: &str| building_index(w, id).is_none();
     let ends: Vec<usize> = (0..world.residents.len())
-        .filter(|&i| match &world.residents[i].order {
-            Some(ResidentOrder::TearDown(o)) => gone(world, &o.building_id),
-            Some(ResidentOrder::Repair(o)) => gone(world, &o.building_id),
-            Some(ResidentOrder::Build(o)) => o.site_id.as_deref().is_some_and(|s| gone(world, s)),
-            _ => false,
+        .filter(|&i| {
+            let on = world.residents[i].order.as_ref().map_or(On::Nothing, |o| o.ties().on);
+            match on {
+                On::TearsDown(id) | On::Repairs(id) | On::Site(id) => gone(world, id),
+                On::Nothing => false,
+            }
         })
         .collect();
     for i in ends {

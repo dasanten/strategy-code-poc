@@ -6,6 +6,8 @@
   section file (a new term also to the index) before building on it.
 - **Decisions:** `docs/adr/`. The game vision in `CONTEXT.md` and `docs/context/` wins over ADR 0001 where they
   conflict.
+- **Adding content** (a building kind, a good, a vessel or siege machine, an order): the steps are
+  in `docs/adding-content.md`.
 - **What to do next:** GitHub tickets, how they work in `docs/tasks.md`. `/next-ticket` picks the
   next one and works it into a PR. PRs reference their tickets (`Closes #n`, `Part of #epic`).
 - **CI minutes are scarce** (ADR 0009): ticket PRs go into the epic branch `epic/<n>-<slug>` and
@@ -22,7 +24,8 @@
 - **Wiki** (`/wiki`, one file per section: `apps/web/src/wiki/<topic>.tsx`): a ticket that changes
   a rule also updates its wiki section. Numbers come from `@csp/balance`, never typed into its text.
 - **Keep scripting cheap to add** (ADR 0002): everything goes through the game API
-  (`crates/csp-sim/src/script_api.rs`; the tables in `script_tables/`, one module per table, each
+  (`crates/csp-sim/src/script_api.rs`; the tables in `script_tables/`, one module per table, an
+  action that asks for an order beside its `OrderMeta` (`script_actions.rs`), each
   default script its own `default_scripts/*.script`); orders only request actions; order
   state is plain serialisable data. After changing the script tables, run `pnpm script-data:rust`.
 - **World state is never reset** (ADR 0006): a change to its shape bumps `WORLD_FORMAT_VERSION`

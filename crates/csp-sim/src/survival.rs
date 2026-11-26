@@ -37,6 +37,7 @@ use crate::queries::residents::{can_work, food_use};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::trade_org::trade_org_hq;
 use crate::queries::vessels::vessel_aboard;
+use crate::running::RunningOrder;
 use crate::sight::InvariantViolation;
 use crate::tick::Scratch;
 
@@ -191,7 +192,9 @@ pub fn down_do_nothing(world: &WorldState) -> Vec<InvariantViolation> {
     for r in &world.residents {
         let Some(until) = r.down_until else { continue };
         let problems = [
-            r.order.as_ref().map(|o| format!("has a {} order", order_kind(o))),
+            r.order
+                .as_ref()
+                .map(|o| format!("has a {} order", crate::order_meta::running_meta(o).kind)),
             r.script.is_some().then(|| "runs a script".to_string()),
             r.queue.is_some().then(|| "has a queue".to_string()),
             r.interrupted.is_some().then(|| "was interrupted by a defence script".to_string()),
@@ -256,52 +259,6 @@ fn js_number(n: f64) -> String {
         format!("{}", n as i64)
     } else {
         format!("{n}")
-    }
-}
-
-/// An order's `kind`, as the TypeScript names it.
-pub fn order_kind(o: &ResidentOrder) -> &'static str {
-    match o {
-        ResidentOrder::WalkTo(_) => "walkTo",
-        ResidentOrder::Drive(_) => "drive",
-        ResidentOrder::Haul(_) => "haul",
-        ResidentOrder::HaulByWater(_) => "haulByWater",
-        ResidentOrder::PickUp(_) => "pickUp",
-        ResidentOrder::Drop(_) => "drop",
-        ResidentOrder::Store(_) => "store",
-        ResidentOrder::Fetch(_) => "fetch",
-        ResidentOrder::Build(_) => "build",
-        ResidentOrder::TearDown(_) => "tearDown",
-        ResidentOrder::Repair(_) => "repair",
-        ResidentOrder::WorkAt(_) => "workAt",
-        ResidentOrder::Breed(_) => "breed",
-        ResidentOrder::Attack(_) => "attack",
-        ResidentOrder::Climb(_) => "climb",
-        ResidentOrder::Teach(_) => "teach",
-        ResidentOrder::Train(_) => "train",
-        ResidentOrder::RoadLine(_) => "roadLine",
-        ResidentOrder::WallLine(_) => "wallLine",
-        ResidentOrder::Pay(_) => "pay",
-        ResidentOrder::BuyCity(_) => "buyCity",
-        ResidentOrder::Trade(_) => "trade",
-        ResidentOrder::Swap(_) => "swap",
-        ResidentOrder::BuyHorse(_) => "buyHorse",
-        ResidentOrder::SellHorse(_) => "sellHorse",
-        ResidentOrder::HandIn(_) => "handIn",
-        ResidentOrder::BuyOff(_) => "buyOff",
-        ResidentOrder::PayDebt(_) => "payDebt",
-        ResidentOrder::AcceptOffer(_) => "acceptOffer",
-        ResidentOrder::Relocate(_) => "relocate",
-        ResidentOrder::Feed(_) => "feed",
-        ResidentOrder::Equip(_) => "equip",
-        ResidentOrder::Row(_) => "row",
-        ResidentOrder::Sail(_) => "sail",
-        ResidentOrder::Crew(_) => "crew",
-        ResidentOrder::Push(_) => "push",
-        ResidentOrder::Ram(_) => "ram",
-        ResidentOrder::Throw(_) => "throw",
-        ResidentOrder::Gather(_) => "gather",
-        ResidentOrder::Rally(_) => "rally",
     }
 }
 
@@ -766,13 +723,13 @@ pub fn refill_source(world: &WorldState, r: &Resident, size: i32) -> Option<Refi
     }
     // Teaching and training refill at the training ground as at a workplace (`CONTEXT.md`:
     // Training).
-    let place_id = match &r.order {
-        Some(ResidentOrder::WorkAt(o)) if r.x == o.at.x && r.y == o.at.y => Some(&o.building_id),
-        Some(ResidentOrder::Teach(o)) => Some(&o.building_id),
-        Some(ResidentOrder::Train(o)) => Some(&o.building_id),
-        _ => None,
-    };
-    let place = place_id.and_then(|id| world.buildings.iter().find(|b| &b.id == id));
+    let place_id = r
+        .order
+        .as_ref()
+        .and_then(|o| o.ties().refills_at)
+        .filter(|(_, at)| at.is_none_or(|at| r.x == at.x && r.y == at.y))
+        .map(|(id, _)| id);
+    let place = place_id.and_then(|id| world.buildings.iter().find(|b| b.id == id));
     if let Some(place) = place {
         if place.site.is_none() && is_at(tile_of(r), placed(place), size) {
             if let Some(i) = building_pile_index(world, place) {

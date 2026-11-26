@@ -8,24 +8,30 @@
 //! (`teardown.rs`).
 
 use csp_shared::balance::{
-    carriage_can_enter, BROKEN_MATERIALS_RETURNED, CARRIAGE_SPEED, CATAPULT_BLOW, CATAPULT_CREW,
-    CATAPULT_REACH, CATAPULT_SHOT_TICKS, CATAPULT_STRENGTH, MAP_SIZE, RAM_BLOW, RAM_CREW,
-    RAM_STRENGTH, RAM_STRIKE_TICKS, SIEGE_PUSH_SHARE, TEARDOWN_MATERIALS_RETURNED,
-    TEARDOWN_WORK_SHARE, WALK_TICKS_PER_TILE,
+    carriage_can_enter, BROKEN_MATERIALS_RETURNED, CARRIAGE_SPEED, CATAPULT_BLOW, CATAPULT_REACH,
+    CATAPULT_SHOT_TICKS, MAP_SIZE, RAM_BLOW, RAM_STRIKE_TICKS, SIEGE_PUSH_SHARE,
+    TEARDOWN_MATERIALS_RETURNED, TEARDOWN_WORK_SHARE, WALK_TICKS_PER_TILE,
 };
 use csp_shared::footprint::near_footprint;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
-    Building, BuildingKind, CrewOrder, CrimeKind, Good, OrderRequest, PushOrder, RamOrder,
-    Resident, ResidentOrder, SiegeMachine, SiegeMachineKind, Stock, ThrowOrder, Tile, WorldState,
+    Building, CrewOrder, CrimeKind, Good, OrderRequest, PushOrder, RamOrder, Resident,
+    ResidentOrder, SiegeMachine, SiegeMachineKind, Stock, ThrowOrder, Tile, WorldState,
 };
 
 use crate::crimes::{building_organization, commit_crime, CrimeAgainst};
 use crate::defence::Alarms;
 use crate::goods_made::GoodsMade;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::building::{build_materials_of, build_work_for};
+use crate::running::{
+    in_place, no_ties, no_ties_mut, same_when_equal, Arrival, By, Going, GoingMut, RunningOrder,
+    Ties, To,
+};
+use crate::script_actions::{arg, place, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 
 use crate::queries::driving::carriage_can_go_to;
 use crate::queries::names::{held, placed};
@@ -33,50 +39,24 @@ use crate::queries::residents::{can_work, is_down};
 use crate::queries::walls::{broken_returns, foreign_wall, wall_strength, wall_strength_left};
 use crate::survival::drop_goods;
 
-/// The site kind a machine of `kind` is built from.
-pub fn site_kind(kind: SiegeMachineKind) -> BuildingKind {
-    match kind {
-        SiegeMachineKind::Ram => BuildingKind::Ram,
-        SiegeMachineKind::Catapult => BuildingKind::Catapult,
-    }
-}
-
-/// The machine a finished site of `kind` becomes, if it is a siege machine's.
-pub fn machine_kind(kind: BuildingKind) -> Option<SiegeMachineKind> {
-    match kind {
-        BuildingKind::Ram => Some(SiegeMachineKind::Ram),
-        BuildingKind::Catapult => Some(SiegeMachineKind::Catapult),
-        _ => None,
-    }
-}
-
 /// The machine's name, as the Player reads it.
 pub fn machine_name(kind: SiegeMachineKind) -> &'static str {
-    match kind {
-        SiegeMachineKind::Ram => "ram",
-        SiegeMachineKind::Catapult => "catapult",
-    }
+    kind.spec().name
 }
 
 /// The fewest crew on its tile for a machine to be pushed (`RAM_CREW`).
 pub fn crew_needed(kind: SiegeMachineKind) -> usize {
-    match kind {
-        SiegeMachineKind::Ram => RAM_CREW as usize,
-        SiegeMachineKind::Catapult => CATAPULT_CREW as usize,
-    }
+    kind.spec().crew as usize
 }
 
 /// Damage a machine takes before it breaks (`RAM_STRENGTH`).
 pub fn machine_strength(kind: SiegeMachineKind) -> f64 {
-    match kind {
-        SiegeMachineKind::Ram => RAM_STRENGTH,
-        SiegeMachineKind::Catapult => CATAPULT_STRENGTH,
-    }
+    kind.spec().strength
 }
 
 /// What a machine is built of: its site's materials.
 pub fn machine_materials(kind: SiegeMachineKind) -> Stock {
-    build_materials_of(site_kind(kind), None)
+    build_materials_of(kind.spec().built_as, None)
 }
 
 /// What a broken machine leaves on its tile (`BROKEN_MATERIALS_RETURNED` of its materials).
@@ -91,7 +71,7 @@ pub fn torn_down_machine_returns(kind: SiegeMachineKind) -> Stock {
 
 /// Work it takes to tear a machine down, as a finished building of its site's kind takes.
 pub fn machine_teardown_work(kind: SiegeMachineKind) -> f64 {
-    build_work_for(site_kind(kind), None) * TEARDOWN_WORK_SHARE
+    build_work_for(kind.spec().built_as, None) * TEARDOWN_WORK_SHARE
 }
 
 fn share_of(materials: Stock, share: f64) -> Stock {
@@ -217,6 +197,45 @@ impl OrderKind for Crew {
     }
 }
 
+pub(crate) static CREW_META: OrderMeta =
+    OrderMeta::request("crew", &Crew).gets_off_first().adults_only().script(&[CREW_ACTION]);
+
+const CREW_ACTION: ScriptAction = ScriptAction {
+    name: "crew",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[place("machine", "machineId")]),
+    cost: 10.0,
+    description: "Join the crew of a siege machine of my realm, by it or its id: I walk onto its tile, following it if it is pushed on, and am one of its crew there until I leave its tile. My order is \"crew\" until I get there.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for CrewOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: true,
+            by: By::Foot,
+            to: To::Machine(&self.machine_id),
+            near: false,
+            after: None,
+            estimated: false,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        Arrival::JoinsCrew
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        // The path found before the interruption is kept (#1619).
+        true
+    }
+    same_when_equal!();
+    no_ties!();
+}
+
 /// The push order (`push`): one of a machine's crew pushes it to (x, y), a tile a carriage could
 /// go to, with at least its crew size on its tile (`CONTEXT.md`: Siege machine). Another of the
 /// crew pushing it stops.
@@ -283,6 +302,45 @@ impl OrderKind for Push {
             progress: 0.0,
         }));
     }
+}
+
+pub(crate) static PUSH_META: OrderMeta =
+    OrderMeta::request("push", &Push).adults_only().script(&[PUSH_ACTION]);
+
+const PUSH_ACTION: ScriptAction = ScriptAction {
+    name: "push",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[place("machine", "machineId"), arg("x"), arg("y")]),
+    cost: 10.0,
+    description: "Push a siege machine, by it or its id, to the tile x, y, where a carriage could go. I must be one of its crew on its tile, with at least as many crew as it needs there; they go along with it, slowly, a Step at a time. My order is \"push\" until it gets there.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for PushOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: true,
+            by: By::Machine(&self.machine_id),
+            to: To::tile(&self.target),
+            near: false,
+            after: None,
+            estimated: false,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        Arrival::Done
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        // The path found before the interruption is kept (#1619).
+        true
+    }
+    same_when_equal!();
+    no_ties!();
 }
 
 /// A crew order got onto its machine's tile (`walking.rs`): the resident joins its crew, if the
@@ -375,7 +433,7 @@ pub fn ram_problem(
     };
     let size = csp_shared::balance::MAP_SIZE;
     // Next to any tile of it: a tower is 2×2 (`CONTEXT.md`: Tower).
-    if !near_footprint(placed(wall), (m.x as i32, m.y as i32), 1, size) {
+    if !near_footprint(placed(wall), (m.x as i32, m.y as i32), m.kind.spec().reach as i32, size) {
         return Some("push the ram next to it first".into());
     }
     None
@@ -441,6 +499,27 @@ impl OrderKind for RamAt {
         world.residents[i].order =
             Some(ResidentOrder::Ram(RamOrder { machine_id, target_id, progress: 0.0 }));
     }
+}
+
+pub(crate) static RAM_META: OrderMeta =
+    OrderMeta::request("ram", &RamAt).adults_only().script(&[RAM_ACTION]);
+
+const RAM_ACTION: ScriptAction = ScriptAction {
+    name: "ram",
+    group: ActionGroup::Movement,
+    request: Request::Fields(&[place("machine", "machineId"), place("wall", "targetId")]),
+    cost: 10.0,
+    description: "Swing a ram, by it or its id, at the wall or gate next to it, by it or its id: one of another realm's city, or of nobody's. I must be one of its crew on its tile, with at least as many crew as it needs there. It strikes far harder than a blow until the wall falls, and nobody up on a wall reaches its crew under its roof. My order is \"ram\" until then.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for RamOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        // Not counted as striking at it (#1620).
+        Ties { falls_with: Some(&self.target_id), ..Ties::NONE }
+    }
+    no_ties_mut!();
 }
 
 /// Resolves this tick's ram strikes (`CONTEXT.md`: Ram, ADR 0002): each ram order that still holds
@@ -515,12 +594,8 @@ fn hit_wall(
 fn end_orders_on(world: &mut WorldState, broken: &[Building]) {
     let gone: Vec<&str> = broken.iter().map(|b| b.id.as_str()).collect();
     for r in &mut world.residents {
-        let on_gone = match &r.order {
-            Some(ResidentOrder::Ram(o)) => gone.contains(&o.target_id.as_str()),
-            Some(ResidentOrder::Throw(o)) => gone.contains(&o.target_id.as_str()),
-            Some(ResidentOrder::Attack(o)) => gone.contains(&o.target_id.as_str()),
-            _ => false,
-        };
+        let on_gone =
+            r.order.as_ref().and_then(|o| o.ties().falls_with).is_some_and(|id| gone.contains(&id));
         if on_gone {
             r.order = None;
         }
@@ -662,6 +737,27 @@ impl OrderKind for ThrowAt {
         world.residents[i].order =
             Some(ResidentOrder::Throw(ThrowOrder { machine_id, target_id, progress: 0.0 }));
     }
+}
+
+pub(crate) static THROW_META: OrderMeta =
+    OrderMeta::request("throw", &ThrowAt).adults_only().script(&[THROW_ACTION]);
+
+const THROW_ACTION: ScriptAction = ScriptAction {
+    name: "throw",
+    group: ActionGroup::Movement,
+    request: Request::ByHand(&["machine", "wallOrX", "y?"]),
+    cost: 10.0,
+    description: "Shoot a catapult, by it or its id, at a wall, gate or tower within its reach: by it or its id, or by the tile x, y of it. It must be one of another realm's city, or of nobody's. I must be one of its crew on its tile, with at least as many crew as it needs there. Each shot throws one Stone that its crew carry or that lies on its tile; out of Stone it stops. It hits only the building, never anyone. My order is \"throw\" until the wall falls.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for ThrowOrder {
+    in_place!();
+    fn ties(&self) -> Ties<'_> {
+        // Not counted as striking at it (#1620).
+        Ties { falls_with: Some(&self.target_id), ..Ties::NONE }
+    }
+    no_ties_mut!();
 }
 
 /// Resolves this tick's catapult shots (`CONTEXT.md`: Catapult, ADR 0002): each throw order that

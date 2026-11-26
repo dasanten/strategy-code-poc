@@ -38,6 +38,7 @@ use crate::queries::residents::{can_work, carry_capacity, is_armed, stock_weight
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::walls::wall_side;
 use crate::queries::warehouse::{stock_floor, warehouse_keeps};
+use crate::running::RunningOrder;
 use crate::sight::InvariantViolation;
 use crate::work::start_work;
 
@@ -191,13 +192,11 @@ pub fn attackers_of(world: &WorldState, city: &City, size: i32) -> Vec<usize> {
             if r.health <= 0.0 || (r.owner.is_none() && r.city_id.as_ref() == Some(&city.id)) {
                 return false;
             }
-            let attacking = match &r.order {
-                Some(ResidentOrder::Attack(o)) => {
-                    o.defending != Some(true) && (own(&o.target_id) || own_wall(&o.target_id))
-                }
-                Some(ResidentOrder::Climb(o)) => own_wall(&o.wall_id),
-                _ => false,
-            };
+            let attacking = r
+                .order
+                .as_ref()
+                .and_then(|o| o.ties().strikes)
+                .is_some_and(|id| own(id) || own_wall(id));
             attacking && in_city_area(world, &city.id, r.x as i32, r.y as i32, size)
         })
         .collect()

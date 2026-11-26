@@ -5,15 +5,20 @@
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap_distance, TerrainMap};
 use csp_shared::world::{
-    BuildingKind, OrderEnded, OrderEndedKind, RealmEventWhat, RelocateOrder, Resident,
-    ResidentOrder, Tile, WorldState,
+    BuildingKind, OrderEnded, OrderEndedKind, OrderRequest, RealmEventWhat, RelocateOrder,
+    Resident, ResidentOrder, Tile, WorldState,
 };
 
 use crate::events::record_event;
+use crate::order_meta::{OrderMeta, StepGroup};
 use crate::order_sender::{ordered_resident, OrderSender};
+use crate::orders::{ids_field, text_field};
 use crate::queries::city::town_hall_of;
 use crate::queries::city_area::{city_area_tiles, free_housing, in_city_area};
 use crate::queries::people::relocate_problem;
+use crate::running::{no_ties, same_when_equal, Arrival, By, Going, GoingMut, RunningOrder, To};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 
 /// The input of a relocate order (`RelocateRequest`): which resident, the realm's city they move
 /// to, and the group they relocate with, their own id among them, when given to a group.
@@ -88,6 +93,65 @@ pub fn apply_relocate(world: &mut WorldState, o: &RelocateRequest, terrain: Opti
         path: None,
         progress: 0.0,
     }));
+}
+
+fn relocate_request(o: &OrderRequest) -> RelocateRequest {
+    let group = o
+        .fields
+        .get("group")
+        .map(|g| g.as_array().map(|_| ids_field(o, "group").unwrap_or_default()));
+    RelocateRequest {
+        resident_id: text_field(o, "residentId"),
+        city_id: text_field(o, "cityId"),
+        group,
+    }
+}
+
+pub(crate) static RELOCATE_META: OrderMeta = OrderMeta::fns(
+    "relocate",
+    |w, s, o, _| validate_relocate(w, s, &relocate_request(o)),
+    |w, _, o, t| apply_relocate(w, &relocate_request(o), t),
+)
+.queue_step(StepGroup::Move)
+.gets_off_first()
+.blocked_carrying_child()
+.script(&[RELOCATE_ACTION]);
+
+const RELOCATE_ACTION: ScriptAction = ScriptAction {
+    name: "relocate",
+    group: ActionGroup::Ruling,
+    request: Request::Fields(&[arg("cityId")]),
+    cost: 10.0,
+    description: "Walk to `cityId`, another city of my realm, and become its resident on stepping into its area, at once if I stand in it already: refused unless it has free housing for me, counting residents already relocating there, or while I carry a child. My order is \"relocate\" until done; then `me.orderEnded` says how it ended: reason null once I moved in, else why not (\"no free housing\", \"it is no longer your realm’s\" or \"the city is gone\"), and I keep my old city.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for RelocateOrder {
+    fn going(&self) -> Option<Going<'_>> {
+        Some(Going {
+            path: &self.path,
+            progress: self.progress,
+            now: true,
+            by: By::Foot,
+            to: To::tile(&self.target),
+            near: false,
+            after: None,
+            estimated: true,
+        })
+    }
+    fn going_mut(&mut self) -> Option<GoingMut<'_>> {
+        Some(GoingMut::new(&mut self.path, &mut self.progress))
+    }
+    fn arrive(&mut self) -> Arrival {
+        GoingMut::new(&mut self.path, &mut self.progress).reset();
+        Arrival::GoesOn
+    }
+    fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
+        GoingMut::new(&mut self.path, &mut self.progress).reset_found();
+        true
+    }
+    same_when_equal!();
+    no_ties!();
 }
 
 /// The tile of a city's area nearest to `from` that a resident can stand on (`nearestAreaTile`):

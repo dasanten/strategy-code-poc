@@ -9,14 +9,21 @@
 use std::collections::{HashMap, HashSet};
 
 use csp_shared::balance::{ARMY_SPREAD, SIGHT_RANGE};
-use csp_shared::terrain::wrap_distance;
-use csp_shared::world::{Army, ArmyOrder, Resident, ResidentOrder, Tile, WalkOrder, WorldState};
+use csp_shared::terrain::{wrap_distance, TerrainMap};
+use csp_shared::world::{
+    Army, ArmyOrder, OrderRequest, Resident, ResidentOrder, Tile, WalkOrder, WorldState,
+};
+
+use serde_json::Value;
 
 use crate::combat::attack_order;
-use crate::order_sender::commands;
+use crate::order_meta::OrderMeta;
+use crate::order_sender::{commands, OrderSender};
+use crate::orders::text_field;
 use crate::queries::alliance::commander_of;
 use crate::queries::army::{army_of, ARMY_NAME_MAX_LENGTH};
 use crate::queries::combat::in_contact;
+use crate::running::RunningOrder;
 use crate::sight::InvariantViolation;
 
 /// The fields an army order may carry (`OrderRequest` as the army kinds read it).
@@ -41,22 +48,6 @@ pub enum ArmyOrderKind {
     ArmyAttack,
     ArmyFollow,
     ArmyStop,
-}
-
-impl ArmyOrderKind {
-    /// The kind an order names, if it is an army order.
-    pub fn of(kind: &str) -> Option<Self> {
-        Some(match kind {
-            "formArmy" => Self::FormArmy,
-            "disbandArmy" => Self::DisbandArmy,
-            "armyWalkTo" => Self::ArmyWalkTo,
-            "armyGuard" => Self::ArmyGuard,
-            "armyAttack" => Self::ArmyAttack,
-            "armyFollow" => Self::ArmyFollow,
-            "armyStop" => Self::ArmyStop,
-            _ => return None,
-        })
-    }
 }
 
 fn realm_of(world: &WorldState, user_id: u64) -> Option<String> {
@@ -110,20 +101,12 @@ fn bad_tile(order: &ArmyRequest) -> Option<String> {
 
 /// Whether the order is one the army `army_id` gave (`forArmy`).
 fn for_army(o: Option<&ResidentOrder>, army_id: &str) -> bool {
-    match o {
-        Some(ResidentOrder::WalkTo(w)) => w.army.as_deref() == Some(army_id),
-        Some(ResidentOrder::Attack(a)) => a.army.as_deref() == Some(army_id),
-        _ => false,
-    }
+    tagged(o) == Some(army_id)
 }
 
-/// The army an order is tagged with, for a walk or attack order.
+/// The army an order is tagged with.
 fn tagged(o: Option<&ResidentOrder>) -> Option<&str> {
-    match o {
-        Some(ResidentOrder::WalkTo(w)) => w.army.as_deref(),
-        Some(ResidentOrder::Attack(a)) => a.army.as_deref(),
-        _ => None,
-    }
+    o?.ties().army
 }
 
 /// Ends the army's own orders for its members (`stopMembers`).
@@ -276,6 +259,79 @@ pub fn apply_army_order(
     world.armies[a].order = new;
 }
 
+fn army_request(order: &OrderRequest) -> ArmyRequest {
+    let f = &order.fields;
+    ArmyRequest {
+        army_id: text_field(order, "armyId"),
+        name: text_field(order, "name"),
+        resident_ids: f.get("residentIds").and_then(Value::as_array).map(|ids| {
+            ids.iter().map(|v| v.as_str().map_or_else(|| v.to_string(), str::to_string)).collect()
+        }),
+        target_id: text_field(order, "targetId"),
+        x: f.get("x").and_then(Value::as_f64),
+        y: f.get("y").and_then(Value::as_f64),
+    }
+}
+
+fn check_army(
+    kind: ArmyOrderKind,
+    world: &WorldState,
+    sender: &OrderSender,
+    order: &OrderRequest,
+    terrain: Option<&TerrainMap>,
+) -> Option<String> {
+    validate_army_order(world, kind, sender.user_id, &army_request(order), terrain.map(|t| t.size))
+}
+
+pub(crate) static ARMY_STOP_META: OrderMeta = OrderMeta::fns(
+    "armyStop",
+    |w, s, o, t| check_army(ArmyOrderKind::ArmyStop, w, s, o, t),
+    |w, s, o, _| apply_army_order(w, ArmyOrderKind::ArmyStop, s.user_id, &army_request(o)),
+)
+.to_army();
+
+pub(crate) static ARMY_FOLLOW_META: OrderMeta = OrderMeta::fns(
+    "armyFollow",
+    |w, s, o, t| check_army(ArmyOrderKind::ArmyFollow, w, s, o, t),
+    |w, s, o, _| apply_army_order(w, ArmyOrderKind::ArmyFollow, s.user_id, &army_request(o)),
+)
+.to_army();
+
+pub(crate) static ARMY_ATTACK_META: OrderMeta = OrderMeta::fns(
+    "armyAttack",
+    |w, s, o, t| check_army(ArmyOrderKind::ArmyAttack, w, s, o, t),
+    |w, s, o, _| apply_army_order(w, ArmyOrderKind::ArmyAttack, s.user_id, &army_request(o)),
+)
+.to_army();
+
+pub(crate) static ARMY_GUARD_META: OrderMeta = OrderMeta::fns(
+    "armyGuard",
+    |w, s, o, t| check_army(ArmyOrderKind::ArmyGuard, w, s, o, t),
+    |w, s, o, _| apply_army_order(w, ArmyOrderKind::ArmyGuard, s.user_id, &army_request(o)),
+)
+.to_army();
+
+pub(crate) static ARMY_WALK_TO_META: OrderMeta = OrderMeta::fns(
+    "armyWalkTo",
+    |w, s, o, t| check_army(ArmyOrderKind::ArmyWalkTo, w, s, o, t),
+    |w, s, o, _| apply_army_order(w, ArmyOrderKind::ArmyWalkTo, s.user_id, &army_request(o)),
+)
+.to_army();
+
+pub(crate) static DISBAND_ARMY_META: OrderMeta = OrderMeta::fns(
+    "disbandArmy",
+    |w, s, o, t| check_army(ArmyOrderKind::DisbandArmy, w, s, o, t),
+    |w, s, o, _| apply_army_order(w, ArmyOrderKind::DisbandArmy, s.user_id, &army_request(o)),
+)
+.to_army();
+
+pub(crate) static FORM_ARMY_META: OrderMeta = OrderMeta::fns(
+    "formArmy",
+    |w, s, o, t| check_army(ArmyOrderKind::FormArmy, w, s, o, t),
+    |w, s, o, _| apply_army_order(w, ArmyOrderKind::FormArmy, s.user_id, &army_request(o)),
+)
+.to_army();
+
 /// Each army member's order as it is now (`memberOrders`), to tell later whether they got one
 /// of their own.
 pub fn member_orders(world: &WorldState) -> HashMap<String, Option<ResidentOrder>> {
@@ -347,14 +403,9 @@ pub fn step_armies(world: &mut WorldState, size: i32) {
         .collect();
     for r in &mut world.residents {
         let mine = army_id_of.get(&r.id);
-        match &mut r.order {
-            Some(ResidentOrder::WalkTo(o)) if o.army.is_some() && mine != o.army.as_ref() => {
-                o.army = None
-            }
-            Some(ResidentOrder::Attack(o)) if o.army.is_some() && mine != o.army.as_ref() => {
-                o.army = None
-            }
-            _ => {}
+        let army = r.order.as_mut().and_then(|o| o.ties_mut().army);
+        if let Some(army) = army.filter(|a| a.is_some() && mine != a.as_ref()) {
+            *army = None;
         }
     }
     let unsupplied: Vec<usize> = (0..world.residents.len())
@@ -375,11 +426,7 @@ pub fn step_armies(world: &mut WorldState, size: i32) {
 /// The army a resident's carriage supplies, following it or on a haul route to it
 /// (`suppliedArmy`).
 fn supplied_army(r: &Resident) -> Option<&str> {
-    match &r.order {
-        Some(ResidentOrder::Drive(o)) => o.army.as_deref(),
-        Some(ResidentOrder::Haul(o)) => o.to_army.as_deref(),
-        _ => None,
-    }
+    r.order.as_ref()?.ties().supplies
 }
 
 /// Whether the army a resident supplies exists and is their commander's, or is the punishment
@@ -512,12 +559,9 @@ pub fn waiting_for_army(world: &WorldState, holding: &HashSet<String>) -> HashSe
     type Group<'w> = (&'w str, Vec<(&'w str, Option<usize>)>);
     let mut groups: Vec<Group> = Vec::new();
     for r in &world.residents {
-        let (army, left) = match &r.order {
-            Some(ResidentOrder::WalkTo(o)) => (o.army.as_deref(), o.path.as_ref().map(Vec::len)),
-            Some(ResidentOrder::Attack(o)) => (o.army.as_deref(), o.path.as_ref().map(Vec::len)),
-            _ => continue,
-        };
-        let Some(army) = army else { continue };
+        let Some(o) = &r.order else { continue };
+        let Some(army) = o.ties().army else { continue };
+        let left = o.going().and_then(|g| g.path.as_ref()).map(Vec::len);
         if holding.contains(&r.id) {
             continue;
         }

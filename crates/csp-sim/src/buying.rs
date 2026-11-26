@@ -9,11 +9,15 @@ use csp_shared::world::{
 use serde_json::Value;
 
 use crate::goods_deps::{join_realm, realm_of, record_event, OrderSender};
+use crate::order_meta::OrderMeta;
 use crate::queries::city::{city_price, for_sale, sells_to, town_hall_of};
 use crate::queries::command::commands;
 use crate::queries::goods::take_out;
 use crate::queries::names::{held, placed};
 use crate::queries::trade_quotes::{buy_problem, buyers_at_town_hall, coins_at_town_hall};
+use crate::running::{in_place, no_ties, RunningOrder};
+use crate::script_actions::{arg, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::sight::InvariantViolation;
 
 /// Checks a buy order (`buyCity.validate`): one of the Player's residents, standing on an NPC
@@ -40,6 +44,29 @@ pub fn apply_buy_city(world: &mut WorldState, _sender: &OrderSender, order: &Ord
     if let Some(r) = world.residents.iter_mut().find(|x| Some(x.id.as_str()) == id) {
         r.order = Some(ResidentOrder::BuyCity(BuyCityOrder { city_id }));
     }
+}
+
+pub(crate) static BUY_CITY_META: OrderMeta = OrderMeta::fns(
+    "buyCity",
+    |w, s, o, _| validate_buy_city(w, s, o),
+    |w, s, o, _| apply_buy_city(w, s, o),
+)
+.gets_off_first()
+.script(&[BUY_CITY_ACTION]);
+
+const BUY_CITY_ACTION: ScriptAction = ScriptAction {
+    name: "buyCity",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("cityId")]),
+    cost: 10.0,
+    description:
+        "On an NPC city’s town hall, buy it with the coins my realm’s residents there carry.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for BuyCityOrder {
+    in_place!();
+    no_ties!();
 }
 
 /// Carries out buy orders (`resolvePurchases`). Where the city still sells to the realm, the buyer

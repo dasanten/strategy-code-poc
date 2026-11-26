@@ -9,13 +9,14 @@
 
 use csp_shared::balance::DEFEND_CALM_TICKS;
 use csp_shared::world::{
-    GivenUnderAttack, HaulPhase, Interrupted, InterruptedAlarm, Resident, ResidentOrder,
-    RunningScript, Task, WorldState,
+    GivenUnderAttack, Interrupted, InterruptedAlarm, Resident, ResidentOrder, RunningScript, Task,
+    WorldState,
 };
 
+use crate::order_meta::running_meta;
 use crate::queries::alliance::commander_of;
-use crate::queries::carriages::{driven_carriage_id, horse_for};
-use crate::queries::residents::is_down;
+use crate::queries::carriages::driven_carriage_id;
+use crate::running::{driven_carriage, RunningOrder};
 use crate::sight::InvariantViolation;
 
 /// The alarm entry points the conflict rules call (`raiseWallAttacked`, `raiseResidentAttacked`,
@@ -119,30 +120,9 @@ pub fn start_defence(world: &mut WorldState, i: usize) {
 /// is the same order however far it has come since; any other order is the same when equal.
 fn same_order(now: Option<&ResidentOrder>, kept: Option<&ResidentOrder>) -> bool {
     match (now, kept) {
-        (Some(ResidentOrder::Drive(a)), Some(ResidentOrder::Drive(b))) => {
-            a.carriage_id == b.carriage_id
-                && a.target == b.target
-                && a.army == b.army
-                && a.near == b.near
-        }
-        (Some(ResidentOrder::Haul(a)), Some(ResidentOrder::Haul(b))) => {
-            a.carriage_id == b.carriage_id
-                && a.from == b.from
-                && a.to == b.to
-                && a.to_army == b.to_army
-                && a.goods == b.goods
-                && a.return_goods == b.return_goods
-                && a.keep_food == b.keep_food
-        }
-        (Some(ResidentOrder::HaulByWater(a)), Some(ResidentOrder::HaulByWater(b))) => {
-            a.vessel_id == b.vessel_id
-                && a.from == b.from
-                && a.to == b.to
-                && a.goods == b.goods
-                && a.return_goods == b.return_goods
-                && a.keep_food == b.keep_food
-        }
-        _ => now == kept,
+        (Some(now), Some(kept)) => now.same(kept),
+        (None, None) => true,
+        (Some(_), None) | (None, Some(_)) => false,
     }
 }
 
@@ -151,65 +131,7 @@ fn same_order(now: Option<&ResidentOrder>, kept: Option<&ResidentOrder>) -> bool
 /// carriage any more, someone else drives it now, or its horse is Down or gone.
 fn order_going_on(world: &WorldState, i: usize, o: Option<ResidentOrder>) -> Option<ResidentOrder> {
     let mut o = o?;
-    clear_path(&mut o);
-    let r = &world.residents[i];
-    let id = match &o {
-        ResidentOrder::Drive(d) => d.carriage_id.clone(),
-        ResidentOrder::Haul(h) => h.carriage_id.clone(),
-        // A haul route by water rowing on needs its rower still at the oars (`CONTEXT.md`:
-        // Rowing); at a stop it goes on from where they stand, or ends there.
-        ResidentOrder::HaulByWater(h) => {
-            let at_oars = world.vessels.iter().any(|v| {
-                v.id == h.vessel_id
-                    && v.rower_id.as_deref() == Some(r.id.as_str())
-                    && r.aboard.as_deref() == Some(v.id.as_str())
-            });
-            return (h.phase == HaulPhase::Loading || at_oars).then_some(o);
-        }
-        _ => return Some(o),
-    };
-    let carriage = world.carriages.iter().find(|k| k.id == id)?;
-    if carriage.x != r.x || carriage.y != r.y {
-        return None;
-    }
-    if world
-        .residents
-        .iter()
-        .enumerate()
-        .any(|(j, x)| j != i && driven_carriage_id(x) == Some(id.as_str()))
-    {
-        return None;
-    }
-    let horse = horse_for(world, carriage)?;
-    if is_down(horse.down_until) {
-        None
-    } else {
-        Some(o)
-    }
-}
-
-/// `if ('path' in o && o.path) Object.assign(o, { path: null, progress: 0 })`.
-fn clear_path(o: &mut ResidentOrder) {
-    macro_rules! clear {
-        ($x:expr) => {
-            if $x.path.is_some() {
-                $x.path = None;
-                $x.progress = 0.0;
-            }
-        };
-    }
-    match o {
-        ResidentOrder::WalkTo(x) => clear!(x),
-        ResidentOrder::Drive(x) => clear!(x),
-        ResidentOrder::Haul(x) => clear!(x),
-        ResidentOrder::HaulByWater(x) => clear!(x),
-        ResidentOrder::Store(x) => clear!(x),
-        ResidentOrder::Fetch(x) => clear!(x),
-        ResidentOrder::Attack(x) => clear!(x),
-        ResidentOrder::RoadLine(x) | ResidentOrder::WallLine(x) => clear!(x),
-        ResidentOrder::Relocate(x) => clear!(x),
-        _ => {}
-    }
+    o.resume(world, &world.residents[i]).then_some(o)
 }
 
 /// The defence script ended (`resumeInterrupted`): what it interrupted goes on, the script with
@@ -230,18 +152,6 @@ pub fn resume_interrupted(world: &mut WorldState, i: usize) -> bool {
     }
     world.residents[i].script = kept.script;
     true
-}
-
-/// The order kinds that go on until stopped (`GOES_ON_UNTIL_STOPPED`).
-fn goes_on_until_stopped(o: &ResidentOrder) -> bool {
-    matches!(
-        o,
-        ResidentOrder::Haul(_)
-            | ResidentOrder::HaulByWater(_)
-            | ResidentOrder::WorkAt(_)
-            | ResidentOrder::Teach(_)
-            | ResidentOrder::Train(_)
-    )
 }
 
 /// Whether `r` counts as under attack for an order given now (`underAttack`): their defence script
@@ -275,7 +185,7 @@ pub fn note_given(
     }
     if r.script.is_some()
         || r.queue.is_some()
-        || r.order.as_ref().is_some_and(goes_on_until_stopped)
+        || r.order.as_ref().is_some_and(|o| running_meta(o).goes_on_until_stopped)
     {
         r.given_under_attack = Some(GivenUnderAttack::UntilCalm);
     } else if r.order.is_some() {
@@ -357,11 +267,8 @@ pub fn interrupted_sound(world: &WorldState) -> Vec<InvariantViolation> {
 /// Invariant (`struckDriverDrivesOn`): a driver struck this tick, whose Defend default hasn't run
 /// yet, still drives: their drive or haul route is kept aside and goes on.
 pub fn struck_driver_drives_on(world: &WorldState) -> Vec<InvariantViolation> {
-    let kept_driven = |r: &Resident| match r.interrupted.as_ref().and_then(|k| k.order.as_ref()) {
-        Some(ResidentOrder::Drive(o)) => Some(o.carriage_id.clone()),
-        Some(ResidentOrder::Haul(o)) => Some(o.carriage_id.clone()),
-        _ => None,
-    };
+    let kept_driven =
+        |r: &Resident| driven_carriage(r.interrupted.as_ref()?.order.as_ref()?).map(str::to_string);
     violations(
         "struck-driver-drives-on",
         world

@@ -17,6 +17,7 @@ use crate::demands::{
 use crate::events::record_event;
 use crate::invariants::InvariantViolation;
 use crate::offers::end_offer;
+use crate::order_meta::OrderMeta;
 use crate::order_sender::{commands, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::alliance::commander_of;
@@ -24,6 +25,9 @@ use crate::queries::standing::{standing_organization, TRADE_ORG};
 use crate::queries::trade_org::trade_org_hq;
 use crate::queries::warehouse_trade::js_number;
 use crate::queries::warehouse_trade::{buy_off_coin_warehouse_at, debt_of, pay_debt_problem};
+use crate::running::{in_place, no_ties, RunningOrder};
+use crate::script_actions::{arg, arg_as, ActionGroup, Request, ScriptAction};
+use crate::script_views::ScriptType;
 use crate::standing::organization_exists;
 
 /// How a debt first reads in the log (`first` of `oweTradeOrg`).
@@ -214,6 +218,23 @@ impl OrderKind for PayDebt {
             carriage_id: f.get("carriageId").and_then(Value::as_str).map(str::to_string),
         }));
     }
+}
+
+pub(crate) static PAY_DEBT_META: OrderMeta =
+    OrderMeta::request("payDebt", &PayDebt).gets_off_first().script(&[PAY_DEBT_ACTION]);
+
+const PAY_DEBT_ACTION: ScriptAction = ScriptAction {
+    name: "payDebt",
+    group: ActionGroup::Trade,
+    request: Request::Fields(&[arg("coins"), arg_as("carriageId?", "carriageId")]),
+    cost: 10.0,
+    description: "On a Trade Org warehouse, pay up to `coins` of my realm’s debt to the Trade Organization with the coins in my hands, or on my carriage there: what I hold, up to what is owed.",
+    returns: ScriptType::String,
+};
+
+impl RunningOrder for PayDebtOrder {
+    in_place!();
+    no_ties!();
 }
 
 /// One payment this tick: the coins of payer and coin warehouse and the debt, before and after

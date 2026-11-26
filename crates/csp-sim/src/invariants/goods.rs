@@ -170,7 +170,7 @@ pub fn store_fetch_orders_sound(world: &WorldState, _: &TerrainMap) -> Out {
             Some(o @ ResidentOrder::Fetch(f)) => {
                 (kind_of(o), Some(&f.goods), kind_of_phase(&f.phase))
             }
-            _ => (String::new(), None, String::new()),
+            _ => ("", None, String::new()),
         };
         if let Some(goods) = goods {
             // `readWanted`: known goods (the type keeps to them), each `null` or a whole number
