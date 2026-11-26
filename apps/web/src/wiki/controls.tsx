@@ -178,9 +178,11 @@ export function ControlsSection() {
       </p>
       <p>
         The card and the residents list say what each resident is doing. Walking, riding or driving
-        somewhere, they also say about when they arrive, and the card’s meters and countdowns
-        (building, tearing down, breeding, carrying, pairing, growing up) say about how long is
-        left, real time first and game time in brackets: “Walking to 12, 40 ·{' '}
+        somewhere, they also say about when they arrive, also on the way to crew a siege machine, to
+        the next tile of a road or wall line, or after someone to attack. Rowing, sailing, pushing a
+        siege machine and hauling by water say only the tiles to go for now. The card’s meters and
+        countdowns (building, tearing down, breeding, carrying, pairing, growing up) say about how
+        long is left, real time first and game time in brackets: “Walking to 12, 40 ·{' '}
         {aboutTime(24 * WALK_TICKS_PER_TILE)}”. Each is an estimate from the current pace, so it
         changes as that does: a way from the ground still to go (terrain, roads, Agility, the
         horse’s Speed and hunger, Driving skill; unexplored ground counts as Plains), a construction

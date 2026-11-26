@@ -219,7 +219,8 @@ impl RunningOrder for LineOrder {
             to: self.tiles.first().map_or(To::Nowhere, |&t| To::At(t)),
             near: false,
             after: None,
-            estimated: false,
+            // It walks to the line's next tile, timed as a walk (Daniel, 2026-11-25, #1621).
+            estimated: true,
         })
     }
     fn going_mut(&mut self) -> Option<GoingMut<'_>> {

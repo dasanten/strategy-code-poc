@@ -1330,6 +1330,8 @@ function DurationChip({
 interface DoingContext {
   /** What is left of a way: about how long, or tiles to go without an estimate. */
   left: (path: readonly unknown[]) => string
+  /** About how long until they arrive, without the tiles to go: none without an estimate. */
+  about: string | undefined
   /** "Walking", or "Riding" on a horse (`CONTEXT.md`: Riding). */
   walking: string
   cities: readonly Pick<City, 'id' | 'name'>[]
@@ -1441,19 +1443,24 @@ const ORDER_DOING: { [K in ResidentOrder['kind']]: (o: OrderOf<K>, c: DoingConte
   sellHorse: () => 'Selling a horse',
   // As it always was: handing in a transfer had no text of its own (#BUG).
   handIn: () => 'Idle',
-  attack: (o) => (o.path ? 'Going after their target' : 'Fighting'),
+  attack: (o, { about }) =>
+    o.path
+      ? about
+        ? `Going after their target · ${about}`
+        : 'Going after their target'
+      : 'Fighting',
   climb: (o) => `Climbing a wall · ${pct(o.progress)}`,
   roadLine: (o, c) => lineDoing(o, c),
   wallLine: (o, c) => lineDoing(o, c),
 }
 
 /** A road or wall order along its line. */
-function lineDoing(o: OrderOf<'roadLine' | 'wallLine'>, { walking }: DoingContext): string {
+function lineDoing(o: OrderOf<'roadLine' | 'wallLine'>, { walking, about }: DoingContext): string {
   const [x, y] = o.tiles[0]!
   const what = LINE_BUILDING[o.kind]
   const left = `${o.tiles.length} ${what} tile${o.tiles.length === 1 ? '' : 's'} to go`
   return o.phase === 'walking'
-    ? `${walking} to lay ${what} at ${x}, ${y} · ${left}`
+    ? `${walking} to lay ${what} at ${x}, ${y} · ${about ? `${about} · ` : ''}${left}`
     : `Building ${what} at ${x}, ${y} · ${left}`
 }
 
@@ -1474,7 +1481,8 @@ export function orderDoing(
     arrives === undefined ? `${path.length} tiles to go` : aboutTime(arrives)
   const walking = r.riding === undefined ? 'Walking' : 'Riding'
   const doing = ORDER_DOING[o.kind] as (o: ResidentOrder, c: DoingContext) => string
-  return doing(o, { left, walking, cities })
+  const about = arrives === undefined ? undefined : aboutTime(arrives)
+  return doing(o, { left, about, walking, cities })
 }
 
 /**

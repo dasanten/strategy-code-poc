@@ -436,7 +436,8 @@ impl RunningOrder for AttackOrder {
             to: To::Foe(&self.target_id),
             near: true,
             after: None,
-            estimated: false,
+            // It walks, so the arrival estimate times it as a walk (Daniel, 2026-11-25, #1621).
+            estimated: true,
         })
     }
     fn going_mut(&mut self) -> Option<GoingMut<'_>> {
