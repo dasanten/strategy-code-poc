@@ -1,4 +1,4 @@
-import { cityMembership } from '../shared/city.js'
+import { cityMembershipOf } from '@csp/lang-wasm'
 import type { Building, City, SeenCarriage, SeenResident } from '@csp/shared-types'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 import { cityRelationship, type Tone, type Viewer } from './tokens.js'
@@ -71,10 +71,7 @@ function emblemPlaces(
   places.set(world.buildings, byCities)
   const kept = byCities.get(world.cities)
   if (kept?.mapSize === mapSize) return kept.places
-  const members = cityMembership(
-    { cities: [...world.cities], buildings: [...world.buildings] },
-    mapSize,
-  )
+  const members = cityMembershipOf(world.buildings, world.cities, mapSize)
   const houses = new Map<string, number>()
   for (const b of world.buildings) {
     const cityId = members.get(b.id)

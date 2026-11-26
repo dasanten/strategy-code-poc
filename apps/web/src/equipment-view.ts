@@ -1,6 +1,6 @@
 import type { Equipment, GearCondition, Good, PieceCondition, Stock } from '@csp/shared-types'
-import { WEAPON_ATTACK } from './shared/narrowed.js'
-import { GOODS, PROTECTION_KINDS } from './shared/world.js'
+import { WEAPON_ATTACK } from './narrowed.js'
+import { GOODS, PROTECTION_KINDS } from './world.js'
 import { GOOD_LABELS } from './goods-grid.js'
 
 /** A resident's three equipment slots as a card shows them (`CONTEXT.md`: Equipment). */
@@ -55,7 +55,9 @@ export function equipmentSlots(
  */
 export function equipmentLine(equipped: Equipment | undefined, condition?: GearCondition): string {
   const slots = equipmentSlots(equipped, condition)
-  const tools = condition?.tools ? ` · ${GOOD_LABELS.tools} (${CONDITION_WORDS[condition.tools]})` : ''
+  const tools = condition?.tools
+    ? ` · ${GOOD_LABELS.tools} (${CONDITION_WORDS[condition.tools]})`
+    : ''
   if (slots.every((s) => !s.item)) return `Nothing equipped${tools}`
   const named = (s: SlotView) => (s.condition ? `${s.item} (${s.condition})` : s.item)
   return slots.map((s) => named(s) ?? `no ${s.label.toLowerCase()}`).join(' · ') + tools

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { Building, BuildingKind, City } from '@csp/shared-types'
-import { cityAreaTiles } from '../shared/city.js'
-import { footprintKeys } from '../shared/footprint.js'
+import type { Building, BuildingKind } from '@csp/shared-types'
+import { cityAreaTileList } from '@csp/lang-wasm'
+import { footprintKeys } from '../footprint.js'
 import { structuresOf } from './structures.js'
 
 const size = 100
@@ -13,14 +13,6 @@ const building = (
   y: number,
   cityId: string | null = 'c1',
 ): Building => ({ id, kind, cityId, x, y })
-
-const city = (id: string): City => ({
-  id,
-  name: id,
-  realmId: null,
-  townHallId: `${id}-hall`,
-  occupation: null,
-})
 
 /** Two cities, one across the map's side, with roads, walls, a gate and a site. */
 const buildings: Building[] = [
@@ -40,11 +32,13 @@ const pairs = (tiles: Int32Array) =>
   Array.from({ length: tiles.length / 2 }, (_, i) => `${tiles[2 * i]},${tiles[2 * i + 1]}`)
 
 describe('structuresOf', () => {
-  it("holds each city's area as cityAreaTiles works it out", () => {
+  it("holds each city's area as the rules module works it out", () => {
     const { areas } = structuresOf(buildings, size)
     for (const id of ['c1', 'c2']) {
       const area = areas.get(id)!
-      expect(new Set(pairs(area.tiles))).toEqual(cityAreaTiles({ buildings }, city(id), size))
+      expect(new Set(pairs(area.tiles))).toEqual(
+        new Set(cityAreaTileList(buildings, id, size).map(([x, y]) => `${x},${y}`)),
+      )
     }
     expect(areas.has('c3')).toBe(false)
   })
@@ -64,9 +58,7 @@ describe('structuresOf', () => {
     const s = structuresOf(buildings, size)
     expect([...s.roads.keys()].sort()).toEqual(['12,12', '13,12'])
     expect([...s.walls].sort()).toEqual(['8,8', '9,8'])
-    const built = buildings
-      .filter((b) => b.kind !== 'road')
-      .flatMap((b) => footprintKeys(b, size))
+    const built = buildings.filter((b) => b.kind !== 'road').flatMap((b) => footprintKeys(b, size))
     expect(s.built).toEqual(new Set(built))
   })
 

@@ -1,4 +1,4 @@
-import { WORKPLACE_PARAM } from './shared/default-scripts.js'
+import { WORKPLACE_PARAM } from '@csp/shared-types'
 import type { PickedParamType, ScriptParam, ScriptParamValue, Waypoint } from '@csp/shared-types'
 import { useId, useRef, useState, type ReactNode } from 'react'
 import { choiceLabel, effectiveParam, paramNote, waypointLabel } from './script-params-view.js'

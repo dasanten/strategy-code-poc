@@ -1,5 +1,5 @@
 import { MAX_HEALTH, MAX_HUNGER } from '@csp/balance'
-import { horseAgeInYears } from './shared/stats.js'
+import { horseAgeInYears } from '@csp/lang-wasm'
 import type { SeenHorse } from '@csp/shared-types'
 import { useEffect, useRef } from 'react'
 import { horseLines, horseNeed, type HorseGroup, type HorseLines } from './horses-view.js'

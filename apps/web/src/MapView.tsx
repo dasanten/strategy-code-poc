@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Application, Container, Graphics, Sprite, Texture, TilingSprite } from 'pixi.js'
-import { CHUNK_SIZE, Terrain, UNEXPLORED, chunksAcross, wrap } from './shared/terrain.js'
+import { CHUNK_SIZE, UNEXPLORED } from '@csp/shared-types'
+import { Terrain, chunksAcross, wrap } from './terrain.js'
 import { PATCH_SIZE, TERRAIN_SPEED } from '@csp/balance'
-import { patchLeft } from './shared/patch.js'
+import { patchLeft } from './patch.js'
 import { structuresOf } from './map/structures.js'
 import type { Building, KnownNode, SeenResident, ResourceKind } from '@csp/shared-types'
-import { FOOTPRINT } from './shared/footprint.js'
-import { isRuin } from './shared/decay.js'
+import { FOOTPRINT } from './footprint.js'
+import { isRuin } from './decay.js'
 import {
   CLOSE_SCALE,
   zoomTier,
@@ -122,7 +123,7 @@ import {
   wallSides,
   type WallTile,
 } from './map/wall-tile.js'
-import { isStone } from './shared/building.js'
+import { isStone } from './building.js'
 import {
   ART_STYLES,
   ART_STYLE_NAMES,

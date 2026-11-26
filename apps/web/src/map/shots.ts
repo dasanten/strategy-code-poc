@@ -1,6 +1,6 @@
 import { SHOT_REACH, WALL_SHOT_REACH_BONUS } from '@csp/balance'
 import type { SeenResident } from '@csp/shared-types'
-import { wrapDelta } from '../shared/terrain.js'
+import { wrapDelta } from '../terrain.js'
 
 /** One shot on the map: an archer and the one they shoot at, by id. */
 export interface Shot {
@@ -17,7 +17,10 @@ export interface Shot {
  * hidden.
  */
 export function shots(
-  residents: readonly Pick<SeenResident, 'id' | 'x' | 'y' | 'order' | 'equipped' | 'carried' | 'up'>[],
+  residents: readonly Pick<
+    SeenResident,
+    'id' | 'x' | 'y' | 'order' | 'equipped' | 'carried' | 'up'
+  >[],
   size: number,
 ): Shot[] {
   const byId = new Map(residents.map((r) => [r.id, r]))

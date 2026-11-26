@@ -1,5 +1,6 @@
 import { BUILDING_KINDS, BUILDING_SPECS } from '@csp/balance'
-import { Terrain, UNEXPLORED } from '../shared/terrain.js'
+import { Terrain } from '../terrain.js'
+import { UNEXPLORED } from '@csp/shared-types'
 import type { BuildingKind, ResourceKind } from '@csp/shared-types'
 import { THEME, hex, type Relationship } from '../theme.js'
 

@@ -1,6 +1,6 @@
-import { GOODS } from './shared/world.js'
+import { GOODS } from './world.js'
 import { GOOD_SPECS, OWN_FOOD } from '@csp/balance'
-import { putAwayUnits } from './shared/goods.js'
+import { putAwayUnits } from '@csp/lang-wasm'
 import type { Good, Stock } from '@csp/shared-types'
 
 /** Good names as the UI shows them (each good's label). */

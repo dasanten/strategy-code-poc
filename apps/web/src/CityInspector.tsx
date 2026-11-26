@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { GOODS } from './shared/world.js'
-import { buildingRealm } from './shared/city.js'
-import { horseBuyerProblem, horseSellerProblem } from './shared/horse-market.js'
-import { isClosed } from './shared/walls.js'
-import { noSwap } from './shared/swap.js'
+import { GOODS } from './world.js'
+import { buildingRealm } from './city.js'
+import { horseBuyerProblem, horseSellerProblem } from '@csp/lang-wasm'
+import { isClosed } from './walls.js'
+import { noSwap } from './swap.js'
 import type {
   Building,
   NpcHorseOffer,
@@ -31,7 +31,7 @@ import type {
   Stance,
   Temperament,
 } from '@csp/shared-types'
-import { aboutTime } from './shared/estimates.js'
+import { aboutTime } from './estimates.js'
 import { moodLine } from './stance-view.js'
 import { temperamentLine } from './temperament-view.js'
 import {

@@ -4,7 +4,7 @@ import {
   QUEUE_MAX_REPEAT,
   QUEUE_MAX_STEPS,
 } from '@csp/balance'
-import { neverEnds, queueStepsProblem } from './shared/queue.js'
+import { neverEnds, queueStepsProblem } from '@csp/lang-wasm'
 import type { Condition, QueueStepRequest, Repeat } from '@csp/shared-types'
 
 /**

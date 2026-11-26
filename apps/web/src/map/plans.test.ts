@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { BuildLine, Queue, SeenScript } from '@csp/shared-types'
-import type { LineOrder } from '../shared/world.js'
+import type { LineBuildOrder } from '../building.js'
 import { plannedBuilding, plannedBuilds, plannedLines } from './plans.js'
 
 const size = 100
 const home = { realmId: 'me' }
 const map = { size }
 
-const wallLine = (tiles: [number, number][]): LineOrder => ({
+const wallLine = (tiles: [number, number][]): LineBuildOrder => ({
   kind: 'wallLine',
   tiles,
   phase: 'walking',

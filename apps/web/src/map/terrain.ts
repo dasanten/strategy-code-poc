@@ -1,4 +1,5 @@
-import { CHUNK_SIZE, Terrain, UNEXPLORED, chunksAcross, wrap } from '../shared/terrain.js'
+import { CHUNK_SIZE, UNEXPLORED } from '@csp/shared-types'
+import { Terrain, chunksAcross, wrap } from '../terrain.js'
 import type { TerrainChunk } from '@csp/shared-types'
 import { TERRAIN_COLORS } from './palette.js'
 

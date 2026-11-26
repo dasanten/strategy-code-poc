@@ -1,38 +1,30 @@
+import { BATCHES_PER_DAY, RECIPES, WORK_OUTPUT_PER_DAY, WORKPLACE_SKILL } from './narrowed.js'
+import { aboutTime, bornIn, foalLeft, grownIn, pairingTicksLeft, workLeft } from './estimates.js'
+import { horsesInNeed } from './reviving.js'
+import { isDown, GOODS, SKILL_NAMES } from './world.js'
+import { STAT_NAMES, LINE_BUILDING, NODE_GOOD } from '@csp/shared-types'
 import {
-  BATCHES_PER_DAY,
-  RECIPES,
-  WORK_OUTPUT_PER_DAY,
-  WORKPLACE_SKILL,
-} from './shared/narrowed.js'
-import {
-  aboutTime,
-  bornIn,
-  foalLeft,
-  grownIn,
-  pairingTicksLeft,
-  workLeft,
-} from './shared/estimates.js'
-import { horsesInNeed } from './shared/reviving.js'
-import { isDown, GOODS, STAT_NAMES, SKILL_NAMES } from './shared/world.js'
-import { inContact } from './shared/combat.js'
-import { isVesselId, vesselCapacity, vesselName } from './shared/vessels.js'
-import {
-  LINE_BUILDING,
-  BUILDABLE,
+  inContact,
   buildingWork,
   workFactor,
-  MAX_WORKERS,
-  NODE_GOOD,
-  teacherAt,
-  traineesOf,
   materialsNeeded,
-  recipeGood,
   teardownReturns,
   teardownWork,
-  isStone,
   materialsOfKind,
   workOfKind,
-} from './shared/building.js'
+  ageInYears,
+  canHandle,
+  canWork,
+  stockWeight,
+  wallStrength,
+  wallStrengthLeft,
+  putAwayUnits,
+  nameProblem,
+  horsesIn,
+  keptBreeding,
+} from '@csp/lang-wasm'
+import { isVesselId, vesselCapacity, vesselName } from './vessels.js'
+import { BUILDABLE, MAX_WORKERS, teacherAt, traineesOf, recipeGood, isStone } from './building.js'
 import {
   CARRIAGE_CAPACITY,
   PASSENGER_WEIGHT,
@@ -56,12 +48,9 @@ import {
   STABLE_BREED_DAYS,
   EQUIP_TICKS,
 } from '@csp/balance'
-import { ageInYears, bestWeapon, canHandle, canWork, stockWeight } from './shared/stats.js'
-import { isAt } from './shared/footprint.js'
-import { wrapDelta, wrapDistance } from './shared/terrain.js'
-import { wallStrength, wallStrengthLeft } from './shared/walls.js'
-import { putAwayUnits } from './shared/goods.js'
-import { nameProblem } from './shared/names.js'
+import { bestWeapon } from './stats.js'
+import { isAt } from './footprint.js'
+import { wrapDelta, wrapDistance } from './terrain.js'
 import type {
   Branch,
   Condition,
@@ -92,13 +81,8 @@ import type {
   WallMaterial,
   Waypoint,
 } from '@csp/shared-types'
-import {
-  STABLE_BREED_TICKS,
-  breedProblem,
-  horsesIn,
-  keptBreeding,
-  keptPair,
-} from './shared/horses.js'
+import { STABLE_BREED_TICKS } from './horse-rules.js'
+import { breedProblem, keptPair } from './world-rules.js'
 import {
   Fragment,
   useContext,
@@ -230,7 +214,6 @@ import {
   runScriptPick,
 } from './script-run-view.js'
 import { BUILDING_NAMES } from './map/palette.js'
-import { horseFaresKnown } from './seen.js'
 import { PanelHead } from './panel-head.js'
 import { labelled } from './name-labels.js'
 import {
@@ -1347,6 +1330,8 @@ function DurationChip({
 interface DoingContext {
   /** What is left of a way: about how long, or tiles to go without an estimate. */
   left: (path: readonly unknown[]) => string
+  /** About how long until they arrive, without the tiles to go: none without an estimate. */
+  about: string | undefined
   /** "Walking", or "Riding" on a horse (`CONTEXT.md`: Riding). */
   walking: string
   cities: readonly Pick<City, 'id' | 'name'>[]
@@ -1458,19 +1443,24 @@ const ORDER_DOING: { [K in ResidentOrder['kind']]: (o: OrderOf<K>, c: DoingConte
   sellHorse: () => 'Selling a horse',
   // As it always was: handing in a transfer had no text of its own (#BUG).
   handIn: () => 'Idle',
-  attack: (o) => (o.path ? 'Going after their target' : 'Fighting'),
+  attack: (o, { about }) =>
+    o.path
+      ? about
+        ? `Going after their target · ${about}`
+        : 'Going after their target'
+      : 'Fighting',
   climb: (o) => `Climbing a wall · ${pct(o.progress)}`,
   roadLine: (o, c) => lineDoing(o, c),
   wallLine: (o, c) => lineDoing(o, c),
 }
 
 /** A road or wall order along its line. */
-function lineDoing(o: OrderOf<'roadLine' | 'wallLine'>, { walking }: DoingContext): string {
+function lineDoing(o: OrderOf<'roadLine' | 'wallLine'>, { walking, about }: DoingContext): string {
   const [x, y] = o.tiles[0]!
   const what = LINE_BUILDING[o.kind]
   const left = `${o.tiles.length} ${what} tile${o.tiles.length === 1 ? '' : 's'} to go`
   return o.phase === 'walking'
-    ? `${walking} to lay ${what} at ${x}, ${y} · ${left}`
+    ? `${walking} to lay ${what} at ${x}, ${y} · ${about ? `${about} · ` : ''}${left}`
     : `Building ${what} at ${x}, ${y} · ${left}`
 }
 
@@ -1491,7 +1481,8 @@ export function orderDoing(
     arrives === undefined ? `${path.length} tiles to go` : aboutTime(arrives)
   const walking = r.riding === undefined ? 'Walking' : 'Riding'
   const doing = ORDER_DOING[o.kind] as (o: ResidentOrder, c: DoingContext) => string
-  return doing(o, { left, walking, cities })
+  const about = arrives === undefined ? undefined : aboutTime(arrives)
+  return doing(o, { left, about, walking, cities })
 }
 
 /**
@@ -3008,7 +2999,6 @@ export function ResidentCard({
           tick={tick}
           stable={building}
           horses={horses}
-          residents={residents}
           realmId={realmId}
           onBreed={onBreed}
         />
@@ -4253,7 +4243,6 @@ function BreedBlock({
   tick,
   stable,
   horses,
-  residents,
   realmId,
   onBreed,
 }: {
@@ -4261,7 +4250,6 @@ function BreedBlock({
   tick: number
   stable: Building
   horses: SeenHorse[]
-  residents: Resident[]
   realmId: string
   onBreed: (stableId: string, horseIds: [string, string]) => void
 }) {
@@ -4269,16 +4257,14 @@ function BreedBlock({
   const own = horsesIn(horses, stable).filter((h) => h.realmId === realmId)
   const o = resident.order
   const breeding = o?.kind === 'breed' && o.stableId === stable.id ? o : undefined
-  // The Player knows how their own horses fare (`CONTEXT.md`: Seeing how someone fares).
-  const seen = { horses: horses.filter(horseFaresKnown), residents }
-  const kept = breeding ? undefined : keptPair(seen, stable, { realmId }, resident)
+  const kept = breeding ? undefined : keptPair(stable.id, { realmId }, resident.id)
   const keptShare = kept ? keptBreeding(stable, kept)!.progress / STABLE_BREED_TICKS : 0
   const chosen = kept ?? picked
   const pair = chosen.length === 2 ? ([chosen[0]!, chosen[1]!] as [string, string]) : undefined
   const problem = !canWork(resident, tick)
     ? 'children can’t breed horses'
     : pair
-      ? breedProblem(seen, stable, { realmId }, resident, pair)
+      ? breedProblem(stable.id, { realmId }, resident.id, pair)
       : 'pick two horses'
   const toggle = (id: string) =>
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id].slice(-2)))

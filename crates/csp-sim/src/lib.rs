@@ -57,6 +57,7 @@ pub mod leader;
 pub mod lent;
 pub mod loading;
 pub mod mending;
+pub mod mirror;
 #[cfg(test)]
 mod movement_test_world;
 pub mod names;

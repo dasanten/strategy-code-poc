@@ -1,6 +1,6 @@
 import { START_CITY_SIZE } from '@csp/balance'
-import { ADMIN_VIEW_MAX_SIDE } from './shared/admin-map.js'
-import { chunksAcross, wrap } from './shared/terrain.js'
+import { ADMIN_VIEW_MAX_SIDE } from '@csp/shared-types'
+import { chunksAcross, wrap } from './terrain.js'
 import type {
   AdminLand,
   AdminPlaces,

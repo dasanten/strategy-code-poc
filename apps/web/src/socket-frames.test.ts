@@ -6,7 +6,7 @@ import {
   WS_CLOSE_RELOAD,
   WS_CLOSE_TOO_MANY_REQUESTS,
   WS_CLOSE_UPDATED,
-} from './shared/protocol.js'
+} from '@csp/shared-types'
 
 /** A binary frame as the server sends it: the gzipped JSON. */
 function gzipped(json: string): ArrayBuffer {

@@ -1,6 +1,6 @@
 import { Fragment, useContext, useState, type ReactNode } from 'react'
 import { FEED_UNITS, HAUL_KEEP_FOOD } from '@csp/balance'
-import { GOODS } from './shared/world.js'
+import { GOODS } from './world.js'
 import { GEAR } from './equipment-view.js'
 import type {
   BuildingKind,

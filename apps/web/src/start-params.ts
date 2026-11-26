@@ -1,10 +1,11 @@
+import { WORKPLACE_PARAM } from '@csp/shared-types'
 import {
-  WORKPLACE_PARAM,
   isWorkScript,
   paramNeedsValue,
   targetParam,
-} from './shared/default-scripts.js'
-import { isParamChoice, isParamNumber } from './shared/script-api.js'
+  isParamChoice,
+  isParamNumber,
+} from '@csp/lang-wasm'
 import type {
   OrderRequest,
   ScriptParam,

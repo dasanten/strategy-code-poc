@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { BUILDABLE, SHARES_A_TILE, buildMenu } from './shared/building.js'
-import { Terrain } from './shared/terrain.js'
+import { BUILDABLE, SHARES_A_TILE } from './building.js'
+import { buildMenu } from '@csp/lang-wasm'
+import { Terrain } from './terrain.js'
 import type { Building, BuildingKind, City, KnownNode } from '@csp/shared-types'
 import {
   buildMenuGroups,
@@ -9,9 +10,9 @@ import {
   kindProblemOn,
   workSpan,
 } from './build-menu-view.js'
-import { BUILD_GROUPS } from './shared/building-info.js'
+import { BUILD_GROUPS } from './building-info.js'
 import { BUILDING_NAMES } from './map/palette.js'
-import { buildHereProblem } from './selection-view.js'
+import { buildProblemOn as buildHereProblem } from './test-mirror.js'
 
 const plains = { size: 200, at: () => Terrain.Plains }
 const seen = { buildings: [] as Building[], cities: [] as City[] }

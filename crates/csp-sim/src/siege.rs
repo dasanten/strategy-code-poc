@@ -219,7 +219,8 @@ impl RunningOrder for CrewOrder {
             to: To::Machine(&self.machine_id),
             near: false,
             after: None,
-            estimated: false,
+            // It walks, so the arrival estimate times it as a walk (Daniel, 2026-11-25, #1621).
+            estimated: true,
         })
     }
     fn going_mut(&mut self) -> Option<GoingMut<'_>> {
@@ -326,6 +327,8 @@ impl RunningOrder for PushOrder {
             to: To::tile(&self.target),
             near: false,
             after: None,
+            // Pushed, not walked: no arrival estimate until pushing has a pace of its own
+            // (Daniel, 2026-11-25, #1621).
             estimated: false,
         })
     }

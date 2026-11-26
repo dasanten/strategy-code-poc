@@ -1,7 +1,8 @@
+import { mirrorOf } from './test-mirror.js'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { GOODS } from './shared/world.js'
+import { GOODS } from './world.js'
 import { QUEUE_DEFAULT_STEP_MINUTES, TICKS_PER_GAME_YEAR } from '@csp/balance'
 import type { Building, Resident, Stock } from '@csp/shared-types'
 import {
@@ -242,7 +243,9 @@ describe('group orders', () => {
       resident('away', 5, 4),
       child('b', 4, 4),
       resident('aboard', 4, 4, { aboard: 'k1' }),
-      resident('driver', 4, 4, { order: { kind: 'drive', carriageId: 'k1' } }),
+      resident('driver', 4, 4, {
+        order: { kind: 'drive', carriageId: 'k1', target: { x: 4, y: 4 }, path: null, progress: 0 },
+      }),
       resident('c', 4, 4),
       resident('d', 4, 4),
     ]
@@ -270,7 +273,7 @@ describe('group orders', () => {
 
   it('boards a boat together from beside it, until it is full, and gets them off together', () => {
     // Boat v1 on the water at (10, 10): a and b on the shore beside it, c too far.
-    const v1 = { id: 'v1', x: 10, y: 10 }
+    const v1 = { id: 'v1', x: 10, y: 10, realmId: 'r1' }
     const rs = [
       resident('a', 9, 10),
       resident('b', 11, 11),
@@ -278,6 +281,7 @@ describe('group orders', () => {
       resident('rider', 9, 9, { riding: 'h1' }),
       resident('c', 10, 9),
     ]
+    mirrorOf({ tick: TICK, size: SIZE, residents: rs, vessels: [v1] })
     const board = send({ kind: 'boardBoat', vessel: v1, seats: 2 }, rs)
     expect(board.requests.map((q) => q.order)).toEqual([
       { kind: 'board', vesselId: 'v1', residentId: 'a' },
@@ -298,10 +302,11 @@ describe('group orders', () => {
   })
 
   it('crews a docked ship from its haven, taking no seats; nobody rows it', () => {
-    // Ship s1 at (10, 10), docked at haven h1 covering (6, 9)–(8, 11).
-    const s1 = { id: 's1', x: 10, y: 10, kind: 'ship' as const, dockedAt: 'h1' }
+    // Ship s1 at (9, 10), docked at haven h1 covering (6, 9)–(8, 11) beside it.
+    const s1 = { id: 's1', x: 9, y: 10, kind: 'ship' as const, dockedAt: 'h1', realmId: 'r1' }
     const seen: GroupSeen = { buildings: [{ id: 'h1', kind: 'haven', x: 6, y: 9 }] }
-    const rs = [resident('a', 6, 9), resident('b', 7, 10), resident('shore', 9, 10)]
+    const rs = [resident('a', 6, 9), resident('b', 7, 10), resident('shore', 10, 10)]
+    mirrorOf({ tick: TICK, size: SIZE, residents: rs, vessels: [s1], buildings: seen.buildings })
     const at = (order: GroupOrder) =>
       groupRequests(order, rs, { tick: TICK, size: SIZE, free: everywhere, seen })
     const crew = at({ kind: 'boardBoat', vessel: s1, seats: 0, asCrew: true })

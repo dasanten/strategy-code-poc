@@ -1,7 +1,7 @@
 import { createElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { BATCHES_PER_DAY } from './shared/narrowed.js'
+import { BATCHES_PER_DAY } from './narrowed.js'
 import { MAX_HEALTH, MAX_HUNGER, TICKS_PER_GAME_YEAR } from '@csp/balance'
 import type { Building, GoodsSpot, Horse, Resident, SeenResident, Stock } from '@csp/shared-types'
 import { describeTile } from './selection-view.js'
@@ -232,7 +232,7 @@ describe('inventories on the tile card (`CONTEXT.md`: Goods on cards)', () => {
       name: 'Ana',
       owner: 'me',
       cityId: 'c-me',
-      order: { kind: 'workAt', buildingId: farm.id },
+      order: { kind: 'workAt', buildingId: farm.id, at: { x: farm.x, y: farm.y }, progress: 0 },
       stats: { strength: { base: 10, trained: 0 } },
       skills: {},
       bornAt: 0,
@@ -249,7 +249,13 @@ describe('inventories on the tile card (`CONTEXT.md`: Goods on cards)', () => {
       name: 'Ana',
       owner: 'me',
       cityId: 'c-me',
-      order: { kind: 'workAt', buildingId: smithy.id, makes: 'sword' },
+      order: {
+        kind: 'workAt',
+        buildingId: smithy.id,
+        makes: 'sword',
+        at: { x: smithy.x, y: smithy.y },
+        progress: 0,
+      },
       stats: { strength: { base: 10, trained: 0 } },
       skills: {},
       bornAt: 0,

@@ -5,8 +5,8 @@ import { KEY_GOODS, keyGoods } from './hud-view.js'
 import { agoText } from './last-seen.js'
 import { FAR_SCALE } from './map/camera.js'
 import { cityRelationship, type Viewer } from './map/tokens.js'
-import { housingRoom } from './shared/city.js'
-import { GOODS } from './shared/world.js'
+import { housingRoom } from './city.js'
+import { GOODS } from './world.js'
 import type { Relationship } from './theme.js'
 
 /** The Cities tab's lists, in this order (`CONTEXT.md`: Cities tab). */

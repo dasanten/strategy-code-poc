@@ -10,8 +10,8 @@ import type {
   CreativeDone,
   Resident,
 } from '@csp/shared-types'
-import { KEEPS_GOODS } from './shared/building.js'
-import { canWork } from './shared/stats.js'
+import { KEEPS_GOODS } from './building.js'
+import { canWork } from '@csp/lang-wasm'
 
 /** Something goods can be given to or taken from, as the section lists it. */
 export interface CreativeHolder {

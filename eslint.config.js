@@ -1,6 +1,7 @@
 import js from '@eslint/js'
 import tseslint from 'typescript-eslint'
 import prettier from 'eslint-config-prettier'
+import noRuleCopy from './scripts/eslint-no-rule-copy.mjs'
 
 export default tseslint.config(
   // `.claude/` holds other sessions' worktrees: whole copies of the repo that must not be linted.
@@ -24,8 +25,7 @@ export default tseslint.config(
   },
   {
     // The client no longer depends on `@csp/shared` (T88.2, ADR 0030): its types come from
-    // `@csp/shared-types`, its numbers from `@csp/balance` and its helpers live in
-    // `apps/web/src/shared/`.
+    // `@csp/shared-types`, its numbers from `@csp/balance` and its rules from `@csp/lang-wasm`.
     files: ['apps/web/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
@@ -35,12 +35,21 @@ export default tseslint.config(
             {
               group: ['@csp/shared', '@csp/shared/*'],
               message:
-                'The client is off @csp/shared: use @csp/shared-types, @csp/balance or ./shared/.',
+                'The client is off @csp/shared: use @csp/shared-types, @csp/balance or @csp/lang-wasm.',
             },
           ],
         },
       ],
     },
+  },
+  {
+    // The client keeps no copy of a rule (T122.8, ADR 0045, `scripts/eslint-no-rule-copy.mjs`).
+    // `world-rules.ts` is the module's front: each of its functions calls the module. Tests may
+    // write an answer out by hand.
+    files: ['apps/web/**/*.{ts,tsx}'],
+    ignores: ['apps/web/src/world-rules.ts', '**/*.test.ts'],
+    plugins: { csp: noRuleCopy },
+    rules: { 'csp/no-rule-copy': 'error' },
   },
   prettier,
 )

@@ -1,9 +1,11 @@
-import { Terrain, UNEXPLORED, tileIndex } from './shared/terrain.js'
-import { aboutTime, arrivalTicks, timeLeft, type ArrivalWorld } from './shared/estimates.js'
-import { drivenCarriageId } from './shared/carriages.js'
-import { isVesselId } from './shared/vessels.js'
-import { isDown } from './shared/world.js'
-import { roadTiles } from './shared/building.js'
+import { Terrain, tileIndex } from './terrain.js'
+import { UNEXPLORED } from '@csp/shared-types'
+import { aboutTime, timeLeft } from './estimates.js'
+import { worldMirror } from './world-mirror.js'
+import { drivenCarriageId } from './carriages.js'
+import { isVesselId } from './vessels.js'
+import { isDown } from './world.js'
+import { roadTiles } from './building.js'
 import type {
   Building,
   City,
@@ -318,18 +320,31 @@ const lower = (line: string) => line.charAt(0).toLowerCase() + line.slice(1)
 
 /**
  * About how many ticks until each resident arrives where they walk, ride or drive
- * (`arrivalTicks`), on the ground as the Player knows it: a road wherever one is built, and
- * Plains where the terrain is unexplored or not loaded yet, as the server guesses too.
+ * (`arrivalTicks`, `CONTEXT.md`: Doing, Estimates), asked of the rules module's mirror once per
+ * way, with the ground of the way's tiles as the Player knows it: a road wherever one is built,
+ * and Plains where the terrain is unexplored or not loaded yet, as the server guesses too. `way`,
+ * when given, is an order to estimate in place of the resident's own (the route preview).
+ * Undefined until the mirror has a world, and for a resident not in sight.
  */
 export function arrivalOf(
-  world: Omit<ArrivalWorld, 'ground'> & { buildings: Building[] },
+  world: { size: number; buildings: Building[] },
   terrainAt: ((x: number, y: number) => number | undefined) | undefined,
-): (r: Resident) => number | undefined {
+): (r: Pick<Resident, 'id' | 'order'>, way?: ResidentOrder) => number | undefined {
   const roads = roadTiles(world, world.size)
   const ground = (x: number, y: number): Terrain => {
     if (roads.has(tileIndex(world.size, x, y))) return Terrain.Road
     const t = terrainAt?.(x, y)
     return t === undefined || t === UNEXPLORED ? Terrain.Plains : (t as Terrain)
   }
-  return (r) => arrivalTicks({ ...world, ground }, r)
+  return (r, way) => {
+    const mirror = worldMirror()
+    const o = way ?? r.order
+    const path = o && 'path' in o ? o.path : undefined
+    if (!mirror || !path) return undefined
+    return mirror.arrivalTicks(
+      r.id,
+      way,
+      Uint8Array.from(path, ([x, y]) => ground(x, y)),
+    )
+  }
 }

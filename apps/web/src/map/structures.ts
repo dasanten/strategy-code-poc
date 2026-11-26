@@ -1,7 +1,7 @@
-import type { Building, City } from '@csp/shared-types'
-import { cityAreaTiles } from '../shared/city.js'
-import { footprintKeys } from '../shared/footprint.js'
-import { wrapDelta } from '../shared/terrain.js'
+import type { Building } from '@csp/shared-types'
+import { cityAreaTileArray } from '@csp/lang-wasm'
+import { footprintKeys } from '../footprint.js'
+import { wrapDelta } from '../terrain.js'
 
 /**
  * What the map draws buildings and city areas from, worked out once for each list of buildings
@@ -58,15 +58,8 @@ function workOut(buildings: readonly Building[], size: number): Structures {
   }
   const areas = new Map<string, CityArea>()
   for (const [id, list] of byCity) {
-    const keys = cityAreaTiles({ buildings: list }, { id } as City, size)
-    if (keys.size === 0) continue
-    const tiles = new Int32Array(keys.size * 2)
-    let at = 0
-    for (const key of keys) {
-      const comma = key.indexOf(',')
-      tiles[at++] = Number(key.slice(0, comma))
-      tiles[at++] = Number(key.slice(comma + 1))
-    }
+    const tiles = cityAreaTileArray(list, id, size)
+    if (tiles.length === 0) continue
     const [x, y] = [tiles[0]!, tiles[1]!]
     let reach = 0
     for (let i = 0; i < tiles.length; i += 2) {

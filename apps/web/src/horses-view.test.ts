@@ -5,7 +5,7 @@ import {
   TICKS_PER_GAME_YEAR,
   ticksForAge,
 } from '@csp/balance'
-import { timeLeft } from './shared/estimates.js'
+import { timeLeft } from './estimates.js'
 import type { SeenHorse } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import { FEED_HORSE_HINT, groupHorses, horseLines } from './horses-view.js'

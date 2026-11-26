@@ -12,8 +12,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { CITY_NAME_MAX_LENGTH, FEED_UNITS, HORSE_NAME_MAX_LENGTH } from '@csp/balance'
-import { canHandle } from './shared/stats.js'
-import { nameProblem } from './shared/names.js'
+import { canHandle, nameProblem } from '@csp/lang-wasm'
 import type {
   Building,
   BuildingKind,

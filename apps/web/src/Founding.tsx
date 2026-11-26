@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { REALM_NAME_MAX_LENGTH, RESIDENT_NAME_MAX_LENGTH } from '@csp/balance'
-import { foundingProblem } from './shared/names.js'
+import { foundingProblem } from '@csp/lang-wasm'
 import { EntryScreen } from './Login.js'
 import { Icon } from './Icon.js'
 

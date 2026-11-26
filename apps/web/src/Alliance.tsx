@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { ALLIANCE_NAME_MAX_LENGTH } from './shared/alliance.js'
-import { formatGameTime } from './shared/time.js'
-import { isArmed } from './shared/stats.js'
+import { ALLIANCE_NAME_MAX_LENGTH } from '@csp/shared-types'
+import { formatGameTime } from '@csp/lang-wasm'
+import { isArmed } from './stats.js'
 import type {
   Diplomacy,
   OrderRequest,

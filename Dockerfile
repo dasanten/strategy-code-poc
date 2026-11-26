@@ -23,14 +23,29 @@ COPY crates crates
 RUN cargo build --release --package csp-server --bin csp-server --bin csp-admin --bin check-fields
 
 # --- the editor's WebAssembly checker (T88.3); wasm-bindgen-cli at the version in Cargo.lock --
+# and binaryen's wasm-opt at the version of the `binaryen` dev dependency in package.json (#1637),
+# with the flags of scripts/wasm-build.mjs.
 FROM chef AS wasm
+ARG BINARYEN=132
+ARG BINARYEN_SHA256=195ddc94f9bc89f45abdabb0b9eea86023d727ba90eac8b35b80f2544fc30572
 RUN rustup target add wasm32-unknown-unknown \
     && cargo install wasm-bindgen-cli --version 0.2.130 --locked
+RUN curl -fsSL -o /tmp/binaryen.tar.gz \
+        https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN}/binaryen-version_${BINARYEN}-x86_64-linux.tar.gz \
+    && echo "${BINARYEN_SHA256}  /tmp/binaryen.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/binaryen.tar.gz -C /tmp \
+    && install /tmp/binaryen-version_${BINARYEN}/bin/wasm-opt /usr/local/bin/wasm-opt \
+    && rm -rf /tmp/binaryen.tar.gz /tmp/binaryen-version_${BINARYEN} \
+    && wasm-opt --version
 COPY Cargo.toml Cargo.lock ./
 COPY crates crates
 RUN cargo build --profile wasm --target wasm32-unknown-unknown --package csp-lang-wasm --lib \
     && wasm-bindgen --target web --out-dir /wasm --out-name csp_lang_wasm \
-        target/wasm32-unknown-unknown/wasm/csp_lang_wasm.wasm
+        --remove-name-section --remove-producers-section \
+        target/wasm32-unknown-unknown/wasm/csp_lang_wasm.wasm \
+    && wasm-opt -Oz --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext \
+        --enable-mutable-globals --enable-reference-types --enable-multivalue \
+        /wasm/csp_lang_wasm_bg.wasm -o /wasm/csp_lang_wasm_bg.wasm
 
 # --- the client, built as before ------------------------------------------------------------
 FROM node:22.23.3-bookworm-slim AS web

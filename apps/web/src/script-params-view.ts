@@ -1,6 +1,6 @@
-import { MAX_WORKERS } from './shared/building.js'
-import { buildingRealm } from './shared/city.js'
-import { isAt } from './shared/footprint.js'
+import { MAX_WORKERS } from './building.js'
+import { buildingRealm } from './city.js'
+import { isAt } from './footprint.js'
 import type {
   Building,
   Carriage,

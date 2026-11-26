@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Resident } from '@csp/shared-types'
-import { aboutTime } from './shared/estimates.js'
+import { aboutTime } from './estimates.js'
 import { SelectionCard } from './SelectionCard.js'
 import {
   AGE_OPTIONS,

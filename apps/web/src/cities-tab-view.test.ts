@@ -13,7 +13,7 @@ import {
 } from './cities-tab-view.js'
 import { showBeside } from './hud-view.js'
 import { FAR_SCALE, zoomTier } from './map/camera.js'
-import { HOUSING_ROOM } from './shared/narrowed.js'
+import { HOUSING_ROOM } from './narrowed.js'
 
 const town = (
   id: string,

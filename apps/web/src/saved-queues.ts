@@ -1,6 +1,6 @@
 import type { Building, OrderRequest } from '@csp/shared-types'
 import { copyItems, type PlanItem } from './plan-blocks.js'
-import { conditionProblem } from './shared/condition.js'
+import { conditionProblem } from '@csp/lang-wasm'
 
 /**
  * Saved queues (`CONTEXT.md`: Saved queue): the planner's steps saved under a name, to load onto

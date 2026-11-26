@@ -94,8 +94,9 @@ mod tests {
     };
     use csp_shared::terrain::DIAGONAL_STEP;
     use csp_shared::world::{
-        DriveOrder, FetchOrder, GoodsPlace, ResidentOrder, SkillName, StoreOrder, StorePhase, Tile,
-        TilePath, WalkOrder,
+        AttackOrder, CrewOrder, DriveOrder, FetchOrder, GoodsPlace, HaulPhase, HaulStop, LineOrder,
+        LinePhase, PushOrder, ResidentOrder, RowOrder, SkillName, StoreOrder, StorePhase, Tile,
+        TilePath, WalkOrder, WaterHaulOrder,
     };
 
     use super::*;
@@ -257,5 +258,72 @@ mod tests {
             way_ticks(64, (r.x, r.y), &[(1.0, 0.0)], 0.0, &|_, _| 0.0, slowest),
             1.0 / slowest
         ));
+    }
+
+    #[test]
+    fn times_the_walk_of_a_crew_line_or_attack_order_and_nothing_over_water_or_pushed() {
+        // Daniel, 2026-11-25 (#1621): the orders that walk are estimated as a walk; row, sail,
+        // push and a haul route by water wait for a pace of their own.
+        let world = world_with_realm(&plains(64));
+        let walked = arrival(&world, &walker(Some(walk()))).expect("an estimate");
+        let line = || LineOrder {
+            tiles: vec![(4.0, 0.0), (5.0, 0.0)],
+            phase: LinePhase::Walking,
+            path: Some(path()),
+            progress: 0.0,
+            site_id: None,
+            material: None,
+        };
+        let walking = [
+            ResidentOrder::Crew(CrewOrder {
+                machine_id: "m1".into(),
+                path: Some(path()),
+                progress: 0.0,
+            }),
+            ResidentOrder::RoadLine(line()),
+            ResidentOrder::WallLine(line()),
+            ResidentOrder::Attack(AttackOrder {
+                target_id: "foe".into(),
+                path: Some(path()),
+                progress: 0.0,
+                strike: 0.0,
+                started: false,
+                defending: None,
+                army: None,
+            }),
+        ];
+        for order in walking {
+            let t = arrival(&world, &walker(Some(order.clone())));
+            assert!(t.is_some_and(|t| close(t, walked)), "{order:?} is timed as a walk");
+        }
+        let target = Tile { x: 4.0, y: 0.0 };
+        let row = RowOrder { vessel_id: "v1".into(), target, path: Some(path()), progress: 0.0 };
+        let not_yet = [
+            ResidentOrder::Row(row.clone()),
+            ResidentOrder::Sail(row),
+            ResidentOrder::Push(PushOrder {
+                machine_id: "m1".into(),
+                target,
+                path: Some(path()),
+                progress: 0.0,
+            }),
+            ResidentOrder::HaulByWater(WaterHaulOrder {
+                vessel_id: "v1".into(),
+                from: Tile { x: 0.0, y: 0.0 },
+                to: target,
+                goods: vec![],
+                return_goods: vec![],
+                keep_food: 0.0,
+                stop: HaulStop::To,
+                phase: HaulPhase::Driving,
+                water: Some(target),
+                path: Some(path()),
+                progress: 0.0,
+                moving: None,
+            }),
+        ];
+        for order in not_yet {
+            assert_eq!(arrival(&world, &walker(Some(order.clone()))), None, "{order:?}");
+        }
     }
 }

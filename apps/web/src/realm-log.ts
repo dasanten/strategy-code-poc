@@ -1,7 +1,7 @@
 import { REALM_LOG_LENGTH } from '@csp/balance'
-import { TRADE_ORG_NAME } from './shared/trade-org.js'
-import { timeLeft } from './shared/estimates.js'
-import { gameTime } from './shared/time.js'
+import { TRADE_ORG_NAME } from '@csp/shared-types'
+import { timeLeft } from './estimates.js'
+import { gameTime } from '@csp/lang-wasm'
 import type {
   DeliveryView,
   HeirLapse,

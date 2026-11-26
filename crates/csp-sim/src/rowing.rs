@@ -177,6 +177,8 @@ impl RunningOrder<Row> for RowOrder {
             to: To::tile(&self.target),
             near: false,
             after: None,
+            // Over water: no arrival estimate until rowing has a pace of its own (Daniel,
+            // 2026-11-25, #1621).
             estimated: false,
         })
     }

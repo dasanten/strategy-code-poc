@@ -30,6 +30,8 @@ mod carrying;
 mod carrying_output;
 #[path = "city_layout.rs"]
 mod city_layout;
+#[path = "client_twins.rs"]
+mod client_twins;
 #[path = "coin_sums.rs"]
 mod coin_sums;
 #[path = "creative.rs"]
@@ -96,6 +98,8 @@ mod last_seen;
 mod lost_post;
 #[path = "mending.rs"]
 mod mending;
+#[path = "mirror_parity.rs"]
+mod mirror_parity;
 #[path = "new_veins.rs"]
 mod new_veins;
 #[path = "npc_chain.rs"]

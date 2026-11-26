@@ -8,6 +8,8 @@ import type { ScriptParamType } from './script-data.js'
  * are synchronous and throw until it has loaded.
  */
 export * from './script-data.js'
+export * from './rules.js'
+export * from './areas.js'
 
 /** A finding at a place in a script. */
 export interface Diagnostic {
@@ -16,21 +18,6 @@ export interface Diagnostic {
   line: number
   /** 1-based. */
   column: number
-}
-
-/** What the checker knows of a value: nothing, a list of something, or an object of a shape. */
-export type CheckedType = 'unknown' | { list: CheckedType } | { shape: string }
-
-/** The names and shapes a script is checked against. */
-export interface CheckEnv {
-  globals: Readonly<Record<string, { type: CheckedType; params?: readonly string[] }>>
-  shapes: Readonly<Record<string, Readonly<Record<string, CheckedType>>>>
-  /** What `params.name` holds for a `param` of each type; unknown without it. */
-  paramTypes?: Readonly<Partial<Record<ScriptParamType, CheckedType>>>
-  /** How a shape is named in a warning, like "a resident"; `a <name>` without it. */
-  describeShape?: (shape: string) => string
-  /** The same as words by shape name, as JSON carries them. */
-  describedShapes?: Readonly<Record<string, string>>
 }
 
 /** A field read from an object whose shape the checker was sure of. */
@@ -130,24 +117,10 @@ export function checkScript(source: string): Diagnostic[] {
 }
 
 /**
- * Checks a script against the names and shapes it gets: warnings, and the fields it reads of
- * known shapes. A script with a syntax error gets none; that error is `checkScript`'s.
- */
-export function checkNames(source: string, env: CheckEnv): CheckResult {
-  const { describeShape, ...plain } = env
-  const described = describeShape
-    ? Object.fromEntries(Object.keys(env.shapes).map((s) => [s, describeShape(s)]))
-    : undefined
-  const json = JSON.stringify({
-    ...plain,
-    describedShapes: { ...described, ...env.describedShapes },
-  })
-  return JSON.parse(ready().checkNames(source, json)) as CheckResult
-}
-
-/**
- * `checkNames` against the game's names and views (`CONTEXT.md`: Script view): both APIs, `me` a
- * resident or an army; a default script (it has a task) gets the resident's API alone.
+ * Checks a script against the game's names and views (`CONTEXT.md`: Script view): warnings, and
+ * the fields it reads of known shapes. Both APIs, `me` a resident or an army; a default script (it
+ * has a task) gets the resident's API alone. A script with a syntax error gets none; that error is
+ * `checkScript`'s.
  */
 export function checkGameNames(source: string, defaultScript: boolean): CheckResult {
   return JSON.parse(ready().checkGameNames(source, defaultScript)) as CheckResult
@@ -166,4 +139,70 @@ export function tokenize(source: string): Token[] {
 /** A script's `param` lines, each with the `//` comment at its end; none for a syntax error. */
 export function scriptParams(source: string): ParamInfo[] {
   return JSON.parse(ready().scriptParams(source)) as ParamInfo[]
+}
+
+/**
+ * The game's rules, `csp-sim`'s own, from the same module (ADR 0045): those that take only
+ * values are in `rules.ts`; a throwaway mirror of what the client sees that a world-reading rule
+ * asks by coordinates (`docs/wasm-rules.md`).
+ */
+
+/**
+ * What the client sees, kept in the module's memory: the server's `welcome` message goes in once,
+ * each `tick` message after it, as the JSON text the socket brought: everything in sight, as a
+ * `WorldState` the rules read (T122.4, `docs/wasm-rules.md`).
+ */
+export class WorldMirror {
+  private readonly mirror = new (ready().WorldMirror)()
+
+  /** Starts over from a `welcome` message's JSON. */
+  welcome(json: string): void {
+    this.mirror.welcome(json)
+  }
+
+  /** Takes in a `tick` message's JSON. */
+  tick(json: string): void {
+    this.mirror.tick(json)
+  }
+
+  /** How many things are in sight. */
+  get count(): number {
+    return this.mirror.count
+  }
+
+  /** The id of the building or construction site in sight whose footprint covers (x, y). */
+  buildingAt(x: number, y: number): string | undefined {
+    return this.mirror.buildingAt(x, y)
+  }
+
+  /**
+   * About how many ticks until resident `id` arrives where they walk, ride or drive
+   * (`arrivalTicks`, `crates/csp-lang-wasm/src/estimate_rules.rs`): `order` is a way to estimate in
+   * place of their own, `ground` the ground of each tile of the path estimated, in its order (a
+   * road over any terrain, Plains where unexplored). Undefined for a resident not in sight or
+   * going nowhere. One call per way.
+   */
+  arrivalTicks(id: string, order: object | undefined, ground: Uint8Array): number | undefined {
+    return this.mirror.arrivalTicks(id, order && JSON.stringify(order), ground)
+  }
+
+  /**
+   * Calls the check on the world `name` (`crates/csp-lang-wasm/src/world_rules.rs`) with `args`,
+   * which go across as JSON (`undefined` as `null`), and answers its JSON result. Throws for a
+   * rule the module doesn't have or arguments it can't read.
+   */
+  rule<T>(name: string, ...args: unknown[]): T {
+    return JSON.parse(this.mirror.rule(name, JSON.stringify(args.map((a) => a ?? null)))) as T
+  }
+
+  /** Many checks in one call, each `[name, args]`, answered in order (`rule`). */
+  rules<T>(calls: readonly (readonly [string, readonly unknown[]])[]): T[] {
+    const json = JSON.stringify(calls.map(([name, args]) => [name, args.map((a) => a ?? null)]))
+    return JSON.parse(this.mirror.rules(json)) as T[]
+  }
+
+  /** Frees the module's memory for it. */
+  free(): void {
+    this.mirror.free()
+  }
 }

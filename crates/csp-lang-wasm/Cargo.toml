@@ -1,6 +1,6 @@
 [package]
 name = "csp-lang-wasm"
-description = "The editor's script checker: csp-lang's checker and the game's script tables, built to WebAssembly for packages/lang-wasm (ADR 0030, T88.3)."
+description = "The client's WebAssembly: csp-lang's script checker with the game's script tables (ADR 0030, T88.3), and the game's rules from csp-sim (ADR 0045, T122.1), for packages/lang-wasm."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -17,7 +17,7 @@ csp-lang.workspace = true
 csp-sim.workspace = true
 csp-shared.workspace = true
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
 # Pinned: `wasm-bindgen-cli` must be this same version (`scripts/wasm-build.mjs` says so).
 wasm-bindgen = "=0.2.130"
 

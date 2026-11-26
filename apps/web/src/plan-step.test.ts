@@ -1,12 +1,13 @@
-import { GOODS } from './shared/world.js'
-import { QUEUE_STEP_KINDS, queueSteps, queueStepsProblem, stepLine } from './shared/queue.js'
-import { freeHousing } from './shared/city.js'
+import { GOODS } from './world.js'
+import { QUEUE_STEP_KINDS, queueSteps } from './queue.js'
+import { queueStepsProblem, stepLine } from '@csp/lang-wasm'
+import { freeHousing } from './city.js'
 import type { Building, Condition, Queue, QueueStepRequest } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   PLAN_STEPS,
   PLAN_TASKS,
-  horsesIn,
+  ownHorsesIn,
   nextPick,
   pickCity,
   pickInto,
@@ -380,7 +381,7 @@ describe('Add step', () => {
 
   it('breeds two of the realm’s horses in the stable picked', () => {
     const plan = planned('breed', [30, 4])
-    expect(horsesIn(w, w.horses as never, plan.picked[0]!.id).map((h) => h.id)).toEqual([
+    expect(ownHorsesIn(w, w.horses as never, plan.picked[0]!.id).map((h) => h.id)).toEqual([
       'h1',
       'h2',
     ])

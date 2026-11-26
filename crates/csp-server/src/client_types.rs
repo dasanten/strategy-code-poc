@@ -34,10 +34,12 @@ macro_rules! roots {
     }};
 }
 
-/// Writes every client type, and an `index.ts` that re-exports each file, into `dir`.
+/// Writes every client type, the client's constants (`client_constants`), and an `index.ts` that
+/// re-exports each file, into `dir`.
 pub fn export_into(dir: &Path) -> io::Result<()> {
     fs::create_dir_all(dir)?;
     client_roots(&config(dir))?;
+    fs::write(dir.join("constants.ts"), crate::client_constants::constants_text())?;
     let names = generated_names(dir)?;
     add_missing_imports(dir, &names)?;
     let mut index = String::from(
@@ -194,6 +196,7 @@ fn client_roots(cfg: &Config) -> io::Result<()> {
         csp_shared::views::StartParamValues,
         csp_shared::views::TraderVisit,
         csp_shared::views::Weapon,
+        csp_shared::world::WorldState,
         csp_shared::world::Alliance,
         csp_shared::world::Army,
         csp_shared::world::Building,
@@ -253,6 +256,7 @@ fn client_roots(cfg: &Config) -> io::Result<()> {
         csp_shared::world::offers::SeenOffer,
         csp_shared::world::protocol::OrderRequest,
         csp_shared::world::protocol::Remembered,
+        csp_sim::queries::trader_trade::TraderPrice,
         csp_sim::admin_map::AdminLand,
         csp_sim::admin_map::AdminPlace,
         csp_sim::admin_map::AdminViewRequest,

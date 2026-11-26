@@ -1,5 +1,5 @@
 import { MAX_HUNGER, PAIRING_WAIT_TICKS, TICKS_PER_GAME_DAY } from '@csp/balance'
-import { ageInYears } from './shared/stats.js'
+import { ageInYears } from '@csp/lang-wasm'
 import type { City, Diplomacy, Good, Resident, Stock } from '@csp/shared-types'
 
 /** One heading of the Residents tab and the residents under it. */
