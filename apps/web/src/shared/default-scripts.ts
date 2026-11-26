@@ -1,8 +1,10 @@
 // Ported from packages/shared/src/default-scripts.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import type { ScriptParam, Task } from '@csp/shared-types'
-import { TARGET_PARAMS as ALL_TARGET_PARAMS, WORKPLACE_PARAM } from '@csp/shared-types'
+import type { Task } from '@csp/shared-types'
+import { TARGET_PARAMS as ALL_TARGET_PARAMS } from '@csp/shared-types'
+
+export { targetParam, isWorkScript, paramNeedsValue } from '@csp/lang-wasm'
 
 export { WORKPLACE_PARAM } from '@csp/shared-types'
 
@@ -16,25 +18,3 @@ export { WORKPLACE_PARAM } from '@csp/shared-types'
 export const TARGET_PARAMS: Partial<Readonly<Record<Task, string>>> = Object.fromEntries(
   Object.entries(ALL_TARGET_PARAMS).filter(([task]) => task !== 'repair'),
 )
-
-/** The target param of a script (`TARGET_PARAMS`), if it is the default of a task with one. */
-export function targetParam(script: { task?: Task | null }): string | undefined {
-  return script.task ? TARGET_PARAMS[script.task] : undefined
-}
-
-/**
- * Whether a script's `param` lines make it a work script (`CONTEXT.md`: Workplace settings): it
- * declares `param workplace: building`, as the Work default does.
- */
-export function isWorkScript(params: readonly Pick<ScriptParam, 'name' | 'type'>[]): boolean {
-  return params.some((p) => p.name === WORKPLACE_PARAM && p.type === 'building')
-}
-
-/**
- * Whether a script has nothing to go on without this param (`CONTEXT.md`: Script parameter, Before
- * it starts): it has no default and its comment says nothing after `none:`. The form before it
- * starts then opens by itself.
- */
-export function paramNeedsValue(p: Pick<ScriptParam, 'default' | 'description'>): boolean {
-  return p.default === undefined && !/\bnone:/.test(p.description ?? '')
-}

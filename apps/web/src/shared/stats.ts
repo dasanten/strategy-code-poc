@@ -1,10 +1,8 @@
 // Ported from packages/shared/src/balance.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { CHILD_GOODS, RECIPES, SKILL_MAX, WEAPON_ATTACK, WORKPLACE_SKILL } from './narrowed.js'
+import { RECIPES, SKILL_MAX, WEAPON_ATTACK, WORKPLACE_SKILL } from './narrowed.js'
 import {
-  ADULT_AGE,
-  CHILD_YEAR_DAYS,
   CONSTRUCTION_SKILL_MAX,
   CONSTRUCTION_SKILL_PER_DAY,
   DECLINE_AGE,
@@ -40,40 +38,11 @@ import type {
   StatName,
   Weapon,
 } from '@csp/shared-types'
+import { ageInYears } from '@csp/lang-wasm'
+
+export { ageInYears, canWork, canHandle } from '@csp/lang-wasm'
 
 export { type Recipe, stockWeight, carriageCanEnter } from '@csp/lang-wasm'
-
-/** Ticks from birth until a resident is grown up. */
-const CHILDHOOD_TICKS = ADULT_AGE * CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY
-
-/**
- * A resident's age in game years at the given tick: each year up to `ADULT_AGE` takes
- * `CHILD_YEAR_DAYS`, later years a full game year (`CONTEXT.md`: Aging).
- */
-export function ageInYears(resident: Pick<Resident, 'bornAt'>, tick: number): number {
-  const lived = tick - resident.bornAt
-  if (lived <= CHILDHOOD_TICKS) return lived / (CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY)
-  return ADULT_AGE + (lived - CHILDHOOD_TICKS) / TICKS_PER_GAME_YEAR
-}
-
-/** Whether a resident is grown up, so they can work, build or take any job (`CONTEXT.md`: Child). */
-export function canWork(resident: Pick<Resident, 'bornAt'>, tick: number): boolean {
-  return ageInYears(resident, tick) >= ADULT_AGE
-}
-
-/**
- * Whether a resident may pick up, put down, Fetch or Store these goods: anyone grown up, a child
- * only `CHILD_GOODS` (`CONTEXT.md`: Child).
- */
-export function canHandle(
-  resident: Pick<Resident, 'bornAt'>,
-  tick: number,
-  goods: readonly string[],
-): boolean {
-  return (
-    canWork(resident, tick) || goods.every((g) => (CHILD_GOODS as readonly string[]).includes(g))
-  )
-}
 
 /**
  * How much of their stats a resident keeps at the given tick: all of it until `DECLINE_AGE`,

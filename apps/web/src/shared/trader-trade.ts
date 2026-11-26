@@ -2,7 +2,7 @@
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
 import { commandsCarriage } from './alliance.js'
-import { caravanFoodFor, carriageCapacity } from './carriages.js'
+import { carriageCapacity } from './carriages.js'
 import { WAREHOUSE_FLOOR } from './narrowed.js'
 import { tradeOrgRefuses } from './standing.js'
 import { canWork, stockWeight } from './stats.js'
@@ -23,6 +23,9 @@ import type {
   WorldState,
 } from '@csp/shared-types'
 import { traderPriceFor } from '@csp/lang-wasm'
+import { traderStock } from '@csp/lang-wasm'
+
+export { traderStock } from '@csp/lang-wasm'
 
 export { traderPriceFor } from '@csp/lang-wasm'
 
@@ -63,13 +66,6 @@ export function traderVisitsTo(
     const city = s && world.cities.find((c) => c.id === s.cityId)
     return s && city?.realmId === realmId ? [{ ...s, traderId: t.id, city: city.name }] : []
   })
-}
-
-/** What a trader has to trade of its `load`: all of it but the Food its crew keep on board. */
-export function traderStock(t: Pick<Trader, 'escortIds'>, load: Stock): Stock {
-  const stock = { ...load }
-  stock.food = Math.max(0, (load.food ?? 0) - caravanFoodFor(t.escortIds.length))
-  return stock
 }
 
 /** What a wandering trader prices a good from: a share of a warehouse's floor. */
