@@ -455,7 +455,7 @@ fn invariant_only_a_living_leader_at_the_building_rallies() {
 
 #[test]
 fn a_leader_aboard_a_carriage_gets_off_first_to_rally() {
-    let (mut world, t) = setup();
+    let (mut world, _) = setup();
     worker(&mut world, "w1", MARA, "farm");
     put(&mut world, LEADER, FARM);
     world.carriages.push(crate::movement_test_world::carriage(
