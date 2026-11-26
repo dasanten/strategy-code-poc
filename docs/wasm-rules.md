@@ -20,6 +20,16 @@ reaches them through `@csp/lang-wasm` (`packages/lang-wasm/src/index.ts`).
   crosses back but answers. Rules that read the world are its methods, called with ids and
   coordinates. Everything in sight is kept in place in its list, found by id, in the server's order,
   so a tick costs what it changed.
+- **The TypeScript twins** (T122.8): what the client asks per frame, per tile or per row (`wrap`,
+  `covers`, `isDown`, `isRuin`, `patchLeft`, a building's realm, a carriage's horse and the rest)
+  stays a few lines of TypeScript beside its user, where a call into the module would cost more
+  than the rule. Each is held to its Rust original: `crates/csp-sim/tests/client_twins.rs` asks the
+  original on two fixture worlds as a realm is sent them and writes `client_twins.json`;
+  `apps/web/src/client-twins.test.ts` asks the twin the same and fails on any answer that differs.
+  ESLint's `csp/no-rule-copy` (`scripts/eslint-no-rule-copy.mjs`) refuses a top-level client
+  function named after a `queries/` function that is not one of those twins. A new twin is one line
+  in each test file; rewrite the answers with `CSP_WRITE_TWINS=1 cargo nextest run -p csp-sim
+client_twins`.
 - `pnpm wasm:build` (`scripts/wasm-build.mjs`) builds the module into
   `packages/lang-wasm/generated/`. The client awaits `loadLang()` before its first render
   (`apps/web/src/main.tsx`), since the rules are called as it renders; in Node and Vitest it loads
@@ -182,7 +192,8 @@ rest of #1634 does not fit until #1637 is decided.
 
 The rules on one building, resident or horse (`materialsNeeded` to `feedProblem`, #1634) take
 the thing whole and read it the way the mirror does (`SeenBuilding`, `SeenResident`, `SeenHorse`
-and `csp_sim::mirror::{resident, horse}`). The module is 541 KB gzipped (1,727 KB raw) with #1586, from
+and `csp_sim::mirror::{resident, horse}`). The module is 541 KB gzipped (1,727 KB raw) with #1586,
+from
 495 KB: over the 500 kB limit, which waits on #1637. The mirror's update is not touched (only
 `resident` and `horse` in `mirror.rs` became public), so its time stays as measured in T122.4.
 
@@ -227,7 +238,8 @@ server checks those orders. `relocateProblem` stays in TypeScript: it reads the 
 buildings the Player remembers out of sight (Last seen), which the mirror doesn't hold, so on the
 mirror every city out of sight would read as none of the realm's.
 
-The module is 584 KB gzipped (1,903 KB raw) after merging the epic tip with the last of #1634; these checks added 10 KB of it (542 to 552 KB before that merge). On a mirror of 4,450 buildings and 500
+The module is 584 KB gzipped (1,903 KB raw) after merging the epic tip with the last of #1634; these
+checks added 10 KB of it (542 to 552 KB before that merge). On a mirror of 4,450 buildings and 500
 residents in Node: `buildProblem` 0.28 ms for a house (its city area), 0.01 ms for a town hall,
 2 ms the first call after an update (the lookup by tile built again); a Build menu's 22 kinds
 0.4 ms; a tile's 5 thieves in one call 0.05 ms.
@@ -273,14 +285,15 @@ no terrain), `cityMembership`, `allied`, `alliedRealms` and `wallMap`; nothing i
 What changed in behaviour:
 
 - **Which orders get an estimate** is the server's (`Going::estimated` while it goes now): the same
-  kinds as the TypeScript (walking, relocating, driving, a haul route while driving, a store or fetch
+kinds as the TypeScript (walking, relocating, driving, a haul route while driving, a store or fetch
   order while it walks to its place).
 - **A resident not in the mirror** (in no `welcome` yet, or gone in a message the client hasn't
   shown) has no estimate; the TypeScript estimated anyone the client's world held.
 - **A construction site of no city** went to the area rules as city 999, a finished building of a
   city the client never named (`-1 + SITE`); it is a site of no city now.
 
-With `wasm-opt -Oz` (#1637), gzipped at level 6 as served: the module is **551.8 KB** (1,503 KB raw),
+With `wasm-opt -Oz` (#1637), gzipped at level 6 as served: the module is **551.8 KB** (1,503 KB
+raw),
 from 537.0 KB at the epic tip built the same way: **1.8 KB over the 550 kB limit**. Of the 14.8 KB,
 the arrival rule is 7.7 KB (`csp-sim`'s `arrival_ticks`: every order's `going()` and the pace
 rules; reading the order from JSON costs nothing, the mirror already reads orders) and
@@ -299,3 +312,119 @@ with a way), the old TypeScript against the call, same answers for all of them:
 
 The TypeScript estimate called `rideSpeed`, a value rule in the module since #1634, once per tile
 of a ridden way: that is the 435 ms. The call crosses once per way.
+
+## The end of `apps/web/src/shared/` (T122.8, #1587)
+
+`apps/web/src/shared/` is gone. What was left in it went one of three ways:
+
+- **Passed on a name only** (most files: `names.ts`, `goods.ts`, `waypoints.ts` and the rest): the
+  client imports the name from where it lives, `@csp/lang-wasm`, `@csp/shared-types` or
+  `@csp/balance`.
+- **No caller any more:** deleted, among them `buildingAt`, `pileTile`, `buildingPile`, `roadAt`,
+  `workplaceGood`, `standsStill`, `driverOf`, `horseRidden`, `armyOf`, `standingOf`,
+  `npcCityRefuses`, `forSale`, `citiesAt`, `contractOf`, `owedBy`, `tickFirstDay`, `stepLength`,
+  `middleOf` and `TARGET_PARAMS`. The client's wrappers of the area rules (`inCityArea`,
+  `cityIdsAt`, `cityAreaTiles`) went too: their three callers ask `@csp/lang-wasm` themselves.
+- **Client code:** moved next to its users in `apps/web/src/` (`building.ts`, `carriages.ts`,
+  `terrain.ts` and so on; `horses.ts` and `offers.ts` became `horse-rules.ts` and
+  `offer-rules.ts`, as Windows reads those names as `Horses.tsx` and `Offers.tsx`): wording
+  (estimates, directives, the phone's clock), the terrain chunks' codec (`map/chunk-codec.ts`),
+  the admin map's paths, the balance tables cast to their types, and the TypeScript twins below.
+
+### The TypeScript twins
+
+78 functions the client keeps in TypeScript have a Rust original. They are what it asks per frame,
+per tile or per row of a list: a call into the module crosses with JSON both ways, which costs
+more than these rules do, and some are drawn every frame (`wrap`, `covers`, `isAt`, `isDown`,
+`isRuin`, `isStone`, `patchLeft`, `roadLine` while a line is dragged). Each is held to its
+original by the client twins test (How it fits together, above): `client_twins.rs` asks the
+original on `sight/two-realms.json` (with an army, a supply wagon, a haul route, a teacher and a
+trainee, a breeding pair, a rider, the Down, a ruin, a stone wall, gear, an offer, a road, a boat
+and a ship at a haven added) and `trade/transfers.json` (the Trade Org's HQ and a post, their
+warehouses and caravan), as a realm is sent them, and `client-twins.test.ts` asks the twin.
+
+| File                                     | Twins                                                                                                                                                                        |
+| :--------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `army.ts`                                | `armyDrivenTo`, `spareFood`                                                                                                                                                  |
+| `building.ts`                            | `holdersOf`, `workersOf`, `teacherAt`, `traineesOf`, `takesWorkSettings`, `isStone`, `recipeGood`, `roadLine`, `roadTiles`                                                   |
+| `carriages.ts`                           | `carriageCapacity`, `horseFor`, `hitchHorseProblem`, `carriagePulledBy`, `crewIdsOf`, `drivenCarriageId`, `carriageOfResident`                                               |
+| `city.ts`                                | `buildingRealm`, `isOutpostStorage`, `cityResidents`, `townHallOf`, `housingRoom`, `freeHousing`, `occupationTicksLeft`                                                      |
+| `decay.ts`, `walls.ts`, `footprint.ts`   | `isRuin`; `isWallOrGate`, `isClosed`; `covers`, `isAt`, `footprintTiles`                                                                                                     |
+| `direct-offer.ts`, `first-day.ts`        | `citiesToCarryAt`; `firstDayShown`                                                                                                                                           |
+| `horse-rules.ts`, `reviving.ts`          | `breedersAt`, `riderOf`, `horseOfResident`; `horseFull`, `feedHorseProblem`                                                                                                  |
+| `offer-rules.ts`                         | `offersAt`, `setAsideAt`, `freeStock`, `timesToPost`, `offerOpenTo`, `wantsNothing`                                                                                          |
+| `relocate.ts`                            | `relocatingTo`, `relocateRoom`, `relocateProblem` (they read Last seen, which the mirror doesn't hold)                                                                       |
+| `stats.ts`, `persuasion.ts`, `world.ts`  | `bestWeapon`, `isArmed`; `fighterStrength`; `isDown`                                                                                                                         |
+| `terrain.ts`, `patch.ts`, `richness.ts`  | `wrap`, `wrapDelta`, `wrapDistance`, `tileIndex`, `isWater`, `isPassableTerrain`; `patchLeft`, `gatheredOn`; `richnessFactor`                                                |
+| `vessels.ts`                             | `besideVessel`, `crewShort`, `vesselCapacity`, `vesselName`, `vesselRoom`, `vesselOfResident`                                                                                |
+| `warehouse.ts`, `swap.ts`, `transfer.ts` | `warehouseKeeps`, `stockFloor`, `tradeCoinWarehouse`, `deliveryStorage`, `quoteTrade`, `quoteDelivery`, `quotePickUp`; `quoteSwap`; `transferWarehouses`, `nearestWarehouse` |
+| `pick-preview.ts`                        | `buildingAt` (the pick preview's, in sight or as last seen)                                                                                                                  |
+
+What the test found, and what changed for it:
+
+- **A ruined house housed residents** on the client (`housingRoom`, so `freeHousing` and
+  `relocateRoom`): a ruin houses nobody (`docs/context/building.md`: Ruin), as the server has it.
+- **`wrapDistance`** takes the root of the exact sum of squares: `Math.hypot` differs from Rust's
+  `hypot` in the last bit on some tiles; the root of the exact sum doesn't, on whole tiles.
+- **The pick preview's `buildingAt`** left out roads only. It leaves out every kind that shares a
+  tile (`SHARES_A_TILE`: carriage, boat, ship and siege machine sites too), as the server's does.
+
+**`csp/no-rule-copy`** (ESLint, `scripts/eslint-no-rule-copy.mjs`) reads the names every
+`crates/csp-sim/src/queries/` module exports (a `pub fn` at the top of the file) and the twins of
+`client_twins.json`, and refuses a top-level function or arrow constant in `apps/web` named after
+a `queries/` function that is not a twin. `world-rules.ts` (each function there calls the module)
+and tests are left out; so are `goodName` and `kindName` (`wiki/names.ts`), which read the
+generated name tables. Two client functions that only shared a name were renamed:
+`selection-view.ts`'s `armyOf` (the army an order is for) is `orderArmy`, and `plan-step.ts`'s
+`horsesIn` is `ownHorsesIn`, which now asks the module's `horsesIn`.
+
+Not checked: client functions outside the old `shared/` named after a `csp-sim` function outside
+`queries/` (`zeal.ts`'s `rallyProblem`, `doing-view.ts`'s `taskOf`, `group-orders.ts`'s
+`placeOf` and a few more). The lint covers `queries/`, as the ticket set it.
+
+### What came out of the module
+
+The module held rules no client code called any more, most of them since their views went to the
+server's answer (#1634): 45 value rules (`siteWorkOf`, `cornersCovering`, `roadLine`,
+`caravanFoodFor`, `foodForWay`, `carriageCanEnter`, `traderPriceFor`, `npcPriceFor`,
+`transferFee`, `feeAtPickUp`, `transferLoads`, `carriedUnloadShares`, `horseStockFactor`,
+`npcSoldierTarget`, `npcFullDays`, `npcFoundingPartySize`, `isFirstDayLine`,
+`isClientFirstDayLine`, `idNumber`, `riderSpareFood`, `traderStock`, `renameWaypointProblem`,
+`removeWaypointProblem`, `offerTermsProblem`, `brokenReturns`, `inInnerRingAround`, `ageFactor`,
+`constructionLearned`, `foodUse`, `workLearned`, `foodPerTick`, `rideSpeed`, `horseWorth`,
+`contractWeeks`, `contractEndsAt`, `contractPayBy`, `demandsCounted`, `demandsLeft`, `goalsMet`,
+`renameProblem`, `horseRenameProblem`, `cityRenameProblem`, `formerPlayerStanding`,
+`traderPrices`, `traderEscortsWanted`), `checkNames` with an env sent as JSON (the editor asks
+`checkGameNames`) and `inAnyCityArea`. Their readers went with them (a realm, a contract, a city,
+a trader, a checker env). A rule a view needs again comes back as one arm in `value_rules.rs` and
+one function in `rules.ts`. The checks of `workLearned` and `constructionLearned` that
+`balance.test.ts` held are Rust tests now (`queries/balance.rs`).
+
+### Measurements (T122.8)
+
+The same messages as T122.1 (a real Player of the live world: 4,949 things in sight, a 4.4 MB
+`welcome`, 30 ticks of about 416 changes), `node scripts/wasm-rules-bench.mjs`, Node 22, the same
+machine, three runs each while other sessions worked on it, the epic's tip before this ticket
+(#1641 merged) built the same way and run in turn:
+
+| What                                           |  Limit |          T122.1 (#1580) |                                Epic tip before T122.8 |                                                T122.8 |
+| :--------------------------------------------- | -----: | ----------------------: | ----------------------------------------------------: | ----------------------------------------------------: |
+| Added download, compressed                     | 550 kB |                 388 KiB |                    565.0 kB (551.8 KiB), 1,539 kB raw |                **539.4 kB** (526.7 KiB), 1,444 kB raw |
+| Start: load the module, mirror the first world | 150 ms |                   47 ms |                                          49.3–51.7 ms |                                          47.8–51.0 ms |
+| Mirror update per tick                         |   4 ms | 2.8 ms mean, 3.4 ms p95 |                   3.76–3.83 ms mean, 4.10–4.33 ms p95 |                   3.77–4.09 ms mean, 4.34–4.91 ms p95 |
+| One rule call (`buildingAt`)                   |   1 ms |           0.002 ms mean | 0.002 ms mean; 0.15–0.17 ms the first after an update | 0.002 ms mean; 0.15–0.20 ms the first after an update |
+
+The download is under its limit by 10.6 kB. Earlier sections counted the module in KiB as the bench
+prints it (`KB`): the 551.8 "KB" of #1641 was 565.0 kB. The update is what the mirror costs, and
+this ticket didn't change the mirror: tip and branch measure the same, within the noise of a loaded
+machine. Its mean sits at the limit, under it in most runs; its p95 is over it, as #1637 found.
+Start and a rule call are far under theirs.
+
+The module's size is counted in kB of 1,000 bytes, gzipped at level 6 as `tower-http` serves it.
+
+**In the browser:** the session that took these could not bring the browser pane on screen, so the
+page ran as a background page; its frame times are not reported. The game was played there on a
+copy of the live world (format 148): founding a realm, the Build menu and its reasons, laying out a
+road, queueing a wall line, a refused order, a resident's card, and panning Eastwick, a large
+player city, with every tile in sight (creative mode's Reveal); no error from the module or the
+mirror in the console.
