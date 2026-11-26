@@ -224,7 +224,7 @@ server checks those orders. `relocateProblem` stays in TypeScript: it reads the 
 buildings the Player remembers out of sight (Last seen), which the mirror doesn't hold, so on the
 mirror every city out of sight would read as none of the realm's.
 
-The module is 552 KB gzipped (1,764 KB raw), from 542 KB. On a mirror of 4,450 buildings and 500
+The module is 584 KB gzipped (1,903 KB raw) after merging the epic tip with the last of #1634; these checks added 10 KB of it (542 to 552 KB before that merge). On a mirror of 4,450 buildings and 500
 residents in Node: `buildProblem` 0.28 ms for a house (its city area), 0.01 ms for a town hall,
 2 ms the first call after an update (the lookup by tile built again); a Build menu's 22 kinds
 0.4 ms; a tile's 5 thieves in one call 0.05 ms.
