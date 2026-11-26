@@ -1,8 +1,7 @@
 // Ported from packages/shared/src/time.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR } from '@csp/balance'
-import { GAME_DAYS_PER_YEAR, TICKS_PER_GAME_HOUR } from '@csp/balance'
+import { GAME_DAYS_PER_YEAR, TICKS_PER_GAME_DAY, TICKS_PER_GAME_HOUR } from '@csp/balance'
 
 export { GAME_DAYS_PER_YEAR, TICKS_PER_GAME_HOUR } from '@csp/balance'
 

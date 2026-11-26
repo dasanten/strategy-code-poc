@@ -1,7 +1,7 @@
 // Gathering by hand and patches (`CONTEXT.md`: Gathering, Patch), as the server's `gathering.rs`
 // has them: what a tile's patch holds now and when it is full again.
 import { PATCH_REGROW_DAYS, PATCH_REST_DAYS, PATCH_SIZE, TICKS_PER_GAME_DAY } from '@csp/balance'
-import type { Good, SeenPatch } from '@csp/shared-types'
+import type { SeenPatch } from '@csp/shared-types'
 import { Terrain } from './terrain.js'
 import { GATHERED_GOODS } from '@csp/shared-types'
 

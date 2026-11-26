@@ -3,7 +3,7 @@
 
 import { CHUNK_SIZE } from './terrain.js'
 import { RICHNESSES } from './richness.js'
-import type { KnownNode, ResourceKind, TerrainChunk } from '@csp/shared-types'
+import type { KnownNode, TerrainChunk } from '@csp/shared-types'
 import { NODE_KINDS } from '@csp/shared-types'
 
 export { NODE_KINDS } from '@csp/shared-types'

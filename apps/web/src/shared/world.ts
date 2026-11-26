@@ -22,7 +22,6 @@ import type {
   RealmEvent,
   Remembered,
   Resident,
-  ResourceKind,
   ResourceNode,
   SkillName,
   Stock,

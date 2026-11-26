@@ -49,7 +49,6 @@ import type {
   Pile,
   Resident,
   ResidentOrder,
-  ResourceKind,
   ResourceNode,
   Stock,
   WallMaterial,

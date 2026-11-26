@@ -41,7 +41,6 @@ import type {
   TradeHolder,
   TradeQuote,
   TradeSide,
-  Weapon,
 } from '@csp/shared-types'
 import { NPC_SMITHY_WEAPON } from '@csp/shared-types'
 

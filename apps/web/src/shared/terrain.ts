@@ -4,7 +4,7 @@
 import { Terrain as TerrainCodes } from '@csp/balance'
 import type { Terrain as TerrainCode } from '@csp/shared-types'
 import { DIAGONAL_STEP } from '@csp/balance'
-import { CHUNK_SIZE, TERRAIN_BATCH_PATH, OVERVIEW_SCALE } from '@csp/shared-types'
+import { CHUNK_SIZE } from '@csp/shared-types'
 
 export {
   CHUNK_SIZE,

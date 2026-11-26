@@ -25,7 +25,7 @@ import {
   TICKS_PER_GAME_DAY,
   hungerFactor,
 } from '@csp/balance'
-import type { Building, BuildingKind, City, Resident } from '@csp/shared-types'
+import type { Building, City, Resident } from '@csp/shared-types'
 import { CITY_BUILDINGS } from '@csp/shared-types'
 
 /** World queries about cities (ADR 0002: the game API orders and scripts share). */
