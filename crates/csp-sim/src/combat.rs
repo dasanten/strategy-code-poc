@@ -174,11 +174,11 @@ fn wanted_at_home(world: &WorldState, org: &str, t: &Resident, size: i32) -> boo
 }
 
 /// Whether `a` striking `t` is a crime (`isAggression`): not when `a` fights back at someone who
-/// hit them, nor when `t` attacks someone of `a`'s Organization on their own account, or breaks or
-/// climbs one of its walls or gates. The Trade Org HQ's soldiers keep its inner ring clear, a
-/// trading post goes after a thief it knows of, and an Organization strikes those wanted in its
-/// own City area, none of it a crime. For `t` running their defence script, what it interrupted is
-/// what they are doing.
+/// hit them, nor when `t` attacks someone of `a`'s Organization on their own account, or breaks,
+/// rams, throws at or climbs one of its walls or gates. The Trade Org HQ's soldiers keep its inner
+/// ring clear, a trading post goes after a thief it knows of, and an Organization strikes those
+/// wanted in its own City area, none of it a crime. For `t` running their defence script, what it
+/// interrupted is what they are doing.
 fn is_aggression(world: &WorldState, a: &Resident, t: &Resident, size: i32) -> bool {
     if matches!(&a.order, Some(ResidentOrder::Attack(o)) if o.defending == Some(true)) {
         return false;

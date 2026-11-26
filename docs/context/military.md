@@ -96,6 +96,10 @@
     stands in the open. The Stone it throws is what its crew on its tile carry, then what lies in
     the pile on its tile (the machine itself holds no goods); out of Stone it stops. It is aimed
     at a building or at a tile of one. *(Decided overnight, Daniel to confirm.)*
+  - **Ramming and throwing attack:** swinging a ram or throwing with a catapult at a city's wall,
+    gate or tower strikes its owner, as a blow or a climb does: striking its crew there is no
+    aggression, an NPC city counts them as attackers, and residents lent by an NPC city never ram
+    or throw at its walls. Pushing the machine up is no attack: nothing is struck yet.
 - **Loot:** when a resident dies, everything they carried drops on the ground for anyone to take.
 - **Capturing a city:** only by occupying its town hall for a set number of game days without a
   break (Occupying a town hall; ADR 0017). When the time is up, the city and its residents join
@@ -129,7 +133,7 @@
   It lends nobody while it feels threatened: while it
   weighs a demand (Demand), while its town hall is occupied, or while armed residents of the
   hirer stand in its area or in sight of it. Those it lends never act against it: they refuse an
-  order to attack its residents, walls or gates, to climb its walls or to tear down its buildings,
+  order to attack its residents, walls or gates, to climb, ram or throw at its walls or to tear down its buildings,
   they can't occupy its town hall, and they never count as the hirer's fighters toward it
   (Respect). Paying
   and ending go as in any mercenary contract: each week in advance into that storage, an unpaid

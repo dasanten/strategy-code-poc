@@ -230,3 +230,30 @@ fn lent_residents_never_count_toward_their_citys_respect_for_the_hirer() {
     world.residents.retain(|r| r.id != "lent" && r.id != "lent2");
     assert_eq!(respect_seen_by(&world, &c1, "realm1", SIZE), with_lent);
 }
+
+#[test]
+fn a_ram_or_throw_order_at_their_citys_wall_ends_and_the_invariant_catches_it() {
+    for kind in ["ram", "throw"] {
+        let (mut world, _) = setup();
+        r_mut(&mut world, "lent").order = Some(
+            serde_json::from_value(
+                json!({"kind": kind, "machineId": "m1", "targetId": "w1", "progress": 0}),
+            )
+            .expect("an order"),
+        );
+        let found = lent_never_turn(&world);
+        assert_eq!(found.len(), 1, "{kind}");
+        assert_eq!(found[0].entity_ids, vec!["lent".to_string(), "w1".to_string()], "{kind}");
+        drop_orders_against_lender(&mut world);
+        assert_eq!(r_mut(&mut world, "lent").order, None, "{kind}");
+        // At another city's wall it stays.
+        r_mut(&mut world, "lent").order = Some(
+            serde_json::from_value(
+                json!({"kind": kind, "machineId": "m1", "targetId": "w2", "progress": 0}),
+            )
+            .expect("an order"),
+        );
+        drop_orders_against_lender(&mut world);
+        assert!(r_mut(&mut world, "lent").order.is_some(), "{kind}");
+    }
+}
