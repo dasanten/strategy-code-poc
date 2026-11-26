@@ -18,9 +18,10 @@ use csp_shared::protocol::{
     ScriptIdOnly, SeenArmy, SeenCaravan, SeenCarriage, SeenEntity, SeenHorse, SeenInterrupted,
     SeenMachine, SeenResident, SeenScript, SeenTrader, SeenVessel,
 };
+use csp_shared::world::offers::SeenOffer;
 use csp_shared::world::{
-    Army, Caravan, CaravanStop, Carriage, Horse, Interrupted, Patch, Resident, RunningScript,
-    SiegeMachine, Trader, TraderStop, Vessel, WorldState,
+    Army, Caravan, CaravanStop, Carriage, Horse, Interrupted, Offer, Patch, Resident,
+    RunningScript, SiegeMachine, Trader, TraderStop, Vessel, WorldState,
 };
 
 /// Down until when, for someone seen to be Down without being told until when: as long as it
@@ -73,35 +74,46 @@ impl SightMirror {
         self.at.len()
     }
 
-    /// Starts over from a `welcome` message: the map's `size` and everything in sight, in the
-    /// server's order.
-    pub fn welcome(&mut self, size: i32, entities: impl IntoIterator<Item = SeenEntity>) {
-        let tick = self.world.tick;
+    /// Starts over from a `welcome` message: the map's `size`, the server's `tick` and everything
+    /// in sight, in the server's order.
+    pub fn welcome(
+        &mut self,
+        size: i32,
+        tick: u64,
+        entities: impl IntoIterator<Item = SeenEntity>,
+    ) {
+        let updates = self.world.next_id;
         self.size = size;
         self.world = WorldState::default();
         self.at.clear();
         for e in entities {
             self.put(e);
         }
-        self.changed(tick);
+        self.changed(tick, updates);
     }
 
-    /// Takes in a `tick` message: what came into sight or changed, then what left it.
-    pub fn tick(&mut self, changed: impl IntoIterator<Item = SeenEntity>, gone: &[String]) {
-        let tick = self.world.tick;
+    /// Takes in a `tick` message: its tick, what came into sight or changed, then what left it.
+    pub fn tick(
+        &mut self,
+        tick: u64,
+        changed: impl IntoIterator<Item = SeenEntity>,
+        gone: &[String],
+    ) {
         for e in changed {
             self.put(e);
         }
         for id in gone {
             self.remove(id);
         }
-        self.changed(tick);
+        self.changed(tick, self.world.next_id);
     }
 
-    /// The lookups the rules keep (`world_index`) have the tick in their stamp: a new one each
-    /// update, so they are built again on their next use.
-    fn changed(&mut self, tick: u64) {
-        self.world.tick = tick + 1;
+    /// The world is at the server's `tick`. The lookups the rules keep (`world_index`) are built
+    /// again when their stamp changes, which has `next_id` in it: the mirror counts its updates
+    /// there (it makes no ids), so every update gets a new stamp, a welcome at the same tick too.
+    fn changed(&mut self, tick: u64, updates: u64) {
+        self.world.tick = tick;
+        self.world.next_id = updates + 1;
     }
 
     /// Something in sight, new or changed: changed in place, new at the end of its list.
@@ -110,7 +122,13 @@ impl SightMirror {
         let w = &mut self.world;
         let (kind, len) = match e {
             SeenEntity::Resident(r) => put(&mut w.residents, &self.at, &id, resident(*r)),
-            SeenEntity::Building(b) => put(&mut w.buildings, &self.at, &id, b.building),
+            SeenEntity::Building(b) => {
+                // The offers standing at a storage come with it (`SeenBuilding.offers`): they
+                // replace what the mirror held there.
+                w.offers.retain(|o| o.storage_id != id);
+                w.offers.extend(b.offers.into_iter().flatten().map(offer));
+                put(&mut w.buildings, &self.at, &id, b.building)
+            }
             SeenEntity::City(c) => put(&mut w.cities, &self.at, &id, c.city),
             SeenEntity::Horse(h) => put(&mut w.horses, &self.at, &id, horse(h)),
             SeenEntity::Carriage(k) => put(&mut w.carriages, &self.at, &id, carriage(k)),
@@ -135,6 +153,9 @@ impl SightMirror {
     fn remove(&mut self, id: &str) {
         let Some((kind, i)) = self.at.remove(id) else { return };
         let w = &mut self.world;
+        if kind == Kind::Building {
+            w.offers.retain(|o| o.storage_id != id);
+        }
         match kind {
             Kind::Resident => drop(w.residents.remove(i)),
             Kind::Building => drop(w.buildings.remove(i)),
@@ -202,6 +223,25 @@ fn put<T: Kept>(
             list.push(item);
             (T::KIND, Some(list.len() - 1))
         }
+    }
+}
+
+/// An offer standing at a storage in sight, as sent with it (`seen_offer`): the offer itself,
+/// less the rate worked out for the Player. A carried Direct offer stands at no storage and isn't
+/// sent with one.
+fn offer(o: SeenOffer) -> Offer {
+    Offer {
+        id: o.id,
+        realm_id: o.realm_id,
+        storage_id: o.storage_id,
+        x: o.x,
+        y: o.y,
+        gives: o.gives,
+        gives_units: o.gives_units,
+        wants: o.wants,
+        wants_units: o.wants_units,
+        times: o.times,
+        direct: o.direct,
     }
 }
 
