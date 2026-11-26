@@ -14,7 +14,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use csp_sim::queries::{
     building, building_info, carriages, city_area, combat, demand, direct_offer, horse_market,
-    npc_trade, people, residents, trader_trade, transfer, warehouse, warehouse_trade,
+    npc_trade, people, residents, trader_trade, transfer, walls, warehouse, warehouse_trade,
 };
 
 /// A tile as a rule takes it: (x, y).
@@ -23,6 +23,26 @@ type Tile = (f64, f64);
 /// The arguments of a call, read as the tuple the rule takes.
 fn args<T: DeserializeOwned>(name: &str, json: &str) -> Result<T, String> {
     serde_json::from_str(json).map_err(|e| format!("{name}: {e}"))
+}
+
+/// A building the client passes: a `SeenBuilding` as it was sent (its `is` too) or a plain one,
+/// read the way the world mirror reads one, so the module needs no other reader for it.
+fn building_arg(mut v: Value) -> Result<csp_shared::world::Building, String> {
+    if let Some(map) = v.as_object_mut() {
+        // What a Player sees of it besides the building, which these rules don't read.
+        for key in ["is", "prices", "offers"] {
+            map.remove(key);
+        }
+    }
+    serde_json::from_value::<csp_shared::protocol::SeenBuilding>(v)
+        .map(|seen| seen.building)
+        .map_err(|e| format!("a building: {e}"))
+}
+
+/// The building in a call's only argument.
+fn one_building(name: &str, json: &str) -> Result<csp_shared::world::Building, String> {
+    let (b,): (Value,) = args(name, json)?;
+    building_arg(b)
 }
 
 /// A price as the client has it.
@@ -370,6 +390,24 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
         "isParamChoice" => {
             let (param, value): (ParamInfo, Value) = args(name, json)?;
             json!(csp_sim::script_api::is_param_choice(&param, &value))
+        }
+        // Rules on one building (T122.5b): the client passes the building.
+        "materialsNeeded" => json!(building::materials_needed(&one_building(name, json)?)),
+        "workNeeded" => json!(building::work_needed(&one_building(name, json)?)),
+        "teardownWork" => json!(building::teardown_work(&one_building(name, json)?)),
+        "teardownLeft" => json!(building::teardown_left(&one_building(name, json)?)),
+        "teardownReturns" => json!(building::teardown_returns(&one_building(name, json)?)),
+        "conditionOf" => {
+            let b = one_building(name, json)?;
+            json!(csp_sim::repair::condition_of(&b).map(|c| c.name()))
+        }
+        "repairable" => json!(csp_sim::repair::repairable(&one_building(name, json)?)),
+        "brokenReturns" => json!(walls::broken_returns(&one_building(name, json)?)),
+        "wallStrength" => json!(walls::wall_strength(&one_building(name, json)?)),
+        "wallStrengthLeft" => json!(walls::wall_strength_left(&one_building(name, json)?)),
+        "inInnerRingAround" => {
+            let (hall, at, size): (Value, Tile, i32) = args(name, json)?;
+            json!(csp_sim::queries::trade_org::in_inner_ring_around(&building_arg(hall)?, at, size))
         }
         _ => return Err(format!("no rule {name}")),
     };

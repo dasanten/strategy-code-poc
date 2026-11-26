@@ -3,6 +3,9 @@
 import * as B from '@csp/balance'
 import type { Building, BuildingKind } from '@csp/shared-types'
 import { repairWork, rebuildWork } from '@csp/lang-wasm'
+import { conditionOf } from '@csp/lang-wasm'
+
+export { conditionOf, repairable } from '@csp/lang-wasm'
 
 export { repairMaterials, repairWork, rebuildMaterials, rebuildWork } from '@csp/lang-wasm'
 
@@ -25,21 +28,6 @@ type Decaying = Pick<Building, 'kind' | 'site' | 'decay' | 'ruinedAt'>
 /** Whether it is a ruin: it stands but does nothing (`CONTEXT.md`: Ruin). */
 export function isRuin(b: Pick<Building, 'ruinedAt'>): boolean {
   return b.ruinedAt !== undefined
-}
-
-/** How the building's condition reads; undefined for a site or a kind that never decays. */
-export function conditionOf(b: Decaying): Condition | undefined {
-  if (b.site || DECAY_DAYS[b.kind] === undefined) return undefined
-  if (isRuin(b)) return 'ruin'
-  const lost = b.decay ?? 0
-  return lost >= B.DECAY_NEARLY_RUIN ? 'nearlyRuin' : lost >= B.DECAY_WORN ? 'worn' : 'good'
-}
-
-/** Whether it can be repaired, or as a ruin rebuilt: worn or worse, or with a repair under way. */
-export function repairable(b: Decaying & Pick<Building, 'repair'>): boolean {
-  if (b.repair) return true
-  const c = conditionOf(b)
-  return c !== undefined && c !== 'good'
 }
 
 /**

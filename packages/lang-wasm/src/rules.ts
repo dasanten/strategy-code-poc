@@ -4,6 +4,7 @@
 // gone; each function here crosses into the module once.
 
 import type {
+  Building,
   BuildingKind,
   CarriedFeeBy,
   ClientFirstDayLine,
@@ -508,4 +509,80 @@ export function paramNeedsValue(p: Pick<ScriptParam, 'default' | 'description'>)
 /** Whether a value fits a `choice` param: one of the words its line lists. */
 export function isParamChoice(param: Pick<ScriptParam, 'choices'>, value: unknown): boolean {
   return rule('isParamChoice', paramInfo({ type: 'choice', ...param }), value)
+}
+
+// Rules on one building (T122.5b): the building goes across whole; what a caller leaves out of
+// it (a `Pick`) reads as a building with no id, of no city, on (0, 0).
+
+/** A building as the module reads it, from what the caller has of one. */
+function asBuilding(b: Partial<Building> & Pick<Building, 'kind'>): Building {
+  return { id: '', cityId: null, x: 0, y: 0, ...b }
+}
+
+/** Materials a construction site still needs. */
+export function materialsNeeded(site: Building): Stock {
+  return rule('materialsNeeded', asBuilding(site))
+}
+
+/** Work a construction site still needs. */
+export function workNeeded(site: Building): number {
+  return rule('workNeeded', asBuilding(site))
+}
+
+/** Work tearing down a building takes (`TEARDOWN_WORK_SHARE` of what building it took). */
+export function teardownWork(b: Building): number {
+  return rule('teardownWork', asBuilding(b))
+}
+
+/** Work tearing down a building still takes. */
+export function teardownLeft(b: Building): number {
+  return rule('teardownLeft', asBuilding(b))
+}
+
+/** What tearing a building down leaves: a site's delivered goods, a building's share of them. */
+export function teardownReturns(b: Building): Stock {
+  return rule('teardownReturns', asBuilding(b))
+}
+
+/** How a building's condition reads, by its decay (`CONTEXT.md`: Decay); none for one that never decays. */
+export function conditionOf(
+  b: Pick<Building, 'kind' | 'site' | 'decay' | 'ruinedAt'>,
+): 'good' | 'worn' | 'nearlyRuin' | 'ruin' | undefined {
+  return opt(rule<'good' | 'worn' | 'nearlyRuin' | 'ruin' | null>('conditionOf', asBuilding(b)))
+}
+
+/** Whether a building can be repaired or rebuilt: worn or worse, or being repaired. */
+export function repairable(
+  b: Pick<Building, 'kind' | 'site' | 'decay' | 'ruinedAt' | 'repair'>,
+): boolean {
+  return rule('repairable', asBuilding(b))
+}
+
+/** What a broken wall, gate or tower leaves (`BROKEN_MATERIALS_RETURNED` of its materials). */
+export function brokenReturns(b: Building): Stock {
+  return rule('brokenReturns', asBuilding(b))
+}
+
+/** Damage a wall, gate or tower takes before it falls, of wood or stone. */
+export function wallStrength(b: Building): number {
+  return rule('wallStrength', asBuilding(b))
+}
+
+/** Damage a wall, gate or tower still takes before it falls. */
+export function wallStrengthLeft(b: Building): number {
+  return rule('wallStrengthLeft', asBuilding(b))
+}
+
+/** Whether (x, y) is in the inner ring around the Trade Org HQ's town hall `hall`. */
+export function inInnerRingAround(
+  hall: { kind: string; x: number; y: number },
+  at: { x: number; y: number },
+  size: number,
+): boolean {
+  return rule(
+    'inInnerRingAround',
+    asBuilding(hall as Pick<Building, 'kind' | 'x' | 'y'>),
+    [at.x, at.y],
+    size,
+  )
 }

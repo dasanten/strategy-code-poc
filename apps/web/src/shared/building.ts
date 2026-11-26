@@ -24,14 +24,7 @@ import {
   wrapDelta,
 } from './terrain.js'
 import { CARRYING_A_CHILD, NODE_WORKPLACE, isTrainingSubject } from './world.js'
-import {
-  MAP_SIZE,
-  TEARDOWN_MATERIALS_RETURNED,
-  TEARDOWN_WORK_SHARE,
-  TRAINING_GROUND_MAX_TRAINEES,
-  buildWork,
-  carryCapacity,
-} from '@csp/balance'
+import { MAP_SIZE, TRAINING_GROUND_MAX_TRAINEES, buildWork, carryCapacity } from '@csp/balance'
 import type {
   BuildLine,
   Building,
@@ -46,13 +39,14 @@ import type {
   WorldState,
 } from '@csp/shared-types'
 import { NODE_GOOD } from '@csp/shared-types'
-import {
-  materialsOfKind,
-  workOfKind,
-  siteWorkOf,
-  hasChoice,
-  recipeFor,
-  cornersCovering,
+import { siteWorkOf, hasChoice, recipeFor, cornersCovering } from '@csp/lang-wasm'
+
+export {
+  materialsNeeded,
+  workNeeded,
+  teardownWork,
+  teardownLeft,
+  teardownReturns,
 } from '@csp/lang-wasm'
 
 export {
@@ -308,27 +302,9 @@ export function carriageCanGoTo(
   return carriageCanEnter(road && !road.site ? Terrain.Road : terrainAt(map, x, y))
 }
 
-/** Materials a construction site still needs before it can become the building. */
-export function materialsNeeded(site: Building): Stock {
-  const out: Stock = {}
-  for (const [good, units] of Object.entries(materialsOfKind(site.kind, site.material)) as [
-    Good,
-    number,
-  ][]) {
-    const left = units - (site.site?.delivered[good] ?? 0)
-    if (left > 0) out[good] = left
-  }
-  return out
-}
-
 /** Whether a building of `kind` of `material` is of stone: only a wall, gate or tower can be. */
 export function isStone(kind: BuildingKind, material?: WallMaterial | null): boolean {
   return material === 'stone' && (kind === 'wall' || kind === 'gate' || kind === 'tower')
-}
-
-/** Work a construction site still needs, out of its `BUILD_WORK` (`siteWorkOf`). */
-export function workNeeded(site: Building): number {
-  return Math.max(0, workOfKind(site.kind, site.material) - (site.site?.work ?? 0))
 }
 
 /**
@@ -684,21 +660,6 @@ export function workProblem(
 }
 
 /**
- * Work it takes to tear down a building or construction site (`CONTEXT.md`: Tearing down):
- * `TEARDOWN_WORK_SHARE` of the building's work, or of the work put into the site so far. Like
- * building, a resident's work on a road on Mountain counts less (`siteWorkOf`).
- */
-export function teardownWork(b: Building): number {
-  const built = b.site ? b.site.work : workOfKind(b.kind, b.material)
-  return built * TEARDOWN_WORK_SHARE
-}
-
-/** Work still needed to tear it down. */
-export function teardownLeft(b: Building): number {
-  return Math.max(0, teardownWork(b) - (b.teardown ?? 0))
-}
-
-/**
  * The residents working on a building or construction site now, standing on it: building it (a
  * build order or a line order on its site) or, with `tearingDown`, tearing it down.
  */
@@ -728,23 +689,6 @@ export function workPace(
   under?: number,
 ): number {
   return workers.reduce((sum, r) => sum + siteWorkOf(buildWork(r, tick), b.kind, under), 0)
-}
-
-/**
- * Goods left on the tile once it is torn down: all of a site's delivered materials, or
- * `TEARDOWN_MATERIALS_RETURNED` of a building's, in whole units. Never more than was built in.
- */
-export function teardownReturns(b: Building): Stock {
-  if (b.site) return { ...b.site.delivered }
-  const out: Stock = {}
-  for (const [good, units] of Object.entries(materialsOfKind(b.kind, b.material)) as [
-    Good,
-    number,
-  ][]) {
-    const back = Math.floor(units * TEARDOWN_MATERIALS_RETURNED)
-    if (back > 0) out[good] = back
-  }
-  return out
 }
 
 /**
