@@ -205,8 +205,10 @@ pub fn apply_water_haul(
     }));
 }
 
-pub(crate) static HAUL_BY_WATER_META: OrderMeta =
-    OrderMeta::not_requested("haulByWater").blocked_carrying_child().goes_on_until_stopped();
+pub(crate) static HAUL_BY_WATER_META: OrderMeta = OrderMeta::not_requested("haulByWater")
+    .adults_only()
+    .blocked_carrying_child()
+    .goes_on_until_stopped();
 
 impl RunningOrder for WaterHaulOrder {
     fn going(&self) -> Option<Going<'_>> {

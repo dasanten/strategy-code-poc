@@ -130,8 +130,10 @@ impl OrderKind for Sail {
     }
 }
 
-pub(crate) static SAIL_META: OrderMeta =
-    OrderMeta::request("sail", &Sail).queue_step(StepGroup::Move).script(&[SAIL_ACTION]);
+pub(crate) static SAIL_META: OrderMeta = OrderMeta::request("sail", &Sail)
+    .queue_step(StepGroup::Move)
+    .adults_only()
+    .script(&[SAIL_ACTION]);
 
 const SAIL_ACTION: ScriptAction = ScriptAction {
     name: "sail",
