@@ -604,7 +604,12 @@ macro_rules! tag_first {
                         other => Err(A::Error::unknown_variant(other, RESIDENT_ORDER_KINDS)),
                     };
                 }
-                // `kind` further on: read the whole object, then by its `kind`.
+                // `kind` further on: read the whole object, then by its `kind`. Not in the client's
+                // module, which reads only what the server wrote, `kind` first: there it would be
+                // every order's reader a second time (docs/wasm-rules.md).
+                if cfg!(target_arch = "wasm32") {
+                    return Err(A::Error::custom("an order whose `kind` doesn't come first"));
+                }
                 let mut object = serde_json::Map::new();
                 if let Some(key) = first {
                     object.insert(key, map.next_value()?);

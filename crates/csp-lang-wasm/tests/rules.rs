@@ -38,13 +38,8 @@ fn a_rule_it_does_not_know_or_arguments_it_cannot_read_are_errors() {
 #[test]
 fn the_mirror_takes_in_ticks_and_answers_by_tile() {
     let mut m = WorldMirror::new();
-    let resident = json!({ "is": "resident", "id": "r1", "anything": [1, 2] });
-    m.welcome(&welcome(vec![
-        building("b1", "farm", 10, 10),
-        building("b2", "storage", 30, 30),
-        resident,
-    ]))
-    .expect("a welcome");
+    m.welcome(&welcome(vec![building("b1", "farm", 10, 10), building("b2", "storage", 30, 30)]))
+        .expect("a welcome");
     assert_eq!(m.count(), 2);
     assert_eq!(m.building_at(11, 11).as_deref(), Some("b1"));
     let tick = json!({

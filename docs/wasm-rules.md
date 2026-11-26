@@ -113,13 +113,14 @@ The value rules add about 15 KB gzipped: the module is 402 KB gzipped (1,139 KB 
 
 ## Measurements (T122.4: the whole mirror)
 
-The same messages and machine as above, with the mirror now holding everything in sight:
+The same messages and machine as above, with the mirror holding everything in sight and the value
+rules of T122.5 in the module, over three runs while other sessions built on the machine:
 
 | What                         |  Limit |                                             Measured |
 | :--------------------------- | -----: | ---------------------------------------------------: |
-| Added download, compressed   | 500 kB |                             493 KB gzipped as served |
-| Start                        | 150 ms |            47 ms (module 2.9 ms, first mirror 44 ms) |
-| Mirror update per tick       |   4 ms |      3.9–4.1 ms mean, 4.2–4.7 ms p95 over three runs |
+| Added download, compressed   | 500 kB |              485 KB gzipped as served (1,484 KB raw) |
+| Start                        | 150 ms |      48–51 ms (module 2.9 ms, first mirror 45–48 ms) |
+| Mirror update per tick       |   4 ms |  **4.2–4.5 ms mean**, 4.8–5.7 ms p95: over the limit |
 | One rule call (`buildingAt`) |   1 ms | 0.002 ms mean; 0.2 ms the first call after an update |
 
 What it took to get there:
@@ -129,13 +130,14 @@ What it took to get there:
   buffer a map with number keys (a script's params by script id) doesn't read at all. The mirror
   reads the `is` the server writes first and the rest straight into that kind's type
   (`seen_entity_raw` in `rules.rs`).
-- **`ResidentOrder` reads tag first** (`tag_first!` in `orders.rs`), the same for saves on the
-  server; the derive's buffering of every resident's order and path was most of what was left.
+- **`ResidentOrder` reads tag first** (`tag_first!` in `orders.rs`), on the server too. In the
+  module it has no fallback for an order whose `kind` comes later (the server never writes one):
+  the fallback read every order a second way and cost 23 KB gzipped.
 - Tried and dropped: `opt-level = 3` for `serde_json` and `csp-shared` in the wasm profile (no
   faster, 14 KB bigger), `float_roundtrip` off (0.3 ms faster, but it changes how every number
   the server reads is rounded).
 
-Both the download and the update are at their limits. A tick of this world changes about 400
-residents, who move: reading their JSON is most of the update. What would give room is in a
-follow-up issue: fewer fields per moving resident in a tick, `wasm-opt` in the image, or a binary
-tick message.
+The update is over its limit, and the download is close to its own. A tick of this world changes
+about 400 residents, who move: reading their JSON is most of the update. The options (fewer fields
+per moving resident in a tick, `wasm-opt`, a binary tick message, other limits) are Daniel's
+call, in #1637.
