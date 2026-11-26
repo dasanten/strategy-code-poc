@@ -414,7 +414,7 @@ fn walking_with_a_load_past_a_rallied_crew_is_no_faster() {
     for world in [&mut plain, &mut rallied] {
         send(world, MARA, json!({ "kind": "walkTo", "residentId": "walker", "x": 40, "y": 6 }))
             .unwrap();
-        let mut walking = Walking::new(Arc::new(t.clone()));
+        let mut walking = Walking::without_budget(Arc::new(t.clone()));
         let mut scratch = Scratch::default();
         for _ in 0..40 {
             step_world(world, &t, &mut scratch, Some(&mut walking), None);

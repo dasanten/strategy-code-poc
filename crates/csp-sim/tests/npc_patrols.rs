@@ -479,7 +479,7 @@ mod patrols_and_food {
         pass(&mut s.world, &s.city);
         assert!(!patrollers(&s.world, &s.city).contains(&id));
         assert!(matches!(by_id(&s.world, &id).order, Some(ResidentOrder::WalkTo(_))));
-        let mut walking = Walking::new(Arc::new(s.terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(s.terrain.clone()));
         let mut scratch = Scratch::default();
         let mut t = 0.0;
         while t < 2.0 * TICKS_PER_GAME_DAY && food_of(by_id(&s.world, &id)) < 1.0 {
@@ -528,7 +528,7 @@ mod in_the_running_world {
         let armed =
             NPC_SOLDIERS_ON_HALL as usize + 1 + (2.0 * NPC_SOLDIERS_PER_PATROL).ceil() as usize;
         let mut s = staged(armed);
-        let mut walking = Walking::new(Arc::new(s.terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(s.terrain.clone()));
         let mut scratch = Scratch::default();
         let soldiers = soldiers_of(&s.world);
         for id in &soldiers {
@@ -605,7 +605,7 @@ mod in_the_running_world {
             }
         }
         let at = (fx, fy);
-        let mut walking = Walking::new(Arc::new(s.terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(s.terrain.clone()));
         let mut scratch = Scratch::default();
         let (mut was, mut gone) = (false, false);
         for _ in 0..180 {
@@ -635,7 +635,7 @@ mod in_the_running_world {
     #[test]
     fn an_alarm_takes_one_off_a_round_and_they_go_on_with_it_after() {
         let mut s = on_posts(11);
-        let mut walking = Walking::new(Arc::new(s.terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(s.terrain.clone()));
         let mut scratch = Scratch::default();
         let id = patrollers(&s.world, &s.city)[0].clone();
         for _ in 0..30 {
@@ -691,7 +691,7 @@ mod in_the_running_world {
     #[test]
     fn an_outsider_in_sight_breaks_a_round_off_for_the_hall_and_the_round_ends_back_on_the_wall() {
         let mut s = on_posts(11);
-        let mut walking = Walking::new(Arc::new(s.terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(s.terrain.clone()));
         let mut scratch = Scratch::default();
         let id = patrollers(&s.world, &s.city)[0].clone();
         let (rx, ry) = (by_id(&s.world, &id).x, by_id(&s.world, &id).y);

@@ -80,7 +80,7 @@ fn upgrading_8_5(world: &mut WorldState) {
 #[test]
 fn a_stone_site_leaves_the_wooden_wall_standing_and_walkable_until_it_replaces_it() {
     let (mut world, terrain) = setup();
-    let mut walking = Walking::new(terrain.clone());
+    let mut walking = Walking::without_budget(terrain.clone());
     upgrading_8_5(&mut world);
     step(&mut world, &terrain, &mut walking, 1);
     let here = wall(&world, 8.0, 5.0);
@@ -156,7 +156,7 @@ fn a_stone_line_over_a_mixed_ring_upgrades_the_wood_and_its_gate_and_passes_the_
 #[test]
 fn a_stone_wall_line_order_upgrades_the_wooden_tiles_and_the_gate_to_stone() {
     let (mut world, terrain) = setup();
-    let mut walking = Walking::new(terrain.clone());
+    let mut walking = Walking::without_budget(terrain.clone());
     let i = world.buildings.iter().position(|b| b.id == "w7-11").unwrap();
     world.buildings[i].material = stone();
     let mut b1 = resident("b1", Some("r1"), 6.0, 12.0);
@@ -198,7 +198,7 @@ fn a_stone_wall_line_order_upgrades_the_wooden_tiles_and_the_gate_to_stone() {
 #[test]
 fn breaking_the_wooden_tile_while_the_stone_site_stands_leaves_the_site() {
     let (mut world, terrain) = setup();
-    let mut walking = Walking::new(terrain.clone());
+    let mut walking = Walking::without_budget(terrain.clone());
     let mut s = building("s", BuildingKind::Wall, 8.0, 5.0);
     s.site = Some(ConstructionSite { delivered: Stock::new(), work: 0.0 });
     s.material = stone();

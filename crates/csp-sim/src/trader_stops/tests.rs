@@ -115,7 +115,7 @@ pub(crate) fn run_until(
     done: &dyn Fn(&WorldState) -> bool,
     ticks: usize,
 ) {
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     for _ in 0..ticks {
         if done(world) {

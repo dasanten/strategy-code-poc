@@ -72,7 +72,7 @@ fn setup() -> Setup {
     let t = Arc::new(terrain.clone());
     let orders = OrderQueue::new(scripts.kinds.clone(), Some(t.clone()));
     let queues = scripts.queue_runner();
-    let walking = Walking::new(t);
+    let walking = Walking::without_budget(t);
     Setup { world, terrain, scripts, orders, queues, walking, scratch: Scratch::default() }
 }
 

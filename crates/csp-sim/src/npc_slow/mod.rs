@@ -96,7 +96,7 @@ pub fn past_reserve(
 /// never moves leaves it all the time it wants, so a run comes out the same however busy the
 /// machine is.
 pub fn unhurried_walking(terrain: &TerrainMap) -> Walking {
-    Walking::with_clock(Arc::new(terrain.clone()), Box::new(|| 0.0))
+    Walking::without_budget(Arc::new(terrain.clone()))
 }
 
 /// `wrapDistance` on positions that may lie between tiles, as a resident's do.

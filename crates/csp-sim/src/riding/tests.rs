@@ -31,7 +31,7 @@ fn setup(map: &TerrainMap) -> WorldState {
 }
 
 fn out(world: &mut WorldState, map: &TerrainMap) -> u32 {
-    walk_out(world, map, &mut Walking::new(Arc::new(map.clone())), "w1", 5000)
+    walk_out(world, map, &mut Walking::without_budget(Arc::new(map.clone())), "w1", 5000)
 }
 
 fn at(world: &WorldState) -> [f64; 4] {
@@ -149,7 +149,7 @@ fn never_enters_the_mountains_going_round_them_instead() {
     );
     walk_to(&mut world.residents[0], 2.0, 14.0);
     let mut seen = HashSet::new();
-    let mut walking = Walking::new(Arc::new(map.clone()));
+    let mut walking = Walking::without_budget(Arc::new(map.clone()));
     let mut scratch = Scratch::default();
     let mut t = 0;
     while t < 5000 && world.residents[0].order.is_some() {

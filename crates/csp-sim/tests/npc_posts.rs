@@ -443,7 +443,10 @@ struct Running {
 
 impl Running {
     fn new(terrain: &TerrainMap) -> Self {
-        Running { walking: Walking::new(Arc::new(terrain.clone())), scratch: Scratch::default() }
+        Running {
+            walking: Walking::without_budget(Arc::new(terrain.clone())),
+            scratch: Scratch::default(),
+        }
     }
 
     fn step(&mut self, s: &mut Staged) {

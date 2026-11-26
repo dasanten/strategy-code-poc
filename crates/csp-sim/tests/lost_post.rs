@@ -188,7 +188,7 @@ impl Fixture {
 
     /// Steps the whole world until `done`, at most `ticks` times (`runUntil`).
     fn run_until(&mut self, done: impl Fn(&Fixture) -> bool, ticks: usize) {
-        let mut walking = Walking::new(Arc::new(self.terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(self.terrain.clone()));
         let mut scratch = Scratch::default();
         let terrain = self.terrain.clone();
         for _ in 0..ticks {

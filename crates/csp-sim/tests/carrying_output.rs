@@ -225,7 +225,7 @@ fn stores_the_load_keeps_their_own_food_and_goes_back_to_work_one_carrier_at_a_t
     });
     let load = full_load(&world);
     let mut runner = runner(&terrain, None);
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     let (mut trips, mut stored) = (0, 0.0);
     for _ in 0..3000 {
@@ -282,7 +282,7 @@ fn refills_from_the_storage_when_low_on_food() {
     world.piles.push(Pile { id: "p".into(), x: ax, y: ay, goods: stock(&[(Good::Wood, 100.0)]) });
     let load = units_that_fit(&world.residents[w], Good::Wood, world.tick as f64);
     let mut runner = runner(&terrain, None);
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     let mut went = false;
     for _ in 0..200 {
@@ -368,7 +368,7 @@ fn carries_the_coal_from_a_mine_on_a_coal_node_to_the_storage() {
     storage(&mut world, "s1", 8.0, 12.0, Stock::new());
     world.piles.push(Pile { id: "p".into(), x: 3.0, y: 12.0, goods: stock(&[(Good::Coal, 40.0)]) });
     let mut runner = runner(&terrain, None);
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     for _ in 0..300 {
         world.residents[0].hunger = MAX_HUNGER;

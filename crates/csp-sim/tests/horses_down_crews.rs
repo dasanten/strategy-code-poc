@@ -156,7 +156,7 @@ fn run(
 const TICKS: usize = 30;
 
 fn walking(terrain: &Arc<TerrainMap>) -> Walking {
-    Walking::new(terrain.clone())
+    Walking::without_budget(terrain.clone())
 }
 
 fn busy(terrain: &Arc<TerrainMap>) -> Busy {

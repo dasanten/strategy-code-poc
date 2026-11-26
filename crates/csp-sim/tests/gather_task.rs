@@ -111,7 +111,7 @@ fn acked(reply: &OrderReply) -> bool {
 /// Runs scripts and steps the world until `until` holds, which it must within `ticks`; every
 /// invariant holds at the end.
 fn run(s: &mut Setup, ticks: usize, mut until: impl FnMut(&Setup) -> bool) {
-    let mut walking = Walking::new(Arc::new(s.terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(s.terrain.clone()));
     let mut held = false;
     for _ in 0..ticks {
         assert_eq!(s.tasks.run_all(&mut s.world, &mut s.scratch), vec![]);

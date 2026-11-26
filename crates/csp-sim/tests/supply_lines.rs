@@ -79,7 +79,7 @@ fn setup() -> Setup {
     });
     let mut s = Setup {
         world,
-        walking: Walking::new(Arc::new(terrain.clone())),
+        walking: Walking::without_budget(Arc::new(terrain.clone())),
         terrain,
         orders: Orders::default(),
         scratch: Scratch::default(),

@@ -49,7 +49,7 @@ fn board(world: &mut WorldState, map: &TerrainMap, id: &str) -> Result<(), Strin
 
 /// Steps the world until the resident's order is done or 2000 ticks pass.
 fn until(world: &mut WorldState, map: &TerrainMap, id: &str) {
-    walk_out(world, map, &mut Walking::new(Arc::new(map.clone())), id, 2000);
+    walk_out(world, map, &mut Walking::without_budget(Arc::new(map.clone())), id, 2000);
 }
 
 fn drive(world: &mut WorldState, map: &TerrainMap, x: f64, y: f64) -> Result<(), String> {
@@ -209,7 +209,7 @@ fn get_passengers_off_a_carriage_that_is_gone_or_no_longer_of_their_realm() {
 
 /// One tick of the world, walking included.
 fn tick(world: &mut WorldState, map: &TerrainMap) {
-    let mut walking = Walking::new(Arc::new(map.clone()));
+    let mut walking = Walking::without_budget(Arc::new(map.clone()));
     step_world(world, map, &mut Scratch::default(), Some(&mut walking), None);
 }
 

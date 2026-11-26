@@ -185,7 +185,7 @@ fn puts_its_rider_on_foot_and_cant_be_mounted() {
         )
         .unwrap(),
     );
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     run(&mut world, &terrain, 600, Some(&mut walking));
     assert_eq!([w1(&mut world).x, world.horses[0].x], [8.0, 2.0]);
 }
@@ -202,7 +202,7 @@ fn leaves_its_carriage_standing_and_the_carriage_cant_be_driven() {
         horse_id: Some("h1".into()),
         load: Default::default(),
     });
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     assert_eq!(order(&mut world, &terrain, drive_order()), Ok(()));
     run(&mut world, &terrain, 30, Some(&mut walking));
     assert!(world.carriages[0].x > 2.0);

@@ -113,7 +113,7 @@ fn step(s: &mut Route, walking: &mut Walking, scratch: &mut Scratch) {
 }
 
 fn walking(s: &Route) -> Walking {
-    Walking::new(Arc::new(s.terrain.clone()))
+    Walking::without_budget(Arc::new(s.terrain.clone()))
 }
 
 fn threats(s: &Route, ki: usize) -> Vec<String> {

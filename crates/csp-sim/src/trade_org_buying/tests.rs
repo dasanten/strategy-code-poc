@@ -141,7 +141,7 @@ fn setup(terrain: TerrainMap) -> Staged {
         world.residents[i].carried.insert(Good::Spear, 1.0);
     }
     crime(&mut world, &hq, TARGET_Y - 20.0);
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);
     // One soldier on the road, the rest and the wagon out of it.
@@ -316,7 +316,7 @@ fn packs_coins_at_the_hq_its_own_and_no_taking() {
         .unwrap();
     world.buildings[coin_house].stock.get_or_insert_with(Stock::new).insert(Good::Coins, 1000.0);
     crime(&mut world, &hq, MID + 60.0);
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);
     for _ in 0..1500 {

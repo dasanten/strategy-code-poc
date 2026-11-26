@@ -197,7 +197,7 @@ pub fn run_walking(
     max: usize,
     mut done: impl FnMut(&WorldState) -> bool,
 ) {
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     for _ in 0..max {
         if done(world) {

@@ -318,7 +318,7 @@ fn keeps_them_lying_still_when_the_game_gives_them_an_order_anyway() {
     go_down(&mut s.world, i);
     // As a fight or an army would: an order set after they went Down.
     s.world.residents[i].order = Some(walk_order(20.0, 11.0));
-    let mut walking = Walking::new(Arc::new(s.terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(s.terrain.clone()));
     run(&mut s, 5, &["a2"], Some(&mut walking));
     let ana = at(&mut s.world, "a2");
     assert_eq!((ana.x, ana.y), (10.0, 11.0));

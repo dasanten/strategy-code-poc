@@ -131,7 +131,7 @@ fn works_the_nearest_node_of_its_regions_most_common_resource() {
 #[test]
 fn left_alone_keeps_its_size_and_keeps_itself_fed() {
     let (mut world, terrain, id) = post();
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     let without_stock = |w: &WorldState| {
         w.buildings

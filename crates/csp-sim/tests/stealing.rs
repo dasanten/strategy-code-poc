@@ -129,7 +129,7 @@ impl Setup {
 
     /// Steps the world with walking until the thief's order is done.
     fn drive_out(&mut self, check: bool) {
-        let mut walking = Walking::new(Arc::new(self.terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(self.terrain.clone()));
         let mut scratch = Scratch::default();
         for _ in 0..10_000 {
             if self.thief().order.is_none() {
@@ -622,7 +622,7 @@ mod never_by_accident {
         );
         s.carriage().realm_id = Some("r1".into());
         s.horse().realm_id = Some("r1".into());
-        let mut walking = Walking::new(Arc::new(s.terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(s.terrain.clone()));
         step_world(&mut s.world, &s.terrain, &mut Scratch::default(), Some(&mut walking), None);
         let o2 = s.r("o2").clone();
         assert!(o2.order.is_none());

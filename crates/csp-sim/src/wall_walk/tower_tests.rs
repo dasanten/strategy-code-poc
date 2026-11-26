@@ -125,7 +125,7 @@ fn every_tile_of_it_closes_the_way_like_a_wall() {
 #[test]
 fn residents_walk_from_the_walk_onto_it_and_back() {
     let (mut world, terrain) = setup();
-    let mut walking = Walking::new(terrain.clone());
+    let mut walking = Walking::without_budget(terrain.clone());
     let mut a1 = up("a1", 6.0, 5.0);
     walk_to(&mut a1, 9.0, 4.0);
     world.residents.push(a1);
@@ -140,7 +140,7 @@ fn residents_walk_from_the_walk_onto_it_and_back() {
 #[test]
 fn its_side_gets_up_onto_it_from_the_ground_inside() {
     let (mut world, terrain) = setup();
-    let mut walking = Walking::new(terrain.clone());
+    let mut walking = Walking::without_budget(terrain.clone());
     let mut a1 = resident("a1", Some("r1"), 8.0, 6.0);
     walk_to(&mut a1, 8.0, 5.0);
     world.residents.push(a1);
@@ -151,7 +151,7 @@ fn its_side_gets_up_onto_it_from_the_ground_inside() {
 #[test]
 fn a_full_tower_refuses_more_until_one_leaves() {
     let (mut world, terrain) = setup();
-    let mut walking = Walking::new(terrain.clone());
+    let mut walking = Walking::without_budget(terrain.clone());
     let room = TOWER_ROOM as usize;
     let tiles = [(8.0, 4.0), (9.0, 4.0), (8.0, 5.0), (9.0, 5.0)];
     for (i, &(x, y)) in tiles.iter().cycle().take(room).enumerate() {
@@ -197,7 +197,7 @@ fn breaking_it_drops_those_up_on_it_inside_with_a_falls_damage() {
     let mut b9 = resident("b9", Some("r2"), 10.0, 3.0);
     b9.order = Some(ResidentOrder::Attack(crate::combat::attack_order("t1", false, false)));
     world.residents.push(b9);
-    let mut walking = Walking::new(terrain.clone());
+    let mut walking = Walking::without_budget(terrain.clone());
     let mut scratch = Scratch::default();
     for _ in 0..20 {
         step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);

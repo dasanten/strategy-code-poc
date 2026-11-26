@@ -35,7 +35,7 @@ fn a_caravan_collecting_a_pick_up_leaves_them_alone_and_no_theft_comes_of_it() {
     let sale = json!({ "kind": "sell", "good": "stone", "units": 40, "cityId": city });
     assert_eq!(s.order(sale), "ack");
     let terrain = s.terrain.clone();
-    let mut walking = Walking::new(terrain.clone());
+    let mut walking = Walking::without_budget(terrain.clone());
     // The first tick orders the pick-up; then the caravan comes for it.
     let mut i = 0;
     while i < 20_000 && (i == 0 || !s.world.deliveries.is_empty()) {

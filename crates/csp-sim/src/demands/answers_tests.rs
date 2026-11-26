@@ -230,7 +230,7 @@ impl Setup {
     fn run(&mut self) {
         self.stayed();
         let terrain = self.terrain.clone();
-        let mut walking = Walking::new(terrain.clone());
+        let mut walking = Walking::without_budget(terrain.clone());
         let mut scratch = Scratch::default();
         for _ in 0..=NPC_PLAN_TICKS as usize {
             step_world(&mut self.world, &terrain, &mut scratch, Some(&mut walking), None);

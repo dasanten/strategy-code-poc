@@ -204,7 +204,7 @@ mod an_outpost_storage {
         world.piles.push(Pile { id: "p".into(), x: 6.0, y: 6.0, goods: food(100.0) });
         let map = Arc::new(terrain());
         let mut runner = ScriptRunner::new(map.clone(), Arc::new(WorkHost), order_kinds());
-        let mut walking = Walking::new(map.clone());
+        let mut walking = Walking::without_budget(map.clone());
         let mut scratch = Scratch::default();
         for _ in 0..600 {
             if held(&world, "out", Good::Food) > 0.0 {
@@ -269,7 +269,7 @@ mod an_outpost_storage {
         assert_eq!(q.receive(&world, &player(7), haul, &terrain()), Ok(()));
         q.apply_all(&mut world, &terrain());
         let map = Arc::new(terrain());
-        let mut walking = Walking::new(map.clone());
+        let mut walking = Walking::without_budget(map.clone());
         let mut scratch = Scratch::default();
         let back = |w: &WorldState| {
             w.piles.iter().any(|p| {

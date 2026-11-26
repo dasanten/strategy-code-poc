@@ -397,7 +397,7 @@ mod giving_the_post_back {
     fn leaves_a_working_post_it_trades_has_its_caravan_and_traders_call_again() {
         let mut s = heard_of();
         let post = s.post();
-        let mut walking = Walking::new(Arc::new(s.terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(s.terrain.clone()));
         let caravans = |w: &WorldState| w.caravans.iter().filter(|c| c.post_id == post).count();
         assert_eq!(caravans(&s.world), 0);
         s.answer("acceptDemand");
