@@ -18,7 +18,7 @@ import type { HaulSetup } from './Residents.js'
 /** The orders a carriage's or vessel's card starts in realm control mode. */
 export type VehicleOrderId = 'haul' | 'drive' | 'board' | 'row' | 'boardBoat' | 'boardCrew'
 
-export const VEHICLE_ORDER_LABELS: Record<VehicleOrderId, string> = {
+const VEHICLE_ORDER_LABELS: Record<VehicleOrderId, string> = {
   haul: 'Haul with this carriage',
   drive: 'Drive this to',
   board: 'Board',
@@ -38,7 +38,7 @@ export interface VehicleOrderRow {
 }
 
 /** Someone of the realm by name, at a carriage's reins or a boat's oars. */
-export interface NamedOne {
+interface NamedOne {
   id: string
   name: string
 }
@@ -72,7 +72,7 @@ export const NO_STAND = 'no land beside it to stand on'
 export const NOT_DOCKED = 'not docked at a haven'
 
 /** "1 seat left", "3 seats left". */
-export function seatsLine(seats: number): string {
+function seatsLine(seats: number): string {
   return `${seats} ${seats === 1 ? 'seat' : 'seats'} left`
 }
 
@@ -189,12 +189,6 @@ export function mostNote(order: VehicleGroupOrder, ticked: number): string | und
   return ticked > 1 ? `One ${who}: tick only one.` : undefined
 }
 
-/** Whether Confirm is on: someone ticked, and no more than the order may send. */
-export function vehicleConfirmable(order: VehicleGroupOrder, ticked: number): boolean {
-  const most = vehicleMost(order)
-  return ticked > 0 && (most === undefined || ticked <= most)
-}
-
 /** What a vessel's beside needs to know of the havens a ship docks at. */
 type Havens = readonly Pick<Building, 'id' | 'kind' | 'x' | 'y'>[]
 
@@ -254,7 +248,7 @@ type VehicleResident = Parameters<typeof groupRequests>[1][number]
  * Whether a resident already stands where the order about the carriage or vessel is taken: on
  * the carriage's tile; aboard the vessel or beside it, a ship's at its haven.
  */
-export function standsThere(
+function standsThere(
   v: OrderedVehicle,
   r: Pick<VehicleResident, 'x' | 'y' | 'aboard'>,
   size: number,
@@ -339,7 +333,7 @@ export function vehicleRequests(
  * request appended to their queue after a walk there. A row is no order on its own tile
  * (`appendRequest` puts no walk before it), so its walk is put in here.
  */
-export function walkThere(
+function walkThere(
   r: VehicleResident,
   request: OrderRequest,
   at: { x: number; y: number },

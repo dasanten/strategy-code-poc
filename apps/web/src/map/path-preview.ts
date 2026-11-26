@@ -12,7 +12,7 @@ export type Goer = 'foot' | 'carriage'
  * How many tiles the preview's search looks at before it gives up and draws a straight line: a
  * few dozen tiles of detour around a lake, cheap enough to run each time the pointer moves on.
  */
-export const PREVIEW_SEARCH_TILES = 20_000
+const PREVIEW_SEARCH_TILES = 20_000
 
 /**
  * The way a resident or carriage would go from `from` to `to` (`CONTEXT.md`: Picking a target),

@@ -487,7 +487,7 @@ export function ActionRows<Id extends string>({
 }
 
 /** An order's panel under the row that opened it, scrolled into view as it opens. */
-export function PanelUnder({ children }: { children: ReactNode }) {
+function PanelUnder({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     ref.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })

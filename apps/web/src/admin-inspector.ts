@@ -68,13 +68,13 @@ export function pickOnTile(
 }
 
 /** Something on the card that inspects something else when clicked. */
-export interface InspectorLink {
+interface InspectorLink {
   target: AdminInspectTarget
   name: string
 }
 
 /** One line of the card: a label and its text, or the things it names. */
-export interface InspectorRow {
+interface InspectorRow {
   label: string
   text?: string
   links?: InspectorLink[]
@@ -92,7 +92,7 @@ export interface InspectorCard {
 }
 
 /** Goods in words: "4 iron ore, 2 wood", or "nothing". */
-export function goodsText(stock: Stock | undefined): string {
+function goodsText(stock: Stock | undefined): string {
   const parts = GOODS.filter((g) => (stock?.[g] ?? 0) > 0).map(
     (g) => `${stock![g]} ${GOOD_LABELS[g].toLowerCase()}`,
   )

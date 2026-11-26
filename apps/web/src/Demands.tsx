@@ -45,7 +45,7 @@ import type { LastSeenCity } from './last-seen.js'
 import { freeAtStorage, ownStorages } from './offers-view.js'
 
 /** A demand's note: the sender's words as plain text, which React escapes, never as markup. */
-export function DemandNote({ note }: { note: string }) {
+function DemandNote({ note }: { note: string }) {
   return <p className="demand-note">{note}</p>
 }
 

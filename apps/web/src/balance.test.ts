@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { GOOD_WEIGHT, SKILL_MAX, SKILL_PER_DAY, WORK_OUTPUT_PER_DAY } from './narrowed.js'
+import { GOOD_WEIGHT, WORK_OUTPUT_PER_DAY } from './narrowed.js'
 import { ageInYears, canWork, stockWeight, subjectValue, trainingCeiling } from '@csp/lang-wasm'
 import {
   ADULT_AGE,
+  SKILL_MAX,
+  SKILL_PER_DAY,
   CARRY_BASE,
   CARRY_PER_STRENGTH,
   CHILD_YEAR_DAYS,

@@ -140,12 +140,6 @@ import {
 } from './world-rules.js'
 import type { Picking } from './Residents.js'
 
-/**
- * What the selection card shows (ADR 0008): one of the Player's residents, or a tile of the map
- * with whatever stands on it (a building or site, a carriage, a pile, a resource node).
- */
-export type Selection = { kind: 'resident'; id: string } | { kind: 'tile'; x: number; y: number }
-
 /** An action the selection card offers. */
 export type ActionId =
   | 'walk'
@@ -379,7 +373,7 @@ export interface ResidentHere {
  * Whether a building can be worked: a finished workplace with something to make (`CONTEXT.md`:
  * Workplace), on its node for a node's workplace.
  */
-export function isWorkable(building: Building | undefined, node: KnownNode | undefined): boolean {
+function isWorkable(building: Building | undefined, node: KnownNode | undefined): boolean {
   if (!building || building.site || MAX_WORKERS[building.kind] === undefined) return false
   if (!WORKPLACE_SKILL[building.kind]) return false
   const good = building.kind === 'farm' ? 'food' : node && NODE_GOOD[node.kind]
@@ -403,16 +397,16 @@ export const HORSE_DOWN_NO_DRIVE = 'its horse is Down'
 export const HAUL_STARTS_ASHORE = 'the route starts on the shore beside the boat: get off first'
 
 /** The action that steals a carriage, which says so (`CONTEXT.md`: Stealing a carriage or horse). */
-export const DRIVE_OFF_LABEL = 'Drive off (theft)'
+const DRIVE_OFF_LABEL = 'Drive off (theft)'
 
 /** The action that steals a boat by rowing it off, which says so (its vessel part). */
-export const ROW_OFF_LABEL = 'Row off (theft)'
+const ROW_OFF_LABEL = 'Row off (theft)'
 
 /** The action that steals a horse by driving off with it hitched, which says so. */
-export const HITCH_OFF_LABEL = 'Drive with their horse (theft)'
+const HITCH_OFF_LABEL = 'Drive with their horse (theft)'
 
 /** The action that steals a horse by mounting it, which says so. */
-export const STEAL_HORSE_LABEL = 'Mount their horse (theft)'
+const STEAL_HORSE_LABEL = 'Mount their horse (theft)'
 
 /**
  * The carriages of the alliance army a realm commands as its leader (`CONTEXT.md`: Alliance army):
@@ -756,7 +750,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
 export const orderGroupOf = (id: ActionId): OrderGroup => ORDER_GROUP[id] ?? 'other'
 
 /** A card's rows as a fresh card shows them: by kind in the kinds' order, as listed within each. */
-export function sortRows<Id extends string>(
+function sortRows<Id extends string>(
   rows: readonly CardAction<Id>[],
   groupOf: (id: Id) => OrderGroup,
 ): CardAction<Id>[] {
@@ -890,7 +884,7 @@ function themeRelationship(tone: ReturnType<typeof cityRelationship>): Relations
 }
 
 /** Owner names for the card's lines. */
-export const RELATIONSHIP_NAMES: Record<Relationship, string> = {
+const RELATIONSHIP_NAMES: Record<Relationship, string> = {
   own: 'Yours',
   alliance: 'Alliance',
   otherRealm: 'Another realm',
@@ -899,7 +893,7 @@ export const RELATIONSHIP_NAMES: Record<Relationship, string> = {
 }
 
 /** How heavily a carriage looks loaded, when the Player can't see its load (`loadLevel`). */
-export const LOAD_LEVEL_NAMES: Record<LoadLevel, string> = {
+const LOAD_LEVEL_NAMES: Record<LoadLevel, string> = {
   empty: 'empty',
   light: 'lightly loaded',
   half: 'half loaded',
@@ -1494,7 +1488,7 @@ function crewDoing(r: SeenResident, b: Building, labels: Record<string, string>)
  * to it as the next stop; each with what for and about when they arrive, soonest first. Undefined
  * while nobody is.
  */
-export function onTheWayList(
+function onTheWayList(
   b: Building,
   t: TileThings,
   goodLabels: Record<string, string>,
@@ -1579,7 +1573,7 @@ function goodsList(
  * How long a stable's Food lasts the horses standing in it (`CONTEXT.md`: Feeding the stable):
  * "about 6 game days for its horses", a meter full at `STABLE_FEED_DAYS`.
  */
-export function stableFoodMeter(
+function stableFoodMeter(
   food: number,
   horses: readonly SeenHorse[],
 ): NonNullable<TileCard['stableFood']> {
@@ -1599,7 +1593,7 @@ export function stableFoodMeter(
  * Game days until the foal of each resident in sight breeding at a stable (`CONTEXT.md`:
  * Breeding), soonest first.
  */
-export function daysToFoals(stable: Building, residents: readonly SeenResident[]): number[] {
+function daysToFoals(stable: Building, residents: readonly SeenResident[]): number[] {
   return breedersAt(residents, stable)
     .map((r) => (r.order?.kind === 'breed' ? STABLE_BREED_TICKS - r.order.progress : 0))
     .map((left) => Math.max(1, Math.ceil(left / TICKS_PER_GAME_DAY)))
@@ -1610,7 +1604,7 @@ export function daysToFoals(stable: Building, residents: readonly SeenResident[]
  * Lines for the breedings a stable keeps that nobody in sight is tending (`CONTEXT.md`:
  * Breeding): how far along each is, then its two horses (`horseDetail`).
  */
-export function pausedBreedingLines(
+function pausedBreedingLines(
   stable: Building,
   residents: readonly SeenResident[],
   horses: readonly SeenHorse[],
@@ -2067,7 +2061,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
 }
 
 /** What each kind of siege machine is called (`CONTEXT.md`: Siege machine). */
-export const MACHINE_NAMES: Record<SiegeMachineKind, string> = Object.fromEntries(
+const MACHINE_NAMES: Record<SiegeMachineKind, string> = Object.fromEntries(
   (Object.keys(MACHINE_SPECS) as SiegeMachineKind[]).map((kind) => [
     kind,
     MACHINE_SPECS[kind].name,
@@ -2075,7 +2069,7 @@ export const MACHINE_NAMES: Record<SiegeMachineKind, string> = Object.fromEntrie
 ) as Record<SiegeMachineKind, string>
 
 /** The fewest crew on each kind of machine for it to be pushed or used (`CONTEXT.md`: Siege machine). */
-export const MACHINE_CREW: Record<SiegeMachineKind, number> = Object.fromEntries(
+const MACHINE_CREW: Record<SiegeMachineKind, number> = Object.fromEntries(
   (Object.keys(MACHINE_SPECS) as SiegeMachineKind[]).map((kind) => [
     kind,
     MACHINE_SPECS[kind].crew,
@@ -2094,7 +2088,7 @@ const MACHINE_STRENGTH: Record<SiegeMachineKind, number> = Object.fromEntries(
  * A siege machine's lines (`CONTEXT.md`: Siege machine): its owner, its crew against what it
  * needs to be pushed, whether it is being pushed, and the damage blows have done it.
  */
-export function describeMachine(m: SeenMachine, rel: Relationship | undefined): string[] {
+function describeMachine(m: SeenMachine, rel: Relationship | undefined): string[] {
   const lines = [rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s']
   const crew = m.crewIds.length
   const needed = MACHINE_CREW[m.kind]
@@ -2110,7 +2104,7 @@ export function describeMachine(m: SeenMachine, rel: Relationship | undefined): 
 }
 
 /** What each kind of vessel is called on its card (`CONTEXT.md`: Vessel). */
-export const VESSEL_NAMES: Record<VesselKind, string> = Object.fromEntries(
+const VESSEL_NAMES: Record<VesselKind, string> = Object.fromEntries(
   (Object.keys(VESSEL_SPECS) as VesselKind[]).map((kind) => [kind, VESSEL_SPECS[kind].label]),
 ) as Record<VesselKind, string>
 
@@ -2119,7 +2113,7 @@ export const VESSEL_NAMES: Record<VesselKind, string> = Object.fromEntries(
  * it holds and its goods when the Player sees inside (its own realm and allies), else only how
  * heavily it is loaded; who is aboard.
  */
-export function describeVessel(
+function describeVessel(
   vessel: SeenVessel,
   rel: Relationship | undefined,
   t?: Pick<TileThings, 'residents' | 'strangers'>,
@@ -2164,7 +2158,7 @@ export function describeVessel(
  * Player knows how it fares, and how long the Food on board feeds it; its driver and passengers in
  * sight by name; and the haul route its driver drives, when the driver is the Player's.
  */
-export function describeCarriage(
+function describeCarriage(
   carriage: SeenCarriage,
   rel: Relationship | undefined,
   t: TileThings,
@@ -2408,7 +2402,7 @@ const VEIN_WORDS: Record<VeinWord, string> = {
  * A workplace's line for how the vein under it stands (`CONTEXT.md`: Running dry), for whoever
  * works it: "Vein: thinning". Never a number.
  */
-export function veinLine(vein: VeinWord): string {
+function veinLine(vein: VeinWord): string {
   return `Vein: ${VEIN_WORDS[vein]}`
 }
 
@@ -2588,7 +2582,7 @@ function townHallLines(cityId: string, t: TileThings): string[] {
  * Whether drifters come to the city the Leader lives in (`CONTEXT.md`: Drifter, Drifters on the
  * city card): one on the way, about how long until the next (Estimates), or why none comes.
  */
-export function drifterLine(line: DrifterLine, tick: number): string {
+function drifterLine(line: DrifterLine, tick: number): string {
   switch (line.state) {
     case 'onTheWay':
       return 'A drifter is on the way'
@@ -2880,7 +2874,7 @@ export function boaterOf(
 }
 
 /** Why the card's siege machine can't be pushed for want of crew (`CONTEXT.md`: Siege machine). */
-export const machinePushProblem = (m: { name: string; short: number }) =>
+const machinePushProblem = (m: { name: string; short: number }) =>
   `the ${m.name} needs ${m.short} more crew to be pushed`
 
 /**

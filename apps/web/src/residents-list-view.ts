@@ -12,7 +12,7 @@ export const FULL_ROW_HEIGHT = 44
 /** A row's height in the full Residents list on a phone, where each is a compact card. */
 export const FULL_CARD_HEIGHT = 130
 /** Rows drawn beyond each edge of the view, so a quick scroll doesn't show a gap. */
-export const ROW_OVERSCAN = 8
+const ROW_OVERSCAN = 8
 
 /** One resident in the full list, with the city heading they stand under in the Residents tab. */
 export interface ListedResident<R> {

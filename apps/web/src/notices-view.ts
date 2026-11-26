@@ -92,7 +92,7 @@ export function skippedByWhy(skipped: readonly { name: string; why: string }[]):
 export const FIRST_DAY_RALLY_TIP = `Tip: stand your Leader at a farm or a building site and Rally the crew: it works ${RALLY_PACE} times as fast while your Zeal lasts.`
 
 /** What each line of the first-day card says (`CONTEXT.md`: First day). */
-export const FIRST_DAY_LABELS: Record<FirstDayLine, string> = {
+const FIRST_DAY_LABELS: Record<FirstDayLine, string> = {
   claimHorses: 'Claim the Horse offer',
   pickResident: 'Pick a resident (with the switch on Unit)',
   giveOrder: 'Give them an order',

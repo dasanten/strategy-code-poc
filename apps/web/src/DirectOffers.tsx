@@ -39,7 +39,7 @@ import {
  * What others sent the Player, waiting for their answer (`incoming-view.ts`). A kind says what can
  * be done with it through `actions`.
  */
-export function IncomingList({
+function IncomingList({
   items,
   tick,
   actions,

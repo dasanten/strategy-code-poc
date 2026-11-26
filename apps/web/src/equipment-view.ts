@@ -18,7 +18,7 @@ export interface SlotView {
 }
 
 /** A piece's condition as a card says it. */
-export const CONDITION_WORDS: Record<PieceCondition, string> = {
+const CONDITION_WORDS: Record<PieceCondition, string> = {
   good: 'good',
   worn: 'worn',
   nearlyBroken: 'nearly broken',

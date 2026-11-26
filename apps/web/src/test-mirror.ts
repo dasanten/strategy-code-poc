@@ -204,7 +204,7 @@ function welcome(world: TestWorld, entities: object[]): string {
 }
 
 /** The `welcome` message's text a Player sent `world` would get. */
-export function welcomeOf(world: TestWorld): string {
+function welcomeOf(world: TestWorld): string {
   return welcome(world, entitiesOf(world))
 }
 

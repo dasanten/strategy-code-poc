@@ -2,7 +2,6 @@
 // narrower type than JSON gives them, cast to it (T88.2, ADR 0030).
 
 import * as B from '@csp/balance'
-import { NpcCitySize } from './stats.js'
 import { Recipe } from '@csp/lang-wasm'
 import type { BuildingKind, Good, HorseStats, SkillName, Stock, Weapon } from '@csp/shared-types'
 
@@ -38,16 +37,6 @@ export const BUILD_WORK = B.BUILD_WORK as unknown as Partial<Record<BuildingKind
 export const CHILD_GOODS = B.CHILD_GOODS as unknown as readonly Good[]
 
 /**
- * What an NPC city asks for each of its finished buildings when it is bought, in Coins, by kind;
- * a kind missing here adds nothing. A village (6 residents, a town hall, a storage, 2 houses, a
- * farm and its wall ring) comes to about 2 800 coins, which three residents can carry; a town to
- * about 7 000. A stretch of wall is a quarter of what it was on the old 40 m tiles.
- */
-export const CITY_PRICE_BY_BUILDING = B.CITY_PRICE_BY_BUILDING as unknown as Partial<
-  Record<BuildingKind, number>
->
-
-/**
  * What one unit of each good weighs, in kg (`CONTEXT.md`: Good). Coins are light but not
  * weightless, so a fortune still has to be carried. Weapons and armour weigh what went into them
  * (`RECIPES`): an average resident (30 kg) in armour with a sword and a shield has half
@@ -61,9 +50,6 @@ export const GOOD_WEIGHT = B.GOOD_WEIGHT as unknown as Record<Good, number>
  */
 export const HOUSING_ROOM = B.HOUSING_ROOM as unknown as Partial<Record<BuildingKind, number>>
 
-/** A village: a starting city's square, a few fewer residents, one farm. */
-export const NPC_VILLAGE = B.NPC_VILLAGE as unknown as NpcCitySize
-
 /**
  * The fixed recipes of the workplaces that process goods (`CONTEXT.md`: Smelter, Coins, Smithy).
  * A smelter turns 2 iron ore into 1 iron, a mint 1 gold ore into 10 coins (less weight than the
@@ -72,56 +58,6 @@ export const NPC_VILLAGE = B.NPC_VILLAGE as unknown as NpcCitySize
  * mostly wood, a sword mostly iron, a shield wood bound with iron, armour nearly all iron.
  */
 export const RECIPES = B.RECIPES as unknown as Partial<Record<BuildingKind, readonly Recipe[]>>
-
-/**
- * The most of each skill a resident can have (`CONTEXT.md`: Skill): where it stops making them
- * better. Training never takes a skill past it.
- */
-export const SKILL_MAX = B.SKILL_MAX as unknown as Readonly<Record<SkillName, number>>
-
-/**
- * Each skill learned by doing, in points per game day for a learner of average Intellect. Combat
- * is learned by blows rather than days; for training it counts as reaching its maximum in a game
- * year, as the work skills do.
- */
-export const SKILL_PER_DAY = B.SKILL_PER_DAY as unknown as Readonly<Record<SkillName, number>>
-
-/**
- * Damage a wall or gate takes from blows before it falls (`CONTEXT.md`: Walls in combat,
- * broken). An average unarmed resident (4 a blow, one blow every `STRIKE_TICKS`) breaks a stretch
- * of wall alone in about five minutes; ten soldiers with swords in well under one. A gate holds
- * out half as long again.
- */
-export const WALL_STRENGTH = B.WALL_STRENGTH as unknown as Record<'wall' | 'gate' | 'tower', number>
-
-/** Damage a stone wall or gate takes before it falls (`CONTEXT.md`: Wood or stone). */
-export const STONE_WALL_STRENGTH = B.STONE_WALL_STRENGTH as unknown as Record<
-  'wall' | 'gate' | 'tower',
-  number
->
-
-/** What a stone wall or gate takes instead of `BUILD_MATERIALS`: Stone. */
-export const STONE_BUILD_MATERIALS = B.STONE_BUILD_MATERIALS as unknown as Record<
-  'wall' | 'gate' | 'tower',
-  Stock
->
-
-/** Work a stone wall or gate takes instead of `BUILD_WORK`. */
-export const STONE_BUILD_WORK = B.STONE_BUILD_WORK as unknown as Record<
-  'wall' | 'gate' | 'tower',
-  number
->
-
-/**
- * What a warehouse sells a unit of each good for, in coins, when it holds `PRICE_REFERENCE_FLOORS`
- * times its floor (`CONTEXT.md`: Warehouse prices, Price anchor). Roughly what goes into it: an
- * iron is two iron ore and the work, a sword two iron and a wood; gold ore stays below the 10
- * coins the mint strikes from it.
- */
-export const WAREHOUSE_BASE_PRICE = B.WAREHOUSE_BASE_PRICE as unknown as Record<
-  Exclude<Good, 'coins'>,
-  number
->
 
 /**
  * A trading post's stock floor (`CONTEXT.md`: Stock floor, ADR 0023), in units: what its spare

@@ -11,7 +11,7 @@ import { stepGroup, type StepGroup } from './queue-view.js'
  */
 
 /** The palette's groups of step kinds, in the Orders tab's order. */
-export type PaletteGroupId = 'move' | 'work' | 'goods' | 'scripts'
+type PaletteGroupId = 'move' | 'work' | 'goods' | 'scripts'
 
 export interface PaletteGroup {
   id: PaletteGroupId

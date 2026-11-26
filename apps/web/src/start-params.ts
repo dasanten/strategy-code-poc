@@ -58,7 +58,7 @@ export function isWorkTask(order: OrderRequest): boolean {
  * The work script a workplace's settings name (`CONTEXT.md`: Workplace settings), while it is
  * still one of the Player's work scripts, else their Work default; as the server picks it.
  */
-export function workScriptOf(
+function workScriptOf(
   scripts: readonly ScriptSummary[],
   settings: WorkplaceSettings | undefined,
 ): ScriptSummary | undefined {

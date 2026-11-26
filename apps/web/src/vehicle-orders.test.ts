@@ -8,7 +8,6 @@ import {
   mostNote,
   onlyThis,
   standAt,
-  vehicleConfirmable,
   vehicleMost,
   vehicleOrder,
   vehicleOrderRows,
@@ -129,14 +128,6 @@ describe('one driver, and Board up to the seats', () => {
     expect(vehicleMost(crew)).toBeUndefined()
     expect(vehicleSuggests(crew)).toBe(1)
     expect(vehicleSuggests(board)).toBe(2)
-  })
-
-  it('turns Confirm off with more than one driver, or more boarders than seats', () => {
-    expect(vehicleConfirmable(drive, 0)).toBe(false)
-    expect(vehicleConfirmable(drive, 1)).toBe(true)
-    expect(vehicleConfirmable(drive, 2)).toBe(false)
-    expect(vehicleConfirmable(board, 2)).toBe(true)
-    expect(vehicleConfirmable(board, 3)).toBe(false)
   })
 
   it('counts the seats on the list', () => {

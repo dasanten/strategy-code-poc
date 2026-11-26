@@ -1,5 +1,6 @@
-// `pnpm check [base]` (ADR 0013): the generated files are current, lint, typecheck, and the tests
-// the change affects. `base` is the branch the change goes into (default origin/dev).
+// `pnpm check [base]` (ADR 0013): the generated files are current, lint, no unused exports, files or
+// dependencies (knip, T123.1), typecheck, and the tests the change affects. `base` is the branch
+// the change goes into (default origin/dev).
 import { spawnSync } from 'node:child_process'
 import process from 'node:process'
 import { checkGenerated } from './check-generated.mjs'
@@ -13,5 +14,6 @@ function run(command) {
 
 checkGenerated(base)
 run('pnpm exec eslint . --cache --cache-location node_modules/.cache/eslint/')
+run('pnpm knip')
 run('pnpm typecheck')
 run(`node scripts/check-tests.mjs "${base}"`)

@@ -125,7 +125,7 @@ export function planProblem(items: readonly PlanItem[]): string | undefined {
  * How a block repeats, as the planner's head gives it: a whole number in range, forever, or until
  * a condition holds (`CONTEXT.md`: Repeat block).
  */
-export function repeatOf(count: Repeat): Repeat {
+function repeatOf(count: Repeat): Repeat {
   if (typeof count !== 'number') return structuredClone(count)
   return Math.min(QUEUE_MAX_REPEAT, Math.max(1, Math.floor(count)))
 }

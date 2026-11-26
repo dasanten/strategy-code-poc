@@ -54,5 +54,5 @@
   `corepack pnpm`. `gh` is at `C:\Program Files\GitHub CLI\gh.exe`.
 - Before finishing: `pnpm check <base>` (ADR 0013), with `<base>` the branch the change goes into
   (`origin/epic/<n>-<slug>`, or `origin/dev` for a bug). It regenerates (when the
-  change touches the crates), runs lint, typecheck and only the client tests the change affects,
-  and says what it ran. `pnpm test` is the client's full suite; CI runs it and `pnpm check:rust`'s steps.
+  change touches the crates), runs lint, `pnpm knip` (no unused export, file or dependency;
+  `knip.jsonc`), typecheck and only the client tests the change affects, and says what it ran. `pnpm test` is the client's full suite; CI runs it and `pnpm check:rust`'s steps.

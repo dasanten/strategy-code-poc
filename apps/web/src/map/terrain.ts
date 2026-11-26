@@ -26,7 +26,7 @@ const GRAIN_CELL = 3
 const GRAIN_SHADE = 0.03
 
 /** A steady pseudo-random number in [0, 1) for a lattice point (the same as terrain generation). */
-export function hash(x: number, y: number, seed: number): number {
+function hash(x: number, y: number, seed: number): number {
   let h = Math.imul(x, 0x27d4eb2d) ^ Math.imul(y, 0x165667b1) ^ Math.imul(seed, 0x9e3779b9)
   h = Math.imul(h ^ (h >>> 15), 0x85ebca6b)
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35)
@@ -218,7 +218,7 @@ export function terrainPixels(
 }
 
 /** A small dark mark that says what the terrain is (ADR 0008). */
-export type TerrainMarkKind = 'tree' | 'trees' | 'hill' | 'peak' | 'wave' | 'tuft'
+type TerrainMarkKind = 'tree' | 'trees' | 'hill' | 'peak' | 'wave' | 'tuft'
 
 export interface TerrainMark {
   kind: TerrainMarkKind

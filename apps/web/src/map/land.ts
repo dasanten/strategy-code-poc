@@ -145,7 +145,7 @@ export function regionAt(
 }
 
 /** What a way is called on the tile card and the map. */
-export const WAY_NAMES: Record<WayKind, string> = { pass: 'pass', landBridge: 'land bridge' }
+const WAY_NAMES: Record<WayKind, string> = { pass: 'pass', landBridge: 'land bridge' }
 
 /**
  * The tile card's line for a tile's region: "Heartland of Ashvale", "Frontier: Greywold",

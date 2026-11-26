@@ -6,20 +6,6 @@ import { WEAPON_ATTACK } from './narrowed.js'
 import { PROTECTION_DEFENCE } from '@csp/balance'
 import type { Equipment, Good, Weapon } from '@csp/shared-types'
 
-/** What an NPC city is placed with, by its size: a walled square like a starting city's. */
-export interface NpcCitySize {
-  /** Tiles along each side, wall included: an odd number, so its storage has a middle tile. */
-  size: number
-  /** Adult residents, with random stats like a starting city's. */
-  residents: number
-  /** Houses inside the wall, in a row north of the storage; room for everyone and a little more. */
-  houses: number
-  /** Farms outside the wall, by the gate; the residents start on them, working them. */
-  farms: number
-  /** Food in its storage, in units. */
-  food: number
-}
-
 /**
  * A resident as far as their gear goes: what they have equipped, which anyone who sees them sees
  * (`CONTEXT.md`: Equipment, Seeing it). The server sends each slot as the rules count it, filled at

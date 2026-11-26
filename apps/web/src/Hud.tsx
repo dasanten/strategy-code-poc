@@ -242,7 +242,7 @@ export function TopBar({
 }
 
 /** The Player's Zeal in the top bar (`CONTEXT.md`: Zeal): how full, and about how long until full. */
-export function ZealMeter({ zeal, draining = false }: { zeal: number; draining?: boolean }) {
+function ZealMeter({ zeal, draining = false }: { zeal: number; draining?: boolean }) {
   const shown = zealShown(zeal, draining)
   return (
     <span className={`hud-zeal${shown.draining ? ' draining' : ''}`} title={shown.title}>

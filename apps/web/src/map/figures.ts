@@ -104,7 +104,7 @@ const SLOTS: readonly (readonly [number, number])[] = [
 ]
 
 /** One resident drawn as their own figure. */
-export interface Figure {
+interface Figure {
   id: string
   /** Where on the tile, as fractions from its top-left corner. */
   dx: number

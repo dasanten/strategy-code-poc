@@ -6,7 +6,7 @@ import type { MemoryValue, ScriptMemory } from '@csp/shared-types'
  */
 
 /** The most rows of memory the Script tab shows; the rest is left out with a note. */
-export const MEMORY_ROWS_SHOWN = 40
+const MEMORY_ROWS_SHOWN = 40
 
 /** The most characters of a text value the Script tab shows. */
 export const MEMORY_TEXT_SHOWN = 60

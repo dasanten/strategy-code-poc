@@ -15,7 +15,7 @@ import { groupRequests, type GroupOrder, type GroupSeen, type GroupSend } from '
 export type BuildingOrderId =
   'work' | 'buildSite' | 'tearDown' | 'feedStable' | 'breed' | 'teach' | 'train'
 
-export const BUILDING_ORDER_LABELS: Record<BuildingOrderId, string> = {
+const BUILDING_ORDER_LABELS: Record<BuildingOrderId, string> = {
   work: 'Work here',
   buildSite: 'Build this site',
   tearDown: 'Tear down',

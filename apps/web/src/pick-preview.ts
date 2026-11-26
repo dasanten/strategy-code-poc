@@ -122,7 +122,7 @@ export interface Goes {
 }
 
 /** How many of a group's ways the preview draws, from the first of them. */
-export const PREVIEW_WAYS = 6
+const PREVIEW_WAYS = 6
 
 /** What the map draws for a pick under the pointer, and the banner's line about it. */
 export interface PickPreview {

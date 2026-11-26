@@ -67,7 +67,7 @@ export function recipeGood(recipe: Recipe): Good {
 export const KEEPS_GOODS: readonly BuildingKind[] = kindsWhere((spec) => spec.keepsGoods)
 
 /** The kinds of site siege machines are built as (`MACHINE_SPECS`): ram and catapult sites. */
-export const SIEGE_SITES: readonly BuildingKind[] = Object.values(MACHINE_SPECS).map(
+const SIEGE_SITES: readonly BuildingKind[] = Object.values(MACHINE_SPECS).map(
   (m) => m.builtAs,
 )
 
