@@ -44,7 +44,10 @@ What costs bytes in the module:
   only the parts a rule reads.
 - **The name section** was half the module's bytes. The build removes it
   (`--remove-name-section`, also in the `Dockerfile`).
-- `wasm-opt` is not installed here nor in the image; with it, the module would be smaller still.
+- **`wasm-opt -Oz`** (binaryen, #1637) takes nearly a quarter off the raw module and 49 KB off the
+  gzipped one. The local build runs it from the pinned `binaryen` dev dependency, the `Dockerfile`
+  from the same version's release; other flags (`--converge`, `--gufa`) save 1–2 KB more, `-O3`
+  is 2 KB bigger.
 
 ## What the mirror doesn't know
 
@@ -228,3 +231,20 @@ The module is 584 KB gzipped (1,903 KB raw) after merging the epic tip with the 
 residents in Node: `buildProblem` 0.28 ms for a house (its city area), 0.01 ms for a town hall,
 2 ms the first call after an update (the lookup by tile built again); a Build menu's 22 kinds
 0.4 ms; a tile's 5 thieves in one call 0.05 ms.
+
+## Measurements after `wasm-opt` (#1637)
+
+Binaryen's `wasm-opt -Oz` (version 132) on the module as #1585 left it, with the same messages and
+machine as T122.1 (`node scripts/wasm-rules-bench.mjs`, Node 22), the module without and with
+`wasm-opt` measured in turn, three times each, while other sessions built on the machine:
+
+| What                         |  Limit |                                        Before (#1585) |                                     With `wasm-opt -Oz` |
+| :--------------------------- | -----: | ----------------------------------------------------: | ------------------------------------------------------: |
+| Added download, compressed   | 500 kB |               586 KB gzipped as served (1,903 KB raw) | **537 KB** gzipped as served (1,472 KB raw): 37 KB over |
+| Start                        | 150 ms |                          45–49 ms (module 2.8–3.7 ms) |                            47–49 ms (module 2.2–2.4 ms) |
+| Mirror update per tick       |   4 ms |                     3.83–4.31 ms mean, 4.1–5.3 ms p95 |                       3.62–3.79 ms mean, 4.0–4.6 ms p95 |
+| One rule call (`buildingAt`) |   1 ms | 0.002 ms mean; 0.15–0.20 ms the first after an update |   0.002 ms mean; 0.13–0.14 ms the first after an update |
+
+The download is still over its limit, by 37 KB. The update's mean is under 4 ms in Node, by about
+0.2–0.4 ms; its p95 is not, and T122.1 measured the browser pane about 0.65 ms slower than Node.
+What next is Daniel's call, in #1637.
