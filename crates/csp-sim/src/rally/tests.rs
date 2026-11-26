@@ -497,3 +497,21 @@ fn invariant_only_a_living_leader_at_the_building_rallies() {
     assert!(!sound(&world));
     let _ = t;
 }
+
+#[test]
+fn a_leader_aboard_a_carriage_gets_off_first_to_rally() {
+    let (mut world, _) = setup();
+    worker(&mut world, "w1", MARA, "farm");
+    put(&mut world, LEADER, FARM);
+    world.carriages.push(crate::movement_test_world::carriage(
+        "k1",
+        Some(&realm_id(MARA)),
+        FARM.0,
+        FARM.1,
+        None,
+    ));
+    world.residents.iter_mut().find(|r| r.id == LEADER).unwrap().aboard = Some("k1".into());
+    rally(&mut world, MARA).unwrap();
+    assert_eq!(live(&world, LEADER).aboard, None);
+    assert!(rallying(&world));
+}
