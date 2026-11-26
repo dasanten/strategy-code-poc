@@ -3,17 +3,14 @@
 
 import { commandsCarriage } from './alliance.js'
 import { carriageCapacity } from './carriages.js'
-import { WAREHOUSE_FLOOR } from './narrowed.js'
 import { tradeOrgRefuses } from './standing.js'
-import { canWork, stockWeight } from './stats.js'
-import { PRICED_GOODS, quoteAtPrices } from './warehouse.js'
-import { TRADER_FLOOR_SHARE } from '@csp/balance'
+import { canWork } from './stats.js'
+import { PRICED_GOODS } from './warehouse.js'
 import type {
   Carriage,
   PricedGood,
   Resident,
   StandingTrader,
-  Stock,
   TradeHolder,
   TradeQuote,
   TradeSide,
@@ -24,6 +21,9 @@ import type {
 } from '@csp/shared-types'
 import { traderPriceFor } from '@csp/lang-wasm'
 import { traderStock } from '@csp/lang-wasm'
+import { quoteTraderTrade } from '@csp/lang-wasm'
+
+export { quoteTraderTrade } from '@csp/lang-wasm'
 
 export { traderStock } from '@csp/lang-wasm'
 
@@ -68,9 +68,6 @@ export function traderVisitsTo(
   })
 }
 
-/** What a wandering trader prices a good from: a share of a warehouse's floor. */
-const traderFloor = (good: PricedGood) => WAREHOUSE_FLOOR[good] * TRADER_FLOOR_SHARE
-
 /** A wandering trader's prices for every good but coins, from what it has to trade. */
 export function traderPrices(t: Pick<Trader, 'escortIds'>, carriage: Carriage): TraderPrice[] {
   const stock = traderStock(t, carriage.load)
@@ -78,36 +75,6 @@ export function traderPrices(t: Pick<Trader, 'escortIds'>, carriage: Carriage): 
     const held = stock[good] ?? 0
     return { good, stock: held, ...traderPriceFor(good, held) }
   })
-}
-
-/**
- * What a trade of up to `wanted` units of a good with a wandering trader would move (`CONTEXT.md`:
- * Trader stop), as at a warehouse (`quoteTrade`): each unit priced as what it has to trade moves
- * (`traderStock`), the coins from and into its load, and what it takes in only as far as its
- * carriage holds (`capacity`). Pure: nothing moves.
- */
-export function quoteTraderTrade(
-  t: Pick<Trader, 'escortIds'>,
-  load: Stock,
-  capacity: number,
-  holder: TradeHolder,
-  side: TradeSide,
-  good: PricedGood,
-  wanted: number,
-): TradeQuote {
-  const stock = traderStock(t, load)[good] ?? 0
-  const room = Math.max(0, capacity - stockWeight(load))
-  return quoteAtPrices(
-    stock,
-    traderFloor(good),
-    load.coins ?? 0,
-    holder,
-    side,
-    good,
-    wanted,
-    0,
-    room,
-  )
 }
 
 /** `quoteTraderTrade` on the world as it is: the room on its `carriage` goes by its horse. */

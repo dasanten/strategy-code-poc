@@ -188,3 +188,9 @@ and `csp_sim::mirror::{resident, horse}`). The module is 541 KB gzipped (1,727 K
 The rules on one contract, realm, directive or carriage, `workPace` and the rename problems
 (#1634) add readers for `MercenaryContract`, `Realm`, `Directive` and `SeenCarriage`: the module is
 557 KB gzipped (1,792 KB raw), from 541 KB. The mirror's update is not touched.
+
+## Size after the fourth part of T122.5b
+
+`workingOn`, the trade holders and quotes, the city rules and the queue step rules (#1634) add
+readers for `City`, `Offer` and `OrderRequest`: the module is 570 KB gzipped (1,850 KB raw), from
+557 KB. The mirror's update is not touched.

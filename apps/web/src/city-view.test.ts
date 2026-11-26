@@ -231,7 +231,7 @@ describe('trading at a warehouse in the inspector', () => {
     const empty = previewTrade(seen, 'w1', trader, carriage, 'iron', 2, 0, [])
     expect(empty.buy).toEqual({ units: 0, coins: 0, limit: 'coins' })
     expect(empty.sell).toEqual({ units: 0, coins: 0, limit: 'held' })
-    expect(empty.holder.stock).toBe(carriage.load)
+    expect(empty.holder.stock).toEqual(carriage.load)
   })
 
   it('says why a trade at the warehouse won’t go, or what cut it down', () => {
