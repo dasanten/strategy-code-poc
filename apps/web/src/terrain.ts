@@ -47,7 +47,11 @@ export function wrapDistance(
   a: { x: number; y: number },
   b: { x: number; y: number },
 ): number {
-  return Math.hypot(wrapDelta(a.x, b.x, size), wrapDelta(a.y, b.y, size))
+  // Not `Math.hypot`: on whole tiles the root of the exact sum is what Rust's `hypot` gives, to
+  // the last bit (`client-twins.test.ts`).
+  const dx = wrapDelta(a.x, b.x, size)
+  const dy = wrapDelta(a.y, b.y, size)
+  return Math.sqrt(dx * dx + dy * dy)
 }
 
 /** The index of a tile in `TerrainMap.tiles`, for any coordinates. */

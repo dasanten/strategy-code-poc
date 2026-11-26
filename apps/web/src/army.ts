@@ -1,14 +1,9 @@
 // Ported from packages/shared/src/army.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import type { Army, Carriage, Resident, WorldState } from '@csp/shared-types'
+import type { Carriage, Resident, WorldState } from '@csp/shared-types'
 
 /** World queries about armies (ADR 0002: the game API orders and scripts share). */
-
-/** The army the resident is in, if any (`CONTEXT.md`: Army: at most one). */
-export function armyOf(world: Pick<WorldState, 'armies'>, residentId: string): Army | undefined {
-  return world.armies.find((a) => a.memberIds.includes(residentId))
-}
 
 /**
  * The army a driver's carriage goes after now (`CONTEXT.md`: Supply line): the one a drive order

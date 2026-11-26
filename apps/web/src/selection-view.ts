@@ -2514,7 +2514,7 @@ function gearText(r: Geared, labels: Record<string, string>): string | undefined
 }
 
 /** The army a resident's order is for, if it is one (`CONTEXT.md`: Army). */
-function armyOf(r: SeenResident): string | undefined {
+function orderArmy(r: SeenResident): string | undefined {
   return (r.order as { army?: string } | null)?.army
 }
 
@@ -2526,7 +2526,7 @@ function strangersLines(strangers: SeenResident[]): string[] {
   const armies = new Map<string, SeenResident[]>()
   const rest: SeenResident[] = []
   for (const r of strangers) {
-    const a = armyOf(r)
+    const a = orderArmy(r)
     if (a) armies.set(a, [...(armies.get(a) ?? []), r])
     else rest.push(r)
   }

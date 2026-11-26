@@ -21,7 +21,7 @@ pub fn carriage_pulled_by<'w>(world: &'w WorldState, horse_id: &str) -> Option<&
 }
 
 /// Why a horse can't be hitched to a carriage now (`hitchHorseProblem`), if it can't.
-pub(crate) fn hitch_horse_problem(
+pub fn hitch_horse_problem(
     world: &WorldState,
     carriage: &Carriage,
     horse: &Horse,

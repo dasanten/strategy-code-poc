@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import {
   PLAN_STEPS,
   PLAN_TASKS,
-  horsesIn,
+  ownHorsesIn,
   nextPick,
   pickCity,
   pickInto,
@@ -381,7 +381,7 @@ describe('Add step', () => {
 
   it('breeds two of the realm’s horses in the stable picked', () => {
     const plan = planned('breed', [30, 4])
-    expect(horsesIn(w, w.horses as never, plan.picked[0]!.id).map((h) => h.id)).toEqual([
+    expect(ownHorsesIn(w, w.horses as never, plan.picked[0]!.id).map((h) => h.id)).toEqual([
       'h1',
       'h2',
     ])

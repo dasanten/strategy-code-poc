@@ -113,7 +113,7 @@ export interface ClientWorld {
 }
 
 /** Sorts what is in sight by kind, dropping the tag. */
-function byKind(entities: Iterable<SeenEntity>) {
+export function byKind(entities: Iterable<SeenEntity>) {
   const out = {
     residents: [] as SeenResident[],
     cities: [] as SeenCity[],

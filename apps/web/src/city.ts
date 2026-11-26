@@ -1,6 +1,7 @@
 // Ported from packages/shared/src/city.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
+import { isRuin } from './decay.js'
 import { HOUSING_ROOM } from './narrowed.js'
 import { OCCUPATION_GAME_DAYS, TICKS_PER_GAME_DAY } from '@csp/balance'
 import type { Building, City, Resident, WorldState } from '@csp/shared-types'
@@ -40,13 +41,13 @@ export function cityResidents<R extends Pick<Resident, 'cityId'>>(
   return world.residents.filter((r) => r.cityId === city.id)
 }
 
-/** How many residents a city's finished buildings house (`HOUSING_ROOM`); sites house nobody. */
+/** How many residents a city's standing buildings house (`HOUSING_ROOM`); sites and ruins house nobody. */
 export function housingRoom(
   world: { buildings: readonly Building[] },
   city: Pick<City, 'id'>,
 ): number {
   return world.buildings
-    .filter((b) => b.cityId === city.id && !b.site)
+    .filter((b) => b.cityId === city.id && !b.site && !isRuin(b))
     .reduce((room, b) => room + (HOUSING_ROOM[b.kind] ?? 0), 0)
 }
 

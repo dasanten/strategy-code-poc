@@ -2,7 +2,7 @@ import { FEED_UNITS } from '@csp/balance'
 import { GOODS } from './world.js'
 import { MAX_WORKERS, recipeGood } from './building.js'
 import { RECIPES } from './narrowed.js'
-import { nearCityAreaAll } from '@csp/lang-wasm'
+import { horsesIn, nearCityAreaAll } from '@csp/lang-wasm'
 import { buildingRealm } from './city.js'
 import { isAt } from './footprint.js'
 import { relocateRoom, type RelocateWorld } from './relocate.js'
@@ -827,14 +827,19 @@ export function planOrder(
   }
 }
 
-/** The realm's horses in sight standing in the stable picked, to pick two to breed. */
-export function horsesIn(
-  w: Pick<PlanWorld, 'buildings' | 'size' | 'realmId'>,
+/** The realm's horses in sight standing in the stable picked (`horsesIn`), to pick two to breed. */
+export function ownHorsesIn(
+  w: Pick<PlanWorld, 'buildings' | 'realmId'>,
   horses: readonly SeenHorse[],
   stableId: string | undefined,
 ): SeenHorse[] {
   const stable = w.buildings.find((b) => b.id === stableId)
-  return stable ? horses.filter((h) => h.realmId === w.realmId && isAt(h, stable, w.size)) : []
+  return stable
+    ? horsesIn(
+        horses.filter((h) => h.realmId === w.realmId),
+        stable,
+      )
+    : []
 }
 
 /**
@@ -848,6 +853,6 @@ export function planHorses(
   plan: Plan | undefined,
 ): SeenHorse[] {
   const at = plan?.picked[0]
-  if (plan?.kind !== 'hitch') return horsesIn(w, horses, at?.id)
+  if (plan?.kind !== 'hitch') return ownHorsesIn(w, horses, at?.id)
   return horses.filter((h) => h.realmId === w.realmId && h.x === at?.x && h.y === at?.y)
 }

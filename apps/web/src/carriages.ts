@@ -67,7 +67,7 @@ export function horsesToHitch<H extends CarriageHorse>(
 }
 
 /** Why a horse can't be hitched to a carriage now, or undefined when it can (`horsesToHitch`). */
-function hitchHorseProblem(
+export function hitchHorseProblem(
   world: {
     carriages: readonly CarriagePlace[]
     residents?: readonly Pick<Resident, 'riding'>[]
