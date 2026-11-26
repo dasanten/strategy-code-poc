@@ -30,6 +30,7 @@ impl Good {
             Good::Bow => &BOW,
             Good::Crossbow => &CROSSBOW,
             Good::Arrows => &ARROWS,
+            Good::Rope => &ROPE,
         }
     }
 }
@@ -238,6 +239,16 @@ const ARROWS: GoodSpec = GoodSpec {
     weight: 0.1,
     warehouse_floor: 40.0,
     base_price: Some(1.0),
+    gear: None,
+    wear_blows: None,
+};
+
+const ROPE: GoodSpec = GoodSpec {
+    label: "Rope",
+    script_text: "Units of rope.",
+    weight: 1.0,
+    warehouse_floor: 10.0,
+    base_price: Some(3.0),
     gear: None,
     wear_blows: None,
 };

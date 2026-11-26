@@ -250,6 +250,7 @@ export const PIXEL_GOOD: Partial<Record<Good, string>> = {
   bow: 'bow',
   crossbow: 'crossbow',
   arrows: 'arrows',
+  rope: 'wood',
 }
 
 /** Where slices sit packed in the atlas: each with `pad` pixels of its own edge around it. */

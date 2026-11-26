@@ -555,6 +555,12 @@ export const GOOD_SPECS = {
     "priced": true,
     "weapon": null,
     "protection": null
+  },
+  "rope": {
+    "label": "Rope",
+    "priced": true,
+    "weapon": null,
+    "protection": null
   }
 } as const satisfies Record<Good, GoodSpec>
 
@@ -592,4 +598,4 @@ export const MACHINE_SPECS = {
 export const BUILDING_KINDS = ['townHall', 'house', 'storage', 'warehouse', 'wall', 'gate', 'tower', 'farm', 'stable', 'mine', 'quarry', 'lumberCamp', 'smelter', 'mint', 'smithy', 'kiln', 'trainingGround', 'road', 'carriage', 'haven', 'boat', 'ship', 'ram', 'catapult'] as const satisfies readonly BuildingKind[]
 
 /** Every good, in the order of the specs (`CONTEXT.md`: Good). */
-export const GOOD_KINDS = ['food', 'wood', 'stone', 'ironOre', 'iron', 'goldOre', 'coins', 'spear', 'sword', 'shield', 'armour', 'coal', 'steel', 'steelSword', 'steelShield', 'steelArmour', 'tools', 'bow', 'crossbow', 'arrows'] as const satisfies readonly Good[]
+export const GOOD_KINDS = ['food', 'wood', 'stone', 'ironOre', 'iron', 'goldOre', 'coins', 'spear', 'sword', 'shield', 'armour', 'coal', 'steel', 'steelSword', 'steelShield', 'steelArmour', 'tools', 'bow', 'crossbow', 'arrows', 'rope'] as const satisfies readonly Good[]

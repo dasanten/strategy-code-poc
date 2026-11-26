@@ -44,6 +44,7 @@ pub enum Good {
     Bow = "bow",
     Crossbow = "crossbow",
     Arrows = "arrows",
+    Rope = "rope",
 }
 }
 
@@ -70,6 +71,7 @@ pub enum PricedGood {
     Bow = "bow",
     Crossbow = "crossbow",
     Arrows = "arrows",
+    Rope = "rope",
 }
 }
 

@@ -494,6 +494,7 @@ export interface Balance {
     bow: number
     crossbow: number
     arrows: number
+    rope: number
     [key: string]: number
   }
   readonly HQ_FLOOR_FACTOR: number
@@ -518,6 +519,7 @@ export interface Balance {
     bow: number
     crossbow: number
     arrows: number
+    rope: number
     [key: string]: number
   }
   readonly PRICE_REFERENCE_FLOORS: number
@@ -570,6 +572,7 @@ export interface Balance {
     bow: number
     crossbow: number
     arrows: number
+    rope: number
     [key: string]: number
   }
   readonly WEAPON_ATTACK: {

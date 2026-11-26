@@ -581,6 +581,12 @@
           "type": "number",
           "description": "Units of arrows.",
           "nullWhen": "when there are none"
+        },
+        {
+          "name": "rope",
+          "type": "number",
+          "description": "Units of rope.",
+          "nullWhen": "when there are none"
         }
       ]
     },

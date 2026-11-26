@@ -33,6 +33,7 @@ export const GOOD_ART: Record<Good, string> = {
   bow: 'bow.svg',
   crossbow: 'crossbow.svg',
   arrows: 'arrows.svg',
+  rope: 'rope.svg',
 }
 
 /** The SVG source of every file in `assets/goods/`, by file name. */
