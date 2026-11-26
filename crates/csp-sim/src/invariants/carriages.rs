@@ -10,6 +10,7 @@ use csp_shared::world::{HaulPhase, HaulStop, ResidentOrder, WorldState};
 
 use super::shared::{driven_carriage_id, of_resident, Out};
 use super::{invariant, js_number, violation, Invariant};
+use crate::order_meta::running_meta;
 use crate::queries::alliance::{carriage_commander_of, commander_of};
 use crate::queries::building::carriage_can_go_to;
 use crate::queries::names::good_name;
@@ -173,7 +174,8 @@ pub fn siege_machines_in_place(world: &WorldState, terrain: &TerrainMap) -> Out 
 }
 
 /// A passenger's carriage exists, is of their realm and stands on their tile, and they neither
-/// drive nor ride; goods and passengers never weigh more than any carriage holds
+/// drive nor ride nor run an order that gets a passenger off first (`CONTEXT.md`: Passenger);
+/// goods and passengers never weigh more than any carriage holds
 /// (`passengersAboard`).
 pub fn passengers_aboard(world: &WorldState, _: &TerrainMap) -> Out {
     let name = "passengers-aboard";
@@ -212,6 +214,10 @@ pub fn passengers_aboard(world: &WorldState, _: &TerrainMap) -> Out {
         }
         if r.riding.is_some() {
             fail(&[&r.id, &k.id], format!("resident {} rides aboard", r.id));
+        }
+        if let Some(o) = r.order.as_ref().filter(|o| running_meta(o).gets_off_first) {
+            let kind = running_meta(o).kind;
+            fail(&[&r.id, &k.id], format!("resident {} runs {kind} aboard", r.id));
         }
     }
     for k in &world.carriages {

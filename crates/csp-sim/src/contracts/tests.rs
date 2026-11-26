@@ -448,3 +448,18 @@ fn lets_an_offer_lapse_without_a_word_when_a_sides_leader_dies() {
     assert!(world.contracts.is_empty());
     assert_eq!(world.events.len(), before);
 }
+
+#[test]
+fn a_hirer_aboard_a_carriage_gets_off_first_to_pay() {
+    let mut world = setup();
+    let c = hire(&mut world);
+    world.carriages.push(crate::movement_test_world::carriage("k1", Some("r2"), 44.0, 40.0, None));
+    let b2 = at_mut(&mut world, "b2");
+    (b2.x, b2.y) = (44.0, 40.0);
+    b2.aboard = Some("k1".into());
+    let kinds = crate::orders::order_kinds();
+    let pay = json!({"kind": "pay", "residentId": "b2", "contractId": c.id, "weeks": 1});
+    assert_eq!(send(&mut world, &terrain(), kinds.get("pay").expect("pay"), HIRER, pay), Ok(()));
+    assert_eq!(at(&world, "b2").aboard, None);
+    assert!(matches!(at(&world, "b2").order, Some(ResidentOrder::Pay(_))));
+}
