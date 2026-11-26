@@ -494,8 +494,9 @@ pub struct AcceptOfferOrder {
     pub carriage_id: Option<String>,
 }
 
-/// Any order a resident can hold (`ResidentOrder`), tagged by `kind`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+/// Any order a resident can hold (`ResidentOrder`), tagged by `kind`. Read by `tag_first!` below,
+/// not by serde's derive.
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ResidentOrder {
     WalkTo(WalkOrder),
@@ -561,4 +562,163 @@ pub struct RallyOrder {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub worked_at: Option<f64>,
+}
+
+/// Reads a [`ResidentOrder`] tag first: the server writes `kind` first (as serde's derive does), so
+/// the rest of the object reads straight into that kind's struct. Serde's own derive of an
+/// internally tagged enum buffers the whole object first and reads it again, which made a
+/// resident's order most of the time a client's world mirror spends on a tick (T122.4). An object
+/// whose `kind` comes later is read whole, then by its `kind`.
+macro_rules! tag_first {
+    ($($variant:ident($ty:ty) = $kind:literal,)*) => {
+        /// Every kind of order a resident can hold, as its `kind` reads (a test in `csp-sim` checks
+        /// that every running order is here).
+        pub const RESIDENT_ORDER_KINDS: &[&str] = &[$($kind),*];
+
+        impl<'de> Deserialize<'de> for ResidentOrder {
+            fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+                d.deserialize_map(OrderVisitor)
+            }
+        }
+
+        struct OrderVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for OrderVisitor {
+            type Value = ResidentOrder;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a resident's order, tagged by `kind`")
+            }
+
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> Result<ResidentOrder, A::Error> {
+                use serde::de::Error;
+                let first: Option<String> = map.next_key()?;
+                if first.as_deref() == Some("kind") {
+                    let kind: String = map.next_value()?;
+                    let rest = serde::de::value::MapAccessDeserializer::new(map);
+                    return match kind.as_str() {
+                        $($kind => <$ty>::deserialize(rest).map(ResidentOrder::$variant),)*
+                        other => Err(A::Error::unknown_variant(other, RESIDENT_ORDER_KINDS)),
+                    };
+                }
+                // `kind` further on: read the whole object, then by its `kind`. Not in the client's
+                // module, which reads only what the server wrote, `kind` first: there it would be
+                // every order's reader a second time (docs/wasm-rules.md).
+                if cfg!(target_arch = "wasm32") {
+                    return Err(A::Error::custom("an order whose `kind` doesn't come first"));
+                }
+                let mut object = serde_json::Map::new();
+                if let Some(key) = first {
+                    object.insert(key, map.next_value()?);
+                }
+                while let Some((key, value)) = map.next_entry::<String, serde_json::Value>()? {
+                    object.insert(key, value);
+                }
+                let kind = match object.remove("kind") {
+                    Some(serde_json::Value::String(kind)) => kind,
+                    Some(_) => return Err(A::Error::custom("an order's kind is not a string")),
+                    None => return Err(A::Error::missing_field("kind")),
+                };
+                let rest = serde_json::Value::Object(object);
+                match kind.as_str() {
+                    $($kind => <$ty>::deserialize(rest)
+                        .map(ResidentOrder::$variant)
+                        .map_err(A::Error::custom),)*
+                    other => Err(A::Error::unknown_variant(other, RESIDENT_ORDER_KINDS)),
+                }
+            }
+        }
+    };
+}
+
+tag_first! {
+    WalkTo(WalkOrder) = "walkTo",
+    Drive(DriveOrder) = "drive",
+    Haul(HaulOrder) = "haul",
+    PickUp(PickUpOrder) = "pickUp",
+    Drop(DropOrder) = "drop",
+    Store(StoreOrder) = "store",
+    Fetch(FetchOrder) = "fetch",
+    Build(BuildOrder) = "build",
+    TearDown(TearDownOrder) = "tearDown",
+    Repair(RepairOrder) = "repair",
+    WorkAt(WorkOrder) = "workAt",
+    Breed(BreedOrder) = "breed",
+    Attack(AttackOrder) = "attack",
+    Climb(ClimbOrder) = "climb",
+    Teach(TeachOrder) = "teach",
+    Train(TrainOrder) = "train",
+    RoadLine(LineOrder) = "roadLine",
+    WallLine(LineOrder) = "wallLine",
+    Pay(PayOrder) = "pay",
+    BuyCity(BuyCityOrder) = "buyCity",
+    Trade(TradeOrder) = "trade",
+    Swap(SwapOrder) = "swap",
+    BuyHorse(HorseTradeOrder) = "buyHorse",
+    SellHorse(HorseTradeOrder) = "sellHorse",
+    HandIn(HandInOrder) = "handIn",
+    BuyOff(BuyOffOrder) = "buyOff",
+    PayDebt(PayDebtOrder) = "payDebt",
+    AcceptOffer(AcceptOfferOrder) = "acceptOffer",
+    Relocate(RelocateOrder) = "relocate",
+    Feed(FeedOrder) = "feed",
+    Row(RowOrder) = "row",
+    HaulByWater(WaterHaulOrder) = "haulByWater",
+    Sail(RowOrder) = "sail",
+    Equip(EquipOrder) = "equip",
+    Crew(CrewOrder) = "crew",
+    Push(PushOrder) = "push",
+    Ram(RamOrder) = "ram",
+    Throw(ThrowOrder) = "throw",
+    Gather(GatherOrder) = "gather",
+    Rally(RallyOrder) = "rally",
+}
+
+#[cfg(test)]
+mod tag_first_tests {
+    use super::*;
+
+    /// Every kind reads back what it wrote, `kind` first as serde writes it or anywhere else.
+    #[test]
+    fn reads_every_kind_with_its_kind_first_or_later() {
+        let tile = Tile { x: 1.0, y: 2.0 };
+        let orders = [
+            ResidentOrder::WalkTo(WalkOrder {
+                target: tile,
+                path: Some(vec![(1.0, 1.0)]),
+                progress: 0.5,
+                army: None,
+            }),
+            ResidentOrder::Sail(RowOrder {
+                vessel_id: "v1".into(),
+                target: tile,
+                path: None,
+                progress: 0.0,
+            }),
+            ResidentOrder::Rally(RallyOrder { building_id: "b1".into(), worked_at: Some(3.0) }),
+        ];
+        for o in orders {
+            let text = serde_json::to_string(&o).expect("an order writes");
+            assert!(text.starts_with("{\"kind\":"), "{text}");
+            assert_eq!(serde_json::from_str::<ResidentOrder>(&text).expect("reads"), o);
+            let mut v = serde_json::to_value(&o).expect("an order writes");
+            let kind = v.as_object_mut().expect("an object").shift_remove("kind").expect("kind");
+            v.as_object_mut().expect("an object").insert("kind".into(), kind);
+            let later = serde_json::to_string(&v).expect("writes");
+            assert!(!later.starts_with("{\"kind\":"), "{later}");
+            assert_eq!(serde_json::from_str::<ResidentOrder>(&later).expect("reads"), o);
+            assert_eq!(serde_json::from_value::<ResidentOrder>(v).expect("reads"), o);
+        }
+    }
+
+    #[test]
+    fn refuses_an_unknown_kind_and_unknown_fields() {
+        let unknown = serde_json::from_str::<ResidentOrder>(r#"{"kind":"fly","x":1}"#);
+        assert!(unknown.expect_err("no such kind").to_string().contains("fly"));
+        let extra = r#"{"kind":"rally","buildingId":"b1","wings":2}"#;
+        assert!(serde_json::from_str::<ResidentOrder>(extra).is_err());
+    }
 }

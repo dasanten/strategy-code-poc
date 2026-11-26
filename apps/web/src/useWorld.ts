@@ -36,6 +36,7 @@ import { appendEvents } from './realm-log.js'
 import { applyRegionMap, type RegionState } from './map/region.js'
 import { decodeExploredCounts } from './shared/chunks.js'
 import { lastSeenByKind, type LastSeen } from './last-seen.js'
+import { feedMirror } from './world-mirror.js'
 
 /**
  * `throttled`: the server closed the socket for sending too much; it reconnects after a wait.
@@ -196,7 +197,10 @@ export function useWorld(onLoggedOut: () => void) {
       // Large messages come gzipped and take a while to unpack: applied in arrival order.
       const receive = inArrivalOrder((text) => {
         if (stopped || socket !== own) return
-        handle(JSON.parse(text) as ServerMessage)
+        const msg = JSON.parse(text) as ServerMessage
+        // The rules module keeps its own copy of the world, from the same text (`world-mirror.ts`).
+        feedMirror(msg.type, text)
+        handle(msg)
       })
       own.onmessage = (ev: MessageEvent<string | ArrayBuffer>) => receive(ev.data)
       const handle = (msg: ServerMessage) => {

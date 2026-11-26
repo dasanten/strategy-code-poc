@@ -38,13 +38,8 @@ fn a_rule_it_does_not_know_or_arguments_it_cannot_read_are_errors() {
 #[test]
 fn the_mirror_takes_in_ticks_and_answers_by_tile() {
     let mut m = WorldMirror::new();
-    let resident = json!({ "is": "resident", "id": "r1", "anything": [1, 2] });
-    m.welcome(&welcome(vec![
-        building("b1", "farm", 10, 10),
-        building("b2", "storage", 30, 30),
-        resident,
-    ]))
-    .expect("a welcome");
+    m.welcome(&welcome(vec![building("b1", "farm", 10, 10), building("b2", "storage", 30, 30)]))
+        .expect("a welcome");
     assert_eq!(m.count(), 2);
     assert_eq!(m.building_at(11, 11).as_deref(), Some("b1"));
     let tick = json!({
@@ -61,4 +56,14 @@ fn the_mirror_takes_in_ticks_and_answers_by_tile() {
     // Not a tick: nothing changes.
     assert!(m.tick("{\"changed\": 1}").is_err());
     assert_eq!(m.building_at(12, 10).as_deref(), Some("b1"));
+}
+
+#[test]
+fn the_mirror_refuses_a_message_it_cant_read_and_keeps_what_it_had() {
+    let mut m = WorldMirror::new();
+    m.welcome(&welcome(vec![building("b1", "farm", 10, 10)])).expect("a welcome");
+    // A resident with nothing of what the server sends of one.
+    let tick = json!({ "type": "tick", "changed": [{ "is": "resident", "id": "r1" }], "gone": [] });
+    assert!(m.tick(&tick.to_string()).is_err());
+    assert_eq!(m.building_at(10, 10).as_deref(), Some("b1"));
 }
