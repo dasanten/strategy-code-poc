@@ -66,8 +66,8 @@ import {
   describeTile,
   escapeStep,
   keepRows,
-  makeLeaderProblem,
-  nameHeirProblem,
+  makeLeaderProblem as handOverCheck,
+  nameHeirProblem as heirCheck,
   groupOrders,
   orderGroupOf,
   residentActions,
@@ -618,12 +618,31 @@ describe('whether a resident can be made Leader', () => {
       payBy: null,
     }) as ContractView
   const seen = (diplomacy: Partial<Pick<Diplomacy, 'alliance' | 'contracts'>> = {}) => ({
-    tick: 0,
-    diplomacy: { alliance: null, contracts: [], ...diplomacy },
-    cities: [city],
-    buildings: [building({ id: 'th', kind: 'townHall', cityId: 'c1', x: 10, y: 10 })],
-    mapSize: 256,
+    alliance: null,
+    contracts: [],
+    ...diplomacy,
   })
+  /** The mirror holds the city, its town hall and `residents` (`test-mirror.ts`). */
+  const inSight = (...residents: Resident[]) =>
+    mirrorOf({
+      size: 256,
+      cities: [city],
+      buildings: [building({ id: 'th', kind: 'townHall', cityId: 'c1', x: 10, y: 10 })],
+      residents,
+    })
+  const makeLeaderProblem = (
+    d: ReturnType<typeof seen>,
+    r: typeof realm,
+    lead: Resident,
+    target: Resident,
+  ) => {
+    inSight(lead, ...(target.id === lead.id ? [] : [target]))
+    return handOverCheck(d, r, target.id)
+  }
+  const nameHeirProblem = (d: ReturnType<typeof seen>, r: typeof realm, target: Resident) => {
+    inSight(...(target.id === leader.id ? [] : [leader]), target)
+    return heirCheck(d, r, target.id)
+  }
 
   it('can when both stand in the same city of the realm and the resident serves no one', () => {
     expect(makeLeaderProblem(seen(), realm, leader, ana)).toBeUndefined()

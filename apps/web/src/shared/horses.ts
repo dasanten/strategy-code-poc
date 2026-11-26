@@ -5,16 +5,8 @@ import { carriagePulledBy } from './carriages.js'
 import { covers, isAt } from './footprint.js'
 import { pileAt } from './goods.js'
 import { wrap } from './terrain.js'
-import { HORSE_REACH, STABLE_BREED_DAYS, STABLE_CAPACITY, TICKS_PER_GAME_DAY } from '@csp/balance'
-import type {
-  BreedOrder,
-  Building,
-  Horse,
-  KeptBreeding,
-  Resident,
-  Stock,
-  WorldState,
-} from '@csp/shared-types'
+import { HORSE_REACH, STABLE_BREED_DAYS, TICKS_PER_GAME_DAY } from '@csp/balance'
+import type { Building, Horse, KeptBreeding, Resident, Stock, WorldState } from '@csp/shared-types'
 import { riderSpareFood } from '@csp/lang-wasm'
 
 export { riderSpareFood } from '@csp/lang-wasm'
@@ -104,77 +96,6 @@ export function keptBreeding(
   return stable.breedings?.find(
     (k) => horseIds.includes(k.horseIds[0]) && horseIds.includes(k.horseIds[1]),
   )
-}
-
-/**
- * The pair a resident breeding at the stable carries on with first (`CONTEXT.md`: Breeding): of
- * the pairs it keeps progress for, the furthest along that they can breed (`breedProblem`), so
- * both still fed and nobody else tending either; undefined when there is none.
- */
-export function keptPair(
-  world: Pick<WorldState, 'horses' | 'residents'>,
-  stable: Building,
-  owner: HorseOwner,
-  breeder: Pick<Resident, 'id'> | undefined,
-): [string, string] | undefined {
-  const kept = [...(stable.breedings ?? [])].sort((a, b) => b.progress - a.progress)
-  const k = kept.find((x) => !breedProblem(world, stable, owner, breeder, x.horseIds))
-  return k && [k.horseIds[0], k.horseIds[1]]
-}
-
-/**
- * Two fed horses of the owner's in a finished stable with room for a foal, which a resident there
- * (`breeder`, when it is one) can breed (`CONTEXT.md`: Breeding), or undefined when there are
- * none. A pair whose breeding the stable keeps comes first (`keptPair`).
- */
-export function breedingPair(
-  world: Pick<WorldState, 'horses' | 'residents'>,
-  stable: Building,
-  owner: HorseOwner,
-  breeder?: Pick<Resident, 'id'>,
-): [Horse, Horse] | undefined {
-  const kept = keptPair(world, stable, owner, breeder)
-  if (kept) {
-    const [a, b] = kept.map((id) => world.horses.find((h) => h.id === id)!)
-    return [a!, b!]
-  }
-  const fed = horsesIn(world.horses, stable).filter((h) => ownsHorse(owner, h) && h.hunger > 0)
-  const pair = fed.slice(0, 2)
-  if (pair.length < 2) return undefined
-  return breedProblem(world, stable, owner, breeder, [pair[0]!.id, pair[1]!.id])
-    ? undefined
-    : [pair[0]!, pair[1]!]
-}
-
-/**
- * Why a resident standing at the stable can't breed the two horses (`CONTEXT.md`: Breeding),
- * undefined when they can: the stable must be finished, the horses two fed ones of the owner's
- * standing in it, and the stable must have room for a foal. Horses another resident already
- * breeds can't be bred twice. `breeder` is the resident who would, left out of that check.
- */
-export function breedProblem(
-  world: Pick<WorldState, 'horses' | 'residents'>,
-  stable: Building,
-  owner: HorseOwner,
-  breeder: Pick<Resident, 'id'> | undefined,
-  horseIds: unknown,
-): string | undefined {
-  if (stable.kind !== 'stable') return 'not a stable'
-  if (stable.site) return 'the stable isn’t finished'
-  if (!Array.isArray(horseIds) || horseIds.length !== 2 || horseIds[0] === horseIds[1])
-    return 'pick two horses'
-  const horses = horseIds.map((id) => world.horses.find((h) => h.id === id))
-  if (horses.some((h) => !h || !isAt(h, stable))) return 'both horses must stand in the stable'
-  if (horses.some((h) => !ownsHorse(owner, h!))) return 'not horses of your realm'
-  if (horses.some((h) => h!.hunger <= 0)) return 'a hungry horse can’t breed'
-  if (horsesIn(world.horses, stable).length >= STABLE_CAPACITY)
-    return 'the stable has no room for a foal'
-  const taken = breedersAt(world.residents, stable).some(
-    (r) =>
-      r.id !== breeder?.id && (r.order as BreedOrder).horseIds.some((id) => horseIds.includes(id)),
-  )
-  if (taken) return 'those horses are already being bred'
-  return undefined
 }
 
 /** The horse a resident rides (`CONTEXT.md`: Riding), if they ride one. */

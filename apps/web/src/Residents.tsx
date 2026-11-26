@@ -92,13 +92,8 @@ import type {
   WallMaterial,
   Waypoint,
 } from '@csp/shared-types'
-import {
-  STABLE_BREED_TICKS,
-  breedProblem,
-  horsesIn,
-  keptBreeding,
-  keptPair,
-} from './shared/horses.js'
+import { STABLE_BREED_TICKS, horsesIn, keptBreeding } from './shared/horses.js'
+import { breedProblem, keptPair } from './world-rules.js'
 import {
   Fragment,
   useContext,
@@ -230,7 +225,6 @@ import {
   runScriptPick,
 } from './script-run-view.js'
 import { BUILDING_NAMES } from './map/palette.js'
-import { horseFaresKnown } from './seen.js'
 import { PanelHead } from './panel-head.js'
 import { labelled } from './name-labels.js'
 import {
@@ -3008,7 +3002,6 @@ export function ResidentCard({
           tick={tick}
           stable={building}
           horses={horses}
-          residents={residents}
           realmId={realmId}
           onBreed={onBreed}
         />
@@ -4253,7 +4246,6 @@ function BreedBlock({
   tick,
   stable,
   horses,
-  residents,
   realmId,
   onBreed,
 }: {
@@ -4261,7 +4253,6 @@ function BreedBlock({
   tick: number
   stable: Building
   horses: SeenHorse[]
-  residents: Resident[]
   realmId: string
   onBreed: (stableId: string, horseIds: [string, string]) => void
 }) {
@@ -4269,16 +4260,14 @@ function BreedBlock({
   const own = horsesIn(horses, stable).filter((h) => h.realmId === realmId)
   const o = resident.order
   const breeding = o?.kind === 'breed' && o.stableId === stable.id ? o : undefined
-  // The Player knows how their own horses fare (`CONTEXT.md`: Seeing how someone fares).
-  const seen = { horses: horses.filter(horseFaresKnown), residents }
-  const kept = breeding ? undefined : keptPair(seen, stable, { realmId }, resident)
+  const kept = breeding ? undefined : keptPair(stable.id, { realmId }, resident.id)
   const keptShare = kept ? keptBreeding(stable, kept)!.progress / STABLE_BREED_TICKS : 0
   const chosen = kept ?? picked
   const pair = chosen.length === 2 ? ([chosen[0]!, chosen[1]!] as [string, string]) : undefined
   const problem = !canWork(resident, tick)
     ? 'children can’t breed horses'
     : pair
-      ? breedProblem(seen, stable, { realmId }, resident, pair)
+      ? breedProblem(stable.id, { realmId }, resident.id, pair)
       : 'pick two horses'
   const toggle = (id: string) =>
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id].slice(-2)))

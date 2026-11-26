@@ -189,15 +189,15 @@ export function breedProblem(
 }
 
 /**
- * Why the realm can't tell `residentIds` to relocate to each of `cityIds` now
- * (`relocateProblem`, `CONTEXT.md`: Relocate).
+ * The pair the stable keeps breeding progress for that `breederId` carries on with first, the
+ * furthest along they can breed (`keptPair`, `CONTEXT.md`: Breeding), if any.
  */
-export function relocateProblems(
-  realmId: string,
-  residentIds: readonly string[],
-  cityIds: readonly string[],
-): Problem[] {
-  return askAll(cityIds.map((c) => ['relocateProblem', [realmId, residentIds, c]] as const))
+export function keptPair(
+  stableId: string,
+  owner: { realmId?: string; cityId?: string },
+  breederId: string | undefined,
+): [string, string] | undefined {
+  return ask('keptPair', stableId, owner.realmId, owner.cityId, breederId, undefined)
 }
 
 /**

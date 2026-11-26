@@ -89,9 +89,7 @@ import type {
   Pile,
   Resident,
   Stock,
-  Alliance,
   Diplomacy,
-  MercenaryContract,
   SeenResident,
   SeenCaravan,
   SeenTrader,
@@ -119,7 +117,6 @@ import { covers, FOOTPRINT, footprintTiles } from './shared/footprint.js'
 import { conditionLine, isRuin, repairable } from './shared/decay.js'
 import { Terrain, UNEXPLORED } from './shared/terrain.js'
 import { fullAt, gatheredOn, isPickedOver, patchLeft } from './shared/patch.js'
-import { handOverProblem, heirProblem } from './shared/leader.js'
 import { aboutTime, workLeft } from './shared/estimates.js'
 import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
@@ -134,8 +131,11 @@ import {
   boardVesselProblems,
   driveOffProblems,
   hitchOffProblems,
+  handOverProblem,
+  heirProblem,
   horseToSteal,
   mountOffProblems,
+  type Serving,
 } from './world-rules.js'
 import type { Picking } from './Residents.js'
 
@@ -820,13 +820,15 @@ export function keepRows<Id extends string>(
   return rows
 }
 
-/** What the Player knows that the handover check needs: their diplomacy and what is in sight. */
-export interface HandOverSeen {
-  tick: number
-  diplomacy: Pick<Diplomacy, 'alliance' | 'contracts'>
-  cities: City[]
-  buildings: Building[]
-  mapSize: number
+/** Who serves others as far as the Player knows, from their diplomacy (`Serving`). */
+function servingOf(diplomacy: Pick<Diplomacy, 'alliance' | 'contracts'>): Serving {
+  return {
+    army: diplomacy.alliance?.army.map((p) => p.id) ?? [],
+    contracts: diplomacy.contracts.map((c) => ({
+      residentIds: c.residents.map((r) => r.id),
+      started: c.startedAt !== null,
+    })),
+  }
 }
 
 /**
@@ -835,12 +837,11 @@ export interface HandOverSeen {
  * checks again when the order arrives.
  */
 export function makeLeaderProblem(
-  seen: HandOverSeen,
+  diplomacy: Pick<Diplomacy, 'alliance' | 'contracts'>,
   realm: { id: string; leaderId: string },
-  leader: Resident | undefined,
-  target: Resident,
+  targetId: string,
 ): string | undefined {
-  return handOverProblem(seenWorld(seen), realm, leader, target, seen.mapSize)
+  return handOverProblem(realm, targetId, servingOf(diplomacy))
 }
 
 /**
@@ -848,51 +849,11 @@ export function makeLeaderProblem(
  * the handover (`CONTEXT.md`: Heir). The server checks again when the order arrives.
  */
 export function nameHeirProblem(
-  seen: HandOverSeen,
+  diplomacy: Pick<Diplomacy, 'alliance' | 'contracts'>,
   realm: { id: string; leaderId: string },
-  target: Resident,
+  targetId: string,
 ): string | undefined {
-  return heirProblem(seenWorld(seen), realm, target)
-}
-
-/** The world the shared checks read, from what the Player sees. */
-function seenWorld(seen: HandOverSeen) {
-  const a = seen.diplomacy.alliance
-  const alliances: Alliance[] = a
-    ? [
-        {
-          id: a.id,
-          name: a.name,
-          leaderId: a.leaderId,
-          members: a.members.map((m) => ({
-            realmId: m.realmId,
-            joinedAt: m.joinedAt,
-            leaving: m.leavesAt === null ? null : { at: m.leavesAt, removed: false },
-          })),
-          invites: a.invites.map((i) => i.realmId),
-          army: a.army.map((p) => ({ is: p.is, id: p.id, recallAt: p.recallAt })),
-        },
-      ]
-    : []
-  const contracts: MercenaryContract[] = seen.diplomacy.contracts.map((c) => ({
-    id: c.id,
-    lenderId: c.lender.realmId,
-    hirerId: c.hirer.realmId,
-    offeredBy: c.offeredBy,
-    residentIds: c.residents.map((r) => r.id),
-    days: c.days,
-    pricePerWeek: c.pricePerWeek,
-    storageId: c.storage?.id ?? '',
-    startedAt: c.startedAt,
-    paidWeeks: c.paidWeeks,
-  }))
-  return {
-    tick: seen.tick,
-    alliances,
-    contracts,
-    cities: seen.cities,
-    buildings: seen.buildings,
-  }
+  return heirProblem(realm, targetId, servingOf(diplomacy))
 }
 
 /** The relationship of a carriage's or a resident's owner (ADR 0008), seen from the viewer. */

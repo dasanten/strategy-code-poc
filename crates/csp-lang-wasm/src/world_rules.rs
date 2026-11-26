@@ -1,8 +1,8 @@
-//! The checks that read the world (T122.6): whether a resident may build, steal, board, breed,
-//! relocate or hand over the realm, and why not, answered by `csp-sim`'s own functions on the world
+//! The checks that read the world (T122.6): whether a resident may build, steal, board, breed
+//! or hand over the realm, and why not, answered by `csp-sim`'s own functions on the world
 //! mirror. One entry, [`rule`], called by name with its arguments as a JSON array of ids,
 //! coordinates and values, answering JSON, so a check is one arm here and one function in
-//! `packages/lang-wasm/src/world-rules.ts`. Things are found in the mirror by id; one that isn't in
+//! `apps/web/src/world-rules.ts`. Things are found in the mirror by id; one that isn't in
 //! sight (gone in the message the client hasn't shown yet) gets the check's own "no such" answer.
 
 use csp_shared::chunks::UNEXPLORED;
@@ -14,7 +14,7 @@ use csp_shared::world::{
 use csp_sim::mirror::{Known, SightMirror};
 use csp_sim::queries::building::{self, TerrainLookup};
 use csp_sim::queries::horses::HorseOwner;
-use csp_sim::queries::{breeding, driving, leader, people, riding, vessels};
+use csp_sim::queries::{breeding, driving, leader, riding, vessels};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -190,8 +190,8 @@ pub fn rule(mirror: &mut SightMirror, name: &str, json: &str) -> Result<Value, S
             };
             problem(vessels::board_vessel_problem(w, r, v, as_crew))
         }
-        // Breeding (`CONTEXT.md`).
-        "breedProblem" => {
+        // Breeding (`CONTEXT.md`): why not, and the pair the stable keeps that they carry on with.
+        "breedProblem" | "keptPair" => {
             type A = (String, Option<String>, Option<String>, Option<String>, Option<Vec<String>>);
             let (stable, realm, city, breeder, horses): A = args(name, json)?;
             let Some(b) = w.buildings.iter().find(|b| b.id == stable) else {
@@ -202,14 +202,10 @@ pub fn rule(mirror: &mut SightMirror, name: &str, json: &str) -> Result<Value, S
                 (None, Some(c)) => HorseOwner::City(c),
                 (None, None) => return Err(format!("{name}: a horse owner")),
             };
+            if name == "keptPair" {
+                return Ok(json!(breeding::kept_pair(w, b, owner, breeder.as_deref())));
+            }
             problem(breeding::breed_problem(w, b, owner, breeder.as_deref(), horses.as_deref()))
-        }
-        // Relocate (`CONTEXT.md`).
-        "relocateProblem" => {
-            let (realm, ids, city): (String, Vec<String>, Option<String>) = args(name, json)?;
-            let rs: Option<Vec<&Resident>> = ids.iter().map(|id| resident(w, id)).collect();
-            let Some(rs) = rs else { return no("resident") };
-            problem(people::relocate_problem(w, &realm, &rs, city.as_deref()))
         }
         // Leader handover, Heir (`CONTEXT.md`).
         "handOverProblem" | "heirProblem" => {

@@ -3425,18 +3425,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 if (selected.owner !== world.home.realmId || selected.id === world.home.leaderId) {
                   return undefined
                 }
-                const seen = {
-                  tick: world.tick,
-                  diplomacy: world.diplomacy,
-                  cities: world.cities,
-                  buildings: world.buildings,
-                  mapSize: world.map.size,
-                }
                 const realm = { id: world.home.realmId, leaderId: world.home.leaderId }
                 return {
-                  problem: makeLeaderProblem(seen, realm, leader, selected),
+                  problem: makeLeaderProblem(world.diplomacy, realm, selected.id),
                   heir: {
-                    problem: nameHeirProblem(seen, realm, selected),
+                    problem: nameHeirProblem(world.diplomacy, realm, selected.id),
                     named: selected.id === heirId,
                   },
                 }
