@@ -10,12 +10,16 @@ import type {
   ClientFirstDayLine,
   FirstDayLine,
   Good,
+  Horse,
+  HorseStats,
   LoadLevel,
   NpcCityPrice,
   PricedGood,
   Resident,
   ResourceKind,
   ScriptParam,
+  SkillName as Skill,
+  StatName,
   SwapRate,
   Task,
   Trader,
@@ -585,4 +589,185 @@ export function inInnerRingAround(
     [at.x, at.y],
     size,
   )
+}
+
+// Rules on one resident or horse (T122.5b): they go across whole, as a Player sees them or as the
+// world has them. What a caller leaves out of one (a `Pick`) reads as a blank: no id, at (0, 0),
+// average stats, no skills, carrying and wearing nothing.
+
+const AVERAGE_STAT = { base: 10, trained: 0 }
+
+/** A resident as the module reads one, from what the caller has of them. */
+function asResident(r: object): object {
+  const stats = (r as { stats?: object }).stats
+  return {
+    id: '',
+    name: '',
+    owner: null,
+    cityId: null,
+    x: 0,
+    y: 0,
+    stats: {
+      strength: AVERAGE_STAT,
+      endurance: AVERAGE_STAT,
+      agility: AVERAGE_STAT,
+      intellect: AVERAGE_STAT,
+    },
+    skills: {},
+    bornAt: 0,
+    lifespan: Number.MAX_SAFE_INTEGER,
+    carried: {},
+    equipped: {},
+    ...r,
+    // A caller's stats may name only those it has; the rest read as average.
+    ...(stats && {
+      stats: {
+        strength: AVERAGE_STAT,
+        endurance: AVERAGE_STAT,
+        agility: AVERAGE_STAT,
+        intellect: AVERAGE_STAT,
+        ...stats,
+      },
+    }),
+  }
+}
+
+/** A horse as the module reads one, from what the caller has of it. */
+/** What of a horse the module reads (`SeenHorse`): anything else a caller's object has is left out. */
+const HORSE_FIELDS = [
+  'id',
+  'name',
+  'realmId',
+  'cityId',
+  'x',
+  'y',
+  'hunger',
+  'health',
+  'stats',
+  'bornAt',
+  'downUntil',
+  'down',
+]
+
+function asHorse(h: object): object {
+  const known = Object.fromEntries(Object.entries(h).filter(([k]) => HORSE_FIELDS.includes(k)))
+  return {
+    id: '',
+    name: '',
+    realmId: null,
+    cityId: null,
+    x: 0,
+    y: 0,
+    stats: { speed: 10, strength: 10, endurance: 10 },
+    bornAt: 0,
+    ...known,
+  }
+}
+
+/** How much a resident's age lets them do, from a child's share up to a grown one's 1. */
+export function ageFactor(resident: Resident, tick: number): number {
+  return rule('ageFactor', asResident(resident), tick)
+}
+
+/** Construction skill a resident gains per game day of building (`CONTEXT.md`: Skill). */
+export function constructionLearned(resident: Resident, tick: number): number {
+  return rule('constructionLearned', asResident(resident), tick)
+}
+
+/** How many times the Food of a day a resident eats on `terrain` (`CONTEXT.md`: Hunger). */
+export function foodUse(resident: Resident, terrain: number, tick: number): number {
+  return rule('foodUse', asResident(resident), terrain, tick)
+}
+
+/** How many of `good` a resident makes a game day at a workplace of `kind`. */
+export function madePerDay(
+  resident: Resident,
+  kind: BuildingKind,
+  good: Good,
+  tick: number,
+): number {
+  return rule('madePerDay', asResident(resident), kind, good, tick)
+}
+
+/** How much of `skill` a resident gains per game day of work using it. */
+export function workLearned(resident: Resident, skill: Skill, tick: number): number {
+  return rule('workLearned', asResident(resident), skill, tick)
+}
+
+/** A resident's value in a stat or skill a training ground teaches. */
+export function subjectValue(resident: Resident, subject: StatName | Skill, tick: number): number {
+  return rule('subjectValue', asResident(resident), subject, tick)
+}
+
+/** How far a teacher can train a trainee in `subject` (`CONTEXT.md`: Training ground). */
+export function trainingCeiling(
+  trainee: Resident,
+  teacher: Resident,
+  subject: StatName | Skill,
+  tick: number,
+): number {
+  return rule('trainingCeiling', asResident(trainee), asResident(teacher), subject, tick)
+}
+
+/** How many more of `good` a resident can carry. */
+export function unitsThatFit(resident: Resident, good: Good, tick: number): number {
+  return rule('unitsThatFit', asResident(resident), good, tick)
+}
+
+/** Why a resident can't buy a horse for `price`, if they can't. */
+export function horseBuyerProblem(
+  resident: Pick<Resident, 'bornAt' | 'carried'>,
+  price: number,
+  tick: number,
+): string | undefined {
+  return opt(rule<string | null>('horseBuyerProblem', asResident(resident), price, tick))
+}
+
+/** Why a resident can't sell a horse for `price`, if they can't. */
+export function horseSellerProblem(
+  resident: Resident,
+  price: number,
+  tick: number,
+): string | undefined {
+  return opt(rule<string | null>('horseSellerProblem', asResident(resident), price, tick))
+}
+
+/** Food a resident eats a tick on `terrain`, with what their horse eats if they ride one. */
+export function foodPerTick(
+  r: Resident,
+  terrain: number,
+  tick: number,
+  horse?: { stats: HorseStats },
+): number {
+  return rule('foodPerTick', asResident(r), terrain, tick, horse?.stats)
+}
+
+/** How fast a rider goes on their horse over `terrain`, in tiles a tick. */
+export function rideSpeed(
+  rider: Resident,
+  horse: Pick<Horse, 'stats' | 'hunger'>,
+  terrain: number,
+): number {
+  return rule('rideSpeed', asResident(rider), asHorse(horse), terrain)
+}
+
+/** What a horse is worth, by its stats and age (`CONTEXT.md`: Horse market). */
+export function horseWorth(horse: Pick<Horse, 'stats' | 'bornAt'>, tick: number): number {
+  return rule('horseWorth', asHorse(horse), tick)
+}
+
+/** A horse's age in game years. */
+export function horseAgeInYears(horse: Pick<Horse, 'bornAt'>, tick: number): number {
+  return rule('horseAgeInYears', asHorse(horse), tick)
+}
+
+/** Why `feeder` can't feed `target`, if they can't (`CONTEXT.md`: Reviving). */
+export function feedProblem(
+  feeder: Pick<Resident, 'bornAt' | 'x' | 'y' | 'carried'>,
+  target: object | undefined,
+  tick: number,
+  size: number,
+): string | undefined {
+  const t = target && asResident(target)
+  return opt(rule<string | null>('feedProblem', asResident(feeder), t, tick, size))
 }

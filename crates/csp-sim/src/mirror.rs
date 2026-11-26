@@ -233,7 +233,7 @@ fn script_id_only(s: ScriptIdOnly) -> RunningScript {
 /// whose fare the Player sees: a stranger reads as full health and fed, and Down without an end.
 /// Never sent: their script's memory and log, whether an order holds against blows, the Alarm
 /// that a defence script interrupted.
-fn resident(r: SeenResident) -> Resident {
+pub fn resident(r: SeenResident) -> Resident {
     Resident {
         id: r.id,
         name: r.name,
@@ -276,7 +276,8 @@ fn resident(r: SeenResident) -> Resident {
 
 /// A horse as far as it is seen: a stranger's reads as full health and fed, and Down without an
 /// end.
-fn horse(h: SeenHorse) -> Horse {
+/// A horse as far as it is seen: a stranger's reads as fed and unhurt.
+pub fn horse(h: SeenHorse) -> Horse {
     Horse {
         id: h.id,
         name: h.name,

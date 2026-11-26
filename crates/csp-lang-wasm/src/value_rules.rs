@@ -6,7 +6,8 @@
 
 use csp_lang::ParamInfo;
 use csp_shared::world::{
-    BuildingKind, CarriedFeeBy, Good, ResourceKind, Stock, Task, WallMaterial, Waypoint,
+    BuildingKind, CarriedFeeBy, Good, HorseStats, ResourceKind, SkillName, Stock, Task,
+    TrainingSubject, WallMaterial, Waypoint,
 };
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
@@ -43,6 +44,30 @@ fn building_arg(mut v: Value) -> Result<csp_shared::world::Building, String> {
 fn one_building(name: &str, json: &str) -> Result<csp_shared::world::Building, String> {
     let (b,): (Value,) = args(name, json)?;
     building_arg(b)
+}
+
+/// A resident the client passes, as a Player sees them (`SeenResident`) or whole, read the way the
+/// world mirror reads one (`csp_sim::mirror::resident`). What the rules here never read of a
+/// whole resident (their script, its log, what interrupted it) is left out first.
+fn resident_arg(mut v: Value) -> Result<csp_shared::world::Resident, String> {
+    if let Some(map) = v.as_object_mut() {
+        for key in ["is", "script", "scriptLog", "interrupted", "givenUnderAttack"] {
+            map.remove(key);
+        }
+    }
+    serde_json::from_value::<csp_shared::protocol::SeenResident>(v)
+        .map(csp_sim::mirror::resident)
+        .map_err(|e| format!("a resident: {e}"))
+}
+
+/// A horse the client passes, as a Player sees it or whole (`csp_sim::mirror::horse`).
+fn horse_arg(mut v: Value) -> Result<csp_shared::world::Horse, String> {
+    if let Some(map) = v.as_object_mut() {
+        map.remove("is");
+    }
+    serde_json::from_value::<csp_shared::protocol::SeenHorse>(v)
+        .map(csp_sim::mirror::horse)
+        .map_err(|e| format!("a horse: {e}"))
 }
 
 /// A price as the client has it.
@@ -408,6 +433,81 @@ pub fn rule(name: &str, json: &str) -> Result<String, String> {
         "inInnerRingAround" => {
             let (hall, at, size): (Value, Tile, i32) = args(name, json)?;
             json!(csp_sim::queries::trade_org::in_inner_ring_around(&building_arg(hall)?, at, size))
+        }
+        // Rules on one resident or horse (T122.5b): the client passes them.
+        "ageFactor" => {
+            let (r, tick): (Value, f64) = args(name, json)?;
+            json!(residents::age_factor(&resident_arg(r)?, tick))
+        }
+        "constructionLearned" => {
+            let (r, tick): (Value, f64) = args(name, json)?;
+            json!(csp_sim::queries::balance::construction_learned(&resident_arg(r)?, tick))
+        }
+        "foodUse" => {
+            let (r, terrain, tick): (Value, u8, f64) = args(name, json)?;
+            json!(residents::food_use(&resident_arg(r)?, terrain, tick))
+        }
+        "madePerDay" => {
+            let (r, kind, good, tick): (Value, BuildingKind, Good, f64) = args(name, json)?;
+            json!(csp_sim::queries::balance::made_per_day(&resident_arg(r)?, kind, good, tick))
+        }
+        "workLearned" => {
+            let (r, skill, tick): (Value, SkillName, f64) = args(name, json)?;
+            json!(csp_sim::queries::balance::work_learned(&resident_arg(r)?, skill, tick))
+        }
+        "subjectValue" => {
+            let (r, subject, tick): (Value, TrainingSubject, f64) = args(name, json)?;
+            json!(csp_sim::queries::balance::subject_value(&resident_arg(r)?, subject, tick))
+        }
+        "trainingCeiling" => {
+            let (trainee, teacher, subject, tick): (Value, Value, TrainingSubject, f64) =
+                args(name, json)?;
+            let (trainee, teacher) = (resident_arg(trainee)?, resident_arg(teacher)?);
+            json!(csp_sim::queries::balance::training_ceiling(&trainee, &teacher, subject, tick))
+        }
+        "unitsThatFit" => {
+            let (r, good, tick): (Value, Good, f64) = args(name, json)?;
+            json!(csp_sim::queries::goods::units_that_fit(&resident_arg(r)?, good, tick))
+        }
+        "horseBuyerProblem" => {
+            let (r, price, tick): (Value, f64, f64) = args(name, json)?;
+            json!(csp_sim::queries::trade_quotes::horse_buyer_problem(
+                &resident_arg(r)?,
+                price,
+                tick
+            ))
+        }
+        "horseSellerProblem" => {
+            let (r, price, tick): (Value, f64, f64) = args(name, json)?;
+            json!(csp_sim::queries::trade_quotes::horse_seller_problem(
+                &resident_arg(r)?,
+                price,
+                tick
+            ))
+        }
+        "foodPerTick" => {
+            let (r, terrain, tick, stats): (Value, u8, f64, Option<HorseStats>) = args(name, json)?;
+            let r = resident_arg(r)?;
+            json!(csp_sim::queries::estimates::food_per_tick(&r, terrain, tick, stats.as_ref()))
+        }
+        "rideSpeed" => {
+            let (rider, horse, terrain): (Value, Value, u8) = args(name, json)?;
+            let (rider, horse) = (resident_arg(rider)?, horse_arg(horse)?);
+            json!(csp_sim::queries::pace::ride_speed(&rider, &horse, terrain))
+        }
+        "horseWorth" => {
+            let (h, tick): (Value, f64) = args(name, json)?;
+            json!(horse_market::horse_worth(&horse_arg(h)?, tick))
+        }
+        "horseAgeInYears" => {
+            let (h, tick): (Value, f64) = args(name, json)?;
+            json!(residents::horse_age_in_years(&horse_arg(h)?, tick))
+        }
+        "feedProblem" => {
+            let (feeder, target, tick, size): (Value, Option<Value>, f64, i32) = args(name, json)?;
+            let feeder = resident_arg(feeder)?;
+            let target = target.map(resident_arg).transpose()?;
+            json!(csp_sim::reviving::feed_problem(&feeder, target.as_ref(), tick, size))
         }
         _ => return Err(format!("no rule {name}")),
     };
