@@ -1,5 +1,4 @@
-// Ported from packages/shared/src/time.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// Game time as the phone's top bar shows it.
 
 import { gameTime } from '@csp/lang-wasm'
 

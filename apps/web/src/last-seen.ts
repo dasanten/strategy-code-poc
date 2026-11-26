@@ -1,5 +1,4 @@
-import { TICKS_PER_GAME_DAY } from '@csp/balance'
-import { TICKS_PER_GAME_HOUR } from '@csp/balance'
+import { TICKS_PER_GAME_DAY, TICKS_PER_GAME_HOUR } from '@csp/balance'
 import { gameTime } from '@csp/lang-wasm'
 import type { Remembered, SeenBuilding, SeenCity } from '@csp/shared-types'
 

@@ -2,8 +2,7 @@
 // and `ruins.rs` have them.
 import * as B from '@csp/balance'
 import type { Building, BuildingKind } from '@csp/shared-types'
-import { repairWork, rebuildWork } from '@csp/lang-wasm'
-import { conditionOf } from '@csp/lang-wasm'
+import { repairWork, rebuildWork, conditionOf } from '@csp/lang-wasm'
 
 /** Game days a finished building of each kind takes to lose all its condition, unrepaired. */
 export const DECAY_DAYS = B.DECAY_DAYS as unknown as Partial<Record<BuildingKind, number>>

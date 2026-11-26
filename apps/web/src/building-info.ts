@@ -1,5 +1,4 @@
-// Ported from packages/shared/src/building-info.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// What each kind of building is for, and the Build menu's groups, from the specs.
 
 import { BUILD_MENU_GROUPS, BUILDING_KINDS, BUILDING_SPECS } from '@csp/balance'
 import { BUILDABLE } from './building.js'

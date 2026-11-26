@@ -1,5 +1,6 @@
-// Ported from packages/shared/src/terrain.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// The map's tiles and chunks on the client (`CONTEXT.md`: Map). Its rules with a Rust original are
+// twins of it, held to it by `client-twins.test.ts` (T122.8, docs/wasm-rules.md): the client asks
+// them per frame or per row.
 
 import { Terrain as TerrainCodes } from '@csp/balance'
 import type { Terrain as TerrainCode } from '@csp/shared-types'

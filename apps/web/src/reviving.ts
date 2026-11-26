@@ -1,8 +1,8 @@
-// Ported from packages/shared/src/reviving.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// Feeding a horse (`CONTEXT.md`: Feeding a horse) on the client. Its rules with a Rust original are
+// twins of it, held to it by `client-twins.test.ts` (T122.8, docs/wasm-rules.md): the client asks
+// them per frame or per row.
 
-import { inContact } from '@csp/lang-wasm'
-import { canWork } from '@csp/lang-wasm'
+import { inContact, canWork } from '@csp/lang-wasm'
 import { isDown } from './world.js'
 import { HORSE_FILL_PER_FOOD, MAX_HUNGER } from '@csp/balance'
 import type { Resident } from '@csp/shared-types'

@@ -1,10 +1,7 @@
-// Ported from packages/shared/src/chunks.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// The terrain chunks as served (`terrainChunkPath`, `TERRAIN_BATCH_PATH`), read and written.
 
-import { CHUNK_SIZE } from '@csp/shared-types'
-import { RICHNESSES } from '@csp/shared-types'
+import { CHUNK_SIZE, RICHNESSES, NODE_KINDS } from '@csp/shared-types'
 import type { KnownNode, TerrainChunk } from '@csp/shared-types'
-import { NODE_KINDS } from '@csp/shared-types'
 
 /**
  * A chunk as served from `terrainChunkPath`: the `CHUNK_SIZE`² terrain bytes, then three bytes

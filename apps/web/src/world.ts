@@ -1,5 +1,6 @@
-// Ported from packages/shared/src/world.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// The client's lists of goods, skills and stats, and who is Down. Its rules with a Rust original
+// are twins of it, held to it by `client-twins.test.ts` (T122.8, docs/wasm-rules.md): the client
+// asks them per frame or per row.
 
 import { GOOD_KINDS, GOOD_SPECS } from '@csp/balance'
 import type { Good, SkillName, Weapon } from '@csp/shared-types'

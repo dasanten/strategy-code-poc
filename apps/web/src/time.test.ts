@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { GAME_DAYS_PER_YEAR, TICKS_PER_GAME_HOUR } from '@csp/balance'
+import {
+  GAME_DAYS_PER_YEAR,
+  TICKS_PER_GAME_HOUR,
+  TICKS_PER_GAME_DAY,
+  TICKS_PER_GAME_YEAR,
+} from '@csp/balance'
 import { formatGameTime, gameTime } from '@csp/lang-wasm'
 import { formatGameTimeShort } from './time.js'
-import { TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR } from '@csp/balance'
 describe('game time', () => {
   it('runs 1 game minute per real second, 1 game day per 24 real minutes, 420 game days a year', () => {
     expect(TICKS_PER_GAME_DAY).toBe(24 * 60)

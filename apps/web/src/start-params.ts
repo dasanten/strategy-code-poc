@@ -1,6 +1,11 @@
 import { WORKPLACE_PARAM } from '@csp/shared-types'
-import { isWorkScript, paramNeedsValue, targetParam } from '@csp/lang-wasm'
-import { isParamChoice, isParamNumber } from '@csp/lang-wasm'
+import {
+  isWorkScript,
+  paramNeedsValue,
+  targetParam,
+  isParamChoice,
+  isParamNumber,
+} from '@csp/lang-wasm'
 import type {
   OrderRequest,
   ScriptParam,

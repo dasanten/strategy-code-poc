@@ -1,5 +1,4 @@
-// Ported from packages/shared/src/admin-map.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// Where the admin map loads the world from (`CONTEXT.md`: Admin, admin map).
 
 import type { AdminInspectTarget, AdminViewRequest } from '@csp/shared-types'
 import { ADMIN_WORLD_PATH, ADMIN_INSPECT_PATH } from '@csp/shared-types'

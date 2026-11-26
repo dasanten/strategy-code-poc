@@ -1,11 +1,17 @@
 import { useEffect, useRef } from 'react'
 import { CHILD_GOODS } from './narrowed.js'
 import { GOODS } from './world.js'
-import { orderKind, type StepGroup } from '@csp/lang-wasm'
+import {
+  orderKind,
+  type StepGroup,
+  feedsOnce,
+  neverEnds,
+  stepLine,
+  canWork,
+  conditionProblem,
+} from '@csp/lang-wasm'
 import { QUEUE_STEP_KINDS, queueSteps } from './queue.js'
-import { feedsOnce, neverEnds, stepLine } from '@csp/lang-wasm'
 import { TICKS_PER_GAME_HOUR } from '@csp/balance'
-import { canWork } from '@csp/lang-wasm'
 import { isVesselId } from './vessels.js'
 import { covers } from './footprint.js'
 import type {
@@ -42,7 +48,6 @@ import {
 } from './plan-blocks.js'
 import { realTimeOf } from './wiki/wiki-view.js'
 import { conditionLabel } from './condition-view.js'
-import { conditionProblem } from '@csp/lang-wasm'
 
 /**
  * Queues on the resident card (`CONTEXT.md`: Queue): holding Shift while giving an order appends

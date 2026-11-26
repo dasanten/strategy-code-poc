@@ -1,11 +1,10 @@
-// Ported from packages/shared/src/estimates.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance. A way's arrival
-// estimate (`arrivalTicks`) is asked of the rules module: `arrivalOf` in `doing-view.ts`.
+// How long things take, in words (`CONTEXT.md`: Doing, Estimates). A way's arrival estimate is
+// asked of the rules module (`arrivalOf` in `doing-view.ts`); the client words the number.
 
 import { teardownLeft, workNeeded, workPace, workingOn } from '@csp/lang-wasm'
 import { STABLE_BREED_TICKS } from './horse-rules.js'
-import { TICKS_PER_GAME_HOUR } from '@csp/balance'
 import {
+  TICKS_PER_GAME_HOUR,
   ADULT_AGE,
   CARRYING_TICKS,
   PAIRING_WAIT_TICKS,

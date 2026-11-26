@@ -1,5 +1,6 @@
-// Ported from packages/shared/src/horses.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// Horses at stables, their riders and owners, as the client shows them. Its rules with a Rust
+// original are twins of it, held to it by `client-twins.test.ts` (T122.8, docs/wasm-rules.md): the
+// client asks them per frame or per row.
 
 import { STABLE_BREED_DAYS, TICKS_PER_GAME_DAY } from '@csp/balance'
 import type { Building, Horse, Resident } from '@csp/shared-types'

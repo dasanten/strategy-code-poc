@@ -1,5 +1,6 @@
-// Ported from packages/shared/src/first-day.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// The first-day card on the client (`CONTEXT.md`: First day). Its rules with a Rust original are
+// twins of it, held to it by `client-twins.test.ts` (T122.8, docs/wasm-rules.md): the client asks
+// them per frame or per row.
 
 import type { FirstDay } from '@csp/shared-types'
 import { FIRST_DAY_LINES } from '@csp/shared-types'

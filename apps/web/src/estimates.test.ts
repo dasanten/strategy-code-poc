@@ -10,8 +10,8 @@ import {
 } from './estimates.js'
 import { STABLE_BREED_TICKS } from './horse-rules.js'
 import { BUILD_WORK } from './narrowed.js'
-import { TICKS_PER_GAME_HOUR } from '@csp/balance'
 import {
+  TICKS_PER_GAME_HOUR,
   ADULT_AGE,
   CARRYING_TICKS,
   CHILD_YEAR_DAYS,

@@ -1,6 +1,5 @@
 import { BUILD_GROUPS } from './building-info.js'
-import { TICKS_PER_GAME_DAY } from '@csp/balance'
-import { TICKS_PER_GAME_HOUR } from '@csp/balance'
+import { TICKS_PER_GAME_DAY, TICKS_PER_GAME_HOUR } from '@csp/balance'
 import { SITES_OF_MOVERS } from './building.js'
 import { buildMenu } from '@csp/lang-wasm'
 import type { BuildingKind, ResourceNode } from '@csp/shared-types'

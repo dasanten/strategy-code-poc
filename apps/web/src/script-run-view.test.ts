@@ -1,5 +1,4 @@
-import { SCRIPT_STEP_BUDGET } from '@csp/balance'
-import { TICKS_PER_GAME_HOUR } from '@csp/balance'
+import { SCRIPT_STEP_BUDGET, TICKS_PER_GAME_HOUR } from '@csp/balance'
 import type { ScriptSummary } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {

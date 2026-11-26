@@ -1,7 +1,8 @@
-// Ported from packages/shared/src/walls.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types. Who may step onto a wall walk or pass a gate (`wallMap`,
+// Walls and gates on the client. Who may step onto a wall walk or pass a gate (`wallMap`,
 // `shutOut`) is the server's: no view asks it, and the route preview's blocked tiles are the
-// client's guess (`App.tsx`), as the server finds the way again (T122.8).
+// client's guess (`App.tsx`), as the server finds the way again (T122.8). Its rules with a Rust
+// original are twins of it, held to it by `client-twins.test.ts` (T122.8, docs/wasm-rules.md): the
+// client asks them per frame or per row.
 
 import type { Building } from '@csp/shared-types'
 

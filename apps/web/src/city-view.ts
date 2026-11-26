@@ -1,4 +1,4 @@
-import { BUILDING_KINDS, BUILDING_SPECS } from '@csp/balance'
+import { BUILDING_KINDS, BUILDING_SPECS, TICKS_PER_GAME_DAY } from '@csp/balance'
 import { SITES_OF_MOVERS } from './building.js'
 import { offerStoragesOf } from './offers-view.js'
 import {
@@ -8,9 +8,17 @@ import {
   quoteTrade,
   tradeCoinWarehouse,
 } from './warehouse.js'
-import { handsOf, loadOf } from '@csp/lang-wasm'
+import {
+  handsOf,
+  loadOf,
+  quoteTransfer,
+  transferTiles,
+  cutSwap,
+  npcSwapRates,
+  quoteTraderTrade,
+  canWork,
+} from '@csp/lang-wasm'
 import { nearestWarehouse } from './transfer.js'
-import { quoteTransfer, transferTiles } from '@csp/lang-wasm'
 import { carriageCapacity } from './carriages.js'
 import type {
   CarriageHorse,
@@ -41,15 +49,11 @@ import type {
   SeenBuilding,
 } from '@csp/shared-types'
 import { quoteSwap, noSwap } from './swap.js'
-import { cutSwap, npcSwapRates } from '@csp/lang-wasm'
-import { quoteTraderTrade } from '@csp/lang-wasm'
 import { wrapDistance } from './terrain.js'
-import { canWork } from '@csp/lang-wasm'
 import { aboutTime } from './estimates.js'
 import { GOOD_WEIGHT } from './narrowed.js'
 import { isAt } from './footprint.js'
 import { occupationTicksLeft } from './city.js'
-import { TICKS_PER_GAME_DAY } from '@csp/balance'
 import type { Shown } from './protocol.js'
 import { TRADE_ORG, TRADE_ORG_NAME } from '@csp/shared-types'
 import { faresKnown, loadKnown } from './seen.js'

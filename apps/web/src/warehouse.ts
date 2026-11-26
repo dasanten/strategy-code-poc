@@ -1,5 +1,6 @@
-// Ported from packages/shared/src/warehouse.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// Trade Org warehouses and their quotes, as the city card shows them. Its rules with a Rust
+// original are twins of it, held to it by `client-twins.test.ts` (T122.8, docs/wasm-rules.md): the
+// client asks them per frame or per row.
 
 import { townHallOf } from './city.js'
 import { GOOD_WEIGHT, WAREHOUSE_FLOOR } from './narrowed.js'
@@ -17,8 +18,7 @@ import type {
   WorldState,
 } from '@csp/shared-types'
 import { HQ_COIN_WAREHOUSE } from '@csp/shared-types'
-import { priceFor, deliveryFee } from '@csp/lang-wasm'
-import { quoteAtPrices } from '@csp/lang-wasm'
+import { priceFor, deliveryFee, quoteAtPrices } from '@csp/lang-wasm'
 
 /** Goods other than coins: what a warehouse puts a price on. */
 export const PRICED_GOODS = GOODS.filter((g): g is Exclude<Good, 'coins'> => g !== 'coins')

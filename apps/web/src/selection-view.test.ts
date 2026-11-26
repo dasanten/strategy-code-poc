@@ -28,13 +28,12 @@ import {
   PATCH_SIZE,
   PATCH_REST_DAYS,
   PATCH_REGROW_DAYS,
+  TICKS_PER_GAME_HOUR,
 } from '@csp/balance'
-import { rebuildWork } from '@csp/lang-wasm'
+import { rebuildWork, buildMenu, stockWeight } from '@csp/lang-wasm'
 import { FOOTPRINT, footprintTiles } from './footprint.js'
 import { MAX_WORKERS } from './building.js'
-import { NODE_GOOD } from '@csp/shared-types'
-import { buildMenu } from '@csp/lang-wasm'
-import { TICKS_PER_GAME_HOUR } from '@csp/balance'
+import { NODE_GOOD, NODE_WORKPLACE, UNEXPLORED } from '@csp/shared-types'
 import { aboutTime, timeLeft } from './estimates.js'
 import {
   BUILD_MATERIALS,
@@ -42,10 +41,7 @@ import {
   WORK_OUTPUT_PER_DAY,
   AVERAGE_HORSE_STATS,
 } from './narrowed.js'
-import { NODE_WORKPLACE } from '@csp/shared-types'
-import { stockWeight } from '@csp/lang-wasm'
 import { Terrain } from './terrain.js'
-import { UNEXPLORED } from '@csp/shared-types'
 import type {
   Building,
   Carriage,

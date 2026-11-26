@@ -1,5 +1,6 @@
-// Ported from packages/shared/src/direct-offer.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// Direct offers (`CONTEXT.md`: Direct offer) on the client. Its rules with a Rust original are
+// twins of it, held to it by `client-twins.test.ts` (T122.8, docs/wasm-rules.md): the client asks
+// them per frame or per row.
 
 import { deliveryStorage } from './warehouse.js'
 import type { WorldState } from '@csp/shared-types'

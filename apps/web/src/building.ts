@@ -1,5 +1,6 @@
-// Ported from packages/shared/src/building.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// Buildings and construction sites as the client draws and lists them. Its rules with a Rust
+// original are twins of it, held to it by `client-twins.test.ts` (T122.8, docs/wasm-rules.md): the
+// client asks them per frame or per row.
 
 import { isAt } from './footprint.js'
 import {
@@ -8,11 +9,11 @@ import {
   BUILDING_SPECS,
   MACHINE_SPECS,
   type BuildingSpec,
+  MAP_SIZE,
 } from '@csp/balance'
 import { WORKPLACE_MAX_WORKERS } from './narrowed.js'
 import type { Recipe } from '@csp/lang-wasm'
 import { tileIndex, wrap, wrapDelta } from './terrain.js'
-import { MAP_SIZE } from '@csp/balance'
 import type {
   Building,
   BuildingKind,

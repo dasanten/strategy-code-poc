@@ -1,5 +1,4 @@
-import { TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR } from '@csp/balance'
-import { TICKS_PER_GAME_HOUR } from '@csp/balance'
+import { TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR, TICKS_PER_GAME_HOUR } from '@csp/balance'
 import { describe, expect, it } from 'vitest'
 import { lastSeenByKind, lastSeenText } from './last-seen.js'
 

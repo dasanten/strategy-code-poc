@@ -1,5 +1,4 @@
-// Ported from packages/shared/src/directive.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// Admin directives in words, for the admin panel and Players.
 
 import type { DirectiveGoalView } from '@csp/shared-types'
 

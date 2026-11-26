@@ -1,5 +1,7 @@
-// Ported from packages/shared/src/relocate.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// Relocating (`CONTEXT.md`: Relocate) on the client: it reads the cities and buildings the Player
+// remembers out of sight (Last seen), which the rules module's mirror doesn't hold. Its rules with
+// a Rust original are twins of it, held to it by `client-twins.test.ts` (T122.8,
+// docs/wasm-rules.md): the client asks them per frame or per row.
 
 import { freeHousing } from './city.js'
 import { CARRYING_A_CHILD } from '@csp/shared-types'

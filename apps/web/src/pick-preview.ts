@@ -1,7 +1,6 @@
 import { FOOTPRINT, covers } from './footprint.js'
-import { NODE_WORKPLACE } from '@csp/shared-types'
+import { NODE_WORKPLACE, UNEXPLORED } from '@csp/shared-types'
 import { ROAD_LINE_MAX_TILES } from '@csp/balance'
-import { UNEXPLORED } from '@csp/shared-types'
 import type { Terrain } from './terrain.js'
 import { aboutTime } from './estimates.js'
 import { SHARES_A_TILE, roadLine } from './building.js'

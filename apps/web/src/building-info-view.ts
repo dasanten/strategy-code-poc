@@ -1,8 +1,7 @@
 import { GOODS } from './world.js'
 import { TICKS_PER_GAME_DAY, TRAINING_GROUND_MAX_TRAINEES } from '@csp/balance'
-import { buildingInfo } from '@csp/lang-wasm'
+import { buildingInfo, materialsNeeded, workNeeded } from '@csp/lang-wasm'
 import { footprintTiles } from './footprint.js'
-import { materialsNeeded, workNeeded } from '@csp/lang-wasm'
 import type {
   Building,
   BuildingKind,

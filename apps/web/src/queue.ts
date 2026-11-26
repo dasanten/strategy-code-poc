@@ -1,5 +1,4 @@
-// Ported from packages/shared/src/queue.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// The steps of a queue as the client lists and draws them (`CONTEXT.md`: Queue).
 
 import type { Queue, QueueItem, QueueStep } from '@csp/shared-types'
 import { ORDER_KINDS } from '@csp/lang-wasm'

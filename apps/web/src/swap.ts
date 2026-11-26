@@ -1,7 +1,8 @@
-// Ported from packages/shared/src/swap.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// Swaps at a Trade Org warehouse as the city card quotes them (`CONTEXT.md`: Swap). Its rules with
+// a Rust original are twins of it, held to it by `client-twins.test.ts` (T122.8,
+// docs/wasm-rules.md): the client asks them per frame or per row.
 
-import { priceFor } from '@csp/lang-wasm'
+import { priceFor, cutSwap } from '@csp/lang-wasm'
 import { stockFloor, tradeCoinWarehouse } from './warehouse.js'
 import type {
   Building,
@@ -11,7 +12,6 @@ import type {
   TradeLimit,
   WorldState,
 } from '@csp/shared-types'
-import { cutSwap } from '@csp/lang-wasm'
 
 /** A swap that moves nothing, and says why when `limit` is given. */
 export function noSwap(limit?: TradeLimit): SwapQuote {

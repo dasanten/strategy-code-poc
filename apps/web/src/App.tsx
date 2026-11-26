@@ -52,7 +52,7 @@ import { carriagePulledBy, carriageOfResident, drivenCarriageId, seatsLeft } fro
 import { horseOfResident, riderOf } from './horse-rules.js'
 import { horsesInNeed } from './reviving.js'
 import { isDown } from './world.js'
-import { NODE_WORKPLACE } from '@csp/shared-types'
+import { NODE_WORKPLACE, UNEXPLORED } from '@csp/shared-types'
 import {
   buildProblem,
   driveOffProblems,
@@ -64,7 +64,6 @@ import {
   type KnownGround,
 } from './world-rules.js'
 import { isPassableTerrain, isWater, Terrain, tileIndex, wrap } from './terrain.js'
-import { UNEXPLORED } from '@csp/shared-types'
 import { isWallOrGate } from './walls.js'
 import { CreativeBar } from './CreativeBar.js'
 import { showsCreativeBar } from './creative-bar.js'
@@ -80,9 +79,8 @@ import {
   CreativeGroupMove,
   CreativeResidentActions,
 } from './CreativeResidents.js'
-import { cityIdsAtTile } from '@csp/lang-wasm'
+import { cityIdsAtTile, targetParam } from '@csp/lang-wasm'
 import { isAt, covers } from './footprint.js'
-import { targetParam } from '@csp/lang-wasm'
 import { HORSE_GRANT_HORSES, PASSENGER_WEIGHT } from '@csp/balance'
 import { besideVessel, crewShort, isVesselId, vesselOfResident, vesselRoom } from './vessels.js'
 import { AdminPage } from './AdminPanel.js'

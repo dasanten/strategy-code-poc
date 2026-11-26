@@ -19,7 +19,14 @@ import {
   isStone,
   isSiegeSite,
 } from './building.js'
-import { NODE_GOOD } from '@csp/shared-types'
+import {
+  NODE_GOOD,
+  CARRYING_A_CHILD,
+  NODE_WORKPLACE,
+  NO_CHILD_FEEDS,
+  NO_FOOD_TO_FEED,
+  UNEXPLORED,
+} from '@csp/shared-types'
 import {
   hasChoice,
   recipeFor,
@@ -27,8 +34,17 @@ import {
   workFactor,
   materialsOfKind,
   workOfKind,
+  unhitchProblem,
+  keptBreeding,
+  feedProblem,
+  horseAgeInYears,
+  trainingCeiling,
+  subjectValue,
+  canWork,
+  stockWeight,
+  madePerDay,
+  repairable,
 } from '@csp/lang-wasm'
-import { CARRYING_A_CHILD, NODE_WORKPLACE } from '@csp/shared-types'
 import { GOODS, isDown } from './world.js'
 import {
   HORSE_FOOD_PER_DAY,
@@ -57,20 +73,8 @@ import {
   carriagePulledBy,
   drivenCarriageId,
 } from './carriages.js'
-import { unhitchProblem } from '@csp/lang-wasm'
 import { riderOf, STABLE_BREED_TICKS, breedersAt } from './horse-rules.js'
-import { keptBreeding } from '@csp/lang-wasm'
 import { feedHorseProblem, horsesInNeed } from './reviving.js'
-import { feedProblem } from '@csp/lang-wasm'
-import { NO_CHILD_FEEDS, NO_FOOD_TO_FEED } from '@csp/shared-types'
-import {
-  horseAgeInYears,
-  trainingCeiling,
-  subjectValue,
-  canWork,
-  stockWeight,
-  madePerDay,
-} from '@csp/lang-wasm'
 import { bestWeapon, wornProtection, isArmed, type Geared } from './stats.js'
 import { richnessFactor } from './richness.js'
 import { isOutpostStorage } from './city.js'
@@ -112,9 +116,7 @@ import type {
 } from '@csp/shared-types'
 import { covers, FOOTPRINT, footprintTiles } from './footprint.js'
 import { conditionLine, isRuin } from './decay.js'
-import { repairable } from '@csp/lang-wasm'
 import { Terrain } from './terrain.js'
-import { UNEXPLORED } from '@csp/shared-types'
 import { fullAt, gatheredOn, isPickedOver, patchLeft } from './patch.js'
 import { aboutTime, workLeft } from './estimates.js'
 import type { Relationship } from './theme.js'

@@ -1,5 +1,6 @@
-// Ported from packages/shared/src/persuasion.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
-// types come from @csp/shared-types and the balance numbers from @csp/balance.
+// Respect (`CONTEXT.md`: Respect) as the Wiki shows it. Its rules with a Rust original are twins of
+// it, held to it by `client-twins.test.ts` (T122.8, docs/wasm-rules.md): the client asks them per
+// frame or per row.
 
 import { bestWeapon, protectionValue } from './stats.js'
 import { BLOW_BASE, COMBAT_SKILL_EFFECT, COMBAT_SKILL_LIMIT, WEAPON_ATTACK } from '@csp/balance'

@@ -1,8 +1,7 @@
 import { PRICED_GOODS } from './warehouse.js'
-import { deliveryFee, priceFor } from '@csp/lang-wasm'
+import { deliveryFee, priceFor, quoteTransfer, transferTiles } from '@csp/lang-wasm'
 import { OCCUPATION_GAME_DAYS, TICKS_PER_GAME_DAY } from '@csp/balance'
 import { OCCUPATION_TICKS } from './city.js'
-import { quoteTransfer, transferTiles } from '@csp/lang-wasm'
 import { WAREHOUSE_FLOOR } from './narrowed.js'
 import type {
   Building,

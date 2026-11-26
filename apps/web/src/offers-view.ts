@@ -1,11 +1,8 @@
 import { GOODS } from './world.js'
 import { buildingRealm } from './city.js'
 import { carriageCapacity } from './carriages.js'
-import { carriedFeesOver } from '@csp/lang-wasm'
+import { carriedFeesOver, quoteOffer, handsOf, loadOf, transferLoad } from '@csp/lang-wasm'
 import { freeStock, offerOpenTo, timesToPost, wantsNothing } from './offer-rules.js'
-import { quoteOffer } from '@csp/lang-wasm'
-import { handsOf, loadOf } from '@csp/lang-wasm'
-import { transferLoad } from '@csp/lang-wasm'
 import type {
   CarriedFeeBy,
   CarriedWay,

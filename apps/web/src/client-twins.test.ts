@@ -3,7 +3,6 @@ import type {
   Building,
   FirstDay,
   Good,
-  Recipe,
   Resident,
   Richness,
   SeenBuilding,
@@ -12,6 +11,7 @@ import type {
   WallMaterial,
   BuildingKind,
 } from '@csp/shared-types'
+import type { Recipe } from '@csp/lang-wasm'
 import { describe, expect, it } from 'vitest'
 import { armyDrivenTo, spareFood } from './army.js'
 import {
@@ -154,7 +154,7 @@ type Twin = (w: Held, ...args: never[]) => unknown
 const TWINS: Record<string, Twin> = {
   // Armies and carriages.
   armyDrivenTo: (w, r: string) => armyDrivenTo(byId(w.residents, r) as Resident),
-  spareFood: (w, k: string) => spareFood(w, byId(w.carriages, k) as never),
+  spareFood: (w, k: string) => spareFood(w as never, byId(w.carriages, k) as never),
   carriageCapacity: (w, k: string) => carriageCapacity(w, byId(w.carriages, k)),
   horseFor: (w, k: string) => idOf(horseFor(w, byId(w.carriages, k))),
   carriagePulledBy: (w, h: string) => idOf(carriagePulledBy(w, byId(w.horses, h))),

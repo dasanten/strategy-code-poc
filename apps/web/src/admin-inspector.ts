@@ -1,8 +1,7 @@
-import { workOfKind } from '@csp/lang-wasm'
+import { workOfKind, stockWeight } from '@csp/lang-wasm'
 import { CARRIAGE_CAPACITY, MAX_HEALTH, MAX_HUNGER } from '@csp/balance'
 import { GOODS } from './world.js'
 import { HORSE_STAT_NAMES, STAT_NAMES } from '@csp/shared-types'
-import { stockWeight } from '@csp/lang-wasm'
 import type {
   AdminInspectTarget,
   AdminInspection,

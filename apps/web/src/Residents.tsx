@@ -2,12 +2,9 @@ import { BATCHES_PER_DAY, RECIPES, WORK_OUTPUT_PER_DAY, WORKPLACE_SKILL } from '
 import { aboutTime, bornIn, foalLeft, grownIn, pairingTicksLeft, workLeft } from './estimates.js'
 import { horsesInNeed } from './reviving.js'
 import { isDown, GOODS, SKILL_NAMES } from './world.js'
-import { STAT_NAMES } from '@csp/shared-types'
-import { inContact } from '@csp/lang-wasm'
-import { isVesselId, vesselCapacity, vesselName } from './vessels.js'
-import { LINE_BUILDING, NODE_GOOD } from '@csp/shared-types'
-import { BUILDABLE, MAX_WORKERS, teacherAt, traineesOf, recipeGood, isStone } from './building.js'
+import { STAT_NAMES, LINE_BUILDING, NODE_GOOD } from '@csp/shared-types'
 import {
+  inContact,
   buildingWork,
   workFactor,
   materialsNeeded,
@@ -15,7 +12,19 @@ import {
   teardownWork,
   materialsOfKind,
   workOfKind,
+  ageInYears,
+  canHandle,
+  canWork,
+  stockWeight,
+  wallStrength,
+  wallStrengthLeft,
+  putAwayUnits,
+  nameProblem,
+  horsesIn,
+  keptBreeding,
 } from '@csp/lang-wasm'
+import { isVesselId, vesselCapacity, vesselName } from './vessels.js'
+import { BUILDABLE, MAX_WORKERS, teacherAt, traineesOf, recipeGood, isStone } from './building.js'
 import {
   CARRIAGE_CAPACITY,
   PASSENGER_WEIGHT,
@@ -39,13 +48,9 @@ import {
   STABLE_BREED_DAYS,
   EQUIP_TICKS,
 } from '@csp/balance'
-import { ageInYears, canHandle, canWork, stockWeight } from '@csp/lang-wasm'
 import { bestWeapon } from './stats.js'
 import { isAt } from './footprint.js'
 import { wrapDelta, wrapDistance } from './terrain.js'
-import { wallStrength, wallStrengthLeft } from '@csp/lang-wasm'
-import { putAwayUnits } from '@csp/lang-wasm'
-import { nameProblem } from '@csp/lang-wasm'
 import type {
   Branch,
   Condition,
@@ -77,7 +82,6 @@ import type {
   Waypoint,
 } from '@csp/shared-types'
 import { STABLE_BREED_TICKS } from './horse-rules.js'
-import { horsesIn, keptBreeding } from '@csp/lang-wasm'
 import { breedProblem, keptPair } from './world-rules.js'
 import {
   Fragment,

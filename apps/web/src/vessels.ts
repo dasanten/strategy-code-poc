@@ -9,9 +9,8 @@ import {
   SHIP_MIN_CREW,
 } from '@csp/balance'
 import type { Building, Resident, SeenVessel, VesselKind } from '@csp/shared-types'
-import { inContact } from '@csp/lang-wasm'
+import { inContact, stockWeight } from '@csp/lang-wasm'
 import { covers } from './footprint.js'
-import { stockWeight } from '@csp/lang-wasm'
 
 /** Whether an id names a vessel: the server names each after its kind, as "boat12". */
 export function isVesselId(id: string | undefined): boolean {
