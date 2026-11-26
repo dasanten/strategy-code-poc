@@ -11,8 +11,9 @@
 //! being there would again give nothing (ADR 0042). `tests` prove it.
 //!
 //! It ends when the Player stops it or gives the Leader another order (that order replaces it),
-//! when the Leader leaves the building, is struck ([`end_when_struck`]) or goes Down, or when the
-//! Zeal is used up; the rest of the Zeal stays.
+//! when the Leader leaves the building or goes Down, or when the Zeal is used up; the rest of the
+//! Zeal stays. It goes on until stopped (#1613): struck, the Leader runs their defence script and
+//! takes the rally up again when it ends; given under attack, it holds until calm.
 
 use csp_shared::balance::{MAP_SIZE, RALLY_PACE, ZEAL_PER_RALLIED_TICK};
 use csp_shared::footprint::is_at;
@@ -101,7 +102,8 @@ pub fn apply_rally(world: &mut WorldState, order: &OrderRequest) {
 }
 
 pub(crate) static RALLY_META: OrderMeta =
-    OrderMeta::fns(RALLY, |w, s, o, _| validate_rally(w, s, o), |w, _, o, _| apply_rally(w, o));
+    OrderMeta::fns(RALLY, |w, s, o, _| validate_rally(w, s, o), |w, _, o, _| apply_rally(w, o))
+        .goes_on_until_stopped();
 
 impl RunningOrder for RallyOrder {
     in_place!();
@@ -136,14 +138,6 @@ pub fn end_rallies(world: &mut WorldState) {
         if ends(world, i, &o.clone()) {
             world.residents[i].order = None;
         }
-    }
-}
-
-/// A blow ends the Leader's rally (`CONTEXT.md`: Rallying the crew), so it never goes on after
-/// their defence script: called first when a struck resident reacts.
-pub fn end_when_struck(world: &mut WorldState, i: usize) {
-    if matches!(world.residents[i].order, Some(ResidentOrder::Rally(_))) {
-        world.residents[i].order = None;
     }
 }
 

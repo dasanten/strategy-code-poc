@@ -221,6 +221,7 @@ describe('wiki page', () => {
     const hours = (balance.ZEAL_FILL_TICKS * balance.TICK_MS) / 3_600_000
     expect(html).toContain(`about ${hours} real hours`)
     expect(html).toContain('No script can rally the crew')
+    expect(html).toContain('takes the rally up again')
   })
 
   it('has a section with an anchor for every topic', () => {
