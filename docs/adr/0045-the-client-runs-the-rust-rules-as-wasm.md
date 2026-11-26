@@ -32,7 +32,8 @@ T88.3) links it for the game's script tables, and loads lazily in the browser an
   `scripts/wasm-build.mjs` fails when the module holds one of their messages, which only code the
   rules can reach puts there.
 - **Limits** for a world of the live game's size, checked in T122.1 and again in the epic's last
-  ticket: 500 kB added to what the browser downloads, compressed; 150 ms to load the module and
+  ticket: 550 kB added to what the browser downloads, compressed (500 kB at first; raised on
+  2026-11-26 once `wasm-opt` had taken the module to 537 kB, #1637); 150 ms to load the module and
   mirror the first world; 4 ms to update the mirror a tick; 1 ms for one rule call.
   `scripts/wasm-rules-bench.mjs` measures them on messages `bench-broadcast` dumps from a save.
 
