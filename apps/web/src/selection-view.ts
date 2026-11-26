@@ -24,6 +24,7 @@ import {
   teardownWork,
   workFactor,
   isStone,
+  isSiegeSite,
   materialsOfKind,
   workOfKind,
   type TerrainLookup,
@@ -1878,11 +1879,11 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     sites.push({ ...head, ...describeSite(carriageSite, t) })
     if (carriageSite.teardown) lines.push(teardownLine(carriageSite))
   }
-  const ramSite = here(t.buildings).find((b) => b.kind === 'ram' || b.kind === 'catapult')
+  const ramSite = here(t.buildings).find((b) => isSiegeSite(b.kind))
   if (ramSite?.site) {
-    // A ram or catapult site in the field (`CONTEXT.md`: Siege machine), worked like a carriage
+    // A siege machine's site in the field (`CONTEXT.md`: Siege machine), worked like a carriage
     // site.
-    const title = ramSite.kind === 'ram' ? 'Ram site' : 'Catapult site'
+    const title = `${BUILDING_NAMES[ramSite.kind]} site`
     const head = card ? { title } : {}
     card ??= { title, what: 'building' }
     sites.push({ ...head, ...describeSite(ramSite, t) })
