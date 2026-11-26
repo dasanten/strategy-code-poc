@@ -228,3 +228,35 @@ The module is 584 KB gzipped (1,903 KB raw) after merging the epic tip with the 
 residents in Node: `buildProblem` 0.28 ms for a house (its city area), 0.01 ms for a town hall,
 2 ms the first call after an update (the lookup by tile built again); a Build menu's 22 kinds
 0.4 ms; a tile's 5 thieves in one call 0.05 ms.
+
+## Way estimates, reach and the rest of the map (T122.8, #1641)
+
+What #1586 left in `apps/web/src/shared/`, each given what it reads with the call (Daniel's
+decision on #1641), so nothing new is mirrored:
+
+| Rule                                                                              | Now                                                                                                                                                                                                                                                                              |
+| :-------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `arrivalTicks` (`wayTicks` in it)                                                 | `WorldMirror.arrivalTicks(id, order, ground)` (`crates/csp-lang-wasm/src/estimate_rules.rs`): the resident, their horse and carriage from the mirror, the ground of the way's tiles as one `Uint8Array`; one call per way. The route preview passes the way it draws as `order`. |
+| `cityMembership` (the far map's city sizes), with the reach it asks per pair      | `cityMembership(buildings, cityIds, halls, size)` (`area_rules.rs`): every building in one typed array, one call per fill of the far map's cache                                                                                                                                 |
+| `nearFootprint`, `footprintsNear`, `gapTo`                                        | gone from the client: only `cityMembership` asked them                                                                                                                                                                                                                           |
+| `wallMap`, `shutOut` and the wall steps                                           | gone from the client: no view asked them (only a test did); the server decides who steps where                                                                                                                                                                                   |
+| `allied`, `alliedRealms`, `commanderOf`, `defendsCity`, `occupierOf` and the rest | gone from the client: no view asked them. Shared sight (`sharingSight`) had already gone; the server sends what an alliance sees                                                                                                                                                 |
+| `previewPath` (`apps/web/src/map/path-preview.ts`)                                | stays in TypeScript, as it runs as the pointer moves; `path-preview-parity.test.ts` holds it to the Rust pathfinder's fixture (`fixtures/paths/requests.json`)                                                                                                                   |
+
+The text of estimates (`aboutTime`, `timeLeft`, `workLeft` and the countdowns) stays with the
+client: it words a number, and `csp-sim` has no twin of it.
+
+The parity test already asks the mirror `arrivalTicks` (on Plains everywhere, as the fixtures hold
+no terrain), `cityMembership`, `allied`, `alliedRealms` and `wallMap`; nothing is added there.
+
+What changed in behaviour:
+
+- **Which orders get an estimate** is the server's (`Going::estimated` while it goes now): the same
+  kinds as the TypeScript (walking, relocating, driving, a haul route while driving, a store or fetch
+  order while it walks to its place).
+- **A resident not in the mirror** (in no `welcome` yet, or gone in a message the client hasn't
+  shown) has no estimate; the TypeScript estimated anyone the client's world held.
+- **A construction site of no city** went to the area rules as city 999, a finished building of a
+  city the client never named (`-1 + SITE`); it is a site of no city now.
+
+The module is 591 KB gzipped (1,919 KB raw), from 584 KB.

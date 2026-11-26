@@ -134,7 +134,8 @@ pub fn city_membership(
     size: i32,
 ) -> Result<Vec<i32>, String> {
     let mut world = world_of(buildings)?;
-    let ids: Vec<&str> = if city_ids.is_empty() { Vec::new() } else { city_ids.split('\n').collect() };
+    let ids: Vec<&str> =
+        if city_ids.is_empty() { Vec::new() } else { city_ids.split('\n').collect() };
     if ids.len() != halls.len() {
         return Err("one town hall for each city".into());
     }
