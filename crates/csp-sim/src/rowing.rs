@@ -189,7 +189,8 @@ impl RunningOrder<Row> for RowOrder {
         Arrival::Done
     }
     fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
-        // The path found before the interruption is kept (#1619).
+        // Found again from where they stand: they may have moved meanwhile (#1619).
+        GoingMut::new(&mut self.path, &mut self.progress).reset_found();
         true
     }
     same_when_equal!();
