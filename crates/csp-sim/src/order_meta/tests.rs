@@ -39,3 +39,14 @@ fn a_running_orders_kind_is_the_one_in_the_save() {
     let saved: BTreeSet<&str> = message.split('`').skip(3).step_by(2).collect();
     assert_eq!(saved, RUNNING.iter().map(|(_, m)| m.kind).collect());
 }
+
+/// Bug #1614: the orders whose checks take only grown residents are adults-only, so
+/// `children-dont-work` catches a child holding one: driving, a haul route (it drives) and one by
+/// water, rowing and sailing.
+#[test]
+fn the_orders_only_grown_residents_can_take_are_adults_only() {
+    for kind in ["drive", "haul", "haulByWater", "row", "sail"] {
+        let meta = meta_of(kind).unwrap_or_else(|| panic!("{kind} is declared"));
+        assert!(meta.adults_only, "{kind} is adults-only");
+    }
+}

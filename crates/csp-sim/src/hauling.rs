@@ -184,6 +184,7 @@ pub fn apply_haul(
 
 pub(crate) static HAUL_META: OrderMeta = OrderMeta::fns("haul", validate_haul, apply_haul)
     .queue_step(StepGroup::Move)
+    .adults_only()
     .never_ends()
     .gets_off_first()
     .blocked_carrying_child()

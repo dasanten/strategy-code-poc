@@ -156,7 +156,7 @@ impl OrderKind for Row {
 }
 
 pub(crate) static ROW_META: OrderMeta =
-    OrderMeta::request("row", &Row).queue_step(StepGroup::Move).script(&[ROW_ACTION]);
+    OrderMeta::request("row", &Row).queue_step(StepGroup::Move).adults_only().script(&[ROW_ACTION]);
 
 const ROW_ACTION: ScriptAction = ScriptAction {
     name: "row",
