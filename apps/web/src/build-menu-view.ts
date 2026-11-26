@@ -100,6 +100,7 @@ const UNIT_KINDS: Partial<Record<BuildingKind, string>> = {
   ship: 'ship',
   ram: 'ram',
   catapult: 'catapult',
+  ballista: 'catapult',
 }
 
 /** Walls, gates and roads are drawn from tile pieces: the one that reads best on its own. */

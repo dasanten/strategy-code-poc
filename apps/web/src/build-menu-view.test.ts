@@ -121,6 +121,7 @@ describe('the Build menu', () => {
     expect(groups.find((g) => g.name === 'Siege')?.kinds.map((k) => k.kind)).toEqual([
       'ram',
       'catapult',
+      'ballista',
     ])
     expect(entry(groups, 'ram').problem).toBeUndefined()
     const ground = (t: number) => ({ size: 200, at: () => t })
