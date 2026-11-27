@@ -94,6 +94,7 @@ fn work_on_it(world: &mut WorldState, t: &TerrainMap) {
 
 #[test]
 fn is_a_buildable_site_of_wood_and_some_work_and_a_boat_holds_a_little() {
+    csp_npc::install(); // T1719
     assert!(BUILDABLE.contains(&BuildingKind::Boat));
     let materials = BUILD_MATERIALS.get("boat").unwrap();
     assert!(materials.get("wood").unwrap() > 0.0);
@@ -103,6 +104,7 @@ fn is_a_buildable_site_of_wood_and_some_work_and_a_boat_holds_a_little() {
 
 #[test]
 fn goes_on_a_tile_of_a_finished_haven_that_touches_the_water() {
+    csp_npc::install(); // T1719
     let mut world = setup();
     // The haven's east column touches the Lake, straight or diagonally.
     for y in 5..=7 {
@@ -120,6 +122,7 @@ fn goes_on_a_tile_of_a_finished_haven_that_touches_the_water() {
 
 #[test]
 fn takes_one_site_per_tile() {
+    csp_npc::install(); // T1719
     let mut world = setup();
     world.buildings.push(site("bs", BuildingKind::Boat, 19.0, 6.0));
     assert_eq!(
@@ -131,6 +134,7 @@ fn takes_one_site_per_tile() {
 
 #[test]
 fn is_laid_out_by_a_build_order_sharing_the_havens_tile() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     let mut orders = Orders::default();
@@ -145,6 +149,7 @@ fn is_laid_out_by_a_build_order_sharing_the_havens_tile() {
 
 #[test]
 fn refuses_a_build_order_off_the_shore_tiles() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     world.residents[0].x = 18.0;
@@ -155,6 +160,7 @@ fn refuses_a_build_order_off_the_shore_tiles() {
 
 #[test]
 fn finished_is_gone_and_an_empty_boat_of_the_finishers_realm_floats_next_to_it() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     nearly_done(&mut world);
@@ -176,6 +182,7 @@ fn finished_is_gone_and_an_empty_boat_of_the_finishers_realm_floats_next_to_it()
 
 #[test]
 fn belongs_to_the_realm_of_whoever_finishes_it() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     nearly_done(&mut world);
@@ -187,6 +194,7 @@ fn belongs_to_the_realm_of_whoever_finishes_it() {
 
 #[test]
 fn floats_on_the_nearest_free_water_tile_when_the_next_one_is_taken() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     world.vessels.push(boat("v1", 20.0, 6.0));
@@ -205,6 +213,7 @@ fn floats_on_the_nearest_free_water_tile_when_the_next_one_is_taken() {
 
 #[test]
 fn the_last_materials_delivered_finish_it_too() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     let i = nearly_done(&mut world);
@@ -234,6 +243,7 @@ fn the_last_materials_delivered_finish_it_too() {
 
 #[test]
 fn a_boat_of_a_realm_that_ends_belongs_to_nobody() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     let mut v = boat("v1", 20.0, 6.0);

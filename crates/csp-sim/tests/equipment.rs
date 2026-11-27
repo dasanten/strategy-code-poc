@@ -85,6 +85,7 @@ fn fist(s: &Setup) -> f64 {
 
 #[test]
 fn picking_up_a_sword_with_an_empty_weapon_slot_equips_it_and_a_second_stays_carried() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     assert!(!is_armed(s.r()));
     s.fetch(json!({ "sword": 1 }));
@@ -101,6 +102,7 @@ fn picking_up_a_sword_with_an_empty_weapon_slot_equips_it_and_a_second_stays_car
 
 #[test]
 fn storing_the_equipped_weapon_equips_the_next_best_carried() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.fetch(json!({ "spear": 1 }));
     s.fetch(json!({ "sword": 1, "steelSword": 1 }));
@@ -114,6 +116,7 @@ fn storing_the_equipped_weapon_equips_the_next_best_carried() {
 
 #[test]
 fn a_shield_and_armour_picked_up_fill_their_slots_and_only_those_protect() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.fetch(json!({ "shield": 2, "armour": 1 }));
     assert_eq!(
@@ -135,6 +138,7 @@ fn a_shield_and_armour_picked_up_fill_their_slots_and_only_those_protect() {
 
 #[test]
 fn a_save_from_before_equipment_equips_each_residents_best_carried_gear_on_its_first_tick() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     // A resident as a save from before Equipment holds them: gear carried, no `equipped`.
     let mut saved = serde_json::to_value(&s.world.residents[0]).unwrap();
@@ -158,6 +162,7 @@ fn a_save_from_before_equipment_equips_each_residents_best_carried_gear_on_its_f
 
 #[test]
 fn the_invariant_catches_gear_equipped_but_not_carried_or_in_the_wrong_slot() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let names = |s: &Setup| -> Vec<String> {
         check_invariants(&s.world, &s.terrain, &equipment_invariants())

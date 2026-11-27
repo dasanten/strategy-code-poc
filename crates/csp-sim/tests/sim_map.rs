@@ -130,16 +130,19 @@ fn assert_same_steps(function: &str) {
 
 #[test]
 fn the_map_names_every_step_world_step_in_order() {
+    csp_npc::install(); // T1719
     assert_same_steps("step_world");
 }
 
 #[test]
 fn the_map_names_every_step_rest_step_in_order() {
+    csp_npc::install(); // T1719
     assert_same_steps("step_rest");
 }
 
 #[test]
 fn the_map_names_every_top_level_module() {
+    csp_npc::install(); // T1719
     let doc = doc();
     let lib = read("src/lib.rs");
     let missing: Vec<&str> = lib
@@ -155,6 +158,7 @@ fn the_map_names_every_top_level_module() {
 
 #[test]
 fn the_step_finder_sees_calls_on_the_world_and_the_scratch() {
+    csp_npc::install(); // T1719
     let body = "fn f() {\n    a(world, 1);\n    // b(world)\n    crate::m::c(&mut world);\n    \
                 d(worlds);\n    h(scratch);\n    scratch.e();\n    scratch.x.f();\n    world.tick += 1;\n    \
                 w.g(world, s);\n}\n";

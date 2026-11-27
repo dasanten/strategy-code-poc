@@ -127,6 +127,7 @@ impl Setup {
 
 #[test]
 fn names_a_price_from_its_residents_and_buildings_which_its_seen_city_carries() {
+    csp_npc::install(); // T1719
     let mut s = default_setup();
     let npc = s.world.cities[0].clone();
     assert_eq!(city_price(&s.world, &npc, None), price());
@@ -142,6 +143,7 @@ fn names_a_price_from_its_residents_and_buildings_which_its_seen_city_carries() 
 
 #[test]
 fn only_npc_cities_name_a_price() {
+    csp_npc::install(); // T1719
     let mut s = default_setup();
     add_city(&mut s.world, "mine", Some("r1"), 24.0, 18.0, "Ashford", None);
     add_city(&mut s.world, "post", None, 18.0, 24.0, "Ashford", Some("post"));
@@ -151,6 +153,7 @@ fn only_npc_cities_name_a_price() {
 
 #[test]
 fn fails_with_too_few_coins_at_the_town_hall() {
+    csp_npc::install(); // T1719
     let mut s = setup([100.0, 100.0]);
     assert_eq!(
         s.order(buy()),
@@ -162,6 +165,7 @@ fn fails_with_too_few_coins_at_the_town_hall() {
 
 #[test]
 fn counts_only_coins_carried_on_the_town_hall_itself() {
+    csp_npc::install(); // T1719
     let mut s = default_setup();
     s.at_mut("p2").x = 23.0;
     assert!(s.order(buy()).starts_with("it costs"));
@@ -173,6 +177,7 @@ fn counts_only_coins_carried_on_the_town_hall_itself() {
 
 #[test]
 fn with_enough_coins_the_coins_are_gone_and_the_city_joins_the_realm_with_everything_in_it() {
+    csp_npc::install(); // T1719
     let mut s = default_setup();
     assert_eq!(s.order(buy()), "ack");
     s.run();
@@ -223,6 +228,7 @@ fn with_enough_coins_the_coins_are_gone_and_the_city_joins_the_realm_with_everyt
 
 #[test]
 fn falls_through_when_the_coins_are_gone_by_the_time_it_is_carried_out() {
+    csp_npc::install(); // T1719
     let mut s = default_setup();
     assert_eq!(s.order(buy()), "ack");
     s.at_mut("p2").carried.insert(Good::Coins, 0.0);
@@ -250,6 +256,7 @@ fn falls_through_when_the_coins_are_gone_by_the_time_it_is_carried_out() {
 
 #[test]
 fn needs_the_resident_on_its_town_hall_and_an_npc_city() {
+    csp_npc::install(); // T1719
     let mut s = default_setup();
     s.at_mut("p1").x = 23.0;
     assert_eq!(s.order(buy()), "the resident must stand at its town hall");
@@ -267,6 +274,7 @@ fn needs_the_resident_on_its_town_hall_and_an_npc_city() {
 
 #[test]
 fn invariant_no_buy_order_outlasts_its_tick() {
+    csp_npc::install(); // T1719
     let mut s = default_setup();
     s.at_mut("p1").order = Some(
         serde_json::from_value::<ResidentOrder>(json!({ "kind": "buyCity", "cityId": "npc" }))

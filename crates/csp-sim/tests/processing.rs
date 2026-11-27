@@ -98,6 +98,7 @@ fn total(world: &WorldState, good: Good) -> f64 {
 
 #[test]
 fn a_smelter_turns_2_iron_ore_into_1_iron_a_mint_1_gold_ore_into_10_coins() {
+    csp_npc::install(); // T1719
     // processing.test.ts: conversion rates (balance file): a smelter turns 2 iron ore into 1 iron,
     // a mint 1 gold ore into 10 coins
     // Its first recipe; the second, Steel (T101.4), is tested below.
@@ -116,6 +117,7 @@ fn a_smelter_turns_2_iron_ore_into_1_iron_a_mint_1_gold_ore_into_10_coins() {
 
 #[test]
 fn an_average_worker_gets_through_batches_per_day_a_game_day() {
+    csp_npc::install(); // T1719
     let (mut world, _, _) = setup(BuildingKind::Smelter);
     let per_day = BATCHES_PER_DAY.get("smelter").unwrap();
     let tick = world.tick as f64;
@@ -131,6 +133,7 @@ fn an_average_worker_gets_through_batches_per_day_a_game_day() {
 
 #[test]
 fn smelter_and_mint_make_iron_and_coins() {
+    csp_npc::install(); // T1719
     let (smelter, _, _) = setup(BuildingKind::Smelter);
     let (mint, _, _) = setup(BuildingKind::Mint);
     assert_eq!(workplace_good(&smelter, &smelter.buildings[0], None), Some(Good::Iron));
@@ -139,6 +142,7 @@ fn smelter_and_mint_make_iron_and_coins() {
 
 #[test]
 fn a_smelter_turns_the_iron_ore_its_worker_carries_into_iron_on_its_pile_and_teaches_smelting() {
+    csp_npc::install(); // T1719
     let (mut world, t, _) = setup(BuildingKind::Smelter);
     world.residents[0].carried.insert(Good::IronOre, 10.0);
     run(&mut world, &t, TICKS_PER_GAME_DAY as usize + 2);
@@ -156,6 +160,7 @@ fn a_smelter_turns_the_iron_ore_its_worker_carries_into_iron_on_its_pile_and_tea
 
 #[test]
 fn a_mint_turns_gold_ore_lying_on_its_tile_into_coins_left_there() {
+    csp_npc::install(); // T1719
     let (mut world, t, _) = setup(BuildingKind::Mint);
     world.piles.push(Pile {
         id: "p1".into(),
@@ -172,6 +177,7 @@ fn a_mint_turns_gold_ore_lying_on_its_tile_into_coins_left_there() {
 
 #[test]
 fn stands_idle_without_ore_no_work_nothing_learned() {
+    csp_npc::install(); // T1719
     let (mut world, t, _) = setup(BuildingKind::Smelter);
     world.residents[0].carried.insert(Good::IronOre, 1.0);
     run(&mut world, &t, TICKS_PER_GAME_DAY as usize);
@@ -186,6 +192,7 @@ fn stands_idle_without_ore_no_work_nothing_learned() {
 
 #[test]
 fn uses_up_the_workers_ore_first_then_the_pile_and_conserves_goods_by_the_recipe() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup(BuildingKind::Smelter);
     let helpers: Vec<usize> = (0..WORKPLACE_MAX_WORKERS.get("smelter").unwrap() as usize - 1)
         .map(|i| resident_at_work(&mut world, &format!("h{i}")))
@@ -222,6 +229,7 @@ fn uses_up_the_workers_ore_first_then_the_pile_and_conserves_goods_by_the_recipe
 
 #[test]
 fn a_smelter_a_mint_and_a_smithy_go_off_nodes_and_off_mountain() {
+    csp_npc::install(); // T1719
     for kind in [BuildingKind::Smelter, BuildingKind::Mint, BuildingKind::Smithy] {
         let t = terrain();
         let mut world = empty_world(&t);
@@ -241,6 +249,7 @@ fn a_smelter_a_mint_and_a_smithy_go_off_nodes_and_off_mountain() {
 
 #[test]
 fn the_invariant_catches_one_on_a_node_or_on_mountain() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = empty_world(&t);
     world.nodes.push(iron_ore_node());
@@ -262,6 +271,7 @@ fn the_invariant_catches_one_on_a_node_or_on_mountain() {
 
 #[test]
 fn a_smelters_second_recipe_turns_iron_and_coal_into_steel() {
+    csp_npc::install(); // T1719
     let steel = &RECIPES.get("smelter").unwrap()[1];
     assert_eq!(steel.input.get("iron"), Some(1.0));
     assert_eq!(steel.input.get("coal"), Some(1.0));
@@ -272,6 +282,7 @@ fn a_smelters_second_recipe_turns_iron_and_coal_into_steel() {
 
 #[test]
 fn a_smelter_set_to_steel_makes_it_at_the_recipes_rate_and_uses_up_iron_and_coal() {
+    csp_npc::install(); // T1719
     let (mut world, t) = smelter_making(Some("steel"));
     assert_eq!(workplace_good(&world, &world.buildings[0], Some(Good::Steel)), Some(Good::Steel));
     world.residents[0].carried.insert(Good::Iron, 5.0);
@@ -299,6 +310,7 @@ fn a_smelter_set_to_steel_makes_it_at_the_recipes_rate_and_uses_up_iron_and_coal
 
 #[test]
 fn a_smelter_set_to_steel_without_coal_makes_nothing() {
+    csp_npc::install(); // T1719
     let (mut world, t) = smelter_making(Some("steel"));
     world.residents[0].carried.insert(Good::Iron, 5.0);
     world.residents[0].carried.insert(Good::IronOre, 6.0);
@@ -317,6 +329,7 @@ fn a_smelter_set_to_steel_without_coal_makes_nothing() {
 
 #[test]
 fn a_smelter_set_to_iron_or_told_nothing_turns_ore_into_iron_as_before() {
+    csp_npc::install(); // T1719
     for makes in [None, Some("iron")] {
         let (mut world, t) = smelter_making(makes);
         world.residents[0].carried.insert(Good::IronOre, 10.0);
@@ -335,6 +348,7 @@ fn a_smelter_set_to_iron_or_told_nothing_turns_ore_into_iron_as_before() {
 
 #[test]
 fn a_smelter_cant_be_set_to_make_a_weapon() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = empty_world(&t);
     world.realms.push(realm("r1", 7, "w1"));

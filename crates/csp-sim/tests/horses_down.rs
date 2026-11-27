@@ -96,6 +96,7 @@ fn drive_order() -> Value {
 
 #[test]
 fn puts_a_starving_horse_down_instead_of_killing_it_and_logs_it() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     starving(&mut world);
     run(&mut world, &terrain, 1, None);
@@ -113,6 +114,7 @@ fn puts_a_starving_horse_down_instead_of_killing_it_and_logs_it() {
 
 #[test]
 fn wakes_at_low_health_once_food_is_put_down_by_it() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     starving(&mut world);
     run(&mut world, &terrain, 10, None);
@@ -138,6 +140,7 @@ fn wakes_at_low_health_once_food_is_put_down_by_it() {
 
 #[test]
 fn wakes_from_food_on_a_tile_next_to_it_too() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     starving(&mut world);
     run(&mut world, &terrain, 1, None);
@@ -152,6 +155,7 @@ fn wakes_from_food_on_a_tile_next_to_it_too() {
 
 #[test]
 fn dies_of_hunger_when_its_time_is_up_and_nobody_fed_it() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     starving(&mut world);
     run(&mut world, &terrain, 1, None);
@@ -166,6 +170,7 @@ fn dies_of_hunger_when_its_time_is_up_and_nobody_fed_it() {
 
 #[test]
 fn puts_its_rider_on_foot_and_cant_be_mounted() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     let mount = json!({ "kind": "mount", "residentId": "w1", "horseId": "h1" });
     assert_eq!(order(&mut world, &terrain, mount.clone()), Ok(()));
@@ -191,6 +196,7 @@ fn puts_its_rider_on_foot_and_cant_be_mounted() {
 
 #[test]
 fn leaves_its_carriage_standing_and_the_carriage_cant_be_driven() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     world.carriages.push(Carriage {
         id: "k1".into(),
@@ -229,6 +235,7 @@ fn leaves_its_carriage_standing_and_the_carriage_cant_be_driven() {
 
 #[test]
 fn is_seen_down_by_anyone_in_sight_how_long_it_has_left_only_by_its_own_realm() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     starving(&mut world);
     run(&mut world, &terrain, 1, None);
@@ -253,6 +260,7 @@ fn is_seen_down_by_anyone_in_sight_how_long_it_has_left_only_by_its_own_realm() 
 
 #[test]
 fn has_an_invariant_a_down_horse_is_neither_ridden_nor_pulling_a_driven_carriage() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     starving(&mut world);
     run(&mut world, &terrain, 1, None);

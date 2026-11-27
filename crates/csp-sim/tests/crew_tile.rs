@@ -160,6 +160,7 @@ fn work_task(id: &str) -> Value {
 
 #[test]
 fn spreads_six_sent_to_a_2x2_mine_over_its_tiles_at_most_two_to_a_tile() {
+    csp_npc::install(); // T1719
     let mut p = setup();
     for i in 1..=6 {
         let id = format!("w{i}");
@@ -177,6 +178,7 @@ fn spreads_six_sent_to_a_2x2_mine_over_its_tiles_at_most_two_to_a_tile() {
 
 #[test]
 fn stands_four_at_a_2x2_mine_one_to_a_tile_and_they_stay_put_once_there() {
+    csp_npc::install(); // T1719
     let mut p = setup();
     for i in 1..=4 {
         let id = format!("w{i}");
@@ -196,6 +198,7 @@ fn stands_four_at_a_2x2_mine_one_to_a_tile_and_they_stay_put_once_there() {
 
 #[test]
 fn sends_a_lone_worker_to_the_footprint_tile_nearest_them() {
+    csp_npc::install(); // T1719
     let mut p = setup();
     let w1 = p.add_resident("w1", 9.0, 6.0);
     p.world.residents[w1].script = Some(
@@ -216,6 +219,7 @@ fn sends_a_lone_worker_to_the_footprint_tile_nearest_them() {
 
 #[test]
 fn leaves_a_resident_already_on_the_footprint_where_they_are() {
+    csp_npc::install(); // T1719
     let mut p = setup();
     let w1 = p.add_resident("w1", 6.0, 6.0);
     p.give(work_task("w1"));
@@ -233,6 +237,7 @@ fn leaves_a_resident_already_on_the_footprint_where_they_are() {
 
 #[test]
 fn makes_the_same_output_on_the_same_pile_with_as_many_workers_as_a_crew_on_one_corner() {
+    csp_npc::install(); // T1719
     /// Six at work on the mine for a while: the ore on its pile and the workers counted.
     fn outcome(spread: bool) -> (f64, usize, usize) {
         let mut p = setup();
@@ -303,6 +308,7 @@ fn site_world() -> Play {
 
 #[test]
 fn spreads_four_joining_the_site_on_their_tile_one_to_a_tile() {
+    csp_npc::install(); // T1719
     let mut p = site_world();
     for i in 1..=4 {
         let ri = p.add_resident(&format!("w{i}"), 5.0, 5.0);
@@ -319,6 +325,7 @@ fn spreads_four_joining_the_site_on_their_tile_one_to_a_tile() {
 
 #[test]
 fn spreads_a_group_given_build_the_first_lays_out_the_site_the_next_stands_on_another_tile() {
+    csp_npc::install(); // T1719
     let mut p = setup();
     p.world.nodes.clear();
     p.world.buildings.retain(|b| b.id != "mine");
@@ -355,6 +362,7 @@ fn spreads_a_group_given_build_the_first_lays_out_the_site_the_next_stands_on_an
 
 #[test]
 fn stands_two_breeders_at_a_3x3_stable_on_different_tiles() {
+    csp_npc::install(); // T1719
     let mut p = setup();
     p.world.nodes.clear();
     p.world.buildings.retain(|b| b.id != "mine");

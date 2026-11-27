@@ -47,6 +47,7 @@ fn storage_food(world: &WorldState) -> f64 {
 
 #[test]
 fn keeps_the_stable_fed_and_works_the_farm_with_no_orders() {
+    csp_npc::install(); // T1719
     let terrain = open(96);
     let mut world = csp_sim::world::create_world(&terrain, 1);
     found_starting_city(&mut world, &terrain, PLAYER, None);

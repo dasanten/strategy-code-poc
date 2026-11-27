@@ -15,6 +15,7 @@ use transfers_fixture::{deliveries, MARA};
 
 #[test]
 fn a_caravan_collecting_a_pick_up_leaves_them_alone_and_no_theft_comes_of_it() {
+    csp_npc::install(); // T1719
     let mut s = deliveries();
     let (storage, city, realm) = (s.storage.clone(), s.city.clone(), s.realm.clone());
     s.b_mut(&storage).stock = Some(Stock::from([(Good::Stone, 40.0)]));

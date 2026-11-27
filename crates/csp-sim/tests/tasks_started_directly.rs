@@ -119,6 +119,7 @@ fn stable_food(g: &Game) -> f64 {
 
 #[test]
 fn tears_down_the_house_the_resident_stands_on_with_run_script_on_an_empty_tile_it_ends() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     give(&mut s, json!({ "kind": "runScript", "scriptId": script(Task::TearDown) }), "w3");
     give(&mut s, json!({ "kind": "runScript", "scriptId": script(Task::TearDown) }), "w2");
@@ -139,6 +140,7 @@ fn tears_down_the_house_the_resident_stands_on_with_run_script_on_an_empty_tile_
 
 #[test]
 fn walks_to_the_building_picked_before_it_starts_and_tears_it_down() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let o = json!({ "kind": "runScript", "scriptId": script(Task::TearDown), "params": { "building": "hs" } });
     give(&mut s, o, "w2");
@@ -154,6 +156,7 @@ fn walks_to_the_building_picked_before_it_starts_and_tears_it_down() {
 
 #[test]
 fn never_keeps_the_building_given_on_the_house_run_again_in_the_stable_it_tears_that_down() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     give(&mut s, json!({ "kind": "task", "task": "tearDown", "buildingId": "hs" }), "w3");
     tick(&mut s);
@@ -177,6 +180,7 @@ fn never_keeps_the_building_given_on_the_house_run_again_in_the_stable_it_tears_
 
 #[test]
 fn feeds_the_stable_the_resident_stands_in_with_run_script_on_an_empty_tile_it_ends() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     give(&mut s, json!({ "kind": "runScript", "scriptId": script(Task::FeedStable) }), "w1");
     give(&mut s, json!({ "kind": "runScript", "scriptId": script(Task::FeedStable) }), "w2");
@@ -195,6 +199,7 @@ fn feeds_the_stable_the_resident_stands_in_with_run_script_on_an_empty_tile_it_e
 
 #[test]
 fn ends_once_the_stable_is_gone_or_when_the_one_picked_is_no_stable() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     give(&mut s, json!({ "kind": "runScript", "scriptId": script(Task::FeedStable) }), "w1");
     let o = json!({ "kind": "runScript", "scriptId": script(Task::FeedStable), "params": { "stable": "s1" } });
@@ -214,6 +219,7 @@ fn ends_once_the_stable_is_gone_or_when_the_one_picked_is_no_stable() {
 
 #[test]
 fn given_in_the_stable_fills_the_param_which_the_next_start_clears() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let o = json!({ "kind": "task", "task": "feedStable", "stableId": "st1", "params": { "source": "s1" } });
     give(&mut s, o, "w1");
@@ -238,6 +244,7 @@ fn until_breeding(s: &mut Game, id: &str, ticks: usize) {
 
 #[test]
 fn breeds_two_fed_horses_in_the_stable_the_resident_stands_in_elsewhere_it_ends() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     give(&mut s, json!({ "kind": "runScript", "scriptId": script(Task::Breed) }), "w1");
     give(&mut s, json!({ "kind": "runScript", "scriptId": script(Task::Breed) }), "w2");
@@ -252,6 +259,7 @@ fn breeds_two_fed_horses_in_the_stable_the_resident_stands_in_elsewhere_it_ends(
 
 #[test]
 fn ends_with_no_two_fed_horses_in_the_stable() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.world.horses.retain(|h| h.id != "h2");
     give(&mut s, json!({ "kind": "runScript", "scriptId": script(Task::Breed) }), "w1");
@@ -262,6 +270,7 @@ fn ends_with_no_two_fed_horses_in_the_stable() {
 
 #[test]
 fn carries_on_with_a_paused_pair_in_the_stable_first() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     for id in ["h3", "h4"] {
         let mut h = s.world.horses[0].clone();
@@ -282,6 +291,7 @@ fn carries_on_with_a_paused_pair_in_the_stable_first() {
 
 #[test]
 fn walks_to_the_stable_picked_before_it_starts_and_breeds_there() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let o = json!({ "kind": "runScript", "scriptId": script(Task::Breed), "params": { "stable": "st1" } });
     give(&mut s, o, "w2");

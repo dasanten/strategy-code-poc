@@ -134,6 +134,7 @@ fn working(world: &WorldState, camp: (i32, i32)) -> bool {
 
 #[test]
 fn walks_to_the_storage_below_food_at_comes_back_with_food_take_and_works_on() {
+    csp_npc::install(); // T1719
     let (mut world, t, camp) = camp_world();
     storage(&mut world, "s1", camp.0 as f64 + 6.0, camp.1 as f64, food(50.0));
     add_worker(&mut world, ("camp", 6.0, 10.0), 3.0, json!({ "foodAt": 4, "foodTake": 12 }));
@@ -157,6 +158,7 @@ fn walks_to_the_storage_below_food_at_comes_back_with_food_take_and_works_on() {
 
 #[test]
 fn with_no_params_set_fetches_the_default_food_take_once_below_the_default_food_at() {
+    csp_npc::install(); // T1719
     let (mut world, t, camp) = camp_world();
     storage(&mut world, "s1", camp.0 as f64 + 6.0, camp.1 as f64, food(50.0));
     add_worker(&mut world, ("camp", 6.0, 10.0), GET_FOOD_AT, json!({}));
@@ -185,6 +187,7 @@ fn with_no_params_set_fetches_the_default_food_take_once_below_the_default_food_
 
 #[test]
 fn goes_to_the_picked_storage_while_it_holds_food_else_the_nearest_with_food() {
+    csp_npc::install(); // T1719
     let (mut world, t, camp) = camp_world();
     storage(&mut world, "near", camp.0 as f64 + 2.0, camp.1 as f64, Stock::new());
     storage(&mut world, "far", camp.0 as f64 + 8.0, camp.1 as f64, food(50.0));
@@ -215,6 +218,7 @@ fn goes_to_the_picked_storage_while_it_holds_food_else_the_nearest_with_food() {
 
 #[test]
 fn keeps_working_with_no_food_anywhere() {
+    csp_npc::install(); // T1719
     let (mut world, t, camp) = camp_world();
     storage(
         &mut world,
@@ -231,6 +235,7 @@ fn keeps_working_with_no_food_anywhere() {
 
 #[test]
 fn stays_at_work_with_food_at_0_however_little_food_they_carry() {
+    csp_npc::install(); // T1719
     let (mut world, t, camp) = camp_world();
     storage(&mut world, "s1", camp.0 as f64 + 6.0, camp.1 as f64, food(50.0));
     add_worker(&mut world, ("camp", 6.0, 10.0), 0.0, json!({ "foodAt": 0 }));
@@ -240,6 +245,7 @@ fn stays_at_work_with_food_at_0_however_little_food_they_carry() {
 
 #[test]
 fn carrying_the_output_with_food_take_set_tops_their_food_up_to_it() {
+    csp_npc::install(); // T1719
     let (mut world, t, camp) = camp_world();
     storage(&mut world, "s1", camp.0 as f64 + 6.0, camp.1 as f64, food(50.0));
     add_worker(&mut world, ("camp", 6.0, 10.0), OWN_FOOD, json!({ "foodTake": 12, "crewFood": 0 }));
@@ -306,6 +312,7 @@ fn building_at_site(world: &WorldState) -> bool {
 
 #[test]
 fn build_walks_to_the_source_below_food_at_comes_back_with_food_take_and_builds_on() {
+    csp_npc::install(); // T1719
     let (mut world, t, _) = camp_world();
     storage(&mut world, "s1", HOUSE_AT.0 as f64 + 6.0, HOUSE_AT.1 as f64, food(50.0));
     add_builder(
@@ -335,6 +342,7 @@ fn build_walks_to_the_source_below_food_at_comes_back_with_food_take_and_builds_
 
 #[test]
 fn fetching_materials_with_food_take_set_tops_their_food_up_to_it() {
+    csp_npc::install(); // T1719
     let (mut world, t, _) = camp_world();
     storage(
         &mut world,
@@ -362,6 +370,7 @@ fn fetching_materials_with_food_take_set_tops_their_food_up_to_it() {
 
 #[test]
 fn build_stays_at_the_site_with_food_at_0_however_little_food_they_carry() {
+    csp_npc::install(); // T1719
     let (mut world, t, _) = camp_world();
     storage(&mut world, "s1", HOUSE_AT.0 as f64 + 6.0, HOUSE_AT.1 as f64, food(50.0));
     add_builder(&mut world, 0.0, json!({ "foodAt": 0 }), house_materials());
@@ -415,6 +424,7 @@ fn tear_down_walks_to_the_nearest_storage_with_food_below_food_at_comes_back_wit
 
 #[test]
 fn tear_down_with_food_at_0_without_leaving_however_little_food_they_carry() {
+    csp_npc::install(); // T1719
     let (mut world, t, camp) = camp_world();
     storage(&mut world, "s1", camp.0 as f64 + 6.0, camp.1 as f64, food(50.0));
     add_tearer(&mut world, 0.0, json!({ "foodAt": 0 }));
@@ -425,6 +435,7 @@ fn tear_down_with_food_at_0_without_leaving_however_little_food_they_carry() {
 
 #[test]
 fn build_takes_food_at_and_food_take_from_its_memory_over_the_params() {
+    csp_npc::install(); // T1719
     // #1379: an NPC city sets them for a builder of a far site.
     let (mut world, t, _) = camp_world();
     storage(&mut world, "s1", HOUSE_AT.0 as f64 + 6.0, HOUSE_AT.1 as f64, food(50.0));
@@ -453,6 +464,7 @@ fn build_takes_food_at_and_food_take_from_its_memory_over_the_params() {
 
 #[test]
 fn fetching_materials_for_a_far_site_fetches_what_the_walk_there_eats_too() {
+    csp_npc::install(); // T1719
     // #1379: Brackenholt's builder of a far quarry fetched Food up to foodTake as reckoned at the
     // site, ate some of it on the walk to the storage, set out again short and went Down. Far out
     // (memory.foodAt set by their city: about what the walk home eats), they fetch that too.

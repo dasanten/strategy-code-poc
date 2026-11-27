@@ -51,6 +51,7 @@ fn threat(world: &WorldState, org: &str) -> Option<f64> {
 
 #[test]
 fn an_npc_citys_demand_is_paid_by_a_transfer_to_it_which_settles_threat_and_standing() {
+    csp_npc::install(); // T1719
     let (mut s, id) = demanded();
     assert_eq!(npc_demands_sound(&s.world), vec![]);
     assert_eq!(demands_sound(&s.world), vec![]);
@@ -74,6 +75,7 @@ fn an_npc_citys_demand_is_paid_by_a_transfer_to_it_which_settles_threat_and_stan
 
 #[test]
 fn an_npc_city_fetches_nothing_set_aside() {
+    csp_npc::install(); // T1719
     let (mut s, id) = demanded();
     let storage = s.to_storage.clone();
     let reason = accept(&mut s, &id, json!({ "way": "setAside", "storageId": storage }));
@@ -83,6 +85,7 @@ fn an_npc_city_fetches_nothing_set_aside() {
 
 #[test]
 fn refusing_an_npc_citys_demand_turns_it_hostile_and_keeps_its_threat() {
+    csp_npc::install(); // T1719
     let (mut s, id) = demanded();
     assert_eq!(s.send(IVO, json!({ "kind": "declineDemand", "demandId": id })), "ack");
     assert_eq!(standing_of(&s.world, NPC, &s.other), NPC_DEMAND_REFUSED_STANDING);
@@ -91,6 +94,7 @@ fn refusing_an_npc_citys_demand_turns_it_hostile_and_keeps_its_threat() {
 
 #[test]
 fn letting_an_npc_citys_demand_lapse_turns_it_hostile_too() {
+    csp_npc::install(); // T1719
     let (mut s, _) = demanded();
     s.world.tick = s.world.demands[0].deadline as u64;
     step_demands(&mut s.world);

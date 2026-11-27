@@ -200,6 +200,7 @@ fn hold_farm(world: &mut WorldState) {
 
 #[test]
 fn names_a_last_seen_workplace_of_another_realm_never_its_storage_or_one_never_seen() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let w = &s.world;
     assert!(matches!(
@@ -214,6 +215,7 @@ fn names_a_last_seen_workplace_of_another_realm_never_its_storage_or_one_never_s
 
 #[test]
 fn is_accepted_with_run_script_the_resident_walks_to_it_as_last_seen_and_works_it() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.give(json!({ "kind": "runScript", "scriptId": work(), "params": { "workplace": "f9" } }));
     s.until(600);
@@ -224,6 +226,7 @@ fn is_accepted_with_run_script_the_resident_walks_to_it_as_last_seen_and_works_i
 
 #[test]
 fn takes_a_work_step_at_it_in_a_queue_after_a_walk_there() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.give(json!({
         "kind": "queue",
@@ -247,6 +250,7 @@ fn takes_a_work_step_at_it_in_a_queue_after_a_walk_there() {
 
 #[test]
 fn a_storage_of_another_realm_stays_refused() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let answer = s
         .receive(json!({ "kind": "runScript", "scriptId": work(), "params": { "storage": "s9" } }));
@@ -263,6 +267,7 @@ fn a_storage_of_another_realm_stays_refused() {
 
 #[test]
 fn ends_with_the_reason_when_the_workplace_is_gone_on_arrival() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.give(json!({ "kind": "runScript", "scriptId": work(), "params": { "workplace": "f9" } }));
     s.tick();
@@ -276,6 +281,7 @@ fn ends_with_the_reason_when_the_workplace_is_gone_on_arrival() {
 
 #[test]
 fn ends_with_the_reason_when_the_workplace_is_held_by_someone_else() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     hold_farm(&mut s.world);
     s.give(json!({ "kind": "runScript", "scriptId": work(), "params": { "workplace": "f9" } }));

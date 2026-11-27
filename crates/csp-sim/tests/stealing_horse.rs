@@ -171,6 +171,7 @@ fn refused(reason: &str) -> Answer {
 
 #[test]
 fn moves_it_to_the_thiefs_realm_and_commits_one_theft_and_they_ride_it() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     assert_eq!(s.mount(), ok());
     // Nothing changes hands before the order is applied.
@@ -193,6 +194,7 @@ fn moves_it_to_the_thiefs_realm_and_commits_one_theft_and_they_ride_it() {
 
 #[test]
 fn rides_on_past_the_tick_step_riders_has_nothing_to_drop() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let _ = s.mount();
     s.apply();
@@ -203,6 +205,7 @@ fn rides_on_past_the_tick_step_riders_has_nothing_to_drop() {
 
 #[test]
 fn tells_the_victim_at_once_it_is_gone_and_where_without_the_thief() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let _ = s.mount();
     s.apply();
@@ -218,6 +221,7 @@ fn tells_the_victim_at_once_it_is_gone_and_where_without_the_thief() {
 
 #[test]
 fn is_refused_while_someone_rides_it_it_is_down_or_it_is_hitched() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.person("o2", Some("r2"), 20.0, 20.0);
     s.r("o2").riding = Some("h2".into());
@@ -235,6 +239,7 @@ fn is_refused_while_someone_rides_it_it_is_down_or_it_is_hitched() {
 
 #[test]
 fn is_refused_while_guarded_and_allowed_when_an_armed_resident_of_the_thiefs_realm_is_there_too() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.person("o2", Some("r2"), 20.0, 20.0);
     assert_eq!(s.mount(), ok());
@@ -250,6 +255,7 @@ fn is_refused_while_guarded_and_allowed_when_an_armed_resident_of_the_thiefs_rea
 
 #[test]
 fn needs_a_grown_resident_on_its_tile_on_foot() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.person("c1", Some("r1"), 20.0, 20.0);
     s.r("c1").born_at = s.world.tick as f64;
@@ -264,6 +270,7 @@ fn needs_a_grown_resident_on_its_tile_on_foot() {
 
 #[test]
 fn lets_the_first_of_two_thieves_in_a_tick_have_it() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.person("t2", Some("r1"), 20.0, 20.0);
     let _ = s.mount();
@@ -276,6 +283,7 @@ fn lets_the_first_of_two_thieves_in_a_tick_have_it() {
 
 #[test]
 fn takes_a_horse_in_its_owners_stable_a_stable_doesnt_protect_it() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let mut st = building("st", BuildingKind::Stable, 20.0, 20.0);
     st.realm_id = Some("r2".into());
@@ -289,6 +297,7 @@ fn takes_a_horse_in_its_owners_stable_a_stable_doesnt_protect_it() {
 
 #[test]
 fn takes_a_horse_of_nobody_with_no_crime_and_no_one_to_tell() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.h("h2").realm_id = None;
     assert_eq!(s.mount(), ok());
@@ -303,6 +312,7 @@ fn takes_a_horse_of_nobody_with_no_crime_and_no_one_to_tell() {
 
 #[test]
 fn takes_an_npc_citys_horse_from_the_city_and_its_armed_residents_guard_it() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.h("h2").realm_id = None;
     s.h("h2").city_id = Some("n1".into());
@@ -319,6 +329,7 @@ fn takes_an_npc_citys_horse_from_the_city_and_its_armed_residents_guard_it() {
 
 #[test]
 fn lets_nobody_steal_to_ride_for_a_realm_they_are_only_on_loan_to() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.person("m1", None, 20.0, 20.0);
     s.r("m1").city_id = Some("n1".into());
@@ -332,6 +343,7 @@ fn lets_nobody_steal_to_ride_for_a_realm_they_are_only_on_loan_to() {
 
 #[test]
 fn is_no_theft_for_the_horses_own_realm() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.person("o2", Some("r2"), 20.0, 20.0);
     // r2's own Player mounting their own horse is no theft.
@@ -347,6 +359,7 @@ fn is_no_theft_for_the_horses_own_realm() {
 
 #[test]
 fn steals_the_horse_the_order_names_hitches_it_and_commits_one_theft() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.carriage_of("k1", Some("r1"));
     assert_eq!(s.drive(json!({ "horseId": "h2" })), ok());
@@ -369,6 +382,7 @@ fn steals_the_horse_the_order_names_hitches_it_and_commits_one_theft() {
 
 #[test]
 fn hitches_a_horse_of_the_drivers_own_first_stealing_nothing() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.carriage_of("k1", Some("r1"));
     s.horse_of("h1", Some("r1"), 20.0, 20.0);
@@ -382,6 +396,7 @@ fn hitches_a_horse_of_the_drivers_own_first_stealing_nothing() {
 
 #[test]
 fn never_steals_with_a_drive_that_names_no_horse() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.carriage_of("k1", Some("r1"));
     assert_eq!(s.drive(json!({})), refused("no horse here to pull that carriage"));
@@ -392,6 +407,7 @@ fn never_steals_with_a_drive_that_names_no_horse() {
 
 #[test]
 fn hitching_is_refused_while_the_horse_is_ridden_down_or_guarded() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.carriage_of("k1", Some("r1"));
     let named = || json!({ "horseId": "h2" });
@@ -413,6 +429,7 @@ fn hitching_is_refused_while_the_horse_is_ridden_down_or_guarded() {
 
 #[test]
 fn never_takes_a_horse_for_a_carriage_the_realm_only_commands() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.carriage_of("k1", Some("r3"));
     s.world.alliances.push(from(json!({
@@ -428,6 +445,7 @@ fn never_takes_a_horse_for_a_carriage_the_realm_only_commands() {
 
 #[test]
 fn steals_its_owners_free_horse_with_it_as_one_theft() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.carriage_of("k2", Some("r2"));
     assert_eq!(s.drive_carriage("k2", json!({})), ok());
@@ -445,6 +463,7 @@ fn steals_its_owners_free_horse_with_it_as_one_theft() {
 
 #[test]
 fn makes_a_third_organizations_horse_a_theft_of_its_own() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.carriage_of("k3", Some("r3"));
     s.world.realms.push(realm("r3", 9, "o3"));
@@ -463,6 +482,7 @@ fn makes_a_third_organizations_horse_a_theft_of_its_own() {
 
 #[test]
 fn prefers_a_horse_of_the_thiefs_own_and_one_it_can_take_over_a_guarded_one() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.carriage_of("k3", Some("r3"));
     s.person("o2", Some("r2"), 20.0, 20.0);
@@ -488,6 +508,7 @@ fn prefers_a_horse_of_the_thiefs_own_and_one_it_can_take_over_a_guarded_one() {
 
 #[test]
 fn has_no_default_script_mount_or_drive_anything_so_none_can_steal() {
+    csp_npc::install(); // T1719
     for (_, _, source) in DEFAULT_SCRIPTS.iter() {
         for word in ["mount", "drive"] {
             let call = format!("{word}(");
@@ -501,6 +522,7 @@ fn has_no_default_script_mount_or_drive_anything_so_none_can_steal() {
 
 #[test]
 fn has_breed_horses_pick_only_the_realms_own_in_a_stable() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let stable = building("st", BuildingKind::Stable, 20.0, 20.0);
     s.horse_of("h3", Some("r2"), 20.0, 20.0);
@@ -515,6 +537,7 @@ fn has_breed_horses_pick_only_the_realms_own_in_a_stable() {
 
 #[test]
 fn refuses_another_realms_horse_in_a_queue_for_mounting_or_hitching() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.carriage_of("k1", Some("r1"));
     let queue = |order: Value| json!({ "kind": "queue", "residentId": "t1", "steps": [{ "order": order }] });
@@ -543,6 +566,7 @@ impl QueueHost for Mara {
 
 #[test]
 fn skips_a_step_whose_horse_was_stolen_since_it_doesnt_steal_it_back() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.h("h2").realm_id = Some("r1".into());
     let queue = json!({
@@ -561,6 +585,7 @@ fn skips_a_step_whose_horse_was_stolen_since_it_doesnt_steal_it_back() {
 
 #[test]
 fn has_an_npc_citys_resident_ride_only_the_citys() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.person("n2", None, 20.0, 20.0);
     s.r("n2").city_id = Some("n1".into());
@@ -579,6 +604,7 @@ fn has_an_npc_citys_resident_ride_only_the_citys() {
 
 #[test]
 fn the_invariants_catch_someone_riding_a_horse_of_another_organization() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.r("t1").riding = Some("h2".into());
     let riders = csp_sim::invariants::world_invariants()

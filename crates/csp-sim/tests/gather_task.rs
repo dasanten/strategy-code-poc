@@ -150,6 +150,7 @@ fn running(s: &Setup, id: &str) -> bool {
 
 #[test]
 fn brings_load_after_load_to_the_storage_moving_outward_as_tiles_empty() {
+    csp_npc::install(); // T1719
     let mut s = setup(terrain(), &["w1"], 50.0);
     assert!(acked(&give(&mut s, "w1", json!({ "good": "wood" }))));
     // The first tile is the nearest forest tile to where they started.
@@ -167,6 +168,7 @@ fn brings_load_after_load_to_the_storage_moving_outward_as_tiles_empty() {
 
 #[test]
 fn two_gatherers_take_different_tiles() {
+    csp_npc::install(); // T1719
     let mut s = setup(terrain(), &["w1", "w2"], 50.0);
     assert!(acked(&give(&mut s, "w1", json!({ "good": "wood" }))));
     assert!(acked(&give(&mut s, "w2", json!({ "good": "wood" }))));
@@ -183,6 +185,7 @@ fn two_gatherers_take_different_tiles() {
 
 #[test]
 fn ends_saying_why_with_nothing_in_reach() {
+    csp_npc::install(); // T1719
     let plains =
         TerrainMap { size: SIZE, tiles: vec![Terrain::Plains as u8; (SIZE * SIZE) as usize] };
     let mut s = setup(plains, &["w1"], 50.0);
@@ -197,6 +200,7 @@ fn ends_saying_why_with_nothing_in_reach() {
 
 #[test]
 fn stores_what_it_carries_and_ends_once_the_land_in_reach_is_picked_over() {
+    csp_npc::install(); // T1719
     let mut s = setup(terrain(), &["w1"], 50.0);
     // Every forest tile but one is picked over, and that one holds 5.
     for y in 18..23 {
@@ -215,6 +219,7 @@ fn stores_what_it_carries_and_ends_once_the_land_in_reach_is_picked_over() {
 
 #[test]
 fn gets_food_below_food_at_as_work_does() {
+    csp_npc::install(); // T1719
     let mut s = setup(terrain(), &["w1"], 50.0);
     s.world.residents[0].carried.shift_remove(&Good::Food);
     assert!(acked(&give(&mut s, "w1", json!({ "good": "wood", "foodAt": 2, "foodTake": 6 }))));
@@ -241,6 +246,7 @@ fn gets_food_below_food_at_as_work_does() {
 
 #[test]
 fn a_child_cant_be_given_gather() {
+    csp_npc::install(); // T1719
     let mut s = setup(terrain(), &["w1"], 50.0);
     s.world.residents[0].born_at = s.world.tick as f64;
     let reply = give(&mut s, "w1", json!({ "good": "wood" }));
@@ -251,6 +257,7 @@ fn a_child_cant_be_given_gather() {
 
 #[test]
 fn the_tile_search_skips_taken_built_and_seen_picked_over_tiles_and_keeps_to_its_reach() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = create_world(&t, 1);
     world.nodes.clear();
@@ -316,6 +323,7 @@ fn the_tile_search_skips_taken_built_and_seen_picked_over_tiles_and_keeps_to_its
 /// last saw there is still left out, and a node that came into being since isn't known either.
 #[test]
 fn the_tile_search_knows_out_of_sight_only_what_the_player_last_saw() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = create_world(&t, 1);
     world.nodes.clear();
@@ -375,6 +383,7 @@ fn the_tile_search_knows_out_of_sight_only_what_the_player_last_saw() {
 /// stands on this tile" is a safeguard it never reaches by itself.)
 #[test]
 fn a_gatherer_who_finds_their_tile_taken_goes_on_to_the_next() {
+    csp_npc::install(); // T1719
     const BIG: i32 = 200;
     let mut t = TerrainMap { size: BIG, tiles: vec![Terrain::Plains as u8; (BIG * BIG) as usize] };
     for y in 18..23 {

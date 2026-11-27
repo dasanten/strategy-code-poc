@@ -68,6 +68,7 @@ fn close_to(a: f64, b: f64, digits: i32) -> bool {
 
 #[test]
 fn has_its_mint_strike_all_its_ore_80_coins_a_game_day() {
+    csp_npc::install(); // T1719
     let input = recipe().input.get("goldOre").unwrap();
     assert_eq!(minters() * BATCHES_PER_DAY.get("mint").unwrap() * input, ore_per_day());
     assert_eq!(coins_per_day(), 80.0);
@@ -75,6 +76,7 @@ fn has_its_mint_strike_all_its_ore_80_coins_a_game_day() {
 
 #[test]
 fn pays_each_worker_a_little_better_than_wood_or_iron_ore_sold() {
+    csp_npc::install(); // T1719
     assert!(close_to(coins_per_worker_day(), 6.67, 2));
     assert!(close_to(sold_per_worker_day("wood"), 4.8, 2));
     assert!(close_to(sold_per_worker_day("ironOre"), 4.8, 2));
@@ -84,6 +86,7 @@ fn pays_each_worker_a_little_better_than_wood_or_iron_ore_sold() {
 
 #[test]
 fn makes_gold_ore_worth_less_at_a_warehouse_than_what_the_mint_strikes_from_it() {
+    csp_npc::install(); // T1719
     let struck = recipe().output.get("coins").unwrap() / recipe().input.get("goldOre").unwrap();
     assert!(WAREHOUSE_BASE_PRICE.get("goldOre").unwrap() < struck);
     assert!(close_to(sold_per_worker_day("goldOre"), sold_per_worker_day("wood"), 2));
@@ -93,11 +96,13 @@ fn makes_gold_ore_worth_less_at_a_warehouse_than_what_the_mint_strikes_from_it()
 
 #[test]
 fn asks_five_days_for_a_resident() {
+    csp_npc::install(); // T1719
     assert_eq!(CITY_PRICE_PER_RESIDENT / coins_per_day(), 5.0);
 }
 
 #[test]
 fn asks_about_35_days_for_a_village_and_three_of_its_residents_can_carry_the_coins() {
+    csp_npc::install(); // T1719
     let price = price_of(&NPC_VILLAGE);
     assert!(price / coins_per_day() > 33.0);
     assert!(price / coins_per_day() < 37.0);
@@ -106,6 +111,7 @@ fn asks_about_35_days_for_a_village_and_three_of_its_residents_can_carry_the_coi
 
 #[test]
 fn asks_about_90_days_for_a_town() {
+    csp_npc::install(); // T1719
     let days = price_of(&NPC_TOWN) / coins_per_day();
     assert!(days > 85.0 && days < 95.0, "{days}");
 }
@@ -114,22 +120,26 @@ fn asks_about_90_days_for_a_town() {
 
 #[test]
 fn counts_a_killing_as_one() {
+    csp_npc::install(); // T1719
     assert_eq!(TRADE_ORG_LOSS.killing, CITY_PRICE_PER_RESIDENT);
 }
 
 #[test]
 fn takes_as_much_for_an_admin_directive_as_for_a_killing() {
+    csp_npc::install(); // T1719
     assert_eq!(DIRECTIVE_PUNISH_WORTH, TRADE_ORG_PUNISH.times * TRADE_ORG_LOSS.killing);
 }
 
 #[test]
 fn offers_to_be_bought_off_for_what_an_average_residents_hands_can_bring() {
+    csp_npc::install(); // T1719
     assert!(DIRECTIVE_BUY_OFF_PRICE * GOOD_WEIGHT.get("coins").unwrap() <= average_hands());
     const { assert!(DIRECTIVE_BUY_OFF_PRICE > DIRECTIVE_PUNISH_WORTH) };
 }
 
 #[test]
 fn has_a_debt_for_a_killing_take_at_most_four_workplaces() {
+    csp_npc::install(); // T1719
     let debt = TRADE_ORG_PUNISH.times * TRADE_ORG_LOSS.killing;
     for (_, worth) in WORKPLACE_WRECK_WORTH.0 {
         assert!(debt / worth <= 4.0);

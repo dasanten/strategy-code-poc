@@ -142,6 +142,7 @@ fn fetch_from(r: &Resident) -> String {
 
 #[test]
 fn stores_the_output_at_output_while_the_crews_food_comes_from_food() {
+    csp_npc::install(); // T1719
     let (mut world, t, camp) = camp_world();
     // The main storage is the nearest, and holds Food: neither is used while both are picked.
     storage(&mut world, "main", camp.0 + 3, camp.1, goods(&[(Good::Food, 50.0)]));
@@ -183,6 +184,7 @@ fn stores_the_output_at_output_while_the_crews_food_comes_from_food() {
 
 #[test]
 fn carries_the_output_to_output_else_storage_else_the_nearest_storage() {
+    csp_npc::install(); // T1719
     let (mut world, t, camp) = camp_world();
     storage(&mut world, "near", camp.0 + 2, camp.1, Stock::new());
     storage(&mut world, "main", camp.0 + 5, camp.1, Stock::new());
@@ -214,6 +216,7 @@ fn carries_the_output_to_output_else_storage_else_the_nearest_storage() {
 
 #[test]
 fn gets_food_at_food_else_storage_else_the_nearest_storage_with_food() {
+    csp_npc::install(); // T1719
     let (mut world, t, camp) = camp_world();
     storage(&mut world, "near", camp.0 + 2, camp.1, goods(&[(Good::Food, 50.0)]));
     storage(&mut world, "main", camp.0 + 5, camp.1, goods(&[(Good::Food, 50.0)]));
@@ -241,6 +244,7 @@ fn gets_food_at_food_else_storage_else_the_nearest_storage_with_food() {
 
 #[test]
 fn brings_the_crews_food_from_storage_while_food_is_unset_though_output_is_elsewhere() {
+    csp_npc::install(); // T1719
     let (mut world, t, camp) = camp_world();
     storage(&mut world, "main", camp.0, camp.1 + 6, goods(&[(Good::Food, 50.0)]));
     storage(&mut world, "out", camp.0 + 8, camp.1, Stock::new());
@@ -282,6 +286,7 @@ fn add_builder(world: &mut WorldState, food: f64, params: &Value) {
 
 #[test]
 fn build_gets_food_at_food_while_the_materials_come_from_source() {
+    csp_npc::install(); // T1719
     let (mut world, t, _) = camp_world();
     storage(
         &mut world,
@@ -320,6 +325,7 @@ fn build_gets_food_at_food_while_the_materials_come_from_source() {
 
 #[test]
 fn build_gets_food_at_source_while_food_is_unset() {
+    csp_npc::install(); // T1719
     let (mut world, t, _) = camp_world();
     storage(&mut world, "near", HOUSE_AT.0 + 1, HOUSE_AT.1, goods(&[(Good::Food, 50.0)]));
     storage(&mut world, "src", HOUSE_AT.0 + 4, HOUSE_AT.1, goods(&[(Good::Food, 50.0)]));
@@ -333,6 +339,7 @@ fn build_gets_food_at_source_while_food_is_unset() {
 
 #[test]
 fn tear_down_gets_food_at_food_else_source_else_the_nearest_with_food() {
+    csp_npc::install(); // T1719
     let (mut world, t, camp) = camp_world();
     storage(&mut world, "near", camp.0 + 2, camp.1, goods(&[(Good::Food, 50.0)]));
     storage(&mut world, "src", camp.0 + 5, camp.1, goods(&[(Good::Food, 50.0)]));
@@ -355,6 +362,7 @@ fn tear_down_gets_food_at_food_else_source_else_the_nearest_with_food() {
 
 #[test]
 fn build_line_gets_food_at_food() {
+    csp_npc::install(); // T1719
     let (mut world, t, _) = camp_world();
     storage(&mut world, "src", HOUSE_AT.0 + 4, HOUSE_AT.1, goods(&[(Good::Food, 50.0)]));
     storage(&mut world, "pantry", HOUSE_AT.0 - 4, HOUSE_AT.1, goods(&[(Good::Food, 50.0)]));

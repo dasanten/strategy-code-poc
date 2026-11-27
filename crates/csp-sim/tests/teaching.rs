@@ -55,6 +55,7 @@ fn teacher(world: &WorldState) -> Option<String> {
 
 #[test]
 fn sets_a_grown_resident_on_the_ground_to_teach_a_stat_or_a_skill_until_ordered_otherwise() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     assert_eq!(send(&mut world, &t, &mut orders, teach("a1", "strength", "g1")), "ack");
     let teaching = json!({ "kind": "teach", "buildingId": "g1", "subject": "strength" });
@@ -73,6 +74,7 @@ fn sets_a_grown_resident_on_the_ground_to_teach_a_stat_or_a_skill_until_ordered_
 
 #[test]
 fn is_refused_for_a_child_off_the_ground_at_another_building_a_site_or_for_no_subject() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     let tick = world.tick as f64;
     at(&mut world, "a1").born_at = tick;
@@ -109,6 +111,7 @@ fn is_refused_for_a_child_off_the_ground_at_another_building_a_site_or_for_no_su
 
 #[test]
 fn is_refused_for_another_realms_resident_and_for_a_citys_sender_not_its_own() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     at(&mut world, "a2").owner = Some("r2".into());
     assert_eq!(
@@ -121,6 +124,7 @@ fn is_refused_for_another_realms_resident_and_for_a_citys_sender_not_its_own() {
 
 #[test]
 fn refuses_a_second_teacher_at_the_ground_naming_the_first() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     assert_eq!(send(&mut world, &t, &mut orders, teach("a1", "strength", "g1")), "ack");
     assert_eq!(
@@ -133,6 +137,7 @@ fn refuses_a_second_teacher_at_the_ground_naming_the_first() {
 
 #[test]
 fn lets_only_the_first_of_two_teach_orders_in_one_tick_teach() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     assert_eq!(orders.receive(&world, &me(), teach("a1", "strength", "g1"), &t), Ok(()));
     assert_eq!(orders.receive(&world, &me(), teach("a2", "combat", "g1"), &t), Ok(()));
@@ -143,6 +148,7 @@ fn lets_only_the_first_of_two_teach_orders_in_one_tick_teach() {
 
 #[test]
 fn ends_on_leaving_the_ground_or_taking_another_order_and_the_ground_teaches_nothing_then() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     assert_eq!(send(&mut world, &t, &mut orders, teach("a1", "strength", "g1")), "ack");
     let walk = json!({ "kind": "walkTo", "residentId": "a1", "x": 10, "y": 10 });
@@ -159,6 +165,7 @@ fn ends_on_leaving_the_ground_or_taking_another_order_and_the_ground_teaches_not
 
 #[test]
 fn ends_when_the_ground_is_gone() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     assert_eq!(send(&mut world, &t, &mut orders, teach("a1", "strength", "g1")), "ack");
     world.buildings.clear();

@@ -101,6 +101,7 @@ fn deliver(
 
 #[test]
 fn lays_out_a_carriage_site_on_the_residents_tile_of_a_finished_stable_of_no_city() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     assert_eq!(send(&mut world, &t, &mut orders, build("w1"), &me()), "ack");
     let s = &world.buildings[site_index(&world).unwrap()];
@@ -112,6 +113,7 @@ fn lays_out_a_carriage_site_on_the_residents_tile_of_a_finished_stable_of_no_cit
 
 #[test]
 fn also_lays_one_out_right_next_to_the_stable_but_not_further_off() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     at(&mut world, "w1").x = 8.0;
     at(&mut world, "w1").y = 3.0;
@@ -127,6 +129,7 @@ fn also_lays_one_out_right_next_to_the_stable_but_not_further_off() {
 
 #[test]
 fn is_turned_down_at_an_unfinished_stable_on_another_building_or_where_no_carriage_can_go() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     let st = world.buildings.iter().position(|b| b.id == "st").unwrap();
     world.buildings[st].site = Some(ConstructionSite { delivered: Stock::new(), work: 0.0 });
@@ -166,6 +169,7 @@ fn is_turned_down_at_an_unfinished_stable_on_another_building_or_where_no_carria
 
 #[test]
 fn joins_the_carriage_site_already_on_the_tile_rather_than_laying_out_a_second() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     send(&mut world, &t, &mut orders, build("w1"), &me());
     person(&mut world, "w2", "r1", 10.0, 5.0);
@@ -181,6 +185,7 @@ fn joins_the_carriage_site_already_on_the_tile_rather_than_laying_out_a_second()
 
 #[test]
 fn takes_its_materials_and_work_and_becomes_an_empty_unhitched_carriage_of_the_finishers_realm() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     // The stable's horses stand there; the new carriage isn't hitched until it is driven.
     world.horses.push(
@@ -218,6 +223,7 @@ fn takes_its_materials_and_work_and_becomes_an_empty_unhitched_carriage_of_the_f
 
 #[test]
 fn leaves_all_its_delivered_materials_when_torn_down() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     send(&mut world, &t, &mut orders, build("w1"), &me());
     let id = world.buildings[site_index(&world).unwrap()].id.clone();

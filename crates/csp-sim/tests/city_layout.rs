@@ -17,6 +17,7 @@ const R: i32 = 16;
 
 #[test]
 fn every_layout_says_of_every_tile_what_the_typescript_says() {
+    csp_npc::install(); // T1719
     let expected: Value =
         serde_json::from_str(include_str!("../src/city_layout/expected.json")).expect("expected");
     for case in expected.as_array().unwrap() {

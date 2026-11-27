@@ -185,6 +185,7 @@ fn find<'a>(list: &'a [Value], id: &str) -> Option<&'a Value> {
 
 #[test]
 fn keeps_a_strangers_city_as_it_was_seen_without_what_is_inside_once_it_leaves_sight() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     t.step();
     let (tobin, storage, city) = (t.tobin.clone(), t.storage.clone(), t.city.clone());
@@ -209,6 +210,7 @@ fn keeps_a_strangers_city_as_it_was_seen_without_what_is_inside_once_it_leaves_s
 
 #[test]
 fn keeps_what_is_inside_when_it_was_seen_at_the_storage_and_for_the_players_own() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     // Tobin's scout on a tile of the storage sees inside it.
     let s = t.world.buildings.iter().find(|b| b.id == t.storage).unwrap();
@@ -233,6 +235,7 @@ fn keeps_what_is_inside_when_it_was_seen_at_the_storage_and_for_the_players_own(
 
 #[test]
 fn stays_as_it_was_while_out_of_sight_then_shows_what_is_there_now_or_forgets_it() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     t.step();
     t.go_home();
@@ -269,6 +272,7 @@ fn stays_as_it_was_while_out_of_sight_then_shows_what_is_there_now_or_forgets_it
 
 #[test]
 fn keeps_what_was_inside_as_it_was_while_the_world_changes_it_in_place() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     t.step();
     t.mara_walks_off();
@@ -283,6 +287,7 @@ fn keeps_what_was_inside_as_it_was_while_the_world_changes_it_in_place() {
 
 #[test]
 fn forgets_a_city_once_none_of_its_buildings_is_remembered() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     t.step();
     t.go_home();
@@ -301,6 +306,7 @@ fn forgets_a_city_once_none_of_its_buildings_is_remembered() {
 
 #[test]
 fn grows_only_from_sight_joining_an_alliance_hands_nothing_over_leaving_keeps_it() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     t.go_home();
     let mara = t.mara.clone();
@@ -343,6 +349,7 @@ fn grows_only_from_sight_joining_an_alliance_hands_nothing_over_leaving_keeps_it
 
 #[test]
 fn records_only_what_the_player_is_allowed_to_see_at_that_moment() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     let walk = [t.back, (t.back.0 - 2.0, t.back.1 - 2.0)];
     let tobin = t.tobin.clone();
@@ -369,6 +376,7 @@ fn records_only_what_the_player_is_allowed_to_see_at_that_moment() {
 
 #[test]
 fn flags_as_an_invariant_last_seen_sent_while_it_is_in_sight() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     t.step();
     let in_sight = t.world.last_seen[&2].clone();
@@ -386,6 +394,7 @@ fn flags_as_an_invariant_last_seen_sent_while_it_is_in_sight() {
 
 #[test]
 fn comes_round_once_every_last_seen_every_ticks_for_each_realm_staggered_by_id() {
+    csp_npc::install(); // T1719
     let mut world = two_realms().world;
     let mut offsets = std::collections::HashSet::new();
     for i in 0..20 {
@@ -406,6 +415,7 @@ fn comes_round_once_every_last_seen_every_ticks_for_each_realm_staggered_by_id()
 
 #[test]
 fn updates_a_realms_last_seen_on_its_turn_only() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     let (tobin, city) = (t.tobin.clone(), t.city.clone());
     t.until_turn(&tobin);
@@ -424,6 +434,7 @@ fn updates_a_realms_last_seen_on_its_turn_only() {
 
 #[test]
 fn remembers_a_building_that_leaves_sight_between_two_refreshes_as_it_was_at_the_last_one() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     let (tobin, city, storage) = (t.tobin.clone(), t.city.clone(), t.storage.clone());
     t.until_turn(&tobin);
@@ -445,6 +456,7 @@ fn remembers_a_building_that_leaves_sight_between_two_refreshes_as_it_was_at_the
 
 #[test]
 fn never_sends_what_is_in_sight_now_as_last_seen_refreshed_or_not() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     let (tobin, storage) = (t.tobin.clone(), t.storage.clone());
     t.go_home();
@@ -466,6 +478,7 @@ fn never_sends_what_is_in_sight_now_as_last_seen_refreshed_or_not() {
 
 #[test]
 fn refreshes_a_fresh_realm_at_once_one_with_nobody_looking_every_tick_and_on_connecting() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     let (mara, tobin) = (t.mara.clone(), t.tobin.clone());
     let off_turn = |t: &mut Two| {
@@ -504,6 +517,7 @@ fn refreshes_a_fresh_realm_at_once_one_with_nobody_looking_every_tick_and_on_con
 
 #[test]
 fn costs_about_one_refresh_in_last_seen_every_ticks_per_realm() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     t.step_last_seen();
     let mut refreshes = 0;
@@ -515,6 +529,7 @@ fn costs_about_one_refresh_in_last_seen_every_ticks_per_realm() {
 
 #[test]
 fn flags_as_an_invariant_a_realm_off_its_cadence_or_remembering_past_its_last_refresh() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     let (mara, tobin) = (t.mara.clone(), t.tobin.clone());
     for _ in 0..3 * EVERY {
@@ -626,6 +641,7 @@ impl Two {
 
 #[test]
 fn keeps_last_seen_out_of_sight_from_what_changed_as_the_whole_list_sends_it_tick_for_tick() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     let mara = t.mara.clone();
     let homes: Vec<(usize, f64, f64)> = t
@@ -700,6 +716,7 @@ fn keeps_last_seen_out_of_sight_from_what_changed_as_the_whole_list_sends_it_tic
 
 #[test]
 fn copies_nothing_and_makes_no_json_on_a_quiet_tick_however_much_is_remembered() {
+    csp_npc::install(); // T1719
     let mut t = two_realms();
     let tobin = t.tobin.clone();
     // Tobin remembers 5,000 houses all over the map, out of his sight; his scout still sees her

@@ -107,6 +107,7 @@ fn work_on_it(world: &mut WorldState, t: &TerrainMap) {
 
 #[test]
 fn takes_wood_and_some_iron_far_more_work_than_a_boat_and_carries_far_more_than_a_carriage() {
+    csp_npc::install(); // T1719
     assert!(BUILDABLE.contains(&BuildingKind::Ship));
     let materials = BUILD_MATERIALS.get("ship").unwrap();
     let (wood, iron) = (materials.get("wood").unwrap(), materials.get("iron").unwrap());
@@ -120,6 +121,7 @@ fn takes_wood_and_some_iron_far_more_work_than_a_boat_and_carries_far_more_than_
 
 #[test]
 fn goes_on_a_tile_of_a_finished_haven_that_touches_the_sea() {
+    csp_npc::install(); // T1719
     let mut world = setup();
     // (19, 6) touches the Sea diagonally at (20, 7), (19, 7) straight; (19, 5) only the lagoon.
     assert_eq!(problem(&world, 19, 6), None);
@@ -139,6 +141,7 @@ fn goes_on_a_tile_of_a_finished_haven_that_touches_the_sea() {
 
 #[test]
 fn takes_one_ship_site_per_tile() {
+    csp_npc::install(); // T1719
     let mut world = setup();
     world.buildings.push(site("ss", BuildingKind::Ship, 19.0, 6.0));
     assert_eq!(
@@ -150,6 +153,7 @@ fn takes_one_ship_site_per_tile() {
 
 #[test]
 fn is_laid_out_by_a_build_order_sharing_the_havens_tile() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     let mut orders = Orders::default();
@@ -168,6 +172,7 @@ fn is_laid_out_by_a_build_order_sharing_the_havens_tile() {
 
 #[test]
 fn finished_is_gone_and_an_empty_ship_of_the_finishers_realm_floats_on_the_sea_next_to_it() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     nearly_done(&mut world);
@@ -188,6 +193,7 @@ fn finished_is_gone_and_an_empty_ship_of_the_finishers_realm_floats_on_the_sea_n
 
 #[test]
 fn belongs_to_the_realm_of_whoever_finishes_it() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     nearly_done(&mut world);
@@ -199,6 +205,7 @@ fn belongs_to_the_realm_of_whoever_finishes_it() {
 
 #[test]
 fn floats_on_the_nearest_free_sea_tile_never_on_the_lake() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     // A boat from the same tile floats straight east, on the lagoon; a ship never does.
@@ -219,6 +226,7 @@ fn floats_on_the_nearest_free_sea_tile_never_on_the_lake() {
 /// A ship is sailed, never rowed (`CONTEXT.md`: Sailing); boarding it is docking's (T91.2).
 #[test]
 fn is_never_rowed() {
+    csp_npc::install(); // T1719
     let mut world = setup();
     let mut ship = vessel("s1", VesselKind::Ship, 20.0, 7.0);
     ship.realm_id = Some("r1".into());

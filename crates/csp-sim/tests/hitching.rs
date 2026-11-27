@@ -128,6 +128,7 @@ fn step_while_ordered(world: &mut WorldState, terrain: &TerrainMap, walking: &mu
 
 #[test]
 fn hitches_the_named_horse_among_several_and_that_one_is_driven_off() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     assert_eq!(hitch(&mut world, &terrain, json!({})), Ok(()));
     assert_eq!(world.carriages[0].horse_id.as_deref(), Some("h2"));
@@ -150,6 +151,7 @@ fn hitches_the_named_horse_among_several_and_that_one_is_driven_off() {
 
 #[test]
 fn leaves_drive_taking_the_first_free_horse_with_none_hitched() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     give(
         &mut world,
@@ -164,6 +166,7 @@ fn leaves_drive_taking_the_first_free_horse_with_none_hitched() {
 
 #[test]
 fn swaps_a_hitched_horse_which_stands_free_on_the_tile_to_be_mounted() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     world.carriages[0].horse_id = Some("h1".into());
     assert_eq!(hitch(&mut world, &terrain, json!({})), Ok(()));
@@ -178,6 +181,7 @@ fn swaps_a_hitched_horse_which_stands_free_on_the_tile_to_be_mounted() {
 
 #[test]
 fn lets_the_driver_drive_on_behind_the_new_horse_and_leaves_the_old_one_behind() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     world.carriages[0].horse_id = Some("h1".into());
     give(
@@ -206,6 +210,7 @@ fn lets_the_driver_drive_on_behind_the_new_horse_and_leaves_the_old_one_behind()
 
 #[test]
 fn goes_on_with_what_the_resident_was_doing() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     give(&mut world, &terrain, json!({ "kind": "walkTo", "residentId": "w1", "x": 9, "y": 9 }))
         .unwrap();
@@ -215,6 +220,7 @@ fn goes_on_with_what_the_resident_was_doing() {
 
 #[test]
 fn refuses_a_horse_that_isnt_the_realms_on_the_tile_and_free() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     refused(hitch(&mut world, &terrain, json!({ "horseId": "nope" })), "no such horse");
     refused(hitch(&mut world, &terrain, json!({ "carriageId": "nope" })), "no such carriage");
@@ -253,6 +259,7 @@ fn refuses_a_horse_that_isnt_the_realms_on_the_tile_and_free() {
 
 #[test]
 fn refuses_a_child_a_resident_off_the_tile_another_realms_carriage_and_a_stranger() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     let born = world.residents[0].born_at;
     world.residents[0].born_at = world.tick as f64 - ticks_for_age(5.0);
@@ -275,6 +282,7 @@ fn refuses_a_child_a_resident_off_the_tile_another_realms_carriage_and_a_strange
 
 #[test]
 fn gives_one_horse_to_the_first_of_two_carriages_hitching_it_in_the_same_tick() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     add_carriage(&mut world, "k2");
     let mut orders = Orders::default();
@@ -292,6 +300,7 @@ fn gives_one_horse_to_the_first_of_two_carriages_hitching_it_in_the_same_tick() 
 
 #[test]
 fn gets_a_passenger_off_the_carriage_first() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = setup();
     assert_eq!(
         give(

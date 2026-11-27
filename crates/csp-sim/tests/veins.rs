@@ -66,6 +66,7 @@ fn piled(world: &WorldState, good: Good) -> f64 {
 
 #[test]
 fn every_normal_or_rich_ore_node_comes_into_being_with_its_stock_and_no_other_node_has_one() {
+    csp_npc::install(); // T1719
     for kind in [ResourceKind::IronOre, ResourceKind::GoldOre, ResourceKind::Coal] {
         let good = match kind {
             ResourceKind::IronOre => "ironOre",
@@ -95,6 +96,7 @@ fn every_normal_or_rich_ore_node_comes_into_being_with_its_stock_and_no_other_no
 
 #[test]
 fn a_rich_mine_makes_exactly_its_stock_then_the_node_is_gone_the_mine_stands_and_work_ends() {
+    csp_npc::install(); // T1719
     let mut n = node(ResourceKind::IronOre, Richness::Rich, 7.0, 1.0);
     n.stock = Some(stock(3.0));
     let (world, terrain) = mine_world(n);
@@ -140,6 +142,7 @@ fn a_rich_mine_makes_exactly_its_stock_then_the_node_is_gone_the_mine_stands_and
 
 #[test]
 fn a_work_script_started_on_a_dry_mine_ends_there_saying_why() {
+    csp_npc::install(); // T1719
     // Its stock all made, the node gone: as a mine stands on a dry spot after a restart.
     let (mut world, terrain) = mine_world(node(ResourceKind::IronOre, Richness::Normal, 7.0, 1.0));
     let n = world.nodes.remove(0);
@@ -203,6 +206,7 @@ fn workers_of_two_realms_make_nothing_more_once_the_last_unit_is_made_and_each_r
 
 #[test]
 fn a_poor_node_a_forest_and_a_stone_node_never_run_dry() {
+    csp_npc::install(); // T1719
     let cases = [
         (BuildingKind::Mine, ResourceKind::IronOre, Richness::Poor, Good::IronOre),
         (BuildingKind::Mine, ResourceKind::GoldOre, Richness::Poor, Good::GoldOre),
@@ -232,6 +236,7 @@ fn a_poor_node_a_forest_and_a_stone_node_never_run_dry() {
 
 #[test]
 fn nothing_can_be_built_on_the_dry_spot_as_a_mine() {
+    csp_npc::install(); // T1719
     let mut n = node(ResourceKind::GoldOre, Richness::Normal, 7.0, 1.0);
     n.stock = Some(stock(1.0));
     let (mut world, terrain) = mine_world(n);
@@ -253,6 +258,7 @@ fn nothing_can_be_built_on_the_dry_spot_as_a_mine() {
 
 #[test]
 fn the_veins_invariant_holds_and_catches_a_broken_stock() {
+    csp_npc::install(); // T1719
     let mut world = empty_world(&plains(16));
     world.nodes.push(node(ResourceKind::IronOre, Richness::Rich, 1.0, 1.0));
     world.nodes.push(node(ResourceKind::Forest, Richness::Rich, 3.0, 1.0));
@@ -310,6 +316,7 @@ fn refresh(world: &mut WorldState, state: &mut LastSeenState) {
 
 #[test]
 fn a_player_who_saw_the_node_keeps_it_on_their_map_until_they_see_the_tile_again() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = far_world();
     let mut explored = ExploredTerrain::new(terrain, &world.nodes_ever());
     explored.explore(MARA, 10, 10, 3);
@@ -336,6 +343,7 @@ fn a_player_who_saw_the_node_keeps_it_on_their_map_until_they_see_the_tile_again
 
 #[test]
 fn a_world_with_a_dry_node_saves_and_loads_as_it_was() {
+    csp_npc::install(); // T1719
     let (world, _) = far_world();
     let text = serde_json::to_string(&world).unwrap();
     assert!(text.contains("\"dryNodes\""));

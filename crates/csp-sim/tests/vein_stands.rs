@@ -69,6 +69,7 @@ fn left(world: &WorldState) -> Option<f64> {
 
 #[test]
 fn the_word_follows_the_share_left_through_both_steps() {
+    csp_npc::install(); // T1719
     let word = |left: f64| VeinStock { first: 100.0, left, made: 100.0 - left }.word();
     assert_eq!(word(100.0), VeinWord::Plenty);
     assert_eq!(word(100.0 * VEIN_THINNING + 1.0), VeinWord::Plenty);
@@ -125,6 +126,7 @@ fn a_worked_mine_goes_from_plenty_to_thinning_to_nearly_gone_and_each_realm_work
 
 #[test]
 fn the_workers_realms_and_their_allies_see_the_word_and_nobody_else_does() {
+    csp_npc::install(); // T1719
     let (mut world, _) = mine_world(100.0);
     world.nodes[0].stock = Some(VeinStock { first: 100.0, left: 40.0, made: 60.0 });
     let mine = world.buildings.iter().find(|b| b.id == "mine").unwrap().clone();
@@ -150,6 +152,7 @@ fn the_workers_realms_and_their_allies_see_the_word_and_nobody_else_does() {
 
 #[test]
 fn a_worker_away_from_the_mine_still_counts_through_their_work_script() {
+    csp_npc::install(); // T1719
     let (mut world, _) = mine_world(100.0);
     world.residents.retain(|r| r.id == "w1");
     let w1 = &mut world.residents[0];
@@ -168,6 +171,7 @@ fn a_worker_away_from_the_mine_still_counts_through_their_work_script() {
 
 #[test]
 fn a_node_that_never_runs_dry_says_so_and_a_dry_mine_or_a_site_says_nothing() {
+    csp_npc::install(); // T1719
     let (mut world, _) = mine_world(100.0);
     // A poor node holds no stock: it never runs dry.
     world.nodes[0].richness = Richness::Poor;

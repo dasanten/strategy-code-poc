@@ -78,6 +78,7 @@ fn farmed_in_a_day(tools: f64) -> f64 {
 
 #[test]
 fn a_smithy_makes_tools_from_iron_and_wood_and_they_weigh_what_went_into_them() {
+    csp_npc::install(); // T1719
     let r = recipe_for(BuildingKind::Smithy, Some("tools")).expect("a Tools recipe");
     let mut inputs: Vec<&str> = r.input.0.iter().map(|(g, _)| *g).collect();
     inputs.sort_unstable();
@@ -93,6 +94,7 @@ fn a_smithy_makes_tools_from_iron_and_wood_and_they_weigh_what_went_into_them() 
 
 #[test]
 fn a_worker_carrying_tools_works_faster_everywhere_and_a_second_set_adds_nothing() {
+    csp_npc::install(); // T1719
     let (none, one, two) = (with_tools(0.0), with_tools(1.0), with_tools(2.0));
     let faster = 1.0 + TOOLS_WORK_BONUS;
     let pairs = [
@@ -124,6 +126,7 @@ fn a_worker_carrying_tools_works_faster_everywhere_and_a_second_set_adds_nothing
 
 #[test]
 fn a_farmer_carrying_tools_makes_more_in_a_day_and_one_without_the_same_as_before() {
+    csp_npc::install(); // T1719
     let plain = farmed_in_a_day(0.0);
     assert!((plain - 2.0).abs() < 0.5, "{plain}");
     let with = farmed_in_a_day(1.0);
@@ -152,6 +155,7 @@ fn tools_of(world: &mut WorldState) -> f64 {
 
 #[test]
 fn tools_wear_with_each_tick_of_work_and_read_worn_on_their_own_realms_card() {
+    csp_npc::install(); // T1719
     let (mut world, t) = farming(1.0);
     let worn = in_use(&world, "w1", Good::Tools);
     assert!(worn > 0.0 && worn <= 2.0 * per_tick(), "{worn}");
@@ -167,6 +171,7 @@ fn tools_wear_with_each_tick_of_work_and_read_worn_on_their_own_realms_card() {
 
 #[test]
 fn worn_out_tools_break_and_the_worker_goes_on_at_the_plain_pace() {
+    csp_npc::install(); // T1719
     let (mut world, t) = farming(1.0);
     // Ten ticks of work left in the set.
     world.wear.insert("w1".into(), Wear::from([(Good::Tools, vec![1.0 - 10.0 * per_tick()])]));
@@ -186,6 +191,7 @@ fn worn_out_tools_break_and_the_worker_goes_on_at_the_plain_pace() {
 
 #[test]
 fn only_the_set_in_use_wears_and_a_spare_takes_over_when_it_breaks() {
+    csp_npc::install(); // T1719
     let (mut world, t) = farming(2.0);
     world.wear.insert("w1".into(), Wear::from([(Good::Tools, vec![1.0 - 10.0 * per_tick()])]));
     run(&mut world, &t, 20);
@@ -203,6 +209,7 @@ fn only_the_set_in_use_wears_and_a_spare_takes_over_when_it_breaks() {
 
 #[test]
 fn tools_carried_but_not_worked_with_dont_wear() {
+    csp_npc::install(); // T1719
     let (mut world, t, _) = setup();
     at(&mut world, "w1").carried = Stock::from([(Good::Tools, 1.0)]);
     run(&mut world, &t, 100);
@@ -212,6 +219,7 @@ fn tools_carried_but_not_worked_with_dont_wear() {
 
 #[test]
 fn a_builder_carrying_tools_builds_faster_and_wears_them() {
+    csp_npc::install(); // T1719
     let mut t = plains(16);
     t.tiles[3 * 16 + 3] = csp_shared::terrain::Terrain::Forest as u8;
     let mut world = empty_world(&t);

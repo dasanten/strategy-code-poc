@@ -51,6 +51,7 @@ fn subset(world: &WorldState, t: u64) -> Value {
 
 #[test]
 fn survival_spoilage_floor_aging_and_refill_step_as_in_typescript() {
+    csp_npc::install(); // T1719
     let stepped: Value =
         serde_json::from_str(include_str!("../src/residents/stepped.json")).expect("stepped.json");
     for case in stepped.as_array().unwrap() {

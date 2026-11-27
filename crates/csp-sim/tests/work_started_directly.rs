@@ -134,6 +134,7 @@ impl Setup {
 
 #[test]
 fn works_the_farm_the_resident_stands_on_with_run_script_on_an_empty_tile_it_ends() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.give(json!({ "kind": "runScript", "scriptId": work() }));
     s.give_to("w2", json!({ "kind": "runScript", "scriptId": work() }));
@@ -152,6 +153,7 @@ fn works_the_farm_the_resident_stands_on_with_run_script_on_an_empty_tile_it_end
 
 #[test]
 fn as_a_queue_step_works_the_workplace_the_resident_stands_on_when_the_step_starts() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.give(json!({
         "kind": "queue",
@@ -174,6 +176,7 @@ fn as_a_queue_step_works_the_workplace_the_resident_stands_on_when_the_step_star
 
 #[test]
 fn never_keeps_the_workplace_given_at_one_farm_run_again_on_the_other_it_works_that_one() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.give(
         json!({ "kind": "task", "task": "work", "workplaceId": "f1", "params": { "foodTake": 4 } }),
@@ -201,6 +204,7 @@ fn never_keeps_the_workplace_given_at_one_farm_run_again_on_the_other_it_works_t
 
 #[test]
 fn works_the_workplace_picked_before_it_starts_wherever_the_resident_stands() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.give(json!({ "kind": "runScript", "scriptId": work(), "params": { "workplace": "f2" } }));
     for _ in 0..100 {
@@ -214,6 +218,7 @@ fn works_the_workplace_picked_before_it_starts_wherever_the_resident_stands() {
 
 #[test]
 fn ends_once_its_workplace_is_gone_or_when_the_one_picked_is_no_workplace() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.give(json!({ "kind": "task", "task": "work", "workplaceId": "f1" }));
     s.give_to(
@@ -241,6 +246,7 @@ fn ends_once_its_workplace_is_gone_or_when_the_one_picked_is_no_workplace() {
 
 #[test]
 fn flags_a_resident_running_work_that_knows_no_workplace() {
+    csp_npc::install(); // T1719
     let s = setup();
     let mut world = s.world;
     for (i, memory) in [(0, json!({ "workplaceId": "f1" })), (1, json!({}))] {
@@ -257,6 +263,7 @@ fn flags_a_resident_running_work_that_knows_no_workplace() {
 
 #[test]
 fn is_checked_where_a_players_scripts_run_once_the_work_default_has_run() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     // A game default that forgets its workplace, as a bug would.
     s.scripts.library.insert(

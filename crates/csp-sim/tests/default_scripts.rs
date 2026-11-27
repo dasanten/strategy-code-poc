@@ -174,6 +174,7 @@ fn sight_context_run(
 
 #[test]
 fn residents_memory_is_readable_by_scripts_for_the_players_own_residents_never_other_players() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = farm_world();
     world.residents[1].script =
         Some(from(json!({ "scriptId": 1, "memory": { "role": "carrier" } })));
@@ -209,6 +210,7 @@ fn residents_memory_is_readable_by_scripts_for_the_players_own_residents_never_o
 
 #[test]
 fn work_from_the_ui_runs_the_players_work_default_with_the_workplace_in_memory() {
+    csp_npc::install(); // T1719
     let mut g = game();
     let work = |p: Value| {
         let mut o = json!({ "task": "work", "residentId": "w1", "workplaceId": "farm" });
@@ -236,6 +238,7 @@ fn work_from_the_ui_runs_the_players_work_default_with_the_workplace_in_memory()
 
 #[test]
 fn work_from_the_ui_is_given_to_a_resident_working_by_a_bare_work_at_order_but_not_twice() {
+    csp_npc::install(); // T1719
     let mut g = game();
     g.world.residents[0].order = Some(from(json!({
         "kind": "workAt", "buildingId": "farm", "at": { "x": 3, "y": 3 }, "progress": 0.5
@@ -251,6 +254,7 @@ fn work_from_the_ui_is_given_to_a_resident_working_by_a_bare_work_at_order_but_n
 
 #[test]
 fn work_from_the_ui_plays_as_the_work_at_order_did_the_same_food_on_the_farms_pile_tick_for_tick() {
+    csp_npc::install(); // T1719
     let mut g = game();
     g.world.residents.retain(|r| r.owner.as_deref() == Some("r1"));
     // w1 is given Work from the UI, w2 the plain work-at order: equal residents, equal output.
@@ -309,6 +313,7 @@ fn with_carriage(world: &mut WorldState) {
 
 #[test]
 fn haul_and_tear_down_run_the_players_defaults_with_the_route_or_the_building_in_memory() {
+    csp_npc::install(); // T1719
     let mut g = game();
     with_carriage(&mut g.world);
     let haul = |extra: Value| {
@@ -381,6 +386,7 @@ fn haul_and_tear_down_run_the_players_defaults_with_the_route_or_the_building_in
 
 #[test]
 fn build_a_here_walks_the_resident_to_where_the_nodes_workplace_fits_and_lays_out_its_site_there() {
+    csp_npc::install(); // T1719
     let mut g = game();
     g.world.residents.retain(|r| r.owner.as_deref() == Some("r1"));
     // A forest node with the farm's corner west of it: the footprint over the node goes east.
@@ -495,6 +501,7 @@ fn build_far_off(edited: bool) -> (Vec<u64>, Game, u64) {
 
 #[test]
 fn build_runs_once_to_set_off_not_on_the_way_and_again_on_arrival() {
+    csp_npc::install(); // T1719
     let (ran, g, tick) = build_far_off(false);
     assert_eq!((g.r("w1").x, g.r("w1").y), (13.0, 9.0));
     assert!(matches!(g.r("w1").order, Some(ResidentOrder::Build(_))));
@@ -505,6 +512,7 @@ fn build_runs_once_to_set_off_not_on_the_way_and_again_on_arrival() {
 
 #[test]
 fn an_edited_copy_waits_just_like_the_default() {
+    csp_npc::install(); // T1719
     let (shipped_ran, _, shipped_tick) = build_far_off(false);
     let (edited_ran, edited, edited_tick) = build_far_off(true);
     assert_eq!(edited_ran, shipped_ran);
@@ -788,6 +796,7 @@ fn south_half(_x: i32, y: i32) -> bool {
 
 #[test]
 fn keeps_every_default_at_most_a_quarter_of_a_residents_budget() {
+    csp_npc::install(); // T1719
     let work = json!({ "workplaceId": "farm" });
     let route = json!({
         "carriageId": "k1", "from": { "x": 3, "y": 3 }, "to": { "x": 10, "y": 3 },
@@ -1140,6 +1149,7 @@ fn keeps_every_default_at_most_a_quarter_of_a_residents_budget() {
 
 #[test]
 fn flags_a_resident_running_an_unedited_default_that_ran_out_of_it() {
+    csp_npc::install(); // T1719
     let mut g = game();
     for follows_default in [true, false] {
         g.world.residents[0].script = Some(from(json!({ "scriptId": 1, "memory": {} })));

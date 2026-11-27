@@ -168,6 +168,7 @@ fn joins_the_site_then_one_builder_fetches_only_what_is_missing_from_the_nearest
 
 #[test]
 fn builds_the_site_with_materials_from_the_storage_one_fetcher_at_a_time() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = house_world();
     storage(&mut world, "s1", AT.0 + 6.0, AT.1, stock(&[(Good::Wood, 100.0)]));
     let mut fetched = false;
@@ -198,6 +199,7 @@ fn builds_the_site_with_materials_from_the_storage_one_fetcher_at_a_time() {
 
 #[test]
 fn just_builds_with_no_storage_of_the_realm_holding_the_materials() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = house_world();
     storage(&mut world, "s1", AT.0 + 6.0, AT.1, stock(&[(Good::Stone, 50.0)]));
     elsewhere(&mut world);
@@ -214,6 +216,7 @@ fn just_builds_with_no_storage_of_the_realm_holding_the_materials() {
 
 #[test]
 fn delivers_materials_a_builder_carries_before_anyone_fetches() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = house_world();
     storage(&mut world, "s1", AT.0 + 6.0, AT.1, stock(&[(Good::Wood, 100.0)]));
     world.residents[1].carried.insert(Good::Wood, 8.0);
@@ -225,6 +228,7 @@ fn delivers_materials_a_builder_carries_before_anyone_fetches() {
 
 #[test]
 fn flags_two_residents_of_a_site_away_fetching_at_once_adr_0004() {
+    csp_npc::install(); // T1719
     let (mut world, _) = house_world();
     let fetch = json!({ "storageId": "s1", "step": "pickUp", "walked": true });
     for r in &mut world.residents[0..2] {

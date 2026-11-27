@@ -170,6 +170,7 @@ impl Staged {
 
 #[test]
 fn sends_soldiers_off_the_storage_to_posts_spread_out_and_leaves_them_there() {
+    csp_npc::install(); // T1719
     let mut s = staged(10, 40.0);
     s.pass();
     let soldiers = s.soldier_ids();
@@ -194,6 +195,7 @@ fn sends_soldiers_off_the_storage_to_posts_spread_out_and_leaves_them_there() {
 
 #[test]
 fn posts_them_on_the_hall_first_then_at_the_gates_then_along_the_wall() {
+    csp_npc::install(); // T1719
     let mut s = staged(10, 40.0);
     let gate = s.world.buildings.iter().find(|b| b.kind == BuildingKind::Gate).unwrap();
     let gate = (gate.x as i32, gate.y as i32);
@@ -210,6 +212,7 @@ fn posts_them_on_the_hall_first_then_at_the_gates_then_along_the_wall() {
 
 #[test]
 fn with_few_soldiers_holds_the_hall_before_anything_else() {
+    csp_npc::install(); // T1719
     let mut s = staged(1, 6.0);
     s.pass();
     let first = s.soldier_ids()[0].clone();
@@ -218,6 +221,7 @@ fn with_few_soldiers_holds_the_hall_before_anything_else() {
 
 #[test]
 fn in_a_city_with_no_wall_uses_the_hall_and_the_ground_around_it_not_other_buildings() {
+    csp_npc::install(); // T1719
     let mut s = staged(10, 40.0);
     s.remove_walls();
     s.pass();
@@ -246,6 +250,7 @@ fn in_a_city_with_no_wall_uses_the_hall_and_the_ground_around_it_not_other_build
 
 #[test]
 fn leaves_a_wall_still_going_up_with_no_gate_to_get_onto_it_from_alone() {
+    csp_npc::install(); // T1719
     let mut s = staged(10, 40.0);
     s.world.buildings.retain(|b| b.kind != BuildingKind::Gate);
     let walls: HashSet<(i32, i32)> = s.walls().into_iter().collect();
@@ -257,6 +262,7 @@ fn leaves_a_wall_still_going_up_with_no_gate_to_get_onto_it_from_alone() {
 
 #[test]
 fn adds_the_ground_around_the_hall_while_its_wall_has_too_few_tiles_for_them() {
+    csp_npc::install(); // T1719
     let mut s = staged(10, 40.0);
     s.remove_walls();
     let (hx, hy) = (s.hall().x, s.hall().y);
@@ -274,6 +280,7 @@ fn adds_the_ground_around_the_hall_while_its_wall_has_too_few_tiles_for_them() {
 
 #[test]
 fn moves_nobody_on_the_wall_when_another_stretch_of_it_goes_up() {
+    csp_npc::install(); // T1719
     let mut s = staged(10, 40.0);
     s.pass();
     s.arrive();
@@ -302,6 +309,7 @@ fn moves_nobody_on_the_wall_when_another_stretch_of_it_goes_up() {
 
 #[test]
 fn keeps_one_on_the_hall_when_those_on_it_are_called_away() {
+    csp_npc::install(); // T1719
     let mut s = staged(10, 40.0);
     s.pass();
     s.arrive();
@@ -336,6 +344,7 @@ fn keeps_one_on_the_hall_when_those_on_it_are_called_away() {
 
 #[test]
 fn turns_one_on_the_way_to_their_old_post_round_when_the_hall_needs_them() {
+    csp_npc::install(); // T1719
     let mut s = staged(10, 40.0);
     s.pass();
     // All still walking; the first two die, so the next two are for the hall.
@@ -350,6 +359,7 @@ fn turns_one_on_the_way_to_their_old_post_round_when_the_hall_needs_them() {
 
 #[test]
 fn takes_a_load_to_the_storage_before_going_to_a_post() {
+    csp_npc::install(); // T1719
     let mut s = staged(4, 40.0);
     s.remove_walls();
     let id = s.soldier_ids()[0].clone();
@@ -362,6 +372,7 @@ fn takes_a_load_to_the_storage_before_going_to_a_post() {
 
 #[test]
 fn does_not_send_a_soldier_on_a_post_back_to_the_storage_for_food() {
+    csp_npc::install(); // T1719
     let mut s = staged(4, 40.0);
     s.remove_walls();
     s.pass();
@@ -376,6 +387,7 @@ fn does_not_send_a_soldier_on_a_post_back_to_the_storage_for_food() {
 
 #[test]
 fn leaves_a_trade_org_city_to_its_own_rules() {
+    csp_npc::install(); // T1719
     let mut s = staged(4, 40.0);
     let city = s.world.cities.iter_mut().find(|c| c.id == s.city).unwrap();
     city.trade_org = Some(TradeOrgCity::Post);
@@ -393,6 +405,7 @@ fn leaves_a_trade_org_city_to_its_own_rules() {
 
 #[test]
 fn stands_none_while_its_hall_is_a_site_and_those_at_a_script_keep_it() {
+    csp_npc::install(); // T1719
     let mut s = staged(4, 40.0);
     let hall = s.hall.clone();
     let b = s.world.buildings.iter_mut().find(|b| b.id == hall).unwrap();
@@ -458,6 +471,7 @@ impl Running {
 
 #[test]
 fn an_alarm_takes_them_off_their_posts_to_the_hall_and_they_go_back() {
+    csp_npc::install(); // T1719
     let mut s = staged(10, 40.0);
     let mut running = Running::new(&s.terrain);
     let walls: Vec<Building> =
@@ -506,6 +520,7 @@ fn an_alarm_takes_them_off_their_posts_to_the_hall_and_they_go_back() {
 
 #[test]
 fn a_soldier_on_the_hall_blocks_an_occupation_without_any_alarm() {
+    csp_npc::install(); // T1719
     let mut s = staged(4, 40.0);
     s.remove_walls();
     let mut running = Running::new(&s.terrain);
@@ -523,6 +538,7 @@ fn a_soldier_on_the_hall_blocks_an_occupation_without_any_alarm() {
 
 #[test]
 fn those_on_posts_along_a_wall_stay_fed_from_the_storage() {
+    csp_npc::install(); // T1719
     let mut s = staged(6, 40.0);
     let mut running = Running::new(&s.terrain);
     let soldiers = s.soldier_ids();
@@ -543,6 +559,7 @@ fn those_on_posts_along_a_wall_stay_fed_from_the_storage() {
 
 #[test]
 fn holds_once_a_pass_has_sent_them() {
+    csp_npc::install(); // T1719
     let mut s = staged(10, 40.0);
     s.pass();
     s.world.tick += 1;
@@ -562,6 +579,7 @@ fn crowd_the_storage(s: &mut Staged) {
 
 #[test]
 fn catches_a_crowd_of_soldiers_on_the_storage_and_a_hall_nobody_goes_to() {
+    csp_npc::install(); // T1719
     let mut s = staged(10, 40.0);
     plan_city(&mut s.world, &s.city, None, None, None);
     s.world.tick += 1;
@@ -579,6 +597,7 @@ fn catches_a_crowd_of_soldiers_on_the_storage_and_a_hall_nobody_goes_to() {
 
 #[test]
 fn does_not_look_before_a_pass_is_over_or_between_passes() {
+    csp_npc::install(); // T1719
     let mut s = staged(10, 40.0);
     plan_city(&mut s.world, &s.city, None, None, None);
     assert_eq!(npc_soldiers_on_posts(&s.world, &s.terrain), vec![]);
@@ -589,6 +608,7 @@ fn does_not_look_before_a_pass_is_over_or_between_passes() {
 
 #[test]
 fn leaves_a_trade_org_city_out() {
+    csp_npc::install(); // T1719
     let mut s = staged(10, 40.0);
     plan_city(&mut s.world, &s.city, None, None, None);
     s.world.tick += 1;
@@ -601,6 +621,7 @@ fn leaves_a_trade_org_city_out() {
 
 #[test]
 fn those_on_wall_posts_get_up_onto_it_taking_the_time_and_stay_up() {
+    csp_npc::install(); // T1719
     let mut s = staged(10, 40.0);
     let mut running = Running::new(&s.terrain);
     let walls: HashSet<(i32, i32)> = s.walls().into_iter().collect();

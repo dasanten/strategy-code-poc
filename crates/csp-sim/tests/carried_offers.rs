@@ -717,6 +717,7 @@ mod the_caravans_of_a_carried_direct_offer {
 
 #[test]
 fn a_carried_offer_tells_its_place_by_its_delivery_storage() {
+    csp_npc::install(); // T1719
     let mut s = carried_setup();
     s.send("sender", json!({}));
     let offer = &s.world.offers[0];

@@ -34,6 +34,7 @@ fn setup() -> WorldState {
 
 #[test]
 fn a_ring_of_wall_shuts_in_its_inside() {
+    csp_npc::install(); // T1719
     let world = setup();
     let terrain = plains(512);
     let walls = wall_map(&world, &terrain);
@@ -47,6 +48,7 @@ fn a_ring_of_wall_shuts_in_its_inside() {
 
 #[test]
 fn the_walls_key_changes_with_a_gate_closing_and_foreign_walls_are_told_apart() {
+    csp_npc::install(); // T1719
     // Not in the TypeScript tests: `wallsKey` and `foreignWall` on the same ring.
     let mut world = setup();
     let before = walls_key(&world);
@@ -69,6 +71,7 @@ fn the_walls_key_changes_with_a_gate_closing_and_foreign_walls_are_told_apart() 
 /// `wallMap` (T122.8): a tower is wall on every tile of its footprint (`CONTEXT.md`: Tower).
 #[test]
 fn a_tower_is_wall_on_every_tile_of_its_footprint() {
+    csp_npc::install(); // T1719
     let mut world = empty_world(&plains(16));
     world.buildings.push(building("t", BuildingKind::Tower, 4.0, 4.0));
     let walls = wall_map(&world, &plains(16));

@@ -91,6 +91,7 @@ fn run_until_done(world: &mut WorldState, t: &TerrainMap, id: &str, max_days: f6
 
 #[test]
 fn gathers_between_a_poor_nodes_pace_and_a_normal_ones() {
+    csp_npc::install(); // T1719
     for good in ["wood", "stone", "food"] {
         let per_day = GATHER_PER_DAY.get(good).unwrap();
         let node = WORK_OUTPUT_PER_DAY.get(good).unwrap();
@@ -100,6 +101,7 @@ fn gathers_between_a_poor_nodes_pace_and_a_normal_ones() {
 
 #[test]
 fn fills_the_hands_at_the_pace_strength_skill_and_tools_give() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     assert_eq!(order(&mut world, &mut orders, &me(), gather("g1", "wood"), &t), Ok(()));
     let plain = GATHER_PER_DAY.get("wood").unwrap() / TICKS_PER_GAME_DAY;
@@ -125,6 +127,7 @@ fn fills_the_hands_at_the_pace_strength_skill_and_tools_give() {
 
 #[test]
 fn takes_a_patch_into_the_hands_until_it_is_picked_over() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     assert_eq!(order(&mut world, &mut orders, &me(), gather("g1", "wood"), &t), Ok(()));
     let days = PATCH_SIZE / GATHER_PER_DAY.get("wood").unwrap();
@@ -143,6 +146,7 @@ fn takes_a_patch_into_the_hands_until_it_is_picked_over() {
 
 #[test]
 fn a_picked_over_patch_grows_back_and_leaves_the_list() {
+    csp_npc::install(); // T1719
     let (mut world, t, _) = setup();
     world.patches.push(Patch { x: FOREST.0, y: FOREST.1, left: 0.0, at: world.tick });
     assert!(picked_over(&world, FOREST.0, FOREST.1));
@@ -159,6 +163,7 @@ fn a_picked_over_patch_grows_back_and_leaves_the_list() {
 
 #[test]
 fn food_and_wood_use_up_the_same_forest_patch() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     world.patches.push(Patch { x: FOREST.0, y: FOREST.1, left: 2.0, at: 0 });
     assert_eq!(order(&mut world, &mut orders, &me(), gather("g1", "food"), &t), Ok(()));
@@ -170,6 +175,7 @@ fn food_and_wood_use_up_the_same_forest_patch() {
 
 #[test]
 fn stops_once_the_hands_are_full() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     at(&mut world, "g1").carried.insert(Good::Stone, 28.0);
     assert_eq!(order(&mut world, &mut orders, &me(), gather("g1", "wood"), &t), Ok(()));
@@ -182,6 +188,7 @@ fn stops_once_the_hands_are_full() {
 
 #[test]
 fn stone_comes_from_hills_and_ore_is_never_gathered() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     let answer = orders.receive(&world, &me(), gather("g1", "stone"), &t);
     assert_eq!(answer, Err("gather that in hills".into()));
@@ -202,6 +209,7 @@ fn stone_comes_from_hills_and_ore_is_never_gathered() {
 
 #[test]
 fn a_child_cant_gather() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     at(&mut world, "g1").born_at = world.tick as f64 - 10.0;
     let answer = orders.receive(&world, &me(), gather("g1", "wood"), &t);
@@ -210,6 +218,7 @@ fn a_child_cant_gather() {
 
 #[test]
 fn nothing_is_gathered_under_a_building_a_site_or_a_node() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     world.nodes.push(ResourceNode::new(
         "n1",
@@ -236,6 +245,7 @@ fn nothing_is_gathered_under_a_building_a_site_or_a_node() {
 
 #[test]
 fn a_gatherer_who_walks_off_stops() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     assert_eq!(order(&mut world, &mut orders, &me(), gather("g1", "wood"), &t), Ok(()));
     at(&mut world, "g1").x = 4.0;
@@ -245,6 +255,7 @@ fn a_gatherer_who_walks_off_stops() {
 
 #[test]
 fn the_patch_invariant_catches_a_bad_patch() {
+    csp_npc::install(); // T1719
     let (mut world, t, _) = setup();
     world.patches.push(Patch { x: FOREST.0, y: FOREST.1, left: 3.0, at: 0 });
     assert_eq!(patch_problems(&world, &t), []);
@@ -257,6 +268,7 @@ fn the_patch_invariant_catches_a_bad_patch() {
 
 #[test]
 fn a_player_sees_the_patches_in_sight_that_arent_full_and_none_out_of_it() {
+    csp_npc::install(); // T1719
     use csp_shared::protocol::SeenEntity;
     use csp_sim::sight::{entities_in_sight, sent_out_of_sight};
     use csp_sim::world_index::WorldIndex;

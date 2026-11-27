@@ -42,6 +42,7 @@ fn food(n: f64) -> Stock {
 
 #[test]
 fn a_ruined_wall_or_gate_tile_lets_anyone_through() {
+    csp_npc::install(); // T1719
     let terrain = plains(SIZE);
     let mut world = empty_world(&terrain);
     add_city(&mut world, "c1", None, 10.0, 10.0);
@@ -66,6 +67,7 @@ fn a_ruined_wall_or_gate_tile_lets_anyone_through() {
 
 #[test]
 fn a_ruined_workplace_makes_nothing() {
+    csp_npc::install(); // T1719
     let terrain = plains(SIZE);
     let mut world = empty_world(&terrain);
     world.buildings.push(building("f1", BuildingKind::Farm, 3.0, 3.0));
@@ -127,6 +129,7 @@ fn stored(world: &WorldState) -> f64 {
 
 #[test]
 fn anyone_takes_from_a_ruined_storage_unguarded_and_it_is_theft_from_another_organization() {
+    csp_npc::install(); // T1719
     let mut world = at_ruined_storage();
     // An outpost storage, armed w1 of its realm beside it: a standing one would be guarded.
     resolve_carrying(&mut world, &[carry(CarryKind::Take, "b1", 3.0)], SIZE);
@@ -142,6 +145,7 @@ fn anyone_takes_from_a_ruined_storage_unguarded_and_it_is_theft_from_another_org
 
 #[test]
 fn a_ruined_storage_takes_nothing_in() {
+    csp_npc::install(); // T1719
     let mut world = at_ruined_storage();
     resolve_carrying(&mut world, &[carry(CarryKind::Put, "b1", 2.0)], SIZE);
     assert_eq!(stored(&world), 9.0);
@@ -169,6 +173,7 @@ fn ruined_house_game(wood: f64) -> Game {
 
 #[test]
 fn the_repair_task_rebuilds_a_ruin_with_the_rebuilds_wood() {
+    csp_npc::install(); // T1719
     let mut g = ruined_house_game(30.0);
     let reply = g.give_to("w1", json!({ "kind": "task", "task": "repair", "buildingId": "h1" }));
     assert!(acked(&reply), "{reply:?}");
@@ -185,6 +190,7 @@ fn the_repair_task_rebuilds_a_ruin_with_the_rebuilds_wood() {
 
 #[test]
 fn a_store_order_to_a_ruined_storage_is_refused() {
+    csp_npc::install(); // T1719
     let mut g = ruined_house_game(30.0);
     let s = b_mut(&mut g.world, "s1");
     ruin(s);

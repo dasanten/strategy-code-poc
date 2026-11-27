@@ -210,6 +210,7 @@ mod world_index;
 /// Cargo no longer finds test files on its own: one missing here would never run.
 #[test]
 fn every_test_file_is_listed() {
+    csp_npc::install(); // T1719
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
     let listed = include_str!("all.rs");
     let mut missing: Vec<String> = std::fs::read_dir(dir)

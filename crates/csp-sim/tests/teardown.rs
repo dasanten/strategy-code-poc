@@ -79,6 +79,7 @@ fn all_goods(world: &WorldState) -> Stock {
 
 #[test]
 fn works_at_the_building_until_it_is_gone_leaving_part_of_its_materials_on_the_tile() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     assert_eq!(orders.receive(&world, &me(), mine(), &terrain), Ok(()));
     orders.apply_all(&mut world, &terrain);
@@ -110,6 +111,7 @@ fn works_at_the_building_until_it_is_gone_leaving_part_of_its_materials_on_the_t
 
 #[test]
 fn frees_the_tile_so_it_can_be_built_on_again() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     order(&mut world, &mut orders, &me(), mine(), &terrain).unwrap();
     world.buildings[0].teardown = Some(teardown_work(&world.buildings[0]) - 0.1);
@@ -124,6 +126,7 @@ fn frees_the_tile_so_it_can_be_built_on_again() {
 
 #[test]
 fn tears_down_an_unfinished_site_with_less_work_leaving_all_its_delivered_materials() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     let mut s = building("b1", BuildingKind::Mine, 7.0, 7.0);
     s.site = Some(ConstructionSite {
@@ -157,6 +160,7 @@ fn tears_down_an_unfinished_site_with_less_work_leaving_all_its_delivered_materi
 
 #[test]
 fn takes_down_a_site_no_one_has_worked_on_yet_at_once() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     world.buildings = vec![site("b1", BuildingKind::Mine, 7.0, 7.0)];
     order(&mut world, &mut orders, &me(), mine(), &terrain).unwrap();
@@ -166,6 +170,7 @@ fn takes_down_a_site_no_one_has_worked_on_yet_at_once() {
 
 #[test]
 fn lets_two_residents_tear_down_together_faster_than_one() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     resident(&mut world, "w2", 7.0, 7.0);
     orders.receive(&world, &me(), tear_down_order("b1", "w1"), &terrain).unwrap();
@@ -177,6 +182,7 @@ fn lets_two_residents_tear_down_together_faster_than_one() {
 
 #[test]
 fn stops_when_the_resident_leaves_the_tile_the_work_done_stays_for_anyone_to_go_on() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     order(&mut world, &mut orders, &me(), mine(), &terrain).unwrap();
     let done = world.buildings[0].teardown.unwrap();
@@ -188,6 +194,7 @@ fn stops_when_the_resident_leaves_the_tile_the_work_done_stays_for_anyone_to_go_
 
 #[test]
 fn tears_down_other_organizations_buildings_too() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     world.realms.push(realm("r2", 8, "w9"));
     let o = resident(&mut world, "w9", 7.0, 7.0);
@@ -197,6 +204,7 @@ fn tears_down_other_organizations_buildings_too() {
 
 #[test]
 fn rejects_what_cannot_be_torn_down() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     let reject = |world: &WorldState, orders: &mut Orders, o: Value, sender: &OrderSender| {
         orders.receive(world, sender, o, &terrain).err().unwrap_or_else(|| "ack".into())
@@ -227,6 +235,7 @@ fn rejects_what_cannot_be_torn_down() {
 
 #[test]
 fn ends_the_order_if_the_building_is_gone_before_work_starts() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     orders.receive(&world, &me(), mine(), &terrain).unwrap();
     orders.apply_all(&mut world, &terrain);
@@ -237,6 +246,7 @@ fn ends_the_order_if_the_building_is_gone_before_work_starts() {
 
 #[test]
 fn tear_down_returns_never_leave_more_than_was_built_in() {
+    csp_npc::install(); // T1719
     for &kind in BUILDABLE {
         let built = build_materials(kind);
         let back = teardown_returns(&building("b", kind, 0.0, 0.0));

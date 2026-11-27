@@ -90,6 +90,7 @@ fn haven_stock(world: &WorldState, good: Good) -> f64 {
 
 #[test]
 fn a_ship_touching_a_havens_footprint_is_docked_there_and_nowhere_else() {
+    csp_npc::install(); // T1719
     let mut world = setup();
     assert_eq!(docked_at(&world, s1(&world)).map(|h| h.id.as_str()), Some("h1"));
     // Out at sea, two tiles off the haven.
@@ -105,6 +106,7 @@ fn a_ship_touching_a_havens_footprint_is_docked_there_and_nowhere_else() {
 
 #[test]
 fn residents_board_a_docked_ship_from_any_tile_of_its_haven() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     // (17, 5) touches no water, but it is the haven's.
@@ -119,6 +121,7 @@ fn residents_board_a_docked_ship_from_any_tile_of_its_haven() {
 
 #[test]
 fn nothing_boards_an_undocked_ship_nor_from_off_its_haven() {
+    csp_npc::install(); // T1719
     let mut world = setup();
     // Off the haven, though the tile touches the ship's water.
     world.residents[0].y = 8.0;
@@ -137,6 +140,7 @@ fn nothing_boards_an_undocked_ship_nor_from_off_its_haven() {
 
 #[test]
 fn crew_are_no_passengers_and_weigh_nothing_against_the_load() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     assert_eq!(crew_short(&world, s1(&world)), SHIP_MIN_CREW as usize);
@@ -158,6 +162,7 @@ fn crew_are_no_passengers_and_weigh_nothing_against_the_load() {
 
 #[test]
 fn only_grown_residents_crew_and_only_a_ship() {
+    csp_npc::install(); // T1719
     let mut world = setup();
     assert_eq!(board(&mut world, "w5", true), Err("children can’t crew a ship".into()));
     // A child boards as a passenger all the same.
@@ -177,6 +182,7 @@ fn only_grown_residents_crew_and_only_a_ship() {
 
 #[test]
 fn getting_off_lands_on_the_haven_and_ends_being_crew() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     assert_eq!(board(&mut world, "w1", true), Ok(()));
@@ -208,6 +214,7 @@ fn getting_off_lands_on_the_haven_and_ends_being_crew() {
 
 #[test]
 fn those_at_the_haven_move_goods_straight_between_its_storage_and_the_ship() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     let load = |goods: Value, unload: bool| {
@@ -237,6 +244,7 @@ fn those_at_the_haven_move_goods_straight_between_its_storage_and_the_ship() {
 
 #[test]
 fn loading_stops_at_what_the_ship_holds_and_the_rest_stays_in_the_haven() {
+    csp_npc::install(); // T1719
     let mut world = setup();
     let iron = (SHIP_CAPACITY / csp_shared::balance::GOOD_WEIGHT.get("ironOre").unwrap()).floor();
     world.buildings[1].stock = Some([(Good::IronOre, iron + 30.0)].into_iter().collect());
@@ -250,6 +258,7 @@ fn loading_stops_at_what_the_ship_holds_and_the_rest_stays_in_the_haven() {
 
 #[test]
 fn nobody_loads_an_undocked_ship_nor_from_off_its_haven() {
+    csp_npc::install(); // T1719
     let mut world = setup();
     let o = || {
         json!({ "kind": "load", "residentId": "w1", "vesselId": "s1",
@@ -271,6 +280,7 @@ fn nobody_loads_an_undocked_ship_nor_from_off_its_haven() {
 
 #[test]
 fn docked_its_load_is_also_handled_by_hand_from_the_haven() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     world.residents[0].carried.insert(Good::Stone, 5.0);
@@ -283,6 +293,7 @@ fn docked_its_load_is_also_handled_by_hand_from_the_haven() {
 
 #[test]
 fn loading_from_another_citys_haven_is_judged_as_taking_from_its_storage() {
+    csp_npc::install(); // T1719
     let mut world = setup();
     add_city(&mut world, "c2", Some("r2"), 2.0, 20.0);
     world.buildings[1].city_id = Some("c2".into());
@@ -295,6 +306,7 @@ fn loading_from_another_citys_haven_is_judged_as_taking_from_its_storage() {
 
 #[test]
 fn a_store_to_a_docked_ship_walks_onto_its_haven() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     world.residents[0].x = 12.0;

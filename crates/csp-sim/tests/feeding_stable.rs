@@ -103,6 +103,7 @@ fn give(g: &mut Game, stable_id: &str) -> csp_sim::orders::OrderReply {
 
 #[test]
 fn fetches_what_is_missing_from_the_nearest_storage_with_food_and_stores_it_in_the_stable() {
+    csp_npc::install(); // T1719
     let mut g = setup(3.0);
     assert_eq!(give(&mut g, "s1"), ack());
     assert_eq!(memory(&g), json!({ "stableId": "s1" }));
@@ -120,6 +121,7 @@ fn fetches_what_is_missing_from_the_nearest_storage_with_food_and_stores_it_in_t
 
 #[test]
 fn keeps_it_at_the_amount_while_the_source_has_food_and_waits_in_the_stable() {
+    csp_npc::install(); // T1719
     let mut g = setup(KEEP + 1.0);
     give(&mut g, "s1");
     run(&mut g, 5, |_| {});
@@ -145,6 +147,7 @@ fn keeps_it_at_the_amount_while_the_source_has_food_and_waits_in_the_stable() {
 
 #[test]
 fn fetches_from_the_storage_picked_as_source_and_feeds_the_stable_picked_as_stable() {
+    csp_npc::install(); // T1719
     let mut g = setup(0.0);
     g.world.buildings.push(from(
         json!({ "id": "s2", "kind": "stable", "cityId": "c1", "x": 6, "y": 14, "stock": {} }),
@@ -167,6 +170,7 @@ fn fetches_from_the_storage_picked_as_source_and_feeds_the_stable_picked_as_stab
 
 #[test]
 fn waits_in_the_stable_while_no_storage_of_the_realm_has_food() {
+    csp_npc::install(); // T1719
     let mut g = setup(0.0);
     for b in &mut g.world.buildings {
         if b.kind == csp_shared::world::BuildingKind::Storage {
@@ -186,6 +190,7 @@ fn waits_in_the_stable_while_no_storage_of_the_realm_has_food() {
 
 #[test]
 fn is_turned_down_outside_the_stable_and_for_a_child() {
+    csp_npc::install(); // T1719
     let mut g = setup(0.0);
     w1_mut(&mut g).x = 4.0;
     assert_eq!(reason(&give(&mut g, "s1")).as_deref(), Some("not standing in that stable"));
@@ -226,6 +231,7 @@ fn run_until_ended(g: &mut Game, ticks: usize) -> usize {
 
 #[test]
 fn once_fills_a_stable_that_is_short_and_ends() {
+    csp_npc::install(); // T1719
     let mut g = setup(3.0);
     assert_eq!(give_once(&mut g), ack());
     run_until_ended(&mut g, 300);
@@ -236,6 +242,7 @@ fn once_fills_a_stable_that_is_short_and_ends() {
 
 #[test]
 fn once_ends_at_once_with_a_full_stable() {
+    csp_npc::install(); // T1719
     let mut g = setup(KEEP + 1.0);
     give_once(&mut g);
     assert!(run_until_ended(&mut g, 3) <= 2);
@@ -245,6 +252,7 @@ fn once_ends_at_once_with_a_full_stable() {
 
 #[test]
 fn once_ends_with_a_reason_when_no_food_is_in_reach() {
+    csp_npc::install(); // T1719
     let mut g = setup(0.0);
     for b in &mut g.world.buildings {
         if b.kind == csp_shared::world::BuildingKind::Storage {
@@ -258,6 +266,7 @@ fn once_ends_with_a_reason_when_no_food_is_in_reach() {
 
 #[test]
 fn without_once_it_keeps_running_once_the_stable_is_full() {
+    csp_npc::install(); // T1719
     let mut g = setup(3.0);
     give(&mut g, "s1");
     run(&mut g, 300, |_| {});
@@ -268,6 +277,7 @@ fn without_once_it_keeps_running_once_the_stable_is_full() {
 
 #[test]
 fn once_is_not_kept_for_the_next_start_of_the_task() {
+    csp_npc::install(); // T1719
     let mut g = setup(KEEP + 1.0);
     give_once(&mut g);
     run_until_ended(&mut g, 3);
@@ -286,6 +296,7 @@ impl csp_sim::queues::QueueHost for QueueSenders {
 
 #[test]
 fn as_a_queue_step_it_ends_and_the_queue_goes_on() {
+    csp_npc::install(); // T1719
     let mut g = setup(3.0);
     let terrain = std::sync::Arc::new(g.terrain.clone());
     let mut queues = csp_sim::queues::QueueRunner::new(

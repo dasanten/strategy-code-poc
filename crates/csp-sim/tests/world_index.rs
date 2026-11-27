@@ -99,6 +99,7 @@ fn busy_world(file: &str, seed: f64) -> (WorldState, i32) {
 
 #[test]
 fn agrees_with_the_scans_it_replaces_on_the_fixture_worlds() {
+    csp_npc::install(); // T1719
     for (seed, file) in WORLDS.into_iter().enumerate() {
         let (world, size) = busy_world(file, seed as f64 + 1.0);
         let index = WorldIndex::new(&world, size);
@@ -147,6 +148,7 @@ fn agrees_with_the_scans_it_replaces_on_the_fixture_worlds() {
 
 #[test]
 fn is_the_same_index_while_nothing_it_reads_has_changed() {
+    csp_npc::install(); // T1719
     let (mut world, size) = busy_world(WORLDS[0], 4.0);
     let mut slot = None;
     world_index(&mut slot, &world, size);
@@ -159,6 +161,7 @@ fn is_the_same_index_while_nothing_it_reads_has_changed() {
 
 #[test]
 fn is_built_again_after_a_push_and_after_a_filter() {
+    csp_npc::install(); // T1719
     let (mut world, size) = busy_world(WORLDS[0], 5.0);
     let mut slot = None;
     let added = new_resident(&world, "newcomer", "realmX", 1.0, 1.0);
@@ -182,6 +185,7 @@ fn is_built_again_after_a_push_and_after_a_filter() {
 
 #[test]
 fn follows_who_commands_a_resident_as_armies_and_contracts_change() {
+    csp_npc::install(); // T1719
     let (mut world, size) = busy_world(WORLDS[0], 6.0);
     let mut slot = None;
     let r = new_resident(&world, "loner", "realm0", 1.0, 1.0);
@@ -245,6 +249,7 @@ fn lookups_agree_with_scans(world: &WorldState, size: i32, step: usize) {
 
 #[test]
 fn building_lookups_agree_with_the_scans_on_the_fixture_worlds() {
+    csp_npc::install(); // T1719
     for file in WORLDS {
         let (world, size) = busy_world(file, 11.0);
         assert!(world.buildings.iter().any(|b| b.city_id.is_some()), "{file}");
@@ -254,6 +259,7 @@ fn building_lookups_agree_with_the_scans_on_the_fixture_worlds() {
 
 #[test]
 fn building_lookups_follow_buildings_added_removed_and_changing_city() {
+    csp_npc::install(); // T1719
     use csp_sim::world_index::forget_building_lookups;
     let (mut world, size) = busy_world(WORLDS[1], 12.0);
     lookups_agree_with_scans(&world, size, 5);

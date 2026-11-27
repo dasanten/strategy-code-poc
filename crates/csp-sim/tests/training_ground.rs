@@ -91,6 +91,7 @@ fn ground() -> Building {
 
 #[test]
 fn is_a_3x3_building_anyone_can_build_off_nodes_and_mountain_from_wood_and_stone() {
+    csp_npc::install(); // T1719
     assert_eq!(FOOTPRINT.get("trainingGround"), Some(3));
     assert!(BUILDABLE.contains(&BuildingKind::TrainingGround));
     assert!(OFF_NODES.contains(&BuildingKind::TrainingGround));
@@ -104,6 +105,7 @@ fn is_a_3x3_building_anyone_can_build_off_nodes_and_mountain_from_wood_and_stone
 
 #[test]
 fn is_no_workplace_no_workers_no_recipe_and_nobody_can_work_it() {
+    csp_npc::install(); // T1719
     assert_eq!(WORKPLACE_MAX_WORKERS.get("trainingGround"), None);
     assert!(RECIPES.get("trainingGround").is_none());
     let mut s = setup(3.0, 3.0);
@@ -116,6 +118,7 @@ fn is_no_workplace_no_workers_no_recipe_and_nobody_can_work_it() {
 
 #[test]
 fn is_laid_out_built_from_its_delivered_materials_and_finished_like_any_building_of_no_city() {
+    csp_npc::install(); // T1719
     let mut s = setup(3.0, 3.0);
     assert_eq!(s.order(build()), "ack");
     s.run();
@@ -154,6 +157,7 @@ fn is_laid_out_built_from_its_delivered_materials_and_finished_like_any_building
 
 #[test]
 fn refuses_mountain_under_any_tile_of_its_footprint() {
+    csp_npc::install(); // T1719
     // From (10, 10) the footprint reaches (12, 12), the Mountain; from (9, 9) it stops short.
     let mut s = setup(10.0, 10.0);
     assert_eq!(
@@ -167,6 +171,7 @@ fn refuses_mountain_under_any_tile_of_its_footprint() {
 
 #[test]
 fn is_torn_down_like_any_building_leaving_part_of_its_materials_on_the_tile() {
+    csp_npc::install(); // T1719
     let mut s = setup(3.0, 3.0);
     s.world.buildings.push(ground());
     assert_eq!(

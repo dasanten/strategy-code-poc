@@ -187,6 +187,7 @@ fn close(got: f64, want: f64) {
 
 #[test]
 fn wakes_a_down_horse_at_low_health_with_something_in_its_hunger_meter() {
+    csp_npc::install(); // T1719
     let mut s = setup(no_library());
     let world = s.world.clone();
     lay(&world, s.rowan());
@@ -202,6 +203,7 @@ fn wakes_a_down_horse_at_low_health_with_something_in_its_hunger_meter() {
 
 #[test]
 fn eats_a_hungry_horse_full_and_leaves_the_rest_with_the_feeder() {
+    csp_npc::install(); // T1719
     let mut s = setup(no_library());
     s.rowan().hunger = 10.0;
     s.give(feed_rowan(50.0));
@@ -214,6 +216,7 @@ fn eats_a_hungry_horse_full_and_leaves_the_rest_with_the_feeder() {
 
 #[test]
 fn wastes_no_food_a_horse_with_room_for_just_a_whole_unit_eats_it_with_less_it_is_full() {
+    csp_npc::install(); // T1719
     let mut s = setup(no_library());
     s.rowan().hunger = MAX_HUNGER - HORSE_FILL_PER_FOOD;
     s.give(feed_rowan(3.0));
@@ -228,6 +231,7 @@ fn wastes_no_food_a_horse_with_room_for_just_a_whole_unit_eats_it_with_less_it_i
 
 #[test]
 fn eats_only_the_units_asked_for() {
+    csp_npc::install(); // T1719
     let mut s = setup(no_library());
     s.rowan().hunger = 0.0;
     s.give(feed_rowan(1.0));
@@ -238,6 +242,7 @@ fn eats_only_the_units_asked_for() {
 
 #[test]
 fn eats_no_more_than_the_food_in_their_hands() {
+    csp_npc::install(); // T1719
     let mut s = setup(no_library());
     s.rowan().hunger = 0.0;
     s.ben().carried = serde_json::from_value(json!({ "food": 1, "stone": 2 })).unwrap();
@@ -248,6 +253,7 @@ fn eats_no_more_than_the_food_in_their_hands() {
 
 #[test]
 fn refuses_a_full_horse_from_too_far_a_child_or_without_food() {
+    csp_npc::install(); // T1719
     let mut s = setup(no_library());
     s.rowan().hunger = MAX_HUNGER;
     rejected(s.give(feed_rowan(3.0)), "that horse is full");
@@ -264,6 +270,7 @@ fn refuses_a_full_horse_from_too_far_a_child_or_without_food() {
 
 #[test]
 fn does_nothing_once_the_food_is_gone_or_another_filled_the_horse_first() {
+    csp_npc::install(); // T1719
     let mut s = setup(no_library());
     s.rowan().hunger = 10.0;
     s.give(feed_rowan(3.0));
@@ -289,6 +296,7 @@ fn does_nothing_once_the_food_is_gone_or_another_filled_the_horse_first() {
 
 #[test]
 fn can_feed_another_realms_horse_and_that_is_no_crime() {
+    csp_npc::install(); // T1719
     let mut s = setup(no_library());
     let world = s.world.clone();
     lay(&world, s.star());
@@ -304,6 +312,7 @@ fn can_feed_another_realms_horse_and_that_is_no_crime() {
 
 #[test]
 fn can_be_a_queue_step() {
+    csp_npc::install(); // T1719
     let mut s = setup(no_library());
     s.ben().x = 14.0;
     let world = s.world.clone();
@@ -325,6 +334,7 @@ fn can_be_a_queue_step() {
 
 #[test]
 fn is_the_script_action_feed_target_id_units() {
+    csp_npc::install(); // T1719
     let feeder = RunnableScript {
         user_id: 7,
         name: "Feeder".into(),

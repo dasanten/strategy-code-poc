@@ -127,6 +127,7 @@ fn relocating_to(g: &Game, city: &str) -> bool {
 
 #[test]
 fn moves_the_resident_in_and_once_it_waited_reads_that_it_ended_well() {
+    csp_npc::install(); // T1719
     let mut s = setup(false, RELOCATE_AND_READ);
     assert!(acked(&s.give(json!({ "kind": "runScript", "scriptId": SCRIPT_ID }))));
     s.step();
@@ -149,6 +150,7 @@ fn moves_the_resident_in_and_once_it_waited_reads_that_it_ended_well() {
 
 #[test]
 fn reads_why_not_when_the_city_filled_up_on_the_way_and_keeps_the_old_city() {
+    csp_npc::install(); // T1719
     let mut s = setup(false, RELOCATE_AND_READ);
     s.give(json!({ "kind": "runScript", "scriptId": SCRIPT_ID }));
     s.step();
@@ -171,6 +173,7 @@ fn reads_why_not_when_the_city_filled_up_on_the_way_and_keeps_the_old_city() {
 
 #[test]
 fn is_refused_with_the_orders_reasons() {
+    csp_npc::install(); // T1719
     let mut full = setup(true, RELOCATE_AND_READ);
     full.give(json!({ "kind": "runScript", "scriptId": SCRIPT_ID }));
     full.step();
@@ -192,6 +195,7 @@ fn is_refused_with_the_orders_reasons() {
 
 #[test]
 fn moves_the_resident_in_then_the_next_step_starts() {
+    csp_npc::install(); // T1719
     let mut s = setup(false, "");
     assert!(acked(
         &s.give(json!({ "kind": "queue", "steps": [relocate_step("c2"), walk(44, 10)] }))
@@ -214,6 +218,7 @@ fn moves_the_resident_in_then_the_next_step_starts() {
 
 #[test]
 fn is_skipped_for_lack_of_housing_when_its_turn_comes_and_noted_in_the_realm_log() {
+    csp_npc::install(); // T1719
     let mut s = setup(true, "");
     // Adding it only checks that the city is the realm's.
     assert!(acked(
@@ -235,6 +240,7 @@ fn is_skipped_for_lack_of_housing_when_its_turn_comes_and_noted_in_the_realm_log
 
 #[test]
 fn that_fails_on_arrival_goes_in_the_realm_log_once_and_the_next_step_starts() {
+    csp_npc::install(); // T1719
     let mut s = setup(false, "");
     s.give(json!({ "kind": "queue", "steps": [relocate_step("c2"), walk(44, 10)] }));
     s.step();
@@ -247,6 +253,7 @@ fn that_fails_on_arrival_goes_in_the_realm_log_once_and_the_next_step_starts() {
 
 #[test]
 fn can_only_be_added_for_a_city_of_the_realm() {
+    csp_npc::install(); // T1719
     let mut s = setup(false, "");
     let steps = json!([walk(9, 10), relocate_step("c3")]);
     assert_eq!(

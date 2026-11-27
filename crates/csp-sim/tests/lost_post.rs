@@ -214,6 +214,7 @@ fn sorted(mut v: Vec<String>) -> Vec<String> {
 
 #[test]
 fn is_a_crime_nobody_knows_of_and_nothing_reacts_until_the_news_comes() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let post = f.posts[0].clone();
     let leader = f.leader.clone();
@@ -243,6 +244,7 @@ fn is_a_crime_nobody_knows_of_and_nothing_reacts_until_the_news_comes() {
 
 #[test]
 fn has_none_of_its_own_residents_for_witnesses_they_joined_the_captor() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let post = f.posts[0].clone();
     let own: Vec<String> = f
@@ -263,6 +265,7 @@ fn has_none_of_its_own_residents_for_witnesses_they_joined_the_captor() {
 
 #[test]
 fn is_no_such_crime_for_any_other_city() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (hq, leader) = (f.hq.clone(), f.leader.clone());
     f.capture(&hq, &leader);
@@ -273,6 +276,7 @@ fn is_no_such_crime_for_any_other_city() {
 
 #[test]
 fn drops_it_from_its_loop_goes_on_and_only_the_news_it_brings_causes_the_reaction() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, other, trader, leader) =
         (f.posts[0].clone(), f.posts[1].clone(), f.traders[0].clone(), f.leader.clone());
@@ -314,6 +318,7 @@ fn drops_it_from_its_loop_goes_on_and_only_the_news_it_brings_causes_the_reactio
 
 #[test]
 fn tells_the_hq_just_the_same() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, other, trader, leader, hq) = (
         f.posts[0].clone(),
@@ -334,6 +339,7 @@ fn tells_the_hq_just_the_same() {
 
 #[test]
 fn remembers_it_from_when_the_news_came_however_long_the_post_stood_lost() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, other, trader, leader) =
         (f.posts[0].clone(), f.posts[1].clone(), f.traders[0].clone(), f.leader.clone());
@@ -359,6 +365,7 @@ fn remembers_it_from_when_the_news_came_however_long_the_post_stood_lost() {
 #[test]
 #[ignore = "6.6 s alone; see #1132"]
 fn drives_up_to_it_and_finds_out_running_the_whole_world_and_the_news_comes_in_by_the_next_post() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, trader, leader) = (f.posts[0].clone(), f.traders[0].clone(), f.leader.clone());
     f.capture(&post, &leader);
@@ -381,6 +388,7 @@ fn drives_up_to_it_and_finds_out_running_the_whole_world_and_the_news_comes_in_b
 
 #[test]
 fn finds_out_at_closed_gates_too_without_getting_in() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, trader, leader) = (f.posts[0].clone(), f.traders[0].clone(), f.leader.clone());
     f.capture(&post, &leader);
@@ -400,6 +408,7 @@ fn finds_out_at_closed_gates_too_without_getting_in() {
 
 #[test]
 fn gives_up_a_stop_there_and_leaves_the_city_out_of_its_calls_so_the_news_goes_straight_on() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, trader, leader) = (f.posts[0].clone(), f.traders[0].clone(), f.leader.clone());
     f.capture(&post, &leader);
@@ -431,6 +440,7 @@ fn gives_up_a_stop_there_and_leaves_the_city_out_of_its_calls_so_the_news_goes_s
 
 #[test]
 fn goes_on_driving_to_a_stop_at_another_city() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, trader, leader) = (f.posts[0].clone(), f.traders[0].clone(), f.leader.clone());
     f.capture(&post, &leader);
@@ -455,6 +465,7 @@ fn goes_on_driving_to_a_stop_at_another_city() {
 
 #[test]
 fn with_no_crew_by_the_carriage_has_seen_nothing_yet() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, trader, leader) = (f.posts[0].clone(), f.traders[0].clone(), f.leader.clone());
     f.capture(&post, &leader);
@@ -473,6 +484,7 @@ fn with_no_crew_by_the_carriage_has_seen_nothing_yet() {
 
 #[test]
 fn brings_no_news_and_the_next_trader_that_gets_there_still_can() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, other, leader) = (f.posts[0].clone(), f.posts[1].clone(), f.leader.clone());
     let (first, second) = (f.traders[0].clone(), f.traders[1].clone());
@@ -499,6 +511,7 @@ fn brings_no_news_and_the_next_trader_that_gets_there_still_can() {
 
 #[test]
 fn and_with_no_trader_left_to_find_out_it_never_reacts() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, trader, leader) = (f.posts[0].clone(), f.traders[0].clone(), f.leader.clone());
     f.world.traders.retain(|t| t.id == trader);
@@ -537,6 +550,7 @@ fn bystander(f: &mut Fixture, post: &str) -> String {
 
 #[test]
 fn who_gets_away_brings_the_news_to_the_hq() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, leader, hq) = (f.posts[0].clone(), f.leader.clone(), f.hq.clone());
     let witness = bystander(&mut f, &post);
@@ -554,6 +568,7 @@ fn who_gets_away_brings_the_news_to_the_hq() {
 
 #[test]
 fn who_gets_to_another_post_brings_it_there_one_of_that_posts_own_as_well() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, other, leader) = (f.posts[0].clone(), f.posts[1].clone(), f.leader.clone());
     let (hx, hy) = f.hall(&post);
@@ -580,6 +595,7 @@ fn who_gets_to_another_post_brings_it_there_one_of_that_posts_own_as_well() {
 
 #[test]
 fn who_is_killed_first_brings_nothing() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, leader) = (f.posts[0].clone(), f.leader.clone());
     let witness = bystander(&mut f, &post);
@@ -592,6 +608,7 @@ fn who_is_killed_first_brings_nothing() {
 
 #[test]
 fn who_joins_the_culprit_with_the_fall_of_the_hq_takes_the_news_with_them() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, leader, hq) = (f.posts[0].clone(), f.leader.clone(), f.hq.clone());
     let witness = bystander(&mut f, &post);
@@ -608,6 +625,7 @@ fn who_joins_the_culprit_with_the_fall_of_the_hq_takes_the_news_with_them() {
 
 #[test]
 fn allow_it_on_a_loop_but_not_a_city_that_is_gone() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, trader, leader) = (f.posts[0].clone(), f.traders[0].clone(), f.leader.clone());
     f.capture(&post, &leader);
@@ -627,6 +645,7 @@ fn allow_it_on_a_loop_but_not_a_city_that_is_gone() {
 
 #[test]
 fn catch_a_capture_kept_with_no_way_left_to_hear_of_it_or_naming_no_post() {
+    csp_npc::install(); // T1719
     let mut f = fixture();
     let (post, leader) = (f.posts[0].clone(), f.leader.clone());
     f.capture(&post, &leader);

@@ -93,6 +93,7 @@ fn counts(world: &WorldState) -> BTreeMap<String, usize> {
 
 #[test]
 fn a_dry_node_has_a_new_one_of_its_kind_and_richness_in_another_fitting_region_out_of_sight() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, regions) = generated();
     let spots = contested_spots(SIZE, &regions);
     let kind_of = |x: f64, y: f64| regions.region_at(x as i32, y as i32).map(|r| r.kind);
@@ -150,6 +151,7 @@ fn a_dry_node_has_a_new_one_of_its_kind_and_richness_in_another_fitting_region_o
 
 #[test]
 fn the_same_seed_places_the_new_node_on_the_same_tile() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, _) = generated();
     let i = first(&world, ResourceKind::IronOre, Richness::Normal);
     let dry = run_dry(&mut world, i);
@@ -170,6 +172,7 @@ fn the_same_seed_places_the_new_node_on_the_same_tile() {
 
 #[test]
 fn a_player_who_explored_the_tile_before_sees_no_node_there_until_they_look_again() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, _) = generated();
     let shared = land(&world, &terrain);
     // Mara has explored the whole map, so the new node comes into being where she explored.
@@ -220,6 +223,7 @@ fn a_player_who_explored_the_tile_before_sees_no_node_there_until_they_look_agai
 
 #[test]
 fn the_nodes_of_each_kind_and_richness_stay_as_many_over_many_dry_nodes() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, _) = generated();
     let before = counts(&world);
     let shared = land(&world, &terrain);
@@ -252,6 +256,7 @@ fn the_nodes_of_each_kind_and_richness_stay_as_many_over_many_dry_nodes() {
 
 #[test]
 fn the_invariant_names_a_dry_node_none_came_for_and_one_followed_by_another_kind() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, _) = generated();
     let i = first(&world, ResourceKind::IronOre, Richness::Normal);
     let dry = run_dry(&mut world, i);
@@ -268,6 +273,7 @@ fn the_invariant_names_a_dry_node_none_came_for_and_one_followed_by_another_kind
 
 #[test]
 fn with_no_fitting_tile_the_node_comes_back_where_it_was_after_its_days() {
+    csp_npc::install(); // T1719
     // A tiny plains map: no region on it fits a rich iron node.
     let mut terrain = plains(16);
     terrain.tiles[16 + 7] = Terrain::Hills as u8;

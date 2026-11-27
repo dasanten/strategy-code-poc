@@ -72,6 +72,7 @@ const COMPARED_UNTIL: &[(&str, u64)] = &[("village-0", 2), ("village-10080", 0)]
 
 #[test]
 fn npc_cities_step_as_in_typescript() {
+    csp_npc::install(); // T1719
     let stepped: Value = serde_json::from_str(include_str!("../src/npc/npc-stepped.json"))
         .expect("npc-stepped.json");
     for case in stepped.as_array().unwrap() {

@@ -234,6 +234,7 @@ fn edge(
 
 #[test]
 fn is_the_nearest_explored_tile_beside_an_unexplored_one_the_way_asked() {
+    csp_npc::install(); // T1719
     let d = disc();
     let any = |_: i32, _: i32| true;
     // The disc's rim lies 9 to 10 tiles out; the nearest of it that way comes first.
@@ -250,6 +251,7 @@ fn is_the_nearest_explored_tile_beside_an_unexplored_one_the_way_asked() {
 
 #[test]
 fn leaves_out_tiles_near_those_to_skip_and_tiles_they_cant_go_onto() {
+    csp_npc::install(); // T1719
     let d = disc();
     let any = |_: i32, _: i32| true;
     let north = edge(&d, Some("north"), &[], &any).unwrap();
@@ -261,6 +263,7 @@ fn leaves_out_tiles_near_those_to_skip_and_tiles_they_cant_go_onto() {
 
 #[test]
 fn is_none_once_all_is_explored() {
+    csp_npc::install(); // T1719
     let all = |_: i32, _: i32| true;
     let search = EdgeSearch {
         size: 64,
@@ -279,6 +282,7 @@ const HOME: (f64, f64) = (500.0, 960.0);
 
 #[test]
 fn sets_out_with_food_walks_north_and_turns_back_in_time() {
+    csp_npc::install(); // T1719
     let terrain = plains(1000);
     let mut s = setup(&terrain, HOME, 26.0);
     assert_eq!(
@@ -315,6 +319,7 @@ fn sets_out_with_food_walks_north_and_turns_back_in_time() {
 
 #[test]
 fn goes_back_out_to_where_they_turned_once_refilled() {
+    csp_npc::install(); // T1719
     // Room for 6 Food, but only 4 in the storage they stand on: they set out with that and turn
     // back early, to s2 nearby, which holds more.
     let terrain = plains(1000);
@@ -345,6 +350,7 @@ fn goes_back_out_to_where_they_turned_once_refilled() {
 
 #[test]
 fn riding_counts_the_horses_food_too_and_turns_back_in_time() {
+    csp_npc::install(); // T1719
     let terrain = plains(1000);
     let mut s = setup(&terrain, HOME, 22.0);
     mounted(&mut s.world);
@@ -368,6 +374,7 @@ fn riding_counts_the_horses_food_too_and_turns_back_in_time() {
 
 #[test]
 fn ends_saying_so_with_nothing_unexplored_left_in_reach() {
+    csp_npc::install(); // T1719
     let small = plains(120);
     let mut s = setup(&small, (60.0, 60.0), 20.0);
     give(&mut s, json!({}));
@@ -383,6 +390,7 @@ fn ends_saying_so_with_nothing_unexplored_left_in_reach() {
 
 #[test]
 fn ends_when_the_edge_is_beyond_the_food_they_can_carry() {
+    csp_npc::install(); // T1719
     let terrain = plains(1000);
     let mut s = setup(&terrain, HOME, 27.0);
     // Everything near home explored: the edge lies further than 3 Food takes them and back.
@@ -394,6 +402,7 @@ fn ends_when_the_edge_is_beyond_the_food_they_can_carry() {
 
 #[test]
 fn leaves_out_the_edge_across_a_lake_they_found_no_way_to_and_goes_on() {
+    csp_npc::install(); // T1719
     // Lakes right across the map north and south of home, the map joining round: they see the
     // land beyond, but can't get there.
     let mut lake = plains(200);
@@ -462,6 +471,7 @@ fn explore(s: &mut Setup, terrain: &TerrainMap) -> f64 {
 
 #[test]
 fn marks_a_gold_ore_node_once_in_sight_then_walks_home_and_ends() {
+    csp_npc::install(); // T1719
     let terrain = hilly();
     let mut s = setup(&terrain, HOME, 26.0);
     s.world.nodes.push(gold("n1", 840.0));
@@ -493,6 +503,7 @@ fn marks_a_gold_ore_node_once_in_sight_then_walks_home_and_ends() {
 
 #[test]
 fn passes_a_node_one_of_their_waypoints_already_marks() {
+    csp_npc::install(); // T1719
     let terrain = hilly();
     let mut s = setup(&terrain, HOME, 26.0);
     s.world
@@ -508,6 +519,7 @@ fn passes_a_node_one_of_their_waypoints_already_marks() {
 
 #[test]
 fn at_the_waypoint_cap_still_ends_at_home_saying_what_they_found() {
+    csp_npc::install(); // T1719
     let terrain = hilly();
     let mut s = setup(&terrain, HOME, 26.0);
     let full: Vec<Waypoint> = (0..WAYPOINTS_MAX as i32)
@@ -532,6 +544,7 @@ fn at_the_waypoint_cap_still_ends_at_home_saying_what_they_found() {
 
 #[test]
 fn is_for_grown_residents() {
+    csp_npc::install(); // T1719
     let terrain = plains(1000);
     let mut s = setup(&terrain, HOME, 0.0);
     let tick = s.world.tick as f64;

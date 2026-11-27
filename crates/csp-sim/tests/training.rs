@@ -105,6 +105,7 @@ fn near(got: f64, want: f64, digits: i32) {
 
 #[test]
 fn three_trainees_gain_over_a_game_week_at_the_pace_their_intellect_sets() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     at(&mut world, "a3").stats.intellect = Stat { base: 15.0, trained: 0.0 };
     assert_eq!(send(&mut world, &t, &mut orders, teach("strength")), "ack");
@@ -128,6 +129,7 @@ fn three_trainees_gain_over_a_game_week_at_the_pace_their_intellect_sets() {
 
 #[test]
 fn a_trainee_stops_at_their_cap_and_at_the_teachers_value_and_waits() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     at(&mut world, "a1").stats.strength =
         Stat { base: 8.0, trained: trained_cap(8.0) - 100.0 * TRAIN_STAT_PER_TICK };
@@ -148,6 +150,7 @@ fn a_trainee_stops_at_their_cap_and_at_the_teachers_value_and_waits() {
 
 #[test]
 fn teaches_nothing_without_a_teacher_nor_a_stronger_trainee() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     send(&mut world, &t, &mut orders, train("a1", "g1"));
     run(&mut world, &t, 100);
@@ -163,6 +166,7 @@ fn teaches_nothing_without_a_teacher_nor_a_stronger_trainee() {
 
 #[test]
 fn trains_a_skill_toward_the_teachers_faster_than_by_doing_never_past_its_maximum() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     at(&mut world, "t1").skills = [(SkillName::Mining, 50.0)].into_iter().collect();
     send(&mut world, &t, &mut orders, teach("mining"));
@@ -188,6 +192,7 @@ fn trains_a_skill_toward_the_teachers_faster_than_by_doing_never_past_its_maximu
 
 #[test]
 fn is_refused_for_a_child_off_the_ground_at_a_site_and_at_a_full_ground() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     let tick = world.tick as f64;
     at(&mut world, "a1").born_at = tick;
@@ -216,6 +221,7 @@ fn is_refused_for_a_child_off_the_ground_at_a_site_and_at_a_full_ground() {
 
 #[test]
 fn refuses_one_too_many_at_a_full_ground_also_within_one_tick() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     let ids = crowd(&mut world);
     let room = &ids[..TRAINING_GROUND_MAX_TRAINEES as usize];
@@ -246,6 +252,7 @@ fn refuses_one_too_many_at_a_full_ground_also_within_one_tick() {
 
 #[test]
 fn is_refused_for_another_realms_resident_and_for_a_citys_sender_not_its_own() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     at(&mut world, "a1").owner = Some("r2".into());
     assert_eq!(send(&mut world, &t, &mut orders, train("a1", "g1")), "not one of your residents");
@@ -255,6 +262,7 @@ fn is_refused_for_another_realms_resident_and_for_a_citys_sender_not_its_own() {
 
 #[test]
 fn ends_on_walking_off_the_ground_or_when_it_is_gone() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     send(&mut world, &t, &mut orders, train("a1", "g1"));
     send(&mut world, &t, &mut orders, train("a2", "g1"));
@@ -269,6 +277,7 @@ fn ends_on_walking_off_the_ground_or_when_it_is_gone() {
 
 #[test]
 fn keeps_training_over_a_long_run_the_teacher_switching_subjects() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     at(&mut world, "t1").skills = [(SkillName::Combat, 15.0)].into_iter().collect();
     at(&mut world, "a1").stats.strength.trained = trained_cap(10.0) - 0.01;
@@ -297,6 +306,7 @@ fn keeps_training_over_a_long_run_the_teacher_switching_subjects() {
 /// `TRAINING_WEAR_BLOWS_PER_DAY` blows a game day, and only while they learn.
 #[test]
 fn training_wears_the_gear_a_trainee_has_equipped_a_little() {
+    csp_npc::install(); // T1719
     use csp_shared::balance::{TRAINING_WEAR_BLOWS_PER_DAY, WEAR_BLOWS};
     use csp_shared::world::Good;
     let (mut world, t, mut orders) = setup();

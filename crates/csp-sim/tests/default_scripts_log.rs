@@ -119,6 +119,7 @@ fn carrying(r: &Resident) -> bool {
 
 #[test]
 fn logs_once_when_getting_food_and_once_when_carrying_a_load_off_not_every_tick() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, camp) = camp_world();
     add_worker(&mut world, &camp, 3.0);
     world.piles.push(
@@ -158,6 +159,7 @@ fn logs_once_when_getting_food_and_once_when_carrying_a_load_off_not_every_tick(
 
 #[test]
 fn logs_nothing_while_it_just_works() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, camp) = camp_world();
     add_worker(&mut world, &camp, 12.0);
     assert_eq!(run_script(&mut world, &terrain, |_| false, 50), 50);

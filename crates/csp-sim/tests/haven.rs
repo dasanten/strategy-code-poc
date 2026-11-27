@@ -61,6 +61,7 @@ fn problem(world: &WorldState, x: i32, y: i32) -> Option<String> {
 
 #[test]
 fn is_a_3x3_building_of_mostly_wood_and_some_stone_offered_off_nodes() {
+    csp_npc::install(); // T1719
     assert_eq!(FOOTPRINT.get("haven"), Some(3));
     assert!(BUILDABLE.contains(&BuildingKind::Haven));
     assert!(OFF_NODES.contains(&BuildingKind::Haven));
@@ -77,6 +78,7 @@ fn is_a_3x3_building_of_mostly_wood_and_some_stone_offered_off_nodes() {
 
 #[test]
 fn goes_where_a_tile_of_its_footprint_touches_water_straight_or_diagonally() {
+    csp_npc::install(); // T1719
     let world = setup();
     // Its east column, x 19, borders the Lake at x 20.
     assert_eq!(problem(&world, 17, 5), None);
@@ -90,6 +92,7 @@ fn goes_where_a_tile_of_its_footprint_touches_water_straight_or_diagonally() {
 
 #[test]
 fn is_refused_on_mountain_on_a_node_on_the_water_and_on_another_building() {
+    csp_npc::install(); // T1719
     let mut world = setup();
     // The footprint from (17, 9) covers the Mountain at (18, 10), on the shore all the same.
     assert_eq!(
@@ -116,6 +119,7 @@ fn is_refused_on_mountain_on_a_node_on_the_water_and_on_another_building() {
 
 #[test]
 fn is_laid_out_built_and_finished_like_any_building_and_belongs_to_the_builders_city() {
+    csp_npc::install(); // T1719
     let terrain = terrain();
     let mut world = setup();
     let mut orders = Orders::default();
@@ -149,6 +153,7 @@ fn is_laid_out_built_and_finished_like_any_building_and_belongs_to_the_builders_
 
 #[test]
 fn refuses_a_build_order_away_from_the_water() {
+    csp_npc::install(); // T1719
     let terrain = terrain();
     let mut world = setup();
     world.residents[0].x = 12.0;
@@ -222,6 +227,7 @@ mod its_storage {
 
 #[test]
 fn breaks_an_invariant_when_away_from_the_water() {
+    csp_npc::install(); // T1719
     let terrain = terrain();
     let mut world = setup();
     world.buildings.push(building("h1", BuildingKind::Haven, 2.0, 12.0));

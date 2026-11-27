@@ -116,6 +116,7 @@ fn working(world: &WorldState) -> usize {
 
 #[test]
 fn sets_a_resident_to_work_the_farm_they_stand_on_as_plain_data() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     assert_eq!(orders.receive(&world, &me(), work_at("w1"), &t), Ok(()));
     orders.apply_all(&mut world, &t);
@@ -134,6 +135,7 @@ fn sets_a_resident_to_work_the_farm_they_stand_on_as_plain_data() {
 
 #[test]
 fn rejects_what_cant_be_worked_and_who_cant_work() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     let reject =
         |world: &WorldState, orders: &mut Orders, reason: &str, id: &str, s: &OrderSender| {
@@ -159,6 +161,7 @@ fn rejects_what_cant_be_worked_and_who_cant_work() {
 
 #[test]
 fn takes_at_most_its_cap_of_workers_on_a_farm() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     let max = farm_max_workers();
     for i in 2..=max as usize {
@@ -187,6 +190,7 @@ fn takes_at_most_its_cap_of_workers_on_a_farm() {
 
 #[test]
 fn stops_when_the_resident_leaves_the_farm() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     work(&mut world, &t, &mut orders, "w1", &me()).unwrap();
     at(&mut world, "w1").x = 3.0 + farm_side(); // just off its footprint
@@ -196,6 +200,7 @@ fn stops_when_the_resident_leaves_the_farm() {
 
 #[test]
 fn makes_about_its_food_a_game_day_onto_the_farms_pile_and_teaches_farming() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     at(&mut world, "w1").carried = Stock::from([(Good::Food, HOME_FOOD_LOW)]);
     work(&mut world, &t, &mut orders, "w1", &me()).unwrap();
@@ -210,6 +215,7 @@ fn makes_about_its_food_a_game_day_onto_the_farms_pile_and_teaches_farming() {
 
 #[test]
 fn is_worked_from_any_tile_of_the_farm_onto_its_one_pile_on_the_north_west_tile() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     let corner = 3.0 + farm_side() - 1.0; // its south-east tile
     at(&mut world, "w1").x = corner;
@@ -228,12 +234,14 @@ fn is_worked_from_any_tile_of_the_farm_onto_its_one_pile_on_the_north_west_tile(
 
 #[test]
 fn makes_2_food_a_game_day_for_a_worker_of_average_strength_and_no_skill() {
+    csp_npc::install(); // T1719
     let (mut world, _, _) = setup();
     close(farm_output(at(&mut world, "w1"), 0.0) * TICKS_PER_GAME_DAY, 2.0);
 }
 
 #[test]
 fn makes_more_food_with_strength_and_farming_skill() {
+    csp_npc::install(); // T1719
     let (mut world, _, _) = setup();
     let r = at(&mut world, "w1");
     let base = farm_output(r, 0.0);
@@ -271,6 +279,7 @@ fn on_node(
 
 #[test]
 fn a_workplace_on_a_node_makes_its_good_onto_the_pile_on_its_tile_and_teaches_its_skill() {
+    csp_npc::install(); // T1719
     let cases = [
         (
             BuildingKind::LumberCamp,
@@ -301,6 +310,7 @@ fn a_workplace_on_a_node_makes_its_good_onto_the_pile_on_its_tile_and_teaches_it
 
 #[test]
 fn makes_more_ore_with_strength_and_the_workplaces_skill() {
+    csp_npc::install(); // T1719
     let (mut world, _, _) = setup();
     let r = at(&mut world, "w1");
     let base = work_output(r, Good::IronOre, SkillName::Mining, 0.0);
@@ -314,6 +324,7 @@ fn makes_more_ore_with_strength_and_the_workplaces_skill() {
 
 #[test]
 fn takes_at_most_its_cap_of_workers_on_a_node_workplace() {
+    csp_npc::install(); // T1719
     let cases = [
         (BuildingKind::LumberCamp, "lumberCamp", ResourceKind::Forest),
         (BuildingKind::Quarry, "quarry", ResourceKind::Stone),
@@ -342,6 +353,7 @@ fn takes_at_most_its_cap_of_workers_on_a_node_workplace() {
 
 #[test]
 fn stops_when_the_workplace_is_torn_down() {
+    csp_npc::install(); // T1719
     let (mut world, t, _) = on_node(BuildingKind::Quarry, ResourceKind::Stone, 5.0, "quarry");
     world.buildings.retain(|b| b.kind != BuildingKind::Quarry);
     run(&mut world, &t, 1);
@@ -356,6 +368,7 @@ fn rival(world: &mut WorldState, x: f64, y: f64) {
 
 #[test]
 fn lets_another_realms_workers_take_over_an_empty_workplace_and_its_output() {
+    csp_npc::install(); // T1719
     let (mut world, t, mut orders) = setup();
     let farm = world.buildings[0].clone();
     assert!(holders_of(&world, &farm).is_empty());
@@ -376,6 +389,7 @@ fn lets_another_realms_workers_take_over_an_empty_workplace_and_its_output() {
 
 #[test]
 fn works_the_same_on_a_workplace_of_no_city() {
+    csp_npc::install(); // T1719
     let (mut world, t, _) = on_node(BuildingKind::Mine, ResourceKind::IronOre, 7.0, "mine");
     let mine = world.buildings.iter().find(|b| b.kind == BuildingKind::Mine).unwrap().clone();
     at(&mut world, "w1").x = 6.0;
@@ -410,6 +424,7 @@ fn mined_in_a_day(richness: Richness, crew: usize) -> f64 {
 
 #[test]
 fn the_same_crew_makes_its_nodes_richness_factor_times_as_much() {
+    csp_npc::install(); // T1719
     let normal = mined_in_a_day(Richness::Normal, 1);
     let iron = WORK_OUTPUT_PER_DAY.get("ironOre").unwrap();
     assert!((normal - iron).abs() < 0.5, "{normal}");
@@ -425,6 +440,7 @@ fn the_same_crew_makes_its_nodes_richness_factor_times_as_much() {
 /// output times its node's factor.
 #[test]
 fn a_workplaces_output_over_a_day_is_its_crews_output_times_its_nodes_factor() {
+    csp_npc::install(); // T1719
     let (world, _, _) = setup();
     let one = work_output(&world.residents[0], Good::IronOre, SkillName::Mining, 0.0);
     for richness in [Richness::Poor, Richness::Normal, Richness::Rich] {
@@ -438,6 +454,7 @@ fn a_workplaces_output_over_a_day_is_its_crews_output_times_its_nodes_factor() {
 
 #[test]
 fn a_farm_yields_the_same_whatever_the_nodes_about_it() {
+    csp_npc::install(); // T1719
     let made = |richness: Richness| {
         let (mut world, t, mut orders) = setup();
         world.nodes.push(ResourceNode::new("n", ResourceKind::Forest, 3.0, 1.0));

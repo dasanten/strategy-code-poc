@@ -140,6 +140,7 @@ fn walk_target(o: &Option<ResidentOrder>) -> Option<(f64, f64)> {
 
 #[test]
 fn is_not_run_while_its_walk_lasts_and_runs_again_on_arrival() {
+    csp_npc::install(); // T1719
     let mut s = setup(THERE_AND_BACK);
     s.tick();
     assert_eq!(s.waiting_since(), Some(0.0));
@@ -162,6 +163,7 @@ fn is_not_run_while_its_walk_lasts_and_runs_again_on_arrival() {
 
 #[test]
 fn runs_again_once_its_order_is_replaced() {
+    csp_npc::install(); // T1719
     let mut s = setup(THERE_AND_BACK);
     s.tick();
     s.tick();
@@ -180,6 +182,7 @@ fn runs_again_once_its_order_is_replaced() {
 
 #[test]
 fn runs_the_same_tick_they_are_struck() {
+    csp_npc::install(); // T1719
     let mut s = setup(THERE_AND_BACK);
     s.tick();
     let tick = s.world.tick;
@@ -191,6 +194,7 @@ fn runs_the_same_tick_they_are_struck() {
 
 #[test]
 fn struck_by_a_blow_that_starts_their_defence_script_runs_again_once_it_hands_back() {
+    csp_npc::install(); // T1719
     let mut s = setup(THERE_AND_BACK);
     s.tick();
     let mut waiting = s.a0().script.clone().unwrap();
@@ -203,6 +207,7 @@ fn struck_by_a_blow_that_starts_their_defence_script_runs_again_once_it_hands_ba
 
 #[test]
 fn with_no_order_to_wait_on_runs_next_tick_as_before_logging_nothing() {
+    csp_npc::install(); // T1719
     let mut s = setup("wait()");
     s.tick();
     s.tick();
@@ -215,6 +220,7 @@ fn with_no_order_to_wait_on_runs_next_tick_as_before_logging_nothing() {
 
 #[test]
 fn shows_its_owner_it_waits_on_the_doing_line_and_the_script_tab() {
+    csp_npc::install(); // T1719
     let mut s = setup(THERE_AND_BACK);
     s.tick();
     let script = s.a0().script.clone().unwrap();
@@ -229,6 +235,7 @@ fn shows_its_owner_it_waits_on_the_doing_line_and_the_script_tab() {
 
 #[test]
 fn run_their_defaults_far_fewer_times_than_once_a_tick_each_on_their_way_to_work() {
+    csp_npc::install(); // T1719
     // `village()` of `npc-growth.fixture.ts`.
     let mut land = TerrainMap { size: 200, tiles: vec![Terrain::Plains as u8; 200 * 200] };
     let mut world = create_world(&land, 1);
@@ -295,6 +302,7 @@ fn run_their_defaults_far_fewer_times_than_once_a_tick_each_on_their_way_to_work
 
 #[test]
 fn flags_a_waiting_script_with_no_order_or_one_from_the_future() {
+    csp_npc::install(); // T1719
     let mut s = setup(THERE_AND_BACK);
     s.tick();
     let ids: Vec<String> = s.world.residents.iter().map(|r| r.id.clone()).collect();

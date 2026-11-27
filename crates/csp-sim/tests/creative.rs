@@ -47,6 +47,7 @@ fn finished_part(b: &Building) -> serde_json::Value {
 
 #[test]
 fn goods_given_and_taken_land_in_a_storage_and_never_go_below_none() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, _) = city_world(4.0, 4.0);
     let mut storage = building("s1", BuildingKind::Storage, 14.0, 10.0);
     storage.city_id = Some("c1".into());
@@ -75,6 +76,7 @@ fn goods_given_and_taken_land_in_a_storage_and_never_go_below_none() {
 
 #[test]
 fn goods_given_and_taken_land_in_a_carriage_up_to_what_it_holds() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, _) = city_world(4.0, 4.0);
     world.carriages.push(Carriage {
         id: "k1".into(),
@@ -110,6 +112,7 @@ fn house_site() -> (WorldState, TerrainMap, Orders, String) {
 
 #[test]
 fn finish_now_leaves_a_house_as_building_it_at_normal_speed_would() {
+    csp_npc::install(); // T1719
     let (mut now, terrain, _, id) = house_site();
     let mut normal = now.clone();
 
@@ -135,6 +138,7 @@ fn finish_now_leaves_a_house_as_building_it_at_normal_speed_would() {
 
 #[test]
 fn finish_now_builds_the_rest_of_a_road_line_and_frees_its_builder() {
+    csp_npc::install(); // T1719
     let map = plains(10);
     let mut world = empty_world(&map);
     world.realms.push(realm("r1", 7, "w1"));
@@ -162,6 +166,7 @@ fn finish_now_builds_the_rest_of_a_road_line_and_frees_its_builder() {
 
 #[test]
 fn finish_now_trains_every_trainee_as_far_as_their_teacher_takes_them() {
+    csp_npc::install(); // T1719
     let terrain = plains(16);
     let mut world = empty_world(&terrain);
     world.realms.push(realm("r1", 7, "t1"));
@@ -203,6 +208,7 @@ fn finish_now_trains_every_trainee_as_far_as_their_teacher_takes_them() {
 
 #[test]
 fn finish_now_refuses_what_has_nothing_to_finish() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, _) = city_world(4.0, 4.0);
     assert!(finish_now(&mut world, "c1-hall", Some(&terrain)).is_err());
     assert!(finish_now(&mut world, "nowhere", Some(&terrain)).is_err());
@@ -211,6 +217,7 @@ fn finish_now_refuses_what_has_nothing_to_finish() {
 
 #[test]
 fn no_creative_action_is_an_order_kind_or_a_script_call() {
+    csp_npc::install(); // T1719
     let kinds = order_kinds();
     for name in CREATIVE_ACTIONS {
         assert!(!kinds.contains(name), "{name} is an order kind");
@@ -221,6 +228,7 @@ fn no_creative_action_is_an_order_kind_or_a_script_call() {
 
 #[test]
 fn an_added_resident_joins_the_picked_city_with_the_picked_age_stats_and_skills() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, _) = city_world(4.0, 4.0);
     world.tick = 5_000;
     let pick = ResidentPick {
@@ -252,6 +260,7 @@ fn an_added_resident_joins_the_picked_city_with_the_picked_age_stats_and_skills(
 
 #[test]
 fn an_added_resident_or_horse_joins_an_npc_city_as_its_own() {
+    csp_npc::install(); // T1719
     let terrain = plains(24);
     let mut world = empty_world(&terrain);
     add_city(&mut world, "n1", None, 18.0, 18.0);
@@ -266,6 +275,7 @@ fn an_added_resident_or_horse_joins_an_npc_city_as_its_own() {
 
 #[test]
 fn an_added_horse_has_the_picked_age_and_stats() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, _) = city_world(4.0, 4.0);
     world.tick = 9_000;
     let stats = HorseStats { speed: 20.0, strength: 2.0, endurance: 11.0 };
@@ -281,6 +291,7 @@ fn an_added_horse_has_the_picked_age_and_stats() {
 
 #[test]
 fn what_cannot_be_added_is_refused_and_changes_nothing() {
+    csp_npc::install(); // T1719
     let (mut world, mut terrain, _) = city_world(4.0, 4.0);
     terrain.tiles[(3 * terrain.size + 3) as usize] = Terrain::Sea as u8;
     let before = world.clone();
@@ -308,6 +319,7 @@ fn what_cannot_be_added_is_refused_and_changes_nothing() {
 
 #[test]
 fn heal_ends_down_and_wounds() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, _) = city_world(4.0, 4.0);
     resident(&mut world, "w2", 5.0, 5.0);
     at(&mut world, "w1").health = 35.0;
@@ -326,6 +338,7 @@ fn heal_ends_down_and_wounds() {
 
 #[test]
 fn grow_up_makes_a_child_an_adult_as_if_the_years_had_passed() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, _) = city_world(4.0, 4.0);
     world.tick = 100_000;
     let pick = ResidentPick { age: Some(3.0), ..Default::default() };
@@ -346,6 +359,7 @@ fn grow_up_makes_a_child_an_adult_as_if_the_years_had_passed() {
 
 #[test]
 fn kill_is_a_normal_death_and_a_killed_leader_follows_the_leader_death_rules() {
+    csp_npc::install(); // T1719
     // A resident: gone, what they carried on the ground.
     let (mut world, terrain, _) = city_world(4.0, 4.0);
     resident(&mut world, "w2", 5.0, 5.0);
@@ -382,6 +396,7 @@ fn ids(list: &[&str]) -> Vec<String> {
 
 #[test]
 fn a_moved_resident_stands_on_the_tile_with_no_way_and_keeps_what_they_carry() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = city_world(4.0, 4.0);
     let walk = json!({ "kind": "walkTo", "residentId": "w1", "x": 20, "y": 4 });
     let _ = order(&mut world, &mut orders, &player(7), walk, &terrain);
@@ -401,6 +416,7 @@ fn a_moved_resident_stands_on_the_tile_with_no_way_and_keeps_what_they_carry() {
 
 #[test]
 fn a_group_moves_all_at_once_and_a_riders_horse_comes_along() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, _) = city_world(4.0, 4.0);
     resident(&mut world, "w2", 6.0, 6.0);
     let mut rand = csp_sim::random::Mulberry32::new(1.0);
@@ -427,6 +443,7 @@ fn a_group_moves_all_at_once_and_a_riders_horse_comes_along() {
 
 #[test]
 fn a_move_refuses_water_without_a_vessel_a_wall_and_off_the_map_and_moves_nobody() {
+    csp_npc::install(); // T1719
     let (mut world, mut terrain, _) = city_world(4.0, 4.0);
     let lake = (terrain.size * 8 + 8) as usize;
     terrain.tiles[lake] = Terrain::Lake as u8;
@@ -453,6 +470,7 @@ fn a_move_refuses_water_without_a_vessel_a_wall_and_off_the_map_and_moves_nobody
 
 #[test]
 fn a_move_onto_water_with_a_vessel_of_their_realm_takes_them_aboard() {
+    csp_npc::install(); // T1719
     let (mut world, mut terrain, _) = city_world(4.0, 4.0);
     let lake = (terrain.size * 8 + 8) as usize;
     terrain.tiles[lake] = Terrain::Lake as u8;
@@ -484,6 +502,7 @@ fn a_move_onto_water_with_a_vessel_of_their_realm_takes_them_aboard() {
 
 #[test]
 fn a_reveal_shows_the_whole_world_and_inside_it_and_leaves_the_players_sight_as_it_is() {
+    csp_npc::install(); // T1719
     use csp_shared::protocol::SeenEntity;
     use csp_sim::sight::{entities_in_sight, entities_revealed, SightCache};
     use csp_sim::world_index::WorldIndex;

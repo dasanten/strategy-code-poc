@@ -22,6 +22,7 @@ const FIXTURES: [(&str, Option<&str>); 8] = [
 
 #[test]
 fn every_side_sees_what_it_sees_in_typescript() {
+    csp_npc::install(); // T1719
     let mut compared = 0;
     let mut kinds = std::collections::BTreeSet::new();
     for (world_file, sight_file) in FIXTURES {

@@ -72,6 +72,7 @@ fn site_id_of(world: &mut WorldState, id: &str) -> Option<String> {
 
 #[test]
 fn lays_out_a_construction_site_on_the_node_in_the_next_tick_of_no_city() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     assert_eq!(orders.receive(&world, &me(), build_order("lumberCamp", "w1"), &terrain), Ok(()));
     assert!(world.buildings.is_empty());
@@ -94,6 +95,7 @@ fn lays_out_a_construction_site_on_the_node_in_the_next_tick_of_no_city() {
 
 #[test]
 fn then_works_on_the_site_strength_and_construction_add_work_and_construction_grows() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     order(&mut world, &mut orders, &me(), build_order("lumberCamp", "w1"), &terrain).unwrap();
     let r = at(&mut world, "w1").clone();
@@ -112,6 +114,7 @@ fn then_works_on_the_site_strength_and_construction_add_work_and_construction_gr
 
 #[test]
 fn puts_in_what_work_pace_says_for_the_residents_working_on_it_so_estimates_match() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     order(&mut world, &mut orders, &me(), build_order("lumberCamp", "w1"), &terrain).unwrap();
     let h = resident(&mut world, "w2", 3.0, 3.0);
@@ -131,6 +134,7 @@ fn puts_in_what_work_pace_says_for_the_residents_working_on_it_so_estimates_matc
 
 #[test]
 fn finishes_a_lumber_camp_once_enough_work_is_in_and_the_order_is_done() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     assert!(build_materials(BuildingKind::LumberCamp).is_empty());
     order(&mut world, &mut orders, &me(), build_order("lumberCamp", "w1"), &terrain).unwrap();
@@ -149,6 +153,7 @@ fn finishes_a_lumber_camp_once_enough_work_is_in_and_the_order_is_done() {
 
 #[test]
 fn needs_its_materials_too_only_what_it_still_needs() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     at(&mut world, "w1").x = 6.0;
     at(&mut world, "w1").y = 6.0;
@@ -186,6 +191,7 @@ fn needs_its_materials_too_only_what_it_still_needs() {
 
 #[test]
 fn lets_another_resident_join_the_site_and_two_finish_sooner_than_one() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     order(&mut world, &mut orders, &me(), build_order("lumberCamp", "w1"), &terrain).unwrap();
     let si = site_index(&world);
@@ -203,6 +209,7 @@ fn lets_another_resident_join_the_site_and_two_finish_sooner_than_one() {
 
 #[test]
 fn lays_out_the_footprint_from_its_north_west_tile_others_join_from_any_tile_of_it() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     // The forest node at (3, 3) is the south-east tile of a camp laid out from (2, 2).
     at(&mut world, "w1").x = 2.0;
@@ -227,6 +234,7 @@ fn lays_out_the_footprint_from_its_north_west_tile_others_join_from_any_tile_of_
 
 #[test]
 fn gathers_goods_lying_on_the_footprint_into_the_sites_one_pile_when_it_is_laid_out() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     at(&mut world, "w1").x = 2.0;
     at(&mut world, "w1").y = 2.0;
@@ -252,6 +260,7 @@ fn gathers_goods_lying_on_the_footprint_into_the_sites_one_pile_when_it_is_laid_
 
 #[test]
 fn stops_when_the_resident_leaves_the_tile_an_unattended_site_stays_for_anyone() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     order(&mut world, &mut orders, &me(), build_order("lumberCamp", "w1"), &terrain).unwrap();
     at(&mut world, "w1").x = 2.0;
@@ -262,6 +271,7 @@ fn stops_when_the_resident_leaves_the_tile_an_unattended_site_stays_for_anyone()
 
 #[test]
 fn rejects_what_cannot_be_built() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     let reject = |world: &WorldState, orders: &mut Orders, o: Value, sender: &OrderSender| {
         orders.receive(world, sender, o, &terrain).err().unwrap_or_else(|| "ack".into())
@@ -298,6 +308,7 @@ fn rejects_what_cannot_be_built() {
 
 #[test]
 fn ends_the_order_if_the_tile_was_taken_before_the_site_is_laid_out() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup();
     orders.receive(&world, &me(), build_order("lumberCamp", "w1"), &terrain).unwrap();
     orders.apply_all(&mut world, &terrain);
@@ -309,6 +320,7 @@ fn ends_the_order_if_the_tile_was_taken_before_the_site_is_laid_out() {
 
 #[test]
 fn building_part_names_what_a_line_order_builds_on_its_next_tile() {
+    csp_npc::install(); // T1719
     // Not in the TypeScript tests: `buildingPart` of a wall line building its first tile.
     let line = serde_json::from_value(json!({
         "kind": "wallLine", "tiles": [[4, 5], [5, 5]], "phase": "building", "path": null,

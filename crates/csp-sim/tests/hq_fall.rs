@@ -68,6 +68,7 @@ fn warehouse_id(f: &Fixture) -> String {
 
 #[test]
 fn turns_the_hq_into_a_plain_city_of_the_captor_its_warehouses_storages_with_all_they_hold() {
+    csp_npc::install(); // T1719
     let mut f = setup();
     let hq = hq_of(&f.world);
     let warehouses: Vec<String> = f
@@ -124,6 +125,7 @@ fn turns_the_hq_into_a_plain_city_of_the_captor_its_warehouses_storages_with_all
 
 #[test]
 fn ends_the_caravans_crew_carriage_horse_and_load_join_the_captor_where_they_stand() {
+    csp_npc::install(); // T1719
     let mut f = setup();
     let c = caravan(&f);
     let ki = f.world.carriages.iter().position(|k| k.id == c.carriage_id).unwrap();
@@ -170,6 +172,7 @@ fn ends_the_caravans_crew_carriage_horse_and_load_join_the_captor_where_they_sta
 
 #[test]
 fn happens_by_occupying_its_town_hall_the_full_time_like_any_city() {
+    csp_npc::install(); // T1719
     let mut f = setup();
     let hq = hq_of(&f.world);
     let c = f.world.cities.iter().find(|c| c.id == hq).unwrap();
@@ -202,6 +205,7 @@ fn happens_by_occupying_its_town_hall_the_full_time_like_any_city() {
 
 #[test]
 fn cancels_open_deliveries_and_transfers_without_refund_each_with_a_line_in_the_log() {
+    csp_npc::install(); // T1719
     let mut f = setup();
     let warehouse = warehouse_id(&f);
     let (realm, other, city, to_city) =
@@ -248,6 +252,7 @@ fn cancels_open_deliveries_and_transfers_without_refund_each_with_a_line_in_the_
 
 #[test]
 fn leaves_the_trading_posts_trading_but_they_take_no_new_deliveries_or_transfers() {
+    csp_npc::install(); // T1719
     let mut f = setup();
     let (hq, other, realm, city, to_city) =
         (hq_of(&f.world), f.other.clone(), f.realm.clone(), f.city.clone(), f.to_city.clone());
@@ -301,6 +306,7 @@ fn leaves_the_trading_posts_trading_but_they_take_no_new_deliveries_or_transfers
 
 #[test]
 fn lets_a_delivery_ordered_just_before_the_fall_come_to_nothing() {
+    csp_npc::install(); // T1719
     let mut f = setup();
     let (hq, other, city) = (hq_of(&f.world), f.other.clone(), f.city.clone());
     r_mut(&mut f.world, "p1").order = Some(
@@ -323,6 +329,7 @@ fn lets_a_delivery_ordered_just_before_the_fall_come_to_nothing() {
 
 #[test]
 fn ends_contracts_with_the_trade_organization_soldiers_join_the_captor_mercenaries_walk_home() {
+    csp_npc::install(); // T1719
     let mut f = setup();
     let (hq, realm, other, storage) =
         (hq_of(&f.world), f.realm.clone(), f.other.clone(), f.storage.clone());
@@ -401,6 +408,7 @@ fn ends_contracts_with_the_trade_organization_soldiers_join_the_captor_mercenari
 
 #[test]
 fn ends_its_punishments_and_nobody_can_hire_from_it_any_more() {
+    csp_npc::install(); // T1719
     let mut f = setup();
     let (hq, realm, other, city) =
         (hq_of(&f.world), f.realm.clone(), f.other.clone(), f.city.clone());
@@ -438,6 +446,7 @@ fn ends_its_punishments_and_nobody_can_hire_from_it_any_more() {
 
 #[test]
 fn forgets_standing_toward_the_trade_organization_only_once_its_last_post_falls_too() {
+    csp_npc::install(); // T1719
     let mut f = setup();
     let (hq, realm, other) = (hq_of(&f.world), f.realm.clone(), f.other.clone());
     f.world.standings.push(
@@ -456,6 +465,7 @@ fn forgets_standing_toward_the_trade_organization_only_once_its_last_post_falls_
 
 #[test]
 fn never_comes_back_the_world_runs_on_with_no_hq_and_no_broken_rule() {
+    csp_npc::install(); // T1719
     let mut f = setup();
     let (hq, other) = (hq_of(&f.world), f.other.clone());
     capture(&mut f, &hq, &other);
@@ -467,6 +477,7 @@ fn never_comes_back_the_world_runs_on_with_no_hq_and_no_broken_rule() {
 
 #[test]
 fn reports_whatever_an_hq_that_fell_left_behind() {
+    csp_npc::install(); // T1719
     let mut f = setup();
     let (hq, other) = (hq_of(&f.world), f.other.clone());
     let c = caravan(&f);

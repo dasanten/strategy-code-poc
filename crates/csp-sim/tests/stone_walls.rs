@@ -51,6 +51,7 @@ fn stone_wall(id: &str, kind: BuildingKind, x: f64, y: f64) -> Building {
 
 #[test]
 fn a_stone_wall_and_gate_take_stone_and_more_work_than_wooden_ones() {
+    csp_npc::install(); // T1719
     for (kind, name) in [(BuildingKind::Wall, "wall"), (BuildingKind::Gate, "gate")] {
         let stone = stone_wall("s", kind, 1.0, 1.0);
         let wood = building("w", kind, 1.0, 1.0);
@@ -67,6 +68,7 @@ fn a_stone_wall_and_gate_take_stone_and_more_work_than_wooden_ones() {
 
 #[test]
 fn builds_a_stone_wall_from_stone_with_the_work_and_it_stands_of_stone() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup(Stock::new());
     let o = build("wall", Some("stone"));
     assert_eq!(order(&mut world, &mut orders, &player(7), o, &terrain), Ok(()));
@@ -92,6 +94,7 @@ fn builds_a_stone_wall_from_stone_with_the_work_and_it_stands_of_stone() {
 
 #[test]
 fn a_wooden_wall_is_written_down_as_no_material_and_wood_is_the_default() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup(Stock::new());
     assert_eq!(
         order(&mut world, &mut orders, &player(7), build("wall", Some("wood")), &terrain),
@@ -108,6 +111,7 @@ fn a_wooden_wall_is_written_down_as_no_material_and_wood_is_the_default() {
 
 #[test]
 fn refuses_a_material_that_is_not_wood_or_stone_or_on_anything_but_a_wall_or_gate() {
+    csp_npc::install(); // T1719
     let (world, terrain, mut orders) = setup(Stock::new());
     let me = player(7);
     let no = orders.receive(&world, &me, build("wall", Some("iron")), &terrain).unwrap_err();
@@ -121,6 +125,7 @@ fn refuses_a_material_that_is_not_wood_or_stone_or_on_anything_but_a_wall_or_gat
 
 #[test]
 fn a_stone_builder_does_not_join_a_wooden_site_on_the_tile() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, mut orders) = setup(Stock::new());
     world.buildings.push(site("old", BuildingKind::Wall, 4.0, 4.0));
     // Turned down, or given and then ended on the taken tile: either way nobody joins.
@@ -136,6 +141,7 @@ fn a_stone_builder_does_not_join_a_wooden_site_on_the_tile() {
 
 #[test]
 fn stone_holds_out_several_times_longer_and_leaves_stone_when_broken() {
+    csp_npc::install(); // T1719
     for (kind, wood, stone) in [
         (BuildingKind::Wall, WALL_STRENGTH.wall, STONE_WALL_STRENGTH.wall),
         (BuildingKind::Gate, WALL_STRENGTH.gate, STONE_WALL_STRENGTH.gate),
@@ -173,6 +179,7 @@ fn strike(
 
 #[test]
 fn a_blow_that_fells_a_worn_wooden_tile_leaves_a_stone_one_standing() {
+    csp_npc::install(); // T1719
     let terrain = plains(16);
     let worn = WALL_STRENGTH.wall - 0.01;
     let mut wooden = empty_world(&terrain);
@@ -204,6 +211,7 @@ fn a_blow_that_fells_a_worn_wooden_tile_leaves_a_stone_one_standing() {
 
 #[test]
 fn a_stone_wall_line_builds_stone_on_each_tile() {
+    csp_npc::install(); // T1719
     let per_tile = stone_of("wall");
     let (mut world, terrain, mut orders) = setup(Stock::from([(Good::Stone, 3.0 * per_tile)]));
     let o = json!({
@@ -225,6 +233,7 @@ fn a_stone_wall_line_builds_stone_on_each_tile() {
 
 #[test]
 fn a_wall_line_refuses_a_material_that_is_not_wood_or_stone() {
+    csp_npc::install(); // T1719
     let (world, terrain, mut orders) = setup(Stock::new());
     let o = json!({
         "kind": "wallLine", "residentId": "w1", "material": "gold",
@@ -235,6 +244,7 @@ fn a_wall_line_refuses_a_material_that_is_not_wood_or_stone() {
 
 #[test]
 fn a_wall_saved_without_a_material_reads_as_wood() {
+    csp_npc::install(); // T1719
     let saved = json!({
         "id": "w", "kind": "wall", "cityId": null, "x": 1.0, "y": 1.0
     });
@@ -246,6 +256,7 @@ fn a_wall_saved_without_a_material_reads_as_wood() {
 
 #[test]
 fn the_invariants_catch_stone_off_a_wall_and_damage_past_a_materials_strength() {
+    csp_npc::install(); // T1719
     let terrain = plains(16);
     let mut world = empty_world(&terrain);
     world.buildings.push(Building {

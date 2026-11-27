@@ -2085,6 +2085,7 @@ fn ask(world: &WorldState, size: i32) -> Ask {
 
 #[test]
 fn the_mirror_answers_each_rule_as_the_full_world_where_the_player_sees_what_it_reads() {
+    csp_npc::install(); // T1719
     let documented: BTreeMap<&str, &str> = DIFFERS.iter().copied().collect();
     let mut differed: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut asked = 0;

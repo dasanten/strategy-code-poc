@@ -70,6 +70,7 @@ fn mine_site(delivered: Stock, work: f64) -> csp_shared::world::Building {
 
 #[test]
 fn a_site_never_holds_more_or_other_materials_than_it_needs_nor_too_much_work() {
+    csp_npc::install(); // T1719
     let (mut world, t) = building_setup();
     world.buildings.push(mine_site(Stock::from([(Good::Wood, 41.0), (Good::Food, 1.0)]), 0.0));
     assert_eq!(check("sites-within-needs", &world, &t).len(), 2);
@@ -85,6 +86,7 @@ fn a_site_never_holds_more_or_other_materials_than_it_needs_nor_too_much_work() 
 
 #[test]
 fn workplaces_stand_on_a_node_of_their_kind_and_belong_to_no_city() {
+    csp_npc::install(); // T1719
     let (mut world, t) = building_setup();
     let mut b1 = mine_site(Stock::new(), 0.0);
     (b1.x, b1.y) = (6.0, 6.0);
@@ -100,6 +102,7 @@ fn workplaces_stand_on_a_node_of_their_kind_and_belong_to_no_city() {
 
 #[test]
 fn a_builder_stands_on_their_site() {
+    csp_npc::install(); // T1719
     let (mut world, t) = building_setup();
     world.buildings.push(mine_site(Stock::new(), 0.0));
     world.residents[0].order = order(
@@ -142,6 +145,7 @@ fn teardown_setup() -> (WorldState, TerrainMap) {
 
 #[test]
 fn tear_down_work_stays_below_what_is_needed_and_only_on_what_can_be_built() {
+    csp_npc::install(); // T1719
     let (mut world, t) = teardown_setup();
     world.buildings[0].teardown = Some(teardown_work(&world.buildings[0]));
     assert_eq!(check("teardowns-within-needs", &world, &t).len(), 1);
@@ -159,6 +163,7 @@ fn tear_down_work_stays_below_what_is_needed_and_only_on_what_can_be_built() {
 
 #[test]
 fn at_most_one_building_or_site_per_tile() {
+    csp_npc::install(); // T1719
     let (mut world, t) = teardown_setup();
     world.buildings.push(site("b2", BuildingKind::Mine, 7.0, 7.0));
     let found = messages(&check("buildings-in-place", &world, &t));
@@ -170,6 +175,7 @@ fn at_most_one_building_or_site_per_tile() {
 
 #[test]
 fn a_resident_tearing_down_stands_on_that_building() {
+    csp_npc::install(); // T1719
     let (mut world, t) = teardown_setup();
     world.residents[0].order =
         order(json!({ "kind": "tearDown", "buildingId": "b1", "at": { "x": 7, "y": 7 } }));
@@ -183,6 +189,7 @@ fn a_resident_tearing_down_stands_on_that_building() {
 
 #[test]
 fn catches_a_worker_who_is_not_on_their_farm_or_a_farm_with_too_many_workers() {
+    csp_npc::install(); // T1719
     let t = plains(16);
     let mut world = empty_world(&t);
     world.realms.push(realm("r1", 7, "w1"));
@@ -207,6 +214,7 @@ fn catches_a_worker_who_is_not_on_their_farm_or_a_farm_with_too_many_workers() {
 
 #[test]
 fn catches_a_work_order_for_a_workplace_without_a_node_to_work() {
+    csp_npc::install(); // T1719
     let t = plains(16);
     let mut world = empty_world(&t);
     world.buildings.push(building("mine", BuildingKind::Mine, 7.0, 1.0));
@@ -231,6 +239,7 @@ fn ground_world() -> (WorldState, TerrainMap) {
 
 #[test]
 fn flags_a_teacher_off_the_ground_at_no_ground_and_a_second_teacher() {
+    csp_npc::install(); // T1719
     let (mut world, t) = ground_world();
     resident(&mut world, "a1", 3.0, 3.0);
     resident(&mut world, "a2", 5.0, 5.0);
@@ -250,6 +259,7 @@ fn flags_a_teacher_off_the_ground_at_no_ground_and_a_second_teacher() {
 
 #[test]
 fn flags_a_trainee_off_the_ground_at_no_ground_and_one_too_many() {
+    csp_npc::install(); // T1719
     let (mut world, t) = ground_world();
     for (id, x, y) in
         [("t1", 4.0, 4.0), ("a1", 3.0, 3.0), ("a2", 5.0, 5.0), ("a3", 3.0, 5.0), ("a4", 5.0, 3.0)]
@@ -277,6 +287,7 @@ fn flags_a_trainee_off_the_ground_at_no_ground_and_one_too_many() {
 
 #[test]
 fn flags_a_finished_carriage_site_and_one_on_a_building_other_than_a_stable() {
+    csp_npc::install(); // T1719
     let t = plains(32);
     let mut world = empty_world(&t);
     world.buildings.push(building("k1", BuildingKind::Carriage, 10.0, 4.0));
@@ -293,6 +304,7 @@ fn flags_a_finished_carriage_site_and_one_on_a_building_other_than_a_stable() {
 
 #[test]
 fn a_road_line_order_is_checked_by_an_invariant() {
+    csp_npc::install(); // T1719
     let t = plains(10);
     let mut world = empty_world(&t);
     resident(&mut world, "w1", 1.0, 1.0);
@@ -313,6 +325,7 @@ fn a_road_line_order_is_checked_by_an_invariant() {
 /// the cap", on a bare realm instead of a starting city (T86.8).
 #[test]
 fn realm_logs_are_watched_by_an_invariant() {
+    csp_npc::install(); // T1719
     use csp_shared::balance::REALM_LOG_LENGTH;
     use csp_sim::events::record_event;
     let t = plains(16);

@@ -69,6 +69,7 @@ fn off_footprints(world: &WorldState, x: f64, y: f64) -> (f64, f64) {
 
 #[test]
 fn hold_on_a_fresh_world_and_after_many_ticks() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     assert_eq!(check(&world), []);
     let mut scratch = Scratch::default();
@@ -80,6 +81,7 @@ fn hold_on_a_fresh_world_and_after_many_ticks() {
 
 #[test]
 fn catch_a_resident_on_impassable_terrain() {
+    csp_npc::install(); // T1719
     for kind in [Terrain::Lake, Terrain::Sea] {
         let mut world = world_with_city();
         let (x, y) = first_tile(kind);
@@ -93,6 +95,7 @@ fn catch_a_resident_on_impassable_terrain() {
 
 #[test]
 fn catch_a_resource_node_on_terrain_that_does_not_fit_it() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     let (x, y) = first_tile(Terrain::Plains);
     let node = world.nodes.iter_mut().find(|n| n.kind == ResourceKind::Forest).unwrap();
@@ -103,6 +106,7 @@ fn catch_a_resource_node_on_terrain_that_does_not_fit_it() {
 
 #[test]
 fn catch_a_position_stored_past_a_side_of_the_map() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     let r = &mut world.residents[0];
     r.order = None;
@@ -113,6 +117,7 @@ fn catch_a_position_stored_past_a_side_of_the_map() {
 
 #[test]
 fn catch_a_trained_bonus_above_its_cap_below_zero_or_on_a_base_of_nothing() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     world.residents[0].stats.strength = Stat { base: 10.0, trained: trained_cap(10.0) };
     assert_eq!(check(&world), []);
@@ -128,6 +133,7 @@ fn catch_a_trained_bonus_above_its_cap_below_zero_or_on_a_base_of_nothing() {
 
 #[test]
 fn catch_a_work_or_construction_skill_above_its_most() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     world.residents[0].skills =
         [(SkillName::Farming, 100.0), (SkillName::Construction, 100.0), (SkillName::Combat, 250.0)]
@@ -146,6 +152,7 @@ fn catch_a_work_or_construction_skill_above_its_most() {
 
 #[test]
 fn catch_a_resident_carrying_more_than_their_capacity() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     let tick = world.tick as f64;
     let cap = carry_capacity(&world.residents[0], tick);
@@ -158,6 +165,7 @@ fn catch_a_resident_carrying_more_than_their_capacity() {
 
 #[test]
 fn catch_negative_goods_empty_piles_and_two_piles_on_one_tile() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     world.residents[0].carried = Stock::from([(Good::Food, -1.0)]);
     let (x, y) = (world.residents[0].x, world.residents[0].y);
@@ -184,6 +192,7 @@ fn catch_negative_goods_empty_piles_and_two_piles_on_one_tile() {
 
 #[test]
 fn catch_health_or_hunger_out_of_range() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     world.residents[0].health = MAX_HEALTH + 1.0;
     world.residents[1].hunger = -1.0;
@@ -203,6 +212,7 @@ fn catch_health_or_hunger_out_of_range() {
 
 #[test]
 fn catch_a_realm_whose_leader_is_gone_or_belongs_elsewhere() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     world.realms[0].leader_id = "nobody".into();
     let id = world.realms[0].id.clone();
@@ -211,6 +221,7 @@ fn catch_a_realm_whose_leader_is_gone_or_belongs_elsewhere() {
 
 #[test]
 fn catch_a_realm_name_that_is_blank_untrimmed_or_too_long() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     let id = world.realms[0].id.clone();
     let long = "x".repeat(REALM_NAME_MAX_LENGTH as usize + 1);
@@ -224,6 +235,7 @@ fn catch_a_realm_name_that_is_blank_untrimmed_or_too_long() {
 
 #[test]
 fn catch_buildings_out_of_place_a_farm_off_plains_and_negative_stock() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     let find =
         |w: &WorldState, k: BuildingKind| w.buildings.iter().position(|b| b.kind == k).unwrap();
@@ -262,6 +274,7 @@ fn catch_buildings_out_of_place_a_farm_off_plains_and_negative_stock() {
 
 #[test]
 fn catch_goods_kept_in_a_building_that_is_not_a_storage() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     let house = world.buildings.iter().position(|b| b.kind == BuildingKind::House).unwrap();
     world.buildings[house].stock = Some(Stock::from([(Good::Food, 3.0)]));
@@ -271,6 +284,7 @@ fn catch_goods_kept_in_a_building_that_is_not_a_storage() {
 
 #[test]
 fn catch_a_pick_up_or_drop_order_left_over_after_its_tick() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     world.residents[0].order = Some(
         serde_json::from_value(
@@ -292,6 +306,7 @@ fn catch_a_pick_up_or_drop_order_left_over_after_its_tick() {
 
 #[test]
 fn catch_a_resident_living_in_a_city_that_does_not_exist() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     world.residents[0].city_id = Some("nowhere".into());
     let id = world.residents[0].id.clone();
@@ -306,6 +321,7 @@ fn npc_city(world: &mut WorldState) {
 
 #[test]
 fn catch_a_resident_of_an_npc_city_who_belongs_to_a_realm() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     npc_city(&mut world);
     for o in &mut world.residents[1..] {
@@ -317,6 +333,7 @@ fn catch_a_resident_of_an_npc_city_who_belongs_to_a_realm() {
 
 #[test]
 fn catch_an_npc_city_resident_holding_an_order_the_city_never_gives() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     npc_city(&mut world);
     for o in &mut world.residents {
@@ -334,6 +351,7 @@ fn catch_an_npc_city_resident_holding_an_order_the_city_never_gives() {
 
 #[test]
 fn catch_an_npc_city_resident_attacking_someone_of_their_own_city() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     npc_city(&mut world);
     for o in &mut world.residents {
@@ -353,6 +371,7 @@ fn catch_an_npc_city_resident_attacking_someone_of_their_own_city() {
 
 #[test]
 fn catch_a_pair_that_does_not_hold_together() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     let pairs = |w: &WorldState| -> Vec<String> {
         check_all(w, terrain())
@@ -386,6 +405,7 @@ fn catch_a_pair_that_does_not_hold_together() {
 
 #[test]
 fn catch_a_resident_carrying_a_child_who_works_or_carries_past_the_time() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     let carrying = |w: &WorldState| -> Vec<String> {
         check_all(w, terrain())
@@ -424,6 +444,7 @@ fn catch_a_resident_carrying_a_child_who_works_or_carries_past_the_time() {
 
 #[test]
 fn are_checked_every_tick_at_rate_1_and_sampled_below_it() {
+    csp_npc::install(); // T1719
     assert!(should_check_invariants(1.0, &mut || 0.99));
     assert!(should_check_invariants(0.1, &mut || 0.05));
     assert!(!should_check_invariants(0.1, &mut || 0.5));
@@ -432,6 +453,7 @@ fn are_checked_every_tick_at_rate_1_and_sampled_below_it() {
 
 #[test]
 fn invariants_for_tick_runs_every_invariant_at_least_once_over_a_round_and_no_tick_runs_them_all() {
+    csp_npc::install(); // T1719
     let all = world_invariants();
     let round = 10;
     let mut runs = vec![0; all.len()];
@@ -448,6 +470,7 @@ fn invariants_for_tick_runs_every_invariant_at_least_once_over_a_round_and_no_ti
 
 #[test]
 fn invariants_for_tick_runs_all_of_them_when_every_tick_is_sampled_none_at_a_rate_of_0() {
+    csp_npc::install(); // T1719
     let all = world_invariants();
     let names = |v: &[csp_sim::invariants::Invariant]| v.iter().map(|i| i.name).collect::<Vec<_>>();
     assert_eq!(names(&invariants_for_tick(7, 1.0, &all)), names(&all));
@@ -456,6 +479,7 @@ fn invariants_for_tick_runs_all_of_them_when_every_tick_is_sampled_none_at_a_rat
 
 #[test]
 fn every_invariant_has_a_name_of_its_own() {
+    csp_npc::install(); // T1719
     let mut seen = std::collections::HashSet::new();
     for inv in world_invariants() {
         assert!(!inv.name.trim().is_empty(), "an invariant has no name");
@@ -467,6 +491,7 @@ fn every_invariant_has_a_name_of_its_own() {
 /// domain's file and nothing else.
 #[test]
 fn every_domain_file_is_joined_into_the_list() {
+    csp_npc::install(); // T1719
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/invariants");
     let mut files: Vec<String> = std::fs::read_dir(dir)
         .expect("the invariants folder")
@@ -504,6 +529,7 @@ fn find(world: &WorldState, kind: BuildingKind) -> csp_shared::world::Building {
 
 #[test]
 fn catch_a_resident_who_runs_low_on_food_where_there_is_more_until_the_refill_runs() {
+    csp_npc::install(); // T1719
     let mut world = at_home();
     let found =
         csp_sim::invariants::invariant_named("refilled-when-low").unwrap().check(&world, terrain());
@@ -520,6 +546,7 @@ fn catch_a_resident_who_runs_low_on_food_where_there_is_more_until_the_refill_ru
 
 #[test]
 fn catch_a_territory_held_for_an_organization_that_does_not_exist() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     assert_eq!(
         csp_sim::invariants::invariant_named("territory-sound").unwrap().check(&world, terrain()),
@@ -536,6 +563,7 @@ fn catch_a_territory_held_for_an_organization_that_does_not_exist() {
 
 #[test]
 fn catch_a_city_building_that_belongs_to_another_city_than_its_chain_gives_it() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     let house = world.buildings.iter().position(|b| b.kind == BuildingKind::House).unwrap();
     let (id, city) =
@@ -567,6 +595,7 @@ fn outsider_world() -> (WorldState, String) {
 
 #[test]
 fn catch_an_outsiders_list_that_is_wrong() {
+    csp_npc::install(); // T1719
     let (mut world, city) = outsider_world();
     let first = world.residents[0].id.clone();
     let wrong = |world: &mut WorldState, list: &[&str]| -> Vec<String> {
@@ -600,6 +629,7 @@ fn catch_an_outsiders_list_that_is_wrong() {
 
 #[test]
 fn catch_more_than_one_carrier_fetcher_and_input_fetcher_of_the_games_own_defaults() {
+    csp_npc::install(); // T1719
     let mut world = world_with_city();
     let script = |memory: serde_json::Value| -> csp_shared::world::RunningScript {
         serde_json::from_value(json!({ "scriptId": 0, "task": "work", "memory": memory })).unwrap()

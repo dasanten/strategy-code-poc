@@ -109,25 +109,30 @@ fn a_worker_makes_that_much_a_game_day(
 
 #[test]
 fn a_simulated_worker_at_a_farm_makes_that_much_food_a_game_day() {
+    csp_npc::install(); // T1719
     a_worker_makes_that_much_a_game_day("farm", BuildingKind::Farm, Good::Food, None);
 }
 
 #[test]
 fn a_simulated_worker_at_a_mine_makes_that_much_iron_ore_a_game_day() {
+    csp_npc::install(); // T1719
     a_worker_makes_that_much_a_game_day("mine", BuildingKind::Mine, Good::IronOre, None);
 }
 
 #[test]
 fn a_simulated_worker_at_a_smelter_makes_that_much_iron_a_game_day() {
+    csp_npc::install(); // T1719
     a_worker_makes_that_much_a_game_day("smelter", BuildingKind::Smelter, Good::Iron, None);
 }
 
 #[test]
 fn a_simulated_worker_at_a_mint_makes_that_much_coins_a_game_day() {
+    csp_npc::install(); // T1719
     a_worker_makes_that_much_a_game_day("mint", BuildingKind::Mint, Good::Coins, None);
 }
 
 #[test]
 fn a_simulated_worker_at_a_smithy_makes_that_much_sword_a_game_day() {
+    csp_npc::install(); // T1719
     a_worker_makes_that_much_a_game_day("smithy", BuildingKind::Smithy, Good::Sword, Some("sword"));
 }

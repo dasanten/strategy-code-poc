@@ -93,6 +93,7 @@ fn order_kind(o: &Option<ArmyOrder>) -> Value {
 
 #[test]
 fn is_only_for_the_players_own_armies_and_scripts_that_can_run() {
+    csp_npc::install(); // T1719
     let mut g = setup();
     let s = create(&g, "idle", "let x = 1");
     let broken = create(&g, "broken", "let = ");
@@ -133,6 +134,7 @@ fn starts_from_fresh_memory_ends_the_armys_order_keeps_its_members_and_any_other
 
 #[test]
 fn is_not_ended_by_a_residents_order() {
+    csp_npc::install(); // T1719
     let mut g = setup();
     let s = create(&g, "idle", "memory.n = 1");
     give_script(&mut g, s);
@@ -145,6 +147,7 @@ fn is_not_ended_by_a_residents_order() {
 
 #[test]
 fn runs_once_a_tick_with_the_armys_memory_and_gives_army_orders_the_members_carry_out() {
+    csp_npc::install(); // T1719
     let mut g = setup();
     // Walk the army to (20, 10); once there, guard (11, 12); count the ticks it ran.
     let s = create(
@@ -187,6 +190,7 @@ fn runs_once_a_tick_with_the_armys_memory_and_gives_army_orders_the_members_carr
 
 #[test]
 fn sees_the_army_as_me_with_its_members_and_is_told_why_an_order_is_turned_down() {
+    csp_npc::install(); // T1719
     let mut g = setup();
     let s = create(
         &g,
@@ -215,6 +219,7 @@ fn sees_the_army_as_me_with_its_members_and_is_told_why_an_order_is_turned_down(
 
 #[test]
 fn logs_trouble_naming_the_army_and_ends_when_the_script_is_deleted() {
+    csp_npc::install(); // T1719
     let mut g = setup();
     let s = create(&g, "oops", "let x = nothing + 1");
     give_script(&mut g, s);
@@ -235,6 +240,7 @@ fn logs_trouble_naming_the_army_and_ends_when_the_script_is_deleted() {
 
 #[test]
 fn runs_with_its_own_step_budget_however_many_residents_scripts_run() {
+    csp_npc::install(); // T1719
     let mut g = setup();
     let lp = create(&g, "loop", "while (true) { }");
     // Many residents' scripts that each use up their own budget: none is cut short by the
@@ -258,6 +264,7 @@ fn runs_with_its_own_step_budget_however_many_residents_scripts_run() {
 
 #[test]
 fn is_seen_by_its_player_as_which_script_it_runs_not_its_memory() {
+    csp_npc::install(); // T1719
     let mut g = setup();
     let s = create(&g, "idle", "let x = 1");
     give_script(&mut g, s);
@@ -274,6 +281,7 @@ fn is_seen_by_its_player_as_which_script_it_runs_not_its_memory() {
 
 #[test]
 fn ends_with_its_army() {
+    csp_npc::install(); // T1719
     let mut g = setup();
     let s = create(&g, "count", "memory.n = 1");
     give_script(&mut g, s);
@@ -336,6 +344,7 @@ fn bind_every_name_in_the_army_script_api_every_army_order_but_forming_and_disba
 
 #[test]
 fn invariant_an_armys_script_requests_only_its_own_army_orders() {
+    csp_npc::install(); // T1719
     let g = setup();
     let kinds = csp_sim::orders::order_kinds();
     let request = |v: Value| -> OrderRequest { from(v) };
@@ -368,6 +377,7 @@ fn invariant_an_armys_script_requests_only_its_own_army_orders() {
 
 #[test]
 fn invariant_an_armys_running_script_is_sound() {
+    csp_npc::install(); // T1719
     let mut g = setup();
     let tick = g.world.tick;
     let army = g.world.armies.iter_mut().find(|a| a.id == "army1").unwrap();

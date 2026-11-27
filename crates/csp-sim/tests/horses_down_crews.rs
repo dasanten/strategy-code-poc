@@ -167,6 +167,7 @@ fn busy(terrain: &Arc<TerrainMap>) -> Busy {
 
 #[test]
 fn stands_on_the_road_with_its_load_its_driver_given_no_drive_order() {
+    csp_npc::install(); // T1719
     let World { mut world, terrain, mut scratch, .. } = fixture();
     let p = stand_on(&mut world, Convoy::Caravan(0), 400.0, 400.0, gold_ore());
     world.caravans[0].heading = Heading::Post;
@@ -186,6 +187,7 @@ fn stands_on_the_road_with_its_load_its_driver_given_no_drive_order() {
 
 #[test]
 fn still_loads_at_a_stop_so_food_put_on_board_wakes_the_horse_and_it_drives_on() {
+    csp_npc::install(); // T1719
     let World { mut world, terrain, mut scratch, .. } = fixture();
     let post_id = world.caravans[0].post_id.clone();
     let storage = route_end(&world, &post_id, Heading::Hq).storage.unwrap();
@@ -207,6 +209,7 @@ fn still_loads_at_a_stop_so_food_put_on_board_wakes_the_horse_and_it_drives_on()
 
 #[test]
 fn drives_on_once_the_horse_has_eaten_where_it_lay() {
+    csp_npc::install(); // T1719
     let World { mut world, terrain, mut scratch, .. } = fixture();
     let p = stand_on(&mut world, Convoy::Caravan(0), 400.0, 400.0, gold_ore());
     world.caravans[0].heading = Heading::Post;
@@ -223,6 +226,7 @@ fn drives_on_once_the_horse_has_eaten_where_it_lay() {
 
 #[test]
 fn keeps_its_delivery_no_drive_counts_as_ending_short_so_it_doesnt_turn_back() {
+    csp_npc::install(); // T1719
     let mut f = transfers_fixture::deliveries();
     let city = f.city.clone();
     let o = json!({ "kind": "buy", "good": "iron", "units": 4, "cityId": city });
@@ -262,6 +266,7 @@ fn keeps_its_delivery_no_drive_counts_as_ending_short_so_it_doesnt_turn_back() {
 
 #[test]
 fn keeps_its_transfer_no_drive_counts_as_ending_short_so_it_doesnt_turn_back() {
+    csp_npc::install(); // T1719
     let mut f = transfers_fixture::setup();
     let storage = f.storage.clone();
     f.set(&storage, Good::Iron, Some(100.0));
@@ -299,6 +304,7 @@ fn keeps_its_transfer_no_drive_counts_as_ending_short_so_it_doesnt_turn_back() {
 
 #[test]
 fn stands_on_the_road_and_doesnt_give_up_its_next_stop() {
+    csp_npc::install(); // T1719
     let World { mut world, terrain, mut scratch, post } = fixture();
     let p = stand_on(&mut world, Convoy::Trader(0), 400.0, 400.0, gold_ore());
     let t = &mut world.traders[0];
@@ -321,6 +327,7 @@ fn stands_on_the_road_and_doesnt_give_up_its_next_stop() {
 
 #[test]
 fn doesnt_give_up_a_stop_at_a_city_on_its_way() {
+    csp_npc::install(); // T1719
     let World { mut world, terrain, mut scratch, .. } = fixture();
     let mut m = Mulberry32::new(9.0);
     let city = found_npc_city(&mut world, &terrain, &NPC_VILLAGE, 500, 400, &mut || m.next(), None);
@@ -342,6 +349,7 @@ fn doesnt_give_up_a_stop_at_a_city_on_its_way() {
 
 #[test]
 fn doesnt_give_up_driving_to_a_lost_post() {
+    csp_npc::install(); // T1719
     let World { mut world, terrain, mut scratch, post } = fixture();
     let p = stand_on(&mut world, Convoy::Trader(0), 400.0, 400.0, gold_ore());
     let t = &mut world.traders[0];

@@ -124,6 +124,7 @@ fn stepped(name: &str, ticks: &[u64], compare: bool) -> Option<String> {
 /// new rule has its own tests (`wall_walk`, `walls`, `pathfinding`).
 #[test]
 fn the_village_steps_as_the_typescript_did() {
+    csp_npc::install(); // T1719
     assert_eq!(differential("village", &[1]), None);
 }
 
@@ -131,6 +132,7 @@ fn the_village_steps_as_the_typescript_did() {
 /// compared with the TypeScript's since T105.2 (`the_village_steps_as_the_typescript_did`).
 #[test]
 fn the_village_keeps_its_invariants_over_a_game_week() {
+    csp_npc::install(); // T1719
     assert_eq!(stepped("village", &[1440, 10080], false), None);
 }
 
@@ -138,6 +140,7 @@ fn the_village_keeps_its_invariants_over_a_game_week() {
 /// ground, so paths out of the HQ's gates differ from the TypeScript's (tick 60).
 #[test]
 fn the_trade_org_hq_steps_as_the_typescript_did() {
+    csp_npc::install(); // T1719
     assert_eq!(differential("hq", &[1]), None);
 }
 
@@ -147,6 +150,7 @@ fn the_trade_org_hq_steps_as_the_typescript_did() {
 #[test]
 #[ignore = "8.9 s alone: the HQ's NPC default scripts over a game week, invariants checked on the way; see #1132"]
 fn the_trade_org_hq_keeps_its_invariants_over_a_game_week() {
+    csp_npc::install(); // T1719
     assert_eq!(stepped("hq", &[1440, 10080], false), None);
 }
 

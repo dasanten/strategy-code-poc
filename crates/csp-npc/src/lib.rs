@@ -40,3 +40,14 @@ pub mod npc_threat;
 pub mod npc_towers;
 pub mod npc_trader;
 pub mod npc_training;
+
+/// T1719 experiment: the lib tests install the hooks before main (Windows CRT initializer).
+#[cfg(test)]
+#[used]
+#[unsafe(link_section = ".CRT$XCU")]
+static INSTALL_FOR_TESTS: extern "C" fn() = {
+    extern "C" fn init() {
+        crate::install()
+    }
+    init
+};

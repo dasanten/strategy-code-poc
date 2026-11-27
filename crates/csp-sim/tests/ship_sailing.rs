@@ -95,6 +95,7 @@ fn sailing(world: &WorldState) -> bool {
 
 #[test]
 fn sails_to_a_haven_across_the_sea_and_docks_there_with_everyone_aboard() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     assert_eq!(sail(&mut world, "w1", 31, 13), Ok(()));
@@ -123,6 +124,7 @@ fn sails_to_a_haven_across_the_sea_and_docks_there_with_everyone_aboard() {
 
 #[test]
 fn sails_to_a_sea_tile_and_lets_nobody_off_out_there() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     assert_eq!(sail(&mut world, "w2", 25, 20), Ok(()));
@@ -137,6 +139,7 @@ fn sails_to_a_sea_tile_and_lets_nobody_off_out_there() {
 
 #[test]
 fn needs_the_minimum_crew_and_a_captain_among_them() {
+    csp_npc::install(); // T1719
     let mut world = setup();
     assert_eq!(
         sail(&mut world, "p1", 25, 20),
@@ -152,6 +155,7 @@ fn needs_the_minimum_crew_and_a_captain_among_them() {
 
 #[test]
 fn goes_over_sea_only_never_onto_a_lake_or_land() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let world = setup();
     let v = s1(&world);
@@ -170,6 +174,7 @@ fn goes_over_sea_only_never_onto_a_lake_or_land() {
 
 #[test]
 fn a_skilled_crew_sails_faster() {
+    csp_npc::install(); // T1719
     let world = setup();
     let crew: Vec<_> = world.residents.iter().take(4).collect();
     let green = sail_speed(&crew);
@@ -183,6 +188,7 @@ fn a_skilled_crew_sails_faster() {
 
 #[test]
 fn stops_where_it_is_once_too_few_crew_are_aboard() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     assert_eq!(sail(&mut world, "w1", 25, 40), Ok(()));
@@ -268,6 +274,7 @@ mod stealing {
 
 #[test]
 fn those_aboard_a_docked_ship_are_fought_from_anywhere_on_its_haven() {
+    csp_npc::install(); // T1719
     let t = terrain();
     let mut world = setup();
     // b1 armed on (17, 5), three tiles from the ship's water: not in contact, but on its haven.

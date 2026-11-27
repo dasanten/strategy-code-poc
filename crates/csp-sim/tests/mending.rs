@@ -79,6 +79,7 @@ fn mend_ticks() -> usize {
 
 #[test]
 fn mending_a_piece_takes_a_share_of_its_recipe_rounded_and_at_least_one_unit() {
+    csp_npc::install(); // T1719
     assert_eq!(mend_input(Good::Sword), Some(vec![(Good::Iron, 1.0)]));
     assert_eq!(mend_input(Good::Armour), Some(vec![(Good::Iron, 2.0)]));
     assert_eq!(mend_input(Good::Spear), Some(vec![(Good::Wood, 1.0)]));
@@ -90,6 +91,7 @@ fn mending_a_piece_takes_a_share_of_its_recipe_rounded_and_at_least_one_unit() {
 
 #[test]
 fn a_worker_set_to_mend_puts_a_worn_sword_back_to_good_and_uses_its_share() {
+    csp_npc::install(); // T1719
     let (mut world, mut q) = setup(0.7, &[(Good::Iron, 5.0)]);
     assert_eq!(order(&mut world, &mut q, "mend"), "ack");
     let Some(ResidentOrder::WorkAt(o)) = &world.residents[0].order else { panic!("work order") };
@@ -108,6 +110,7 @@ fn a_worker_set_to_mend_puts_a_worn_sword_back_to_good_and_uses_its_share() {
 
 #[test]
 fn mending_is_faster_than_forging() {
+    csp_npc::install(); // T1719
     let (mut world, mut q) = setup(0.9, &[(Good::Iron, 5.0)]);
     assert_eq!(order(&mut world, &mut q, "mend"), "ack");
     let batches = BATCHES_PER_DAY.get("smithy").expect("batches");
@@ -119,6 +122,7 @@ fn mending_is_faster_than_forging() {
 
 #[test]
 fn stands_idle_without_the_input_and_mends_nothing_in_good_condition() {
+    csp_npc::install(); // T1719
     let (mut world, mut q) = setup(0.7, &[(Good::Wood, 5.0)]);
     assert_eq!(order(&mut world, &mut q, "mend"), "ack");
     run(&mut world, mend_ticks() * 3);
@@ -130,6 +134,7 @@ fn stands_idle_without_the_input_and_mends_nothing_in_good_condition() {
 
 #[test]
 fn mends_the_most_worn_piece_on_the_smithys_pile_too() {
+    csp_npc::install(); // T1719
     let (mut world, mut q) = setup(0.6, &[(Good::Iron, 5.0)]);
     world.piles.push(Pile {
         id: "p1".into(),
@@ -150,6 +155,7 @@ fn mends_the_most_worn_piece_on_the_smithys_pile_too() {
 
 #[test]
 fn only_a_smithy_mends() {
+    csp_npc::install(); // T1719
     let (mut world, mut q) = setup(0.7, &[]);
     world.buildings[0].kind = BuildingKind::Mint;
     assert_eq!(order(&mut world, &mut q, "mend"), "only a smithy mends");

@@ -123,6 +123,7 @@ fn sum(units: u32, price: impl Fn(f64) -> f64) -> f64 {
 
 #[test]
 fn sells_the_goods_go_into_the_warehouse_and_its_buy_price_per_unit_into_the_hands() {
+    csp_npc::install(); // T1719
     let mut s = post();
     s.carry(json!({ "iron": 10 }));
     let stock_before = s.wh(Good::Iron);
@@ -153,6 +154,7 @@ fn sells_the_goods_go_into_the_warehouse_and_its_buy_price_per_unit_into_the_han
 
 #[test]
 fn buys_the_coins_go_into_the_warehouse_and_the_goods_into_the_hands_at_its_sell_price() {
+    csp_npc::install(); // T1719
     let mut s = post();
     s.carry(json!({ "coins": 500 }));
     let stock_before = s.wh(Good::Wood);
@@ -170,6 +172,7 @@ fn buys_the_coins_go_into_the_warehouse_and_the_goods_into_the_hands_at_its_sell
 /// stock it is placed with.
 #[test]
 fn buys_and_sells_coal_and_steel() {
+    csp_npc::install(); // T1719
     for (good, name) in [(Good::Coal, "coal"), (Good::Steel, "steel")] {
         let mut s = post();
         let start = s.wh(good);
@@ -194,6 +197,7 @@ fn buys_and_sells_coal_and_steel() {
 
 #[test]
 fn cuts_a_purchase_down_to_what_fits_in_their_hands_and_to_the_coins_they_have() {
+    csp_npc::install(); // T1719
     let mut s = post();
     s.carry(json!({ "coins": 1000 }));
     s.set_wh(Good::Stone, 10_000.0);
@@ -215,6 +219,7 @@ fn cuts_a_purchase_down_to_what_fits_in_their_hands_and_to_the_coins_they_have()
 
 #[test]
 fn cuts_a_sale_down_to_what_they_hold_and_to_the_coins_the_warehouse_has() {
+    csp_npc::install(); // T1719
     let mut s = post();
     s.carry(json!({ "iron": 3 }));
     s.order(json!({ "kind": "sell", "good": "iron", "units": 50 }));
@@ -234,6 +239,7 @@ fn cuts_a_sale_down_to_what_they_hold_and_to_the_coins_the_warehouse_has() {
 
 #[test]
 fn logs_each_trade_in_the_realm_log() {
+    csp_npc::install(); // T1719
     let mut s = post();
     s.carry(json!({ "iron": 10 }));
     s.order(json!({ "kind": "sell", "good": "iron", "units": 2 }));
@@ -255,6 +261,7 @@ fn logs_each_trade_in_the_realm_log() {
 
 #[test]
 fn trades_from_and_into_a_carriage_of_theirs_on_the_tile() {
+    csp_npc::install(); // T1719
     let mut s = post();
     let (x, y) = (s.warehouse().x, s.warehouse().y);
     s.world.carriages.push(
@@ -280,6 +287,7 @@ fn trades_from_and_into_a_carriage_of_theirs_on_the_tile() {
 
 #[test]
 fn at_the_hq_takes_and_pays_coins_from_its_coin_warehouse() {
+    csp_npc::install(); // T1719
     let (mut world, size, _) = common::load_world("worlds/hq-0.json");
     let terrain = open(size);
     let hq = world.cities.iter().find(|c| c.trade_org.is_some()).unwrap().clone();
@@ -329,6 +337,7 @@ fn at_the_hq_takes_and_pays_coins_from_its_coin_warehouse() {
 /// (`stepSurvival`, T86.3), 900 coins of it; `bought` is then undefined and the sale rejected.
 #[test]
 fn always_costs_coins_to_buy_and_sell_back_or_sell_and_buy_back() {
+    csp_npc::install(); // T1719
     let mut s = post();
     for good in ["food", "iron", "goldOre"] {
         let g = csp_sim::queries::names::good_of(good).unwrap();
@@ -353,6 +362,7 @@ fn always_costs_coins_to_buy_and_sell_back_or_sell_and_buy_back() {
 
 #[test]
 fn rejects_trades_off_a_warehouse_by_children_of_unknown_goods_and_with_others_carriages() {
+    csp_npc::install(); // T1719
     let mut s = post();
     s.carry(json!({ "iron": 2, "coins": 50 }));
     assert_eq!(
@@ -395,6 +405,7 @@ fn rejects_trades_off_a_warehouse_by_children_of_unknown_goods_and_with_others_c
 
 #[test]
 fn has_an_invariant_that_a_trade_never_creates_or_destroys_goods_or_coins() {
+    csp_npc::install(); // T1719
     let mut s = post();
     s.carry(json!({ "iron": 4 }));
     s.order(json!({ "kind": "sell", "good": "iron", "units": 4 }));

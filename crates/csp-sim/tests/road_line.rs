@@ -55,6 +55,7 @@ fn line(
 
 #[test]
 fn runs_from_end_to_end_with_each_tile_next_to_the_one_before() {
+    csp_npc::install(); // T1719
     assert_eq!(road_line((1, 1), (4, 1), 10), [(1, 1), (2, 1), (3, 1), (4, 1)]);
     assert_eq!(road_line((0, 0), (3, 2), 10), [(0, 0), (1, 1), (2, 1), (3, 2)]);
     assert_eq!(road_line((2, 2), (2, 2), 10), [(2, 2)]);
@@ -62,6 +63,7 @@ fn runs_from_end_to_end_with_each_tile_next_to_the_one_before() {
 
 #[test]
 fn steps_diagonally_0_0_to_5_5_is_6_tiles_each_a_diagonal_step_on() {
+    csp_npc::install(); // T1719
     let l = road_line((0, 0), (5, 5), 10);
     assert_eq!(l.len(), 6);
     assert_eq!(l[0], (0, 0));
@@ -81,11 +83,13 @@ fn steps_diagonally_0_0_to_5_5_is_6_tiles_each_a_diagonal_step_on() {
 
 #[test]
 fn goes_the_short_way_round_the_map() {
+    csp_npc::install(); // T1719
     assert_eq!(road_line((8, 0), (1, 0), 10), [(8, 0), (9, 0), (0, 0), (1, 0)]);
 }
 
 #[test]
 fn rejects_lines_it_cant_build_and_orders_it_cant_give() {
+    csp_npc::install(); // T1719
     let mut rows = vec![".".repeat(10); 10];
     rows[1] = "...~......".into();
     let map = draw(&rows);
@@ -110,6 +114,7 @@ fn rejects_lines_it_cant_build_and_orders_it_cant_give() {
 
 #[test]
 fn covers_at_most_road_line_max_tiles_tiles() {
+    csp_npc::install(); // T1719
     let size = 3 * ROAD_LINE_MAX_TILES as usize;
     let map = draw(&vec![".".repeat(size); size]);
     let (world, mut orders) = setup(&map, 1.0, 1.0, 3.0 * stone());
@@ -132,6 +137,7 @@ fn covers_at_most_road_line_max_tiles_tiles() {
 
 #[test]
 fn a_wall_line_skips_tiles_with_a_wall_or_gate_and_checks_the_rest_like_a_wall() {
+    csp_npc::install(); // T1719
     let rows: Vec<String> =
         (0..10).map(|y| if y == 5 { ".^........".into() } else { ".".repeat(10) }).collect();
     let map = draw(&rows);
@@ -156,6 +162,7 @@ fn a_wall_line_skips_tiles_with_a_wall_or_gate_and_checks_the_rest_like_a_wall()
 
 #[test]
 fn builds_the_wall_line_that_skips_a_wall_or_gate() {
+    csp_npc::install(); // T1719
     let rows: Vec<String> =
         (0..10).map(|y| if y == 5 { ".^........".into() } else { ".".repeat(10) }).collect();
     let map = draw(&rows);
@@ -224,6 +231,7 @@ fn road_order(
 
 #[test]
 fn builds_the_line_of_road_tiles_one_after_another_then_is_done() {
+    csp_npc::install(); // T1719
     let map = open();
     let (mut world, mut orders) = setup(&map, 1.0, 1.0, 3.0 * stone());
     assert_eq!(road_order(&mut world, &mut orders, &map, (2, 1), (4, 1)), Ok(()));
@@ -253,6 +261,7 @@ fn builds_the_line_of_road_tiles_one_after_another_then_is_done() {
 
 #[test]
 fn skips_a_tile_that_has_a_road_already() {
+    csp_npc::install(); // T1719
     let map = open();
     let (mut world, mut orders) = setup(&map, 1.0, 1.0, 2.0 * stone());
     world.buildings.push(building("old", BuildingKind::Road, 2.0, 1.0));
@@ -272,6 +281,7 @@ fn skips_a_tile_that_has_a_road_already() {
 
 #[test]
 fn waits_on_a_site_for_materials_it_doesnt_carry() {
+    csp_npc::install(); // T1719
     let map = open();
     let (mut world, mut orders) = setup(&map, 1.0, 1.0, 0.0);
     road_order(&mut world, &mut orders, &map, (1, 1), (2, 1)).unwrap();
@@ -285,6 +295,7 @@ fn waits_on_a_site_for_materials_it_doesnt_carry() {
 
 #[test]
 fn lays_out_and_builds_every_tile_of_a_line_across_mountain() {
+    csp_npc::install(); // T1719
     let mut rows = vec![".".repeat(10); 10];
     rows[1] = "..^^^.....".into();
     let map = draw(&rows);
@@ -301,6 +312,7 @@ fn lays_out_and_builds_every_tile_of_a_line_across_mountain() {
 
 #[test]
 fn is_checked_by_an_invariant() {
+    csp_npc::install(); // T1719
     let map = open();
     let (mut world, _) = setup(&map, 1.0, 1.0, 3.0 * stone());
     world.residents[0].order = Some(
@@ -324,6 +336,7 @@ fn is_checked_by_an_invariant() {
 
 #[test]
 fn builds_wall_diagonally_tile_by_tile_and_nobody_steps_diagonally_through_it() {
+    csp_npc::install(); // T1719
     let map = open();
     let (mut world, mut orders) = setup(&map, 1.0, 1.0, 0.0);
     world.residents[0].carried = Stock::from([(Good::Wood, 4.0 * wood())]);

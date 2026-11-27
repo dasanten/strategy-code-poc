@@ -21,6 +21,7 @@ fn shortages_json(s: &[Shortage]) -> Value {
 
 #[test]
 fn every_city_of_the_fixtures_is_short_of_what_it_is_short_of_in_typescript() {
+    csp_npc::install(); // T1719
     let expected: Value =
         serde_json::from_str(include_str!("../src/npc/chain.json")).expect("chain.json");
     for case in expected.as_array().unwrap() {

@@ -175,6 +175,7 @@ fn load_of(
 
 #[test]
 fn fetches_a_load_of_ore_at_the_storage_picked_as_input() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = smelter_world("smelter");
     storage(&mut world, "near", 8.0, 6.0, json!({ "ironOre": 500 }));
     storage(&mut world, "main", 10.0, 6.0, json!({ "ironOre": 500 }));
@@ -198,6 +199,7 @@ fn fetches_a_load_of_ore_at_the_storage_picked_as_input() {
 
 #[test]
 fn fetches_at_the_main_storage_without_an_input_or_with_one_holding_none() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = smelter_world("smelter");
     storage(&mut world, "near", 8.0, 6.0, json!({ "ironOre": 500 }));
     storage(&mut world, "main", 10.0, 6.0, json!({ "ironOre": 500 }));
@@ -213,6 +215,7 @@ fn fetches_at_the_main_storage_without_an_input_or_with_one_holding_none() {
 
 #[test]
 fn fetches_at_the_nearest_storage_holding_ore_with_none_picked() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = smelter_world("smelter");
     storage(&mut world, "near", 8.0, 6.0, json!({ "wood": 50 }));
     storage(&mut world, "holding", 12.0, 6.0, json!({ "ironOre": 500 }));
@@ -229,6 +232,7 @@ fn fetches_at_the_nearest_storage_holding_ore_with_none_picked() {
 
 #[test]
 fn stands_idle_with_no_ore_anywhere() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = smelter_world("smelter");
     storage(&mut world, "s1", 8.0, 6.0, json!({ "wood": 50, "food": 50 }));
     for id in ["w1", "w2"] {
@@ -248,6 +252,7 @@ fn stands_idle_with_no_ore_anywhere() {
 
 #[test]
 fn fetches_nothing_while_the_pile_holds_a_batch_or_a_worker_carries_one() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = smelter_world("smelter");
     storage(&mut world, "s1", 8.0, 6.0, json!({ "ironOre": 500 }));
     let w1 = add_worker(&mut world, "w1", json!({}), None);
@@ -268,6 +273,7 @@ fn fetches_nothing_while_the_pile_holds_a_batch_or_a_worker_carries_one() {
 
 #[test]
 fn fetches_nothing_while_one_of_them_carries_the_output() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = smelter_world("smelter");
     storage(&mut world, "s1", 8.0, 6.0, json!({ "ironOre": 500 }));
     let w1 = add_worker(&mut world, "w1", json!({}), None);
@@ -286,6 +292,7 @@ fn fetches_nothing_while_one_of_them_carries_the_output() {
 
 #[test]
 fn brings_the_ore_to_the_pile_and_goes_back_to_work_one_fetcher_at_a_time() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = smelter_world("smelter");
     storage(&mut world, "s1", 12.0, 6.0, json!({ "ironOre": 300, "food": 200 }));
     for id in ["w1", "w2", "w3"] {
@@ -323,6 +330,7 @@ fn brings_the_ore_to_the_pile_and_goes_back_to_work_one_fetcher_at_a_time() {
 
 #[test]
 fn fetches_iron_and_wood_for_a_smithy_workers_recipe_in_its_proportions() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = smelter_world("smithy");
     storage(&mut world, "s1", 10.0, 6.0, json!({ "iron": 200, "wood": 200 }));
     add_worker(&mut world, "w1", json!({}), Some("spear"));
@@ -335,6 +343,7 @@ fn fetches_iron_and_wood_for_a_smithy_workers_recipe_in_its_proportions() {
 
 #[test]
 fn fetches_only_the_iron_a_smithy_lacks_with_wood_enough_on_its_pile_and_none_from_wood_alone() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = smelter_world("smithy");
     storage(&mut world, "s1", 10.0, 6.0, json!({ "wood": 200 }));
     world.piles.push(
@@ -354,6 +363,7 @@ fn fetches_only_the_iron_a_smithy_lacks_with_wood_enough_on_its_pile_and_none_fr
 
 #[test]
 fn flags_two_residents_of_a_workplace_away_fetching_its_inputs_at_once() {
+    csp_npc::install(); // T1719
     let (mut world, _) = smelter_world("smelter");
     let w1 = add_worker(&mut world, "w1", json!({}), None);
     let w2 = add_worker(&mut world, "w2", json!({}), None);
@@ -371,6 +381,7 @@ fn flags_two_residents_of_a_workplace_away_fetching_its_inputs_at_once() {
 
 #[test]
 fn fetches_iron_and_coal_for_a_smelter_set_to_steel() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = smelter_world("smelter");
     storage(&mut world, "s1", 10.0, 6.0, json!({ "iron": 200, "coal": 200, "ironOre": 200 }));
     add_worker(&mut world, "w1", json!({}), Some("steel"));
@@ -387,6 +398,7 @@ fn fetches_iron_and_coal_for_a_smelter_set_to_steel() {
 
 #[test]
 fn a_smelter_set_to_steel_with_no_coal_anywhere_stands_idle_and_says_so() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = smelter_world("smelter");
     storage(&mut world, "s1", 10.0, 6.0, json!({ "food": 50 }));
     world.piles.push(
@@ -413,6 +425,7 @@ fn a_smelter_set_to_steel_with_no_coal_anywhere_stands_idle_and_says_so() {
 
 #[test]
 fn a_smelter_with_no_ore_anywhere_says_so() {
+    csp_npc::install(); // T1719
     let (mut world, terrain) = smelter_world("smelter");
     storage(&mut world, "s1", 10.0, 6.0, json!({ "food": 50 }));
     add_worker(&mut world, "w1", json!({}), None);

@@ -181,6 +181,7 @@ fn died_events(world: &WorldState, user: u64) -> Vec<(String, DeathCause, bool, 
 
 #[test]
 fn lasts_about_one_real_day() {
+    csp_npc::install(); // T1719
     assert_eq!(DOWN_TICKS, DOWN_DAYS * TICKS_PER_GAME_DAY);
     // One tick is one real second.
     let hours = std::hint::black_box(DOWN_TICKS) / 3600.0;
@@ -189,6 +190,7 @@ fn lasts_about_one_real_day() {
 
 #[test]
 fn puts_a_resident_whose_health_hunger_used_up_down_instead_of_killing_them() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     starving(at(&mut s.world, "a2"));
     at(&mut s.world, "a2").carried = stock(&[(Good::Stone, 3.0)]);
@@ -210,6 +212,7 @@ fn puts_a_resident_whose_health_hunger_used_up_down_instead_of_killing_them() {
 
 #[test]
 fn ends_their_order_script_and_queue_gets_them_off_their_horse_and_out_of_their_army() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let ana = at(&mut s.world, "a2");
     starving(ana);
@@ -243,6 +246,7 @@ fn ends_their_order_script_and_queue_gets_them_off_their_horse_and_out_of_their_
 
 #[test]
 fn neither_eats_nor_loses_health_while_down_and_dies_of_hunger_when_the_time_is_up() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     starving(at(&mut s.world, "a2"));
     run(&mut s, 1, &["a2"], None);
@@ -267,6 +271,7 @@ fn neither_eats_nor_loses_health_while_down_and_dies_of_hunger_when_the_time_is_
 
 #[test]
 fn refuses_orders_to_a_down_resident_in_an_army_too() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let i = index_of(&s.world, "a2");
     go_down(&mut s.world, i);
@@ -297,6 +302,7 @@ fn refuses_orders_to_a_down_resident_in_an_army_too() {
 
 #[test]
 fn drops_an_order_that_came_before_they_went_down() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let walk = receive(
         &mut s,
@@ -313,6 +319,7 @@ fn drops_an_order_that_came_before_they_went_down() {
 
 #[test]
 fn keeps_them_lying_still_when_the_game_gives_them_an_order_anyway() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let i = index_of(&s.world, "a2");
     go_down(&mut s.world, i);
@@ -327,6 +334,7 @@ fn keeps_them_lying_still_when_the_game_gives_them_an_order_anyway() {
 
 #[test]
 fn keeps_a_down_leader_leading_the_realm_goes_on_until_they_die() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     starving(at(&mut s.world, "a1"));
     run(&mut s, 1, &["a1"], None);
@@ -340,6 +348,7 @@ fn keeps_a_down_leader_leading_the_realm_goes_on_until_they_die() {
 
 #[test]
 fn still_kills_in_a_fight_wounds_put_nobody_down() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     at(&mut s.world, "a2").health = 1.0;
     let reply = receive(
@@ -363,6 +372,7 @@ fn still_kills_in_a_fight_wounds_put_nobody_down() {
 
 #[test]
 fn shows_anyone_in_sight_that_they_are_down_and_when_it_ends_only_to_those_who_see_how_they_fare() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let i = index_of(&s.world, "a2");
     go_down(&mut s.world, i);
@@ -382,6 +392,7 @@ fn shows_anyone_in_sight_that_they_are_down_and_when_it_ends_only_to_those_who_s
 
 #[test]
 fn is_caught_by_the_invariant_when_someone_down_does_something_or_heals() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let i = index_of(&s.world, "a2");
     go_down(&mut s.world, i);
@@ -405,6 +416,7 @@ fn from_ana() -> Value {
 
 #[test]
 fn lets_one_of_the_same_realm_on_the_tile_take_what_they_carry_as_from_a_pile() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     at(&mut s.world, "a2").carried = stock(&[(Good::Stone, 3.0), (Good::Food, 2.0)]);
     let i = index_of(&s.world, "a2");
@@ -423,6 +435,7 @@ fn lets_one_of_the_same_realm_on_the_tile_take_what_they_carry_as_from_a_pile() 
 
 #[test]
 fn makes_taking_from_another_realms_down_resident_theft() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     at(&mut s.world, "a2").carried = stock(&[(Good::Stone, 3.0)]);
     let i = index_of(&s.world, "a2");
@@ -449,6 +462,7 @@ fn makes_taking_from_another_realms_down_resident_theft() {
 
 #[test]
 fn refuses_taking_from_someone_not_down_or_not_on_the_tile_and_putting_goods_on_them() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     at(&mut s.world, "a2").carried = stock(&[(Good::Stone, 3.0)]);
     at(&mut s.world, "a1").carried = stock(&[(Good::Wood, 1.0)]);
@@ -481,6 +495,7 @@ fn refuses_taking_from_someone_not_down_or_not_on_the_tile_and_putting_goods_on_
 
 #[test]
 fn kills_them_with_the_first_blow_lying_down_they_cant_dodge() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let i = index_of(&s.world, "a2");
     go_down(&mut s.world, i);
@@ -499,6 +514,7 @@ fn kills_them_with_the_first_blow_lying_down_they_cant_dodge() {
 
 #[test]
 fn dies_like_anyone_when_attacked_killed_a_crime_leaving_what_they_carried() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     at(&mut s.world, "a2").carried = stock(&[(Good::Stone, 3.0)]);
     let i = index_of(&s.world, "a2");

@@ -108,6 +108,7 @@ fn at_a_house(world: &WorldState, city: &str, t: Option<(f64, f64)>) -> bool {
 
 #[test]
 fn idle_adults_walk_to_a_house_spread_over_the_houses_and_stay_there() {
+    csp_npc::install(); // T1719
     let Village { mut world, city, .. } = village();
     assert!(houses_of(&world, &city).len() > 1);
     all_idle(&mut world, &city);
@@ -131,6 +132,7 @@ fn idle_adults_walk_to_a_house_spread_over_the_houses_and_stay_there() {
 
 #[test]
 fn takes_those_carrying_a_child_and_children_there_too() {
+    csp_npc::install(); // T1719
     let Village { mut world, city, .. } = village();
     let tick = world.tick as f64;
     world.residents[0].carrying = Some(
@@ -151,6 +153,7 @@ fn takes_those_carrying_a_child_and_children_there_too() {
 
 #[test]
 fn a_new_house_moves_nobody() {
+    csp_npc::install(); // T1719
     let Village { mut world, city, .. } = village();
     let house = houses_of(&world, &city)[0].clone();
     for r in &mut world.residents {
@@ -169,6 +172,7 @@ fn a_new_house_moves_nobody() {
 
 #[test]
 fn sets_off_when_the_pass_runs_but_at_once_from_outside_the_city() {
+    csp_npc::install(); // T1719
     let Village { mut world, city, .. } = village();
     all_idle(&mut world, &city);
     world.tick += 1;
@@ -180,6 +184,7 @@ fn sets_off_when_the_pass_runs_but_at_once_from_outside_the_city() {
 
 #[test]
 fn doesnt_walk_back_to_the_storage_for_food_once_it_has_eaten() {
+    csp_npc::install(); // T1719
     let Village { mut world, city, .. } = village();
     let house = houses_of(&world, &city)[0].clone();
     let r = &mut world.residents[0];
@@ -192,6 +197,7 @@ fn doesnt_walk_back_to_the_storage_for_food_once_it_has_eaten() {
 
 #[test]
 fn stands_at_a_house_for_days_eating_and_leaves_when_given_a_job() {
+    csp_npc::install(); // T1719
     let Village { mut world, terrain, city, storage } = village();
     let map = Arc::new(terrain.clone());
     let mut walking = Walking::without_budget(map);
@@ -248,6 +254,7 @@ fn stands_at_a_house_for_days_eating_and_leaves_when_given_a_job() {
 
 #[test]
 fn calls_off_the_walk_to_a_house_when_the_pass_finds_them_a_job() {
+    csp_npc::install(); // T1719
     let Village { mut world, city, storage, .. } = village();
     let farm = world
         .buildings
@@ -272,6 +279,7 @@ fn calls_off_the_walk_to_a_house_when_the_pass_finds_them_a_job() {
 
 #[test]
 fn leaves_soldiers_to_come_home_as_before() {
+    csp_npc::install(); // T1719
     let Village { mut world, city, storage, .. } = village();
     let house = houses_of(&world, &city)[0].clone();
     let r = &mut world.residents[0];
@@ -292,6 +300,7 @@ fn leaves_soldiers_to_come_home_as_before() {
 
 #[test]
 fn a_city_with_no_house_stands_at_its_home_as_before() {
+    csp_npc::install(); // T1719
     let Village { mut world, city, storage, .. } = village();
     world.buildings.retain(|b| b.kind != BuildingKind::House);
     stand(&mut world.residents[1], (110.0, 110.0));
@@ -306,6 +315,7 @@ fn a_city_with_no_house_stands_at_its_home_as_before() {
 
 #[test]
 fn leaves_a_trade_org_city_as_it_was() {
+    csp_npc::install(); // T1719
     let Village { mut world, city, .. } = village();
     world.cities.iter_mut().find(|c| c.id == city).unwrap().trade_org = Some(TradeOrgCity::Post);
     let tick = world.tick as f64;
@@ -318,6 +328,7 @@ fn leaves_a_trade_org_city_as_it_was() {
 
 #[test]
 fn has_an_invariant_against_a_crowd_of_idle_on_the_storage() {
+    csp_npc::install(); // T1719
     let Village { mut world, terrain, city, storage } = village();
     all_idle(&mut world, &city);
     let mut i = 0;

@@ -13,6 +13,7 @@ use csp_sim::world::create_world;
 
 #[test]
 fn lays_out_the_hq_as_the_typescript_did() {
+    csp_npc::install(); // T1719
     let (world, _, _) = common::load_world("worlds/hq-0.json");
     let hq = world.cities.iter().find(|c| c.trade_org.is_some()).unwrap();
     let hall = world.buildings.iter().find(|b| b.id == hq.town_hall_id).unwrap();
@@ -43,6 +44,7 @@ fn lays_out_the_hq_as_the_typescript_did() {
 
 #[test]
 fn founds_the_hq_the_typescript_founded() {
+    csp_npc::install(); // T1719
     let (mut want, _, _) = common::load_world("worlds/hq-0.json");
     // Its residents aged by today's childhood (Epic 113).
     csp_sim::fixture_ages::residents_aged_as_today(&mut want);

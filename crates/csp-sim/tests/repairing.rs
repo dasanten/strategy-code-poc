@@ -42,6 +42,7 @@ fn house(g: &Game) -> &csp_shared::world::Building {
 
 #[test]
 fn a_repair_from_the_card_fetches_the_wood_and_puts_the_house_back_to_good() {
+    csp_npc::install(); // T1719
     let mut g = game(30.0);
     let reply = g.give_to("w1", json!({ "kind": "task", "task": "repair", "buildingId": "h1" }));
     assert!(acked(&reply), "{reply:?}");
@@ -61,6 +62,7 @@ fn a_repair_from_the_card_fetches_the_wood_and_puts_the_house_back_to_good() {
 
 #[test]
 fn with_no_wood_in_any_storage_the_repair_ends_and_the_house_stays_worn() {
+    csp_npc::install(); // T1719
     let mut g = game(0.0);
     let reply = g.give_to("w1", json!({ "kind": "task", "task": "repair", "buildingId": "h1" }));
     assert!(acked(&reply), "{reply:?}");
@@ -70,6 +72,7 @@ fn with_no_wood_in_any_storage_the_repair_ends_and_the_house_stays_worn() {
 
 #[test]
 fn a_house_in_good_condition_is_not_repaired() {
+    csp_npc::install(); // T1719
     let mut g = game(30.0);
     g.world.buildings.iter_mut().find(|b| b.id == "h1").unwrap().decay = None;
     let reply = g.give_to("w1", json!({ "kind": "task", "task": "repair", "buildingId": "h1" }));
@@ -89,6 +92,7 @@ fn idle_builder(g: &mut Game) {
 
 #[test]
 fn an_idle_build_default_builder_repairs_the_worn_buildings_of_their_city_worst_first() {
+    csp_npc::install(); // T1719
     let mut g = game(30.0);
     idle_builder(&mut g);
     let build = default_script_id(MARA, Task::Build);
@@ -112,6 +116,7 @@ fn an_idle_build_default_builder_repairs_the_worn_buildings_of_their_city_worst_
 
 #[test]
 fn a_worn_building_outside_their_city_area_is_left_alone() {
+    csp_npc::install(); // T1719
     let mut g = game(30.0);
     idle_builder(&mut g);
     g.world.buildings.retain(|b| b.id != "h2");

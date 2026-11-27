@@ -929,6 +929,7 @@ fn written() -> Value {
 
 #[test]
 fn the_client_twins_file_holds_what_the_rust_originals_answer() {
+    csp_npc::install(); // T1719
     let want = written();
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(OUT);
     if std::env::var_os("CSP_WRITE_TWINS").is_some() {

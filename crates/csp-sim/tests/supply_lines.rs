@@ -144,6 +144,7 @@ impl Setup {
 
 #[test]
 fn feeds_army_members_from_a_carriage_of_their_realm_on_or_next_to_their_tile() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let k = &mut s.world.carriages[0];
     (k.x, k.y) = (31.0, 31.0);
@@ -160,6 +161,7 @@ fn feeds_army_members_from_a_carriage_of_their_realm_on_or_next_to_their_tile() 
 
 #[test]
 fn feeds_anyone_of_the_realm_beside_it_but_not_from_a_carriage_further_off_or_of_another_realm() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     add(&mut s.world, "x1", 31.0, 32.0);
     let k = &mut s.world.carriages[0];
@@ -178,6 +180,7 @@ fn feeds_anyone_of_the_realm_beside_it_but_not_from_a_carriage_further_off_or_of
 
 #[test]
 fn leaves_the_food_a_haul_route_keeps_on_board_for_the_horse() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.world.carriages[0].load = serde_json::from_value(json!({ "food": 5 })).unwrap();
     let haul = json!({
@@ -197,6 +200,7 @@ fn leaves_the_food_a_haul_route_keeps_on_board_for_the_horse() {
 
 #[test]
 fn take_only_the_players_own_army_as_a_stop_bringing_nothing_back() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let army = s.army_id.clone();
     let haul = |more: Value| {
@@ -222,6 +226,7 @@ fn take_only_the_players_own_army_as_a_stop_bringing_nothing_back() {
 
 #[test]
 fn a_supply_wagon_follows_its_army_and_feeds_it_far_from_home() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     s.world.carriages[0].load = serde_json::from_value(json!({ "food": 60 })).unwrap();
     let army = s.army_id.clone();
@@ -247,6 +252,7 @@ fn a_supply_wagon_follows_its_army_and_feeds_it_far_from_home() {
 
 #[test]
 fn a_haul_route_keeps_a_moving_army_fed_cutting_it_starves_the_army() {
+    csp_npc::install(); // T1719
     let start = |s: &mut Setup| {
         let route = json!({
             "kind": "haul", "residentId": "d1", "carriageId": "k1", "goods": ["food"],
@@ -283,6 +289,7 @@ fn a_haul_route_keeps_a_moving_army_fed_cutting_it_starves_the_army() {
 
 #[test]
 fn breaks_the_invariant_when_a_supply_line_goes_to_no_army_of_the_realm() {
+    csp_npc::install(); // T1719
     let mut s = setup();
     let army = s.army_id.clone();
     assert_eq!(

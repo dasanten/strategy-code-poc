@@ -17,6 +17,7 @@ use common::{assert_same_json, fixtures};
 
 #[test]
 fn founds_npc_cities_as_typescript_does() {
+    csp_npc::install(); // T1719
     let mut want: Value =
         serde_json::from_str(include_str!("../src/npc/founded.json")).expect("founded.json");
     // Its residents aged by today's childhood (Epic 113), as founded at tick 0.

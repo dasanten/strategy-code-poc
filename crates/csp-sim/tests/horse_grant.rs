@@ -66,6 +66,7 @@ fn assert_sound(world: &WorldState, terrain: &TerrainMap) {
 
 #[test]
 fn puts_two_new_horses_in_a_realms_stable_and_says_so_in_the_realm_log() {
+    csp_npc::install(); // T1719
     let (world, terrain, realm) = without_horses();
     let stable = world
         .buildings
@@ -101,6 +102,7 @@ fn puts_two_new_horses_in_a_realms_stable_and_says_so_in_the_realm_log() {
 
 #[test]
 fn puts_them_next_to_the_storage_with_food_on_the_ground_by_each_when_the_realm_has_no_stable() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, realm) = without_horses();
     let stable = world
         .buildings
@@ -140,6 +142,7 @@ fn puts_them_next_to_the_storage_with_food_on_the_ground_by_each_when_the_realm_
 
 #[test]
 fn puts_them_next_to_the_leader_when_the_realm_has_no_city() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, realm) = without_horses();
     // The realm's city went to nobody, as if lost; its Leader is still alive.
     for c in &mut world.cities {
@@ -164,6 +167,7 @@ fn puts_them_next_to_the_leader_when_the_realm_has_no_city() {
 
 #[test]
 fn gives_nothing_to_a_realm_with_a_horse_npc_cities_or_the_trade_organization() {
+    csp_npc::install(); // T1719
     let (world, terrain) = world_with_post();
     let before = world.clone();
     assert!(world.horses.iter().any(|h| h.realm_id.is_some()));
@@ -175,6 +179,7 @@ fn gives_nothing_to_a_realm_with_a_horse_npc_cities_or_the_trade_organization() 
 
 #[test]
 fn gives_nothing_a_second_time() {
+    csp_npc::install(); // T1719
     let (mut once, terrain, _) = without_horses();
     grant_horses(&mut once, &terrain);
     let mut twice = once.clone();
@@ -184,6 +189,7 @@ fn gives_nothing_a_second_time() {
 
 #[test]
 fn gives_nothing_to_a_realm_whose_leader_is_dead() {
+    csp_npc::install(); // T1719
     let (mut world, terrain, realm) = without_horses();
     let leader = world.realms[0].leader_id.clone();
     world.residents.retain(|r| r.id != leader);
