@@ -36,6 +36,9 @@ impl TickReporter for Kept {
     }
 }
 
+/// What a play asks before each tick: the orders of that tick of the run, as `(user id, request)`.
+pub type Requests<'a> = dyn FnMut(&WorldState, u64) -> Vec<(u64, Value)> + 'a;
+
 /// Plays `ticks` ticks on `world`. Before each, the residents are fed, `requests` is asked for
 /// the orders of this tick of the run (counted from 0), each as `(the Player's user id, the
 /// request)`, and they are given; `rule` runs on the world; then the tick, with every world
@@ -46,7 +49,7 @@ pub fn play(
     terrain: TerrainMap,
     seed: u64,
     ticks: u64,
-    requests: &mut dyn FnMut(&WorldState, u64) -> Vec<(u64, Value)>,
+    requests: &mut Requests,
     rule: &mut dyn FnMut(&mut WorldState),
 ) -> Result<Vec<Given>, Box<Failure>> {
     let terrain = Arc::new(terrain);

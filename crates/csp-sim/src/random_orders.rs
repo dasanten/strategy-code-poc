@@ -22,7 +22,7 @@ mod shrink;
 
 pub use play::play;
 pub use replay::{replay, Broken, Replay, Step};
-pub use shrink::{report, shrink};
+pub use shrink::report;
 
 /// The run's own random numbers (splitmix64), seeded by the run's seed.
 pub struct Draws(u64);
