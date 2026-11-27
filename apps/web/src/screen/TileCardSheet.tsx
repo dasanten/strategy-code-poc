@@ -18,7 +18,7 @@ import { CardSheet, TileCard } from './SelectionCard.js'
 import { storePlaceAt } from '../realm/realm-orders-view.js'
 import { RealmTileOrders } from '../realm/RealmOrders.js'
 import { buildingNodeKind } from '../building/building-info-view.js'
-import { describeTile } from './selection-view.js'
+import { describeTile, strangersOnTile } from './selection-view.js'
 import { WorkSettings } from '../building/WorkSettings.js'
 import { paramValueLabel } from '../script/script-params-view.js'
 import { useLand } from '../world/useLand.js'
@@ -107,7 +107,7 @@ export function TileCardSheet(props: TileCardSheetProps) {
             terrain: terrainAt?.(selectedTile.x, selectedTile.y),
             region: regionAt(land, world.map.size, selectedTile.x, selectedTile.y),
             patch: world.patches.find((p) => p.x === selectedTile.x && p.y === selectedTile.y),
-            strangers: world.residents.filter((r) => !own.some((o) => o.id === r.id)),
+            strangers: strangersOnTile(world.residents, own, selectedTile, tileBuilding),
             residents: world.residents,
             // A building remembered out of sight is named after its city as last seen.
             cities: [...world.cities, ...world.lastSeen.cities],

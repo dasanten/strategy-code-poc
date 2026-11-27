@@ -1625,6 +1625,23 @@ function pausedBreedingLines(
 }
 
 /**
+ * The strangers a tile card is about: the residents in sight who are not the Player's to command
+ * and stand on the tile, or on the footprint of the building the card is about.
+ */
+export function strangersOnTile(
+  residents: SeenResident[],
+  own: readonly { id: string }[],
+  tile: { x: number; y: number },
+  building?: Building,
+): SeenResident[] {
+  return residents.filter(
+    (r) =>
+      !own.some((o) => o.id === r.id) &&
+      (building ? covers(building, r.x, r.y) : r.x === tile.x && r.y === tile.y),
+  )
+}
+
+/**
  * The card for a tile: named after the most important thing on it (a building or site, then a
  * carriage, goods on the ground, a resource node, strangers), with a line for everything there.
  * Where no building is in sight but the Player remembers one, the card is named after that, says
