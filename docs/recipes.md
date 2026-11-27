@@ -4,7 +4,7 @@ Step lists for the changes tickets make again and again (T124.3). Adding a build
 a vessel or siege machine, or an order is in `docs/adding-content.md`; this covers the rest. Each
 recipe was followed once on a throwaway branch; what the checks asked for is written in.
 
-What a change *does* is a rule. It is Daniel's call, and it goes into its section file of
+What a change _does_ is a rule. It is Daniel's call, and it goes into its section file of
 `docs/context/` first (a new term also into `CONTEXT.md`). Its numbers are yours to pick: list
 them in the PR.
 
@@ -20,7 +20,7 @@ Every recipe ends the same way:
 1. The rule, in its section file of `docs/context/`.
 2. Its code in the module of its domain in `crates/csp-sim/src/`. A new module is declared in
    `crates/csp-sim/src/lib.rs`; its tests go in `<module>/tests.rs` beside it (`#[cfg(test)] mod
-   tests;`), as `rally.rs` and `rally/tests.rs` do.
+tests;`), as `rally.rs` and `rally/tests.rs` do.
 3. If it runs every tick: its call in `step_world` or `step_rest` (`crates/csp-sim/src/world.rs`),
    at the place in the tick order that what it reads needs. The order carries behaviour: read the
    steps around the place before you pick it. A rule a resident's order carries out goes in its
@@ -38,8 +38,8 @@ Every recipe ends the same way:
 8. A rule that changes what NPC cities do: also "An NPC behaviour".
 9. A rule that changes what a save holds: also "A change to the shape of the world state".
 
-The fixture comparisons (`npc_chain`, `npc_stepped`, `residents_stepped`, `sight_fixtures` and
-the rest in `crates/csp-sim/tests/`) are frozen TypeScript output. A rule that changes what they
+The fixture comparisons (`differential`, `npc_chain`, `npc_stepped`, `residents_stepped`,
+`sight_fixtures` and the rest in `crates/csp-sim/tests/`) are frozen TypeScript output. A rule that changes what they
 compare fails them: replace the failing comparison with a Rust test of the new rule, never edit a
 fixture, and say so in the PR (`CLAUDE.md`: The server is Rust).
 
@@ -48,7 +48,11 @@ fixture, and say so in the PR (`CLAUDE.md`: The server is Rust).
 The world is never reset (ADR 0006): a save written by today's server loads into tomorrow's.
 
 1. The type in `crates/csp-shared/src/world/` (`mod.rs` holds `WorldState`; each part has its own
-   file). A new field takes `#[serde(default)]` unless every save must already hold it.
+   file). A new field takes `#[serde(default, skip_serializing_if = ...)]` on its empty value, as
+   the fields around it do: `default` so an older save loads, `skip_serializing_if` because the
+   round trips fail on a field that a save without it comes back with ("added by the round
+   trip"). A field of `WorldState` itself is also set in `create_world`
+   (`crates/csp-sim/src/world.rs`), which the compiler asks for.
 2. Bump `WORLD_FORMAT_VERSION` in `crates/csp-shared/src/world/world_format.rs` by one. Two
    tickets on one epic each bump in turn: after merging the epic tip, bump again past it.
 3. Its migration step in `migrations()` (`crates/csp-server/src/world_format.rs`), with a test
@@ -62,6 +66,9 @@ The world is never reset (ADR 0006): a save written by today's server loads into
 5. Run `cargo nextest run -p csp-shared` and `cargo nextest run -p csp-server world_format`: the
    round trips (`crates/csp-shared/tests/world_round_trip.rs`) read the frozen save and the world
    fixtures with the new shape.
+6. A field that a tick changes on the fixture worlds fails the differential run
+   (`crates/csp-sim/tests/differential.rs`: "extra" or "missing" at some tick), a fixture
+   comparison like those above: replace it with a Rust test of the rule, never edit the fixture.
 
 ## A balance number
 
@@ -72,10 +79,14 @@ The world is never reset (ADR 0006): a save written by today's server loads into
    the block and says `Not exported` in its comment.
 2. Read it in Rust as `csp_shared::balance::NAME`, whichever file it is in.
 3. `pnpm balance:rust`, and commit `packages/balance/`: `balance.json`, `balance.d.ts` and
-   `src/constants.ts` each get its line. The client imports it from `@csp/balance`.
-4. Its wiki section shows it from `@csp/balance`: `import { NAME } from '@csp/balance'` in
+   `src/constants.ts` each get its line (`the_files_in_packages_balance_are_not_stale` fails
+   until then). The client imports it from `@csp/balance`.
+4. A changed value fails the unit tests that pin what it does (changing `NPC_JOB_MARGIN` failed
+   two of `npc_scores`): read them, as they say what the number is for, and move their numbers
+   with it only where the rule still holds.
+5. Its wiki section shows it from `@csp/balance`: `import { NAME } from '@csp/balance'` in
    `apps/web/src/wiki/<topic>.tsx`, never the value typed into the text.
-5. List it in the PR with the value picked and why.
+6. List it in the PR with the value picked and why.
 
 ## An invariant
 
@@ -118,7 +129,8 @@ Everything a script reads or asks for goes through the game API (ADR 0002). The 
   it as it is.
 - **What a param accepts:** `script_tables/param_descriptions.rs`.
 
-Then `pnpm script-data:rust`, and commit `packages/lang-wasm/script-data.json`. The
+Then `pnpm script-data:rust`, and commit `packages/lang-wasm/script-data.json`
+(`script_data_json_is_not_stale` fails until then). The
 editor's completions, the checker and the wiki's game API section read it: the wiki test
 (`apps/web/src/wiki/wiki-scripting.test.ts`) asks for every binding and view field there, so
 they need no hand-written text, but a binding's `description` is what the Player reads.
@@ -135,7 +147,7 @@ The client calls the game's own Rust rules as WebAssembly, never a TypeScript co
      `value_rules.rs`, and one function in `packages/lang-wasm/src/rules.ts` that calls
      `rule('<name>', ...)`;
    - **the world in sight:** a method of `WorldMirror` in `rules.rs` (`#[wasm_bindgen(js_name =
-     ...)]`), called on the client through `worldMirror()` (`apps/web/src/world/world-mirror.ts`);
+...)]`), called on the client through `worldMirror()` (`apps/web/src/world/world-mirror.ts`);
      and its line in `crates/csp-sim/tests/mirror_parity.rs`, which asks it of the full world and
      of each realm's mirror. If it reads what no Player is sent, it answers otherwise there: name
      it in `DIFFERS` with what the mirror answers, and in the table of `docs/wasm-rules.md`;
@@ -183,7 +195,7 @@ NPC cities only give their residents orders, which request actions as a Player's
    Most are `#[ignore]`d with their time; run them with `pnpm test:slow` (all but the year run,
    several minutes on an idle machine), or one by name:
    `cargo nextest run --cargo-profile slow --profile slow -p csp-sim --lib --run-ignored only -E
-   "test(/npc_slow::surplus::/)"`. Run the ones for what you changed before the PR, and say which
+"test(/npc_slow::surplus::/)"`. Run the ones for what you changed before the PR, and say which
    in it. The coordinator runs `pnpm test:slow` before an epic goes into `dev`, as epics interact
    through NPC behaviour. The year run (`pnpm test:year`) is a nightly report, not a check.
 
@@ -199,7 +211,9 @@ in `map/` (ADR 0044: the layout; `docs/context/screen.md`: its terms).
    `<name>-view.ts` beside it and tested in `<name>-view.test.ts` (the tests run in Node: keep
    React out of the view).
 2. Where it opens: a sidebar tab is one line in `SIDE_TABS` (`screen/hud-view.ts`) and its
-   `sideTab(...)` in `screen/GameSidebar.tsx`; typecheck asks for nothing more, so check it shows.
+   `sideTab(...)` in `screen/GameSidebar.tsx`. Typecheck then asks for its icon in `TAB_ICONS`
+   (`ui/ui-icons.ts`), and `screen/hud-view.test.ts` for its place in the strip; nothing asks for
+   the `sideTab(...)`, so check that it shows.
    A card or its tab goes in `screen/SelectionCard.tsx` and `screen/selection-view.ts`
    (ADR 0012).
 3. Its look from `ui/Kit.tsx`, `ui/panel-head.tsx` and the theme (`ui/theme.ts`; ADR 0044: Pixel
@@ -217,7 +231,8 @@ in `map/` (ADR 0044: the layout; `docs/context/screen.md`: its terms).
    city areas, roads) or `overlay` (above them), or a container of its own added to the stage in
    its order (`app.stage.addChild(...)`). Colours from `map/palette.ts`.
 3. If it shows at some zoom tiers only, say which (`map/levels.ts`); if the legend names it,
-   `map/legend.ts`.
+   `map/legend.ts`. Typecheck and the tests ask for none of this: the layer is only seen in the
+   browser.
 
 Then `pnpm check <base>` runs lint, typecheck and the tests your change affects. A change you can
 see goes into the browser before the PR: run the app on a copy of a world (`world.db` copied to a
