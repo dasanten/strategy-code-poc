@@ -1,6 +1,6 @@
 import { Container, Graphics, Sprite, Text } from 'pixi.js'
 import type { City, ResourceKind } from '@csp/shared-types'
-import { THEME, hex } from '../theme.js'
+import { THEME, hex } from '../ui/theme.js'
 import type { Atlas } from './atlas.js'
 
 /** Who owns a token, seen from the Player's realm (ADR 0008). There is no "enemy": no war state. */

@@ -1,7 +1,7 @@
 import type { Building } from '@csp/shared-types'
 import { cityAreaTileArray } from '@csp/lang-wasm'
-import { footprintKeys } from '../footprint.js'
-import { wrapDelta } from '../terrain.js'
+import { footprintKeys } from '../building/footprint.js'
+import { wrapDelta } from '../world/terrain.js'
 
 /**
  * What the map draws buildings and city areas from, worked out once for each list of buildings
@@ -21,7 +21,7 @@ export interface Structures {
 }
 
 /** A city's area: its tiles, and a square around them to tell whether any is on screen. */
-export interface CityArea {
+interface CityArea {
   /** The tiles as x, y pairs. */
   tiles: Int32Array
   /** A tile of the area, and how many tiles from it, along either side, the area reaches. */

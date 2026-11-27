@@ -1,5 +1,5 @@
-import { SHARES_A_TILE } from '../building.js'
-import { isDown } from '../world.js'
+import { SHARES_A_TILE } from '../building/building.js'
+import { isDown } from '../world/world.js'
 import type {
   Army,
   Building,
@@ -12,7 +12,7 @@ import type {
   SeenVessel,
   SeenMachine,
 } from '@csp/shared-types'
-import { caravanParts } from '../caravans.js'
+import { caravanParts } from '../trade/caravans.js'
 import {
   ACTIVITY_ART,
   BASE_ART,
@@ -85,7 +85,7 @@ export interface Spot {
 export type Where = (id: string, x: number, y: number) => readonly [number, number]
 
 /** Every token in place: the map between ticks when nothing moves. */
-export const inPlace: Where = (_id, x, y) => [x, y]
+const inPlace: Where = (_id, x, y) => [x, y]
 
 /** How far a Down resident's or horse's figure is turned: lying on its side (`CONTEXT.md`: Down). */
 const LYING = -Math.PI / 2

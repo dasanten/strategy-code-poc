@@ -52,7 +52,7 @@ Trial: a Kiln (wood into coal), 5 files edited by hand and 4 regenerated. The ep
    label, the script stock view's text, weight, warehouse floor, base price, what it is as gear,
    and wear. The goods lists, the balance tables and the script stock view's field are made from
    it.
-3. The client's art: `GOOD_ART` (`apps/web/src/goods-grid.ts`), which typecheck asks for. Its
+3. The client's art: `GOOD_ART` (`apps/web/src/ui/goods-grid.ts`), which typecheck asks for. Its
    icon file in `apps/web/src/assets/goods/` and its slice in `PIXEL_GOOD` (`map/pixel-art.ts`),
    which the tests ask for.
 4. Where it comes from (a recipe in a building's block, a node) and who uses it. These are rules.

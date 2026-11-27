@@ -1,0 +1,17 @@
+// Unused exports, files and dependencies (knip, T123.1): `pnpm knip`, run by `pnpm check` and CI.
+// An export only a test imports counts as used: the test reaches it.
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      // The scripts run as `node scripts/<name>.mjs` from package.json, check.mjs and the docs.
+      "entry": ["scripts/*.mjs"],
+      // wasm-build.mjs runs `node_modules/binaryen/bin/wasm-opt` by its path, not by an import.
+      "ignoreDependencies": ["binaryen"],
+      // A cargo-installed binary (`cargo install wasm-bindgen-cli`), not an npm package.
+      "ignoreBinaries": ["wasm-bindgen"],
+    },
+    "apps/web": {},
+    "packages/*": {},
+  },
+}

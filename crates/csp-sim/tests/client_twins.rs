@@ -3,7 +3,7 @@
 //! would cost more than the rule. Each is held to its Rust original here: for two fixture worlds,
 //! as a realm is sent them (`entities_revealed`), each original answers the cases below on the
 //! mirror of what was sent, and `client_twins.json` keeps the entities, the cases and the answers.
-//! `apps/web/src/client-twins.test.ts` asks the TypeScript the same cases of the same entities and
+//! `apps/web/src/world/client-twins.test.ts` asks the TypeScript the same cases of the same entities and
 //! fails on any answer that differs; this test fails when the file is not what the originals
 //! answer now. Write it again with `CSP_WRITE_TWINS=1 cargo nextest run -p csp-sim client_twins`.
 //!

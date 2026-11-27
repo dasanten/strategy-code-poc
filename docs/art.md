@@ -238,4 +238,4 @@ of half-finished sheets is fine.
 Draw it in a new slice, and if the code doesn't know the name yet, add it to
 `apps/web/src/map/pixel-art.ts`. A different look by state (as the open gate or the hitched
 carriage) is a slice of its own that the code picks. A new UI icon goes in `UI_ICONS` in
-`apps/web/src/ui-icons.ts`, with a placeholder cell if it has one.
+`apps/web/src/ui/ui-icons.ts`, with a placeholder cell if it has one.

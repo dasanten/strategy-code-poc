@@ -1,6 +1,6 @@
 import { CARRIAGE_SPEED, DIAGONAL_STEP, TERRAIN_SPEED } from '@csp/balance'
-import { Terrain, wrap, wrapDelta } from '../terrain.js'
-import { roadLine } from '../building.js'
+import { Terrain, wrap, wrapDelta } from '../world/terrain.js'
+import { roadLine } from '../building/building.js'
 
 /** A tile on the map. */
 export type Point = readonly [x: number, y: number]
@@ -12,7 +12,7 @@ export type Goer = 'foot' | 'carriage'
  * How many tiles the preview's search looks at before it gives up and draws a straight line: a
  * few dozen tiles of detour around a lake, cheap enough to run each time the pointer moves on.
  */
-export const PREVIEW_SEARCH_TILES = 20_000
+const PREVIEW_SEARCH_TILES = 20_000
 
 /**
  * The way a resident or carriage would go from `from` to `to` (`CONTEXT.md`: Picking a target),

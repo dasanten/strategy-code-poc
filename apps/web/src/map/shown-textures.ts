@@ -1,5 +1,5 @@
 /** How long one frame may spend painting chunk textures, new ones and ones made again. */
-export const PAINT_BUDGET_MS = 4
+const PAINT_BUDGET_MS = 4
 
 /**
  * How many chunk textures are kept at most, besides those on screen now: 64 KB each, so 64 MB

@@ -1,5 +1,5 @@
 import { CHUNK_SIZE, TERRAIN_BATCH_MAX, TERRAIN_LEVEL_MAX, UNEXPLORED } from '@csp/shared-types'
-import { chunksAcross, levelChunksAcross, wrap, wrapDelta } from '../terrain.js'
+import { chunksAcross, levelChunksAcross, wrap, wrapDelta } from '../world/terrain.js'
 import { cityAreaTileList } from '@csp/lang-wasm'
 import type { Building, City } from '@csp/shared-types'
 import type { Camera, Size } from './camera.js'
@@ -192,7 +192,7 @@ export function minimapPixels(
 }
 
 /** What a dot on the minimap stands for; drawn in this order, the Player's waypoints on top. */
-export type MinimapDotKind = 'resident' | 'carriage' | 'city' | 'home' | 'waypoint'
+type MinimapDotKind = 'resident' | 'carriage' | 'city' | 'home' | 'waypoint'
 
 export interface MinimapDot {
   kind: MinimapDotKind

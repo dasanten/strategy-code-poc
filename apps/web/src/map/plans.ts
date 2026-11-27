@@ -1,8 +1,8 @@
 import type { Graphics } from 'pixi.js'
-import { FOOTPRINT } from '../footprint.js'
+import { FOOTPRINT } from '../building/footprint.js'
 import { LINE_BUILDING } from '@csp/shared-types'
-import { isLineOrder, roadLine } from '../building.js'
-import { currentIndex, queueSteps } from '../queue.js'
+import { isLineOrder, roadLine } from '../building/building.js'
+import { currentIndex, queueSteps } from '../queue/queue.js'
 import type { Building, BuildingKind, OrderRequest, SeenResident } from '@csp/shared-types'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 import { ROAD_COLOR } from './palette.js'
@@ -10,10 +10,10 @@ import { roadJoins, roadWidth } from './roads.js'
 import { drawWallTiles, wallSides, type WallTile } from './wall-tile.js'
 
 /** What a road or wall line builds on each of its tiles. */
-export type LineBuilding = 'road' | 'wall'
+type LineBuilding = 'road' | 'wall'
 
 /** A tile still to build of one of the Player's lines; `strong` when a picked resident's. */
-export interface GhostTile {
+interface GhostTile {
   x: number
   y: number
   kind: LineBuilding
@@ -21,7 +21,7 @@ export interface GhostTile {
 }
 
 /** A build of the Player's not laid out yet: its kind and north-west tile; `strong` as above. */
-export interface GhostFootprint {
+interface GhostFootprint {
   x: number
   y: number
   kind: BuildingKind
@@ -40,7 +40,7 @@ export interface Plans {
 }
 
 /** How strongly a ghost is drawn: faint, or a picked resident's. */
-export const GHOST_ALPHA = { faint: 0.3, strong: 0.65 } as const
+const GHOST_ALPHA = { faint: 0.3, strong: 0.65 } as const
 
 /** Who the plans are of, and what already stands. */
 interface Planners {

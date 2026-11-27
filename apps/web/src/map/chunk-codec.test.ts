@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { decodeChunk, decodeChunkBatch, encodeChunk, encodeChunkBatch } from './chunk-codec.js'
 import { CHUNK_SIZE } from '@csp/shared-types'
-import { Terrain } from '../terrain.js'
+import { Terrain } from '../world/terrain.js'
 describe('chunk encoding', () => {
   it('round-trips terrain and resource nodes', () => {
     const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(Terrain.Forest)

@@ -47,9 +47,25 @@ export default tseslint.config(
     // `world-rules.ts` is the module's front: each of its functions calls the module. Tests may
     // write an answer out by hand.
     files: ['apps/web/**/*.{ts,tsx}'],
-    ignores: ['apps/web/src/world-rules.ts', '**/*.test.ts'],
+    ignores: ['apps/web/src/world/world-rules.ts', '**/*.test.ts'],
     plugins: { csp: noRuleCopy },
     rules: { 'csp/no-rule-copy': 'error' },
+  },
+  {
+    // No client function grows longer (T123.6): the limit sits at the longest one left,
+    // `MapView`; the long ones are to be split in tickets of their own. Tests are left out: a
+    // `describe` block holds its cases. `Game()` only wires and lays out, and keeps to 300.
+    files: ['apps/web/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'max-lines-per-function': ['error', { max: 1150, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  {
+    files: ['apps/web/src/App.tsx'],
+    rules: {
+      'max-lines-per-function': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
+    },
   },
   prettier,
 )

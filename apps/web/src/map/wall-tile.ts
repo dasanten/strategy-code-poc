@@ -1,7 +1,7 @@
 import type { Graphics } from 'pixi.js'
 
 /** The dark edge of a wall tile (`CONTEXT.md`: Wall / Gate). */
-export const WALL_EDGE_COLOR = 0x0e1419
+const WALL_EDGE_COLOR = 0x0e1419
 
 /** One wall or gate tile to draw: its top left corner on screen, and which sides touch another wall. */
 export interface WallTile {
@@ -69,7 +69,7 @@ export function wallSides(
 }
 
 /** The stone of a stone wall or gate tile (`CONTEXT.md`: Wood or stone), a placeholder look. */
-export const STONE_WALL_COLOR = 0xc9c4ba
+const STONE_WALL_COLOR = 0xc9c4ba
 
 /**
  * Marks stone wall or gate tiles apart from wooden ones (`CONTEXT.md`: Wood or stone): a block of

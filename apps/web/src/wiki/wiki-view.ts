@@ -67,9 +67,9 @@ import {
   walkSpeed,
   workOutput,
 } from '@csp/balance'
-import { BUILDABLE, SITES_OF_MOVERS } from '../building.js'
+import { BUILDABLE, SITES_OF_MOVERS } from '../building/building.js'
 import { STAT_NAMES } from '@csp/shared-types'
-import { SKILL_NAMES } from '../world.js'
+import { SKILL_NAMES } from '../world/world.js'
 import type {
   TrainingSubject,
   BuildingKind,
@@ -151,7 +151,7 @@ export const zealFullRealMinutes = () => (ZEAL_CAP_HOURS * TICKS_PER_GAME_HOUR *
 export const pct = (share: number) => `${num(share * 100, 1)} %`
 
 /** Real time for a number of real seconds: "1 h 36 min". */
-export function realTime(seconds: number): string {
+function realTime(seconds: number): string {
   const s = Math.round(seconds)
   if (s >= 2 * 86_400) return `${num(s / 86_400, 1)} real days`
   if (s >= 3600) {
@@ -256,7 +256,7 @@ export function priceAt(good: PricedGood, floors: number) {
 }
 
 /** What goods are worth at a warehouse at its base price (`sell`) and what it pays (`buy`). */
-export function worth(stock: Stock): { sell: number; buy: number } {
+function worth(stock: Stock): { sell: number; buy: number } {
   let sell = 0
   let buy = 0
   for (const [good, units] of Object.entries(stock) as [Good, number][]) {
@@ -477,7 +477,7 @@ export interface TransportRow {
 export const AVERAGE_CARRY = carryCapacity(AVERAGE, AT)
 
 /** A horse of average stats (`CONTEXT.md`: Horse stats), for the wiki's carriage numbers. */
-export const AVERAGE_HORSE = { stats: AVERAGE_HORSE_STATS }
+const AVERAGE_HORSE = { stats: AVERAGE_HORSE_STATS }
 
 export function transport(): TransportRow[] {
   return TERRAIN_NAMES.map((terrain) => {

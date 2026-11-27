@@ -1,8 +1,8 @@
 import { BUILDING_KINDS, BUILDING_SPECS } from '@csp/balance'
-import { Terrain } from '../terrain.js'
+import { Terrain } from '../world/terrain.js'
 import { UNEXPLORED } from '@csp/shared-types'
 import type { BuildingKind, ResourceKind } from '@csp/shared-types'
-import { THEME, hex, type Relationship } from '../theme.js'
+import { THEME, hex, type Relationship } from '../ui/theme.js'
 
 /** Roads, wide and light over the terrain (ADR 0008). */
 export const ROAD_COLOR = hex(THEME.terrain.road)
@@ -72,31 +72,6 @@ export const LEADER_COLOR = RELATIONSHIP_COLORS.own
 export const WALL_COLOR = 0x8a5a2b
 /** A city's area, laid faintly over the terrain. */
 export const CITY_AREA_COLOR = 0xf2e3b8
-export const BUILDING_COLORS: Record<BuildingKind, number> = {
-  townHall: 0xd8c08a,
-  wall: WALL_COLOR,
-  gate: 0xb88a55,
-  tower: WALL_COLOR,
-  house: 0xc7b391,
-  storage: 0x8c6a44,
-  warehouse: 0x6e5236,
-  farm: 0x9db05f,
-  stable: 0xa0703f,
-  mine: 0x5e5a57,
-  quarry: 0xb3ada3,
-  lumberCamp: 0x6b7f3c,
-  smelter: 0x9a4a2f,
-  mint: 0xc9a227,
-  smithy: 0x4a4e57,
-  trainingGround: 0xb8925a,
-  road: ROAD_COLOR,
-  carriage: 0xa0703f,
-  boat: 0x8a6a45,
-  ship: 0x6b5236,
-  ram: 0x7a5a3a,
-  catapult: 0x6e5a44,
-  haven: 0x5f8fa8,
-}
 
 /** What the game calls each kind of building (its spec's label). */
 export const BUILDING_NAMES: Record<BuildingKind, string> = Object.fromEntries(

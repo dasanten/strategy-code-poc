@@ -562,9 +562,9 @@ fn the_client_speaks_the_servers_protocol_version_and_knows_its_close_code() {
     // Where the client uses them, it imports them from the generated constants.
     let web = concat!(env!("CARGO_MANIFEST_DIR"), "/../../apps/web/src/");
     let uses = [
-        ("useWorld.ts", "PROTOCOL_VERSION"),
-        ("socket-frames.ts", "WS_CLOSE_UPDATED"),
-        ("socket-frames.ts", "WS_CLOSE_RELOAD"),
+        ("world/useWorld.ts", "PROTOCOL_VERSION"),
+        ("world/socket-frames.ts", "WS_CLOSE_UPDATED"),
+        ("world/socket-frames.ts", "WS_CLOSE_RELOAD"),
     ];
     for (file, name) in uses {
         let text = std::fs::read_to_string(format!("{web}{file}")).unwrap().replace("\r\n", "\n");

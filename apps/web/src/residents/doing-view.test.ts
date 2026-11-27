@@ -1,0 +1,555 @@
+import { TERRAIN_SPEED, TICKS_PER_GAME_YEAR, WALK_TICKS_PER_TILE } from '@csp/balance'
+import { Terrain } from '../world/terrain.js'
+import { UNEXPLORED } from '@csp/shared-types'
+import type { Building, ResidentOrder, ScriptSummary } from '@csp/shared-types'
+import { afterEach, describe, expect, it } from 'vitest'
+import { mirrorOf } from '../world/test-mirror.js'
+import { arrivalOf, doingLine, interruptedLine, scriptLine, type DoingOf } from './doing-view.js'
+
+const summary = (id: number, task: ScriptSummary['task']): ScriptSummary => ({
+  id,
+  name: task ? `${task} (default)` : 'Mine',
+  activeVersion: 1,
+  latestVersion: 1,
+  task,
+  followsDefault: true,
+  params: [],
+})
+const scripts = [
+  summary(1, 'work'),
+  summary(2, 'build'),
+  summary(3, 'haul'),
+  summary(4, 'tearDown'),
+  summary(6, 'feedStable'),
+  summary(7, 'breed'),
+  summary(8, 'train'),
+  summary(9, 'buildLine'),
+  summary(5, null),
+]
+const buildings: Pick<Building, 'id' | 'kind'>[] = [
+  { id: 's1', kind: 'storage' },
+  { id: 'st1', kind: 'stable' },
+]
+const at = { x: 4, y: 5 }
+
+const walk: ResidentOrder = { kind: 'walkTo', target: at, path: [[4, 5]], progress: 0 }
+const store: ResidentOrder = {
+  kind: 'store',
+  goods: { iron: null },
+  to: { kind: 'storage', storageId: 's1' },
+  phase: 'walking',
+  path: null,
+  progress: 0,
+}
+const fetch: ResidentOrder = {
+  kind: 'fetch',
+  goods: { wood: 10, stone: 4 },
+  from: { kind: 'storage', storageId: 's1' },
+  phase: 'walking',
+  path: null,
+  progress: 0,
+}
+const work: ResidentOrder = { kind: 'workAt', buildingId: 'b1', at, progress: 0 }
+const build: ResidentOrder = { kind: 'build', building: 'house', at, siteId: 'x1' }
+const tearDown: ResidentOrder = { kind: 'tearDown', buildingId: 'b1', at }
+const haul: ResidentOrder = {
+  kind: 'haul',
+  carriageId: 'k1',
+  from: { x: 1, y: 1 },
+  to: at,
+  goods: ['wood'],
+  returnGoods: [],
+  keepFood: 2,
+  moving: null,
+  stop: 'to',
+  phase: 'driving',
+  path: null,
+  progress: 0,
+}
+
+const line = (r: DoingOf) => doingLine(r, { scripts, buildings })
+
+describe('doingLine', () => {
+  it('says someone is Down, and how long is left when that is seen (`CONTEXT.md`: Down)', () => {
+    const until = 5000 + 23 * 3600
+    expect(doingLine({ order: null, downUntil: until }, { tick: 5000 })).toBe(
+      'Down from hunger: about 23 h (58 game days) left',
+    )
+    // Another realm's resident: Down is seen, when it ends isn't.
+    expect(doingLine({ order: null, down: true }, { tick: 5000 })).toBe('Down from hunger')
+  })
+
+  it('names the city a resident relocates to (`CONTEXT.md`: Relocate)', () => {
+    const order: ResidentOrder = {
+      kind: 'relocate',
+      cityId: 'c2',
+      target: at,
+      path: null,
+      progress: 0,
+    }
+    const cities = [{ id: 'c2', name: 'Redbank' }]
+    expect(doingLine({ order }, { cities })).toBe('Relocating to Redbank')
+    const walking = { ...order, path: [[4, 5]] as [number, number][] }
+    expect(doingLine({ order: walking }, { cities })).toBe('Relocating to Redbank · 1 tiles to go')
+    expect(doingLine({ order }, {})).toBe('Relocating to another city')
+  })
+
+  it('says a resident is handing in a transfer, to the city it goes to (`CONTEXT.md`: Transfer)', () => {
+    const order: ResidentOrder = {
+      kind: 'handIn',
+      good: 'wood',
+      units: 10,
+      carriageId: null,
+      toCityId: 'c2',
+    }
+    expect(doingLine({ order }, { cities: [{ id: 'c2', name: 'Redbank' }] })).toBe(
+      'Handing in a transfer to Redbank',
+    )
+    expect(doingLine({ order }, {})).toBe('Handing in a transfer')
+  })
+
+  it('says what a teacher teaches (`CONTEXT.md`: Teacher)', () => {
+    const teach = (subject: 'strength' | 'combat'): ResidentOrder => ({
+      kind: 'teach',
+      buildingId: 'g1',
+      subject,
+    })
+    expect(line({ order: teach('strength') })).toBe('Teaching Strength')
+    expect(line({ order: teach('combat') })).toBe('Teaching Combat')
+  })
+
+  it('says what a trainee learns, or that they wait (`CONTEXT.md`: Training)', () => {
+    const train = (learning: 'strength' | null): ResidentOrder => ({
+      kind: 'train',
+      buildingId: 'g1',
+      learning,
+    })
+    expect(line({ order: train('strength') })).toBe('Training Strength')
+    expect(line({ order: train(null) })).toBe('Waiting to train')
+    // Under the Train task the order's line shows, unless the script says otherwise.
+    const trainee = { scriptId: 8 }
+    expect(line({ order: train('strength'), script: trainee })).toBe('Training Strength')
+    expect(line({ order: null, script: trainee })).toBe('Training: waiting')
+    const waiting = { scriptId: 8, doing: 'Waiting for a teacher' }
+    expect(line({ order: train(null), script: waiting })).toBe('Waiting for a teacher')
+  })
+
+  it('names the task and what its current order has them doing', () => {
+    const worker = { scriptId: 1, building: 'mine' as const }
+    expect(line({ order: work, script: worker })).toBe('Working the mine')
+    expect(
+      line({ order: { ...work, makes: 'sword' }, script: { ...worker, building: 'smithy' } }),
+    ).toBe('Working the smithy: making sword')
+    expect(line({ order: store, script: worker })).toBe(
+      'Working the mine: carrying iron to the storage',
+    )
+    expect(line({ order: walk, script: worker })).toBe(
+      'Working the mine: walking to 4, 5 · 1 tiles to go',
+    )
+    const builder = { scriptId: 2, building: 'house' as const }
+    expect(line({ order: build, script: builder })).toBe('Building a house')
+    expect(line({ order: fetch, script: builder })).toBe(
+      'Building a house: fetching 10 wood and 4 stone from the storage',
+    )
+    expect(line({ order: null, script: builder })).toBe('Building a house: waiting')
+    // Its script waits on the order (`CONTEXT.md`: Running a script, Waiting).
+    expect(line({ order: fetch, script: { ...builder, waiting: true } })).toBe(
+      'Building a house: fetching 10 wood and 4 stone from the storage · script waiting',
+    )
+    expect(line({ order: build, script: { scriptId: 2, building: 'lumberCamp' } })).toBe(
+      'Building a lumber camp',
+    )
+    // Build line: the line's road or wall (`CONTEXT.md`: Build line).
+    const liner = { scriptId: 9, building: 'wall' as const }
+    const wall: ResidentOrder = { ...build, building: 'wall' }
+    expect(line({ order: wall, script: liner })).toBe('Building a wall line')
+    expect(line({ order: walk, script: liner })).toBe(
+      'Building a wall line: walking to 4, 5 · 1 tiles to go',
+    )
+    expect(line({ order: fetch, script: liner })).toBe(
+      'Building a wall line: fetching 10 wood and 4 stone from the storage',
+    )
+    expect(line({ order: tearDown, script: { scriptId: 4, building: 'farm' } })).toBe(
+      'Tearing down the farm',
+    )
+    expect(line({ order: haul, script: { scriptId: 3 } })).toBe('Hauling wood to 4, 5')
+    expect(line({ order: null, script: { scriptId: 3 } })).toBe('Hauling: waiting')
+    // Feed the stable has no order of its own: it waits, walks, fetches and stores.
+    const feeder = { scriptId: 6 }
+    expect(line({ order: null, script: feeder })).toBe('Feeding the stable: waiting')
+    expect(line({ order: { ...fetch, goods: { food: 12 } }, script: feeder })).toBe(
+      'Feeding the stable: fetching 12 food from the storage',
+    )
+    expect(
+      line({
+        order: { ...store, goods: { food: 12 }, to: { kind: 'storage', storageId: 'st1' } },
+        script: feeder,
+      }),
+    ).toBe('Feeding the stable: carrying 12 food to the stable')
+    // Breed horses: its own order reads as the task; while getting Food it fetches.
+    const breeder = { scriptId: 7, building: 'stable' as const }
+    const breed: ResidentOrder = {
+      kind: 'breed',
+      stableId: 'st1',
+      horseIds: ['h1', 'h2'],
+      at,
+      progress: 0,
+    }
+    expect(line({ order: breed, script: breeder })).toBe('Breeding horses')
+    expect(line({ order: { ...fetch, goods: { food: 10 } }, script: breeder })).toBe(
+      'Breeding horses: fetching 10 food from the storage',
+    )
+  })
+
+  it('names the two horses being bred, as far as the Player knows them (`CONTEXT.md`: Doing)', () => {
+    const breed: ResidentOrder = {
+      kind: 'breed',
+      stableId: 'st1',
+      horseIds: ['h1', 'h2'],
+      at,
+      progress: 0,
+    }
+    const star = { id: 'h1', name: 'Star' }
+    const blaze = { id: 'h2', name: 'Blaze' }
+    const breeder = { scriptId: 7, building: 'stable' as const }
+    const seen = (horses: { id: string; name: string }[]) => ({ scripts, buildings, horses })
+
+    // The order on its own, and under the Breed horses task.
+    expect(doingLine({ order: breed }, seen([star, blaze]))).toBe('Breeding Star and Blaze')
+    expect(doingLine({ order: breed, script: breeder }, seen([star, blaze]))).toBe(
+      'Breeding Star and Blaze',
+    )
+    // One gone from the stable and out of what the Player knows, whichever of the two it is.
+    expect(doingLine({ order: breed, script: breeder }, seen([star]))).toBe(
+      'Breeding Star and another horse',
+    )
+    expect(doingLine({ order: breed, script: breeder }, seen([blaze]))).toBe(
+      'Breeding Blaze and another horse',
+    )
+    // Neither known.
+    expect(doingLine({ order: breed, script: breeder }, seen([]))).toBe('Breeding horses')
+    // Getting Food first, no pair is being bred yet.
+    expect(
+      doingLine({ order: { ...fetch, goods: { food: 10 } }, script: breeder }, seen([star, blaze])),
+    ).toBe('Breeding horses: fetching 10 food from the storage')
+    // Under another task, a script's own doing() and a defence script's small line.
+    expect(
+      doingLine({ order: breed, script: { scriptId: 1, building: 'farm' } }, seen([star, blaze])),
+    ).toBe('Working the farm: breeding Star and Blaze')
+    expect(
+      doingLine({ order: breed, script: { ...breeder, doing: 'Tending' } }, seen([star, blaze])),
+    ).toBe('Tending')
+    expect(
+      interruptedLine({ interrupted: { order: breed, script: breeder } }, seen([star, blaze])),
+    ).toBe('Then: breeding Star and Blaze')
+  })
+
+  it('says Work builds its workplace first while it is still a site', () => {
+    // `CONTEXT.md`: Working a site.
+    const first = { scriptId: 0, task: 'work', building: 'farm', site: true } as const
+    expect(line({ order: build, script: first })).toBe('Building the farm (to work it)')
+    expect(line({ order: { ...fetch, goods: { wood: 10 } }, script: first })).toBe(
+      'Building the farm (to work it): fetching 10 wood from the storage',
+    )
+    expect(line({ order: work, script: { scriptId: 0, task: 'work', building: 'farm' } })).toBe(
+      'Working the farm',
+    )
+  })
+
+  it('takes the task from the server when the script is none of the Player’s', () => {
+    expect(line({ order: work, script: { scriptId: 0, task: 'work', building: 'farm' } })).toBe(
+      'Working the farm',
+    )
+  })
+
+  it('says where goods go or come from, the stable or a carriage too', () => {
+    const toStable = {
+      ...store,
+      goods: { food: 6 },
+      to: { kind: 'storage' as const, storageId: 'st1' },
+    }
+    expect(line({ order: toStable })).toBe('Carrying 6 food to the stable')
+    const fromCarriage = {
+      ...fetch,
+      goods: { food: null },
+      from: { kind: 'carriage' as const, carriageId: 'k1' },
+    }
+    expect(line({ order: fromCarriage })).toBe('Fetching food from the carriage')
+    expect(line({ order: { ...store, phase: 'refilling' } })).toBe('Taking food along')
+  })
+
+  it('shows a script’s own order lines without a task, and Idle without an order', () => {
+    expect(line({ order: walk, script: { scriptId: 5 } })).toBe('Walking to 4, 5 · 1 tiles to go')
+    expect(line({ order: null, script: { scriptId: 5 } })).toBe('Idle')
+    expect(line({ order: null })).toBe('Idle')
+    expect(line({ order: null, carrying: { since: 0 } })).toBe('Carrying a child')
+  })
+
+  it('says Riding where a rider would walk (CONTEXT.md: Riding)', () => {
+    const riding = 'h1'
+    expect(line({ order: walk, riding })).toBe('Riding to 4, 5 · 1 tiles to go')
+    expect(line({ order: walk, riding, script: { scriptId: 5 } })).toBe(
+      'Riding to 4, 5 · 1 tiles to go',
+    )
+    expect(line({ order: walk, riding, script: { scriptId: 1, building: 'mine' } })).toBe(
+      'Working the mine: riding to 4, 5 · 1 tiles to go',
+    )
+    const road: ResidentOrder = {
+      kind: 'roadLine',
+      tiles: [[4, 5]],
+      phase: 'walking',
+      path: null,
+      progress: 0,
+      siteId: null,
+    }
+    expect(line({ order: road, riding })).toBe('Riding to lay road at 4, 5 · 1 road tile to go')
+    // Their own doing() still wins.
+    expect(line({ order: walk, riding, script: { scriptId: 5, doing: 'Scouting' } })).toBe(
+      'Scouting',
+    )
+  })
+
+  it('shows what the script last gave doing() instead', () => {
+    expect(
+      line({
+        order: work,
+        script: { scriptId: 1, building: 'farm', doing: 'Feeding the stable: waiting' },
+      }),
+    ).toBe('Feeding the stable: waiting')
+    expect(line({ order: null, script: { scriptId: 5, doing: 'Guarding' } })).toBe('Guarding')
+  })
+
+  it('says someone is up on the wall walk (`CONTEXT.md`: Wall walk)', () => {
+    const seen = { scripts, buildings, residents: [] }
+    expect(doingLine({ order: null, up: 'inside' }, seen)).toBe('Up on the wall walk')
+    const walk: ResidentOrder = { kind: 'walkTo', target: { x: 4, y: 5 }, path: null, progress: 0 }
+    expect(doingLine({ order: walk, up: 'outside' }, seen)).toBe(
+      `${doingLine({ order: walk }, seen)} · on the wall walk`,
+    )
+    expect(doingLine({ order: null, up: 'inside', down: true }, seen)).toBe('Down from hunger')
+  })
+
+  it('says a boat’s passenger is aboard a boat', () => {
+    expect(doingLine({ order: null, aboard: 'boat7' }, { scripts, buildings, residents: [] })).toBe(
+      'Aboard a boat',
+    )
+    expect(doingLine({ order: null, aboard: 'ship3' }, { scripts, buildings, residents: [] })).toBe(
+      'Aboard a ship',
+    )
+  })
+
+  it('says a passenger is aboard, and where the carriage is heading while it is driven', () => {
+    const aboard = (residents: { order: ResidentOrder | null }[], more: Partial<DoingOf> = {}) =>
+      doingLine({ order: null, aboard: 'k1', ...more }, { scripts, buildings, residents })
+    expect(aboard([])).toBe('Aboard a carriage')
+    const drive: ResidentOrder = {
+      kind: 'drive',
+      carriageId: 'k1',
+      target: { x: 12, y: 30 },
+      path: null,
+      progress: 0,
+    }
+    expect(aboard([{ order: null }, { order: drive }])).toBe(
+      'Aboard a carriage · heading to 12, 30',
+    )
+    // Another carriage's driver says nothing about this one.
+    expect(aboard([{ order: { ...drive, carriageId: 'k2' } }])).toBe('Aboard a carriage')
+    // On a haul route: heading to the stop it drives to, and only aboard while it loads.
+    expect(aboard([{ order: haul }])).toBe('Aboard a carriage · heading to 4, 5')
+    expect(aboard([{ order: { ...haul, phase: 'loading' } }])).toBe('Aboard a carriage')
+    // Instead of Idle, waiting or expecting a child; a script's own doing() still wins.
+    expect(aboard([], { script: { scriptId: 5 } })).toBe('Aboard a carriage')
+    expect(aboard([], { script: { scriptId: 1, building: 'farm' } })).toBe('Aboard a carriage')
+    expect(aboard([], { carrying: { since: 0 } })).toBe('Aboard a carriage')
+    expect(aboard([], { script: { scriptId: 5, doing: 'Riding along' } })).toBe('Riding along')
+  })
+
+  it('says about when a walker, rider or driver arrives (CONTEXT.md: Doing, Estimates)', () => {
+    const soon = (r: DoingOf, arrives: number) => doingLine(r, { scripts, buildings, arrives })
+    expect(soon({ order: walk }, 180)).toBe('Walking to 4, 5 · about 3 min (3 game hours)')
+    expect(soon({ order: walk, riding: 'h1' }, 30)).toBe('Riding to 4, 5 · under a minute')
+    const drive: ResidentOrder = {
+      kind: 'drive',
+      carriageId: 'k1',
+      target: at,
+      path: [],
+      progress: 0,
+    }
+    expect(soon({ order: drive }, 1200)).toBe('Driving to 4, 5 · about 20 min (a game day)')
+    const row: ResidentOrder = { kind: 'row', vesselId: 'boat1', target: at, path: [], progress: 0 }
+    expect(soon({ order: row, aboard: 'boat1' }, 60)).toBe(
+      'Rowing to 4, 5 · about 1 min (a game hour)',
+    )
+    expect(soon({ order: { ...row, path: null }, aboard: 'boat1' }, 60)).toBe(
+      'Finding a way over the water to 4, 5',
+    )
+    const hauling = { ...haul, path: [[4, 5]] as [number, number][] }
+    expect(soon({ order: hauling, script: { scriptId: 3 } }, 180)).toBe(
+      'Hauling wood to 4, 5 · about 3 min (3 game hours)',
+    )
+    expect(soon({ order: walk, script: { scriptId: 1, building: 'mine' } }, 180)).toBe(
+      'Working the mine: walking to 4, 5 · about 3 min (3 game hours)',
+    )
+  })
+
+  it('says about when a crew, line or attack order gets there, as a walk (#1621)', () => {
+    const soon = (r: DoingOf, arrives: number) => doingLine(r, { scripts, buildings, arrives })
+    const path: [number, number][] = [[4, 5]]
+    const crew: ResidentOrder = { kind: 'crew', machineId: 'm1', path, progress: 0 }
+    expect(soon({ order: crew }, 180)).toBe(
+      'Walking to the ram to crew it · about 3 min (3 game hours)',
+    )
+    const road: ResidentOrder = {
+      kind: 'roadLine',
+      tiles: [[4, 5]],
+      phase: 'walking',
+      path,
+      progress: 0,
+      siteId: null,
+    }
+    expect(soon({ order: road }, 180)).toBe(
+      'Walking to lay road at 4, 5 · about 3 min (3 game hours) · 1 road tile to go',
+    )
+    const attack: ResidentOrder = {
+      kind: 'attack',
+      targetId: 'r9',
+      path,
+      progress: 0,
+      strike: 0,
+      started: false,
+    }
+    expect(soon({ order: attack }, 60)).toBe('Going after their target · about 1 min (a game hour)')
+    expect(doingLine({ order: attack }, { scripts, buildings })).toBe('Going after their target')
+  })
+})
+
+describe('scriptLine', () => {
+  it('leaves out the default script of the task, which the Doing line already says', () => {
+    const working: DoingOf = { order: work, script: { scriptId: 1, building: 'farm' } }
+    expect(doingLine(working, { scripts, buildings })).toBe('Working the farm')
+    expect(scriptLine(working, scripts)).toBeUndefined()
+    expect(scriptLine({ script: { scriptId: 0, task: 'work' } }, scripts)).toBeUndefined()
+  })
+
+  it('names any other script, and nothing while none runs', () => {
+    expect(scriptLine({ script: { scriptId: 5 } }, scripts)).toBe('Mine')
+    expect(scriptLine({ script: { scriptId: 99 } }, scripts)).toBe('a script')
+    expect(scriptLine({}, scripts)).toBeUndefined()
+  })
+})
+
+describe('arrivalOf', () => {
+  const stat = { base: 10, trained: 0 }
+  const way = (path: [number, number][]): ResidentOrder => ({
+    kind: 'walkTo',
+    target: { x: 2, y: 0 },
+    path,
+    progress: 0,
+  })
+  const ada = {
+    id: 'r1',
+    owner: 'me',
+    stats: { strength: stat, endurance: stat, agility: stat, intellect: stat },
+    bornAt: -30 * TICKS_PER_GAME_YEAR,
+    order: way([
+      [1, 0],
+      [2, 0],
+    ]),
+  }
+  const road = { id: 'rd', kind: 'road' as const, cityId: null, x: 2, y: 0 } as Building
+  const world = { size: 64, buildings: [road] }
+  const ground = (x: number) => (x === 1 ? UNEXPLORED : Terrain.Mountain)
+  const plains = WALK_TICKS_PER_TILE / TERRAIN_SPEED[Terrain.Plains]
+  const onRoad = WALK_TICKS_PER_TILE / TERRAIN_SPEED[Terrain.Road]
+  afterEach(() => mirrorOf())
+
+  it('counts a road over any terrain, and unexplored ground as Plains', () => {
+    mirrorOf({ size: 64, residents: [ada], buildings: [road] })
+    expect(arrivalOf(world, ground)(ada)).toBeCloseTo(plains + onRoad)
+  })
+
+  it('estimates a way given in place of their own order, as the route preview does', () => {
+    mirrorOf({ size: 64, residents: [{ ...ada, order: null }], buildings: [road] })
+    const ticks = arrivalOf(world, ground)({ ...ada, order: null }, way([[1, 0]]))
+    expect(ticks).toBeCloseTo(plains)
+    expect(arrivalOf(world, ground)({ ...ada, order: null })).toBeUndefined()
+  })
+
+  it('tells nothing until the mirror has a world, nor of one it doesn’t hold', () => {
+    expect(arrivalOf(world, ground)(ada)).toBeUndefined()
+    mirrorOf({ size: 64, residents: [], buildings: [road] })
+    expect(arrivalOf(world, ground)(ada)).toBeUndefined()
+  })
+})
+
+describe('defending (`CONTEXT.md`: Defence script)', () => {
+  const work: ResidentOrder = { kind: 'workAt', buildingId: 'f1', at, progress: 0 }
+  it('says what Defend says, and what goes on once it ends', () => {
+    const defending: DoingOf = {
+      order: walk,
+      script: { scriptId: 7, task: 'defend', doing: 'Defending: fleeing home' },
+    }
+    expect(doingLine(defending, { scripts, buildings })).toBe('Defending: fleeing home')
+    expect(doingLine({ order: null, script: { scriptId: 0, task: 'defend' } }, {})).toBe(
+      'Defending: waiting',
+    )
+    const kept = { order: work, script: { scriptId: 1, building: 'farm' as const } }
+    expect(interruptedLine({ interrupted: kept }, { scripts, buildings })).toBe(
+      'Then: working the farm',
+    )
+    expect(interruptedLine({ interrupted: { order: walk } }, {})).toBe(
+      'Then: walking to 4, 5 · 1 tiles to go',
+    )
+    expect(interruptedLine({}, {})).toBeUndefined()
+  })
+
+  it('a driver just struck keeps their line: their drive goes on (`CONTEXT.md`: On a carriage under attack)', () => {
+    const drive: ResidentOrder = {
+      kind: 'drive',
+      carriageId: 'k1',
+      target: { x: 4, y: 5 },
+      path: [[4, 5]],
+      progress: 0,
+    }
+    const struck: DoingOf = {
+      order: drive,
+      script: { scriptId: 0, task: 'defend' },
+      interrupted: { order: drive },
+    }
+    const driving = doingLine({ order: drive }, {})
+    expect(doingLine(struck, {})).toBe(driving)
+    expect(interruptedLine(struck, {})).toBeUndefined()
+    // Fighting back they do say so, with the drive to go on with after it.
+    const fighting: DoingOf = {
+      order: walk,
+      script: { scriptId: 7, task: 'defend', doing: 'Defending: fighting back at Bo' },
+      interrupted: { order: drive },
+    }
+    expect(doingLine(fighting, {})).toBe('Defending: fighting back at Bo')
+    expect(interruptedLine(fighting, {})).toMatch(/^Then: /)
+  })
+})
+
+describe('the Gather task’s Doing line (`CONTEXT.md`: Gather)', () => {
+  const gatherer = { scriptId: 20, task: 'gather' as const, params: { good: 'wood' } }
+  const gathering: ResidentOrder = { kind: 'gather', good: 'wood', at, progress: 0 }
+
+  it('says what they gather at a tile, and where they walk with the usual estimate', () => {
+    expect(line({ order: gathering, script: gatherer })).toBe('Gathering wood')
+    expect(
+      doingLine({ order: walk, script: gatherer }, { scripts, buildings, arrives: 1 }),
+    ).toMatch(/^Gathering wood: walking to the forest · /)
+    const stone = { ...gatherer, params: { good: 'stone' } }
+    expect(line({ order: walk, script: stone })).toBe(
+      'Gathering stone: walking to the hills · 1 tiles to go',
+    )
+    expect(line({ order: store, script: gatherer })).toBe(
+      'Gathering wood: carrying iron to the storage',
+    )
+    expect(line({ order: null, script: gatherer })).toBe('Gathering wood: waiting')
+  })
+
+  it('names a bare gather order', () => {
+    expect(line({ order: gathering })).toBe('Gathering wood')
+  })
+})

@@ -2,7 +2,7 @@
 // written once, in Rust; the client asks it of the wasm module (`@csp/lang-wasm`). The rule
 // refuses a top-level client function or arrow constant named after a function that a module of
 // `crates/csp-sim/src/queries/` exports (its name in camelCase), unless the name is a twin held to
-// its Rust original by `apps/web/src/client-twins.test.ts`: a name among the twins of
+// its Rust original by `apps/web/src/world/client-twins.test.ts`: a name among the twins of
 // `crates/csp-sim/tests/client_twins.json`, which the Rust side writes. A few names that are no
 // rule are let through below, each with why.
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -86,7 +86,7 @@ const noRuleCopy = {
               message:
                 `${name} is a rule of csp-sim (${file}): ask it of @csp/lang-wasm, or keep it as a ` +
                 'twin held to Rust (crates/csp-sim/tests/client_twins.rs and ' +
-                'apps/web/src/client-twins.test.ts, docs/wasm-rules.md).',
+                'apps/web/src/world/client-twins.test.ts, docs/wasm-rules.md).',
             })
           }
         }

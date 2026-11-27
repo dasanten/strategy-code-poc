@@ -1,4 +1,4 @@
-import { coarseChunkOf } from '../terrain.js'
+import { coarseChunkOf } from '../world/terrain.js'
 import type { ChunkSource } from './chunks.js'
 
 /*
@@ -138,7 +138,7 @@ const CHUNKS = 'chunks'
 const META = 'meta'
 
 /** The browser's IndexedDB as a `CacheBackend`. */
-export function indexedDbBackend(): Promise<CacheBackend> {
+function indexedDbBackend(): Promise<CacheBackend> {
   return new Promise((resolve, reject) => {
     const open = indexedDB.open(DB_NAME, 1)
     open.onupgradeneeded = () => {

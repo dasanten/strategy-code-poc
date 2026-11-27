@@ -1,0 +1,249 @@
+import { useEffect, useState } from 'react'
+import { ROAD_LINE_MAX_TILES } from '@csp/balance'
+import type { BuildingKind, ScriptParam } from '@csp/shared-types'
+import { BUILDING_NAMES } from '../map/palette.js'
+import type { ArmyPick } from '../army/Armies.js'
+import type { GroupPicking, Picking } from '../residents/Residents.js'
+import { nextPick, type Plan } from '../queue/plan-step.js'
+
+/**
+ * What the map is waiting for while an order that needs a target is being given (ADR 0012;
+ * `CONTEXT.md`: Picking a target): the picked resident's, the group's, an army's, a value for
+ * a param of the script the picked resident runs, or a place for a step planned with Add step.
+ */
+export type PickTarget =
+  | { kind: 'resident'; mode: Exclude<Picking, false> }
+  | { kind: 'group'; mode: Exclude<GroupPicking, false> }
+  | { kind: 'army'; mode: ArmyPick['kind'] }
+  | { kind: 'param'; param: ScriptParam }
+  | { kind: 'plan'; prompt: string; error?: string }
+  /**
+   * A realm order picking its place (`CONTEXT.md`: Realm order): where the kind goes, or with no
+   * kind where to walk to; with `vehicle`, where to drive or row a carriage or boat, or a haul
+   * route's other stop.
+   */
+  | { kind: 'realm'; building?: BuildingKind; vehicle?: RealmVehiclePick; error?: string }
+  /**
+   * A realm order's road or wall line picking its ends (`CONTEXT.md`: Realm order, Build line):
+   * where it starts, then, with `from`, where it ends; `error` is why the last line would not do.
+   */
+  | { kind: 'realmLine'; building: 'road' | 'wall'; from?: Tile; error?: string }
+
+/** A tile of the map. */
+type Tile = { x: number; y: number }
+
+/** What a carriage's or boat's realm order picks on the map: where to haul, drive or row to. */
+export type RealmVehiclePick = 'haul' | 'drive' | 'row'
+
+/** The banner while a carriage's or boat's realm order picks its tile, after "Click"/"Tap". */
+const VEHICLE_PROMPTS: Record<RealmVehiclePick, string> = {
+  haul: 'the haul route’s other stop',
+  drive: 'where to drive the carriage',
+  row: 'where to row the boat',
+}
+
+/** What comes after the tile, under the banner. */
+const VEHICLE_HINTS: Record<RealmVehiclePick, string> = {
+  haul: 'Then who drives it: the nearest idle resident is ticked, and walks to the carriage first.',
+  drive:
+    'Then who drives it: the nearest idle resident is ticked, and walks to the carriage first.',
+  row: 'Then who rows it: the nearest idle resident is ticked, and walks to the boat first.',
+}
+
+/** The target the map waits for, if any; one at a time, the param before the others. */
+export function pickTarget(state: {
+  picking: Picking
+  groupPicking: GroupPicking
+  /** Whether several residents are picked, so a group order is the one waiting. */
+  isGroup: boolean
+  armyPick: ArmyPick | undefined
+  paramPick: ScriptParam | undefined
+  /** The step being planned with Add step, if it still picks a place. */
+  plan?: Plan
+  /** The kind a realm order picks a place for, and why the last tile picked would not do. */
+  realm?: { building?: BuildingKind; vehicle?: RealmVehiclePick; error?: string }
+  /** The line a realm order picks the ends of, and why the last line picked would not do. */
+  realmLine?: { building: 'road' | 'wall'; from?: Tile; error?: string }
+}): PickTarget | undefined {
+  if (state.paramPick) return { kind: 'param', param: state.paramPick }
+  if (state.realm) return { kind: 'realm', ...state.realm }
+  if (state.realmLine) return { kind: 'realmLine', ...state.realmLine }
+  if (state.armyPick) return { kind: 'army', mode: state.armyPick.kind }
+  const planned = state.plan && nextPick(state.plan)
+  if (planned) {
+    const error = state.plan!.error
+    return { kind: 'plan', prompt: planned.prompt, ...(error ? { error } : {}) }
+  }
+  if (state.isGroup && state.groupPicking) return { kind: 'group', mode: state.groupPicking }
+  if (!state.isGroup && state.picking) return { kind: 'resident', mode: state.picking }
+  return undefined
+}
+
+const RESIDENT_PROMPTS: Record<Exclude<Picking, false>, string> = {
+  walk: 'where to walk',
+  drive: 'where to drive the carriage',
+  row: 'where to row the boat: water, or a shore to land at',
+  driveOff: 'where to drive the carriage off to',
+  rowOff: 'where to row the boat off to: water, or a shore to land at',
+  push: 'where to push the siege machine, where a carriage could go',
+  throw: 'which wall, gate or tower to throw Stone at',
+  hitchOff: 'where to drive the carriage',
+  haul: 'where the haul route’s other stop is',
+  roadFrom: 'where the road starts',
+  roadTo: 'where the road ends',
+  wallFrom: 'where the wall starts',
+  wallTo: 'where the wall ends',
+  creativeMove: 'where to move them at once (creative)',
+}
+
+const GROUP_PROMPTS: Record<Exclude<GroupPicking, false>, string> = {
+  walk: 'where they walk',
+  work: 'the workplace they work',
+  build: 'where to build, or a site to join',
+  drive: 'where they drive the carriages',
+  row: 'where they row the boats: water, or a shore to land at',
+  haul: 'where the haul route’s other stop is',
+  roadFrom: 'where the road starts',
+  roadTo: 'where the road ends',
+  wallFrom: 'where the wall starts',
+  wallTo: 'where the wall ends',
+  creativeMove: 'where to move them at once (creative)',
+  tearDown: 'the building they tear down',
+  storeAt: 'the storage, stable, carriage or boat they store at',
+  fetchFrom: 'the storage, stable, carriage or boat they fetch from',
+  attack: 'whom they attack, or the wall or gate they break',
+  climb: 'the wall or gate they climb',
+}
+
+const ARMY_PROMPTS: Record<ArmyPick['kind'], string> = {
+  armyWalkTo: 'where the army marches',
+  armyGuard: 'where the army stands guard',
+}
+
+const PARAM_PROMPTS: Record<ScriptParam['type'], string> = {
+  building: 'the building',
+  storage: 'the storage, stable or carriage',
+  waypoint: 'the waypoint',
+  // Typed or chosen in their fields, never picked on the map.
+  number: 'the number',
+  choice: 'the word',
+}
+
+/** What picking a tile does for the picked resident, said under the banner where it needs more. */
+const RESIDENT_HINTS: Partial<Record<Exclude<Picking, false>, string>> = {
+  driveOff: 'This is theft: the carriage, its load and its horse join your realm at once.',
+  rowOff: 'This is theft: the boat and its load join your realm at once.',
+  hitchOff: 'This is theft: the horse joins your realm at once and is hitched to your carriage.',
+  roadFrom: 'Then where it ends; the resident walks there and builds along the line.',
+  roadTo: `Builds road along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, fetching stone from storage; with none, the sites are laid out for later.`,
+  wallFrom: 'Then where it ends; the resident walks there and builds along the line.',
+  creativeMove: 'They stand there at once, their way and work dropped, what they carry kept.',
+  wallTo: `Builds wall along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, past tiles with a wall or gate, fetching wood or stone from storage; with none, the sites are laid out for later.`,
+}
+
+/** What picking a tile does for a group, said under the banner. */
+export const GROUP_HINTS: Record<Exclude<GroupPicking, false>, string> = {
+  walk: 'They spread over free tiles around it, nearest first.',
+  work: 'Those standing at the workplace there work it.',
+  build: 'Then pick what to build on their card.',
+  drive: 'Each standing on a carriage drives it there.',
+  row: 'One of them aboard or beside each boat rows it there; the others aboard go along.',
+  haul: 'Each standing on a carriage hauls between there and their tile.',
+  roadFrom: 'Then where it ends; they share the line, each building a tile of their own.',
+  roadTo: `They share the road line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, each building the nearest tile nobody else has taken and fetching stone from storage.`,
+  wallFrom: 'Then where it ends; they share the line, each building a tile of their own.',
+  wallTo: `They share the wall line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, past tiles with a wall or gate, each building the nearest tile nobody else has taken and fetching wood or stone from storage.`,
+  tearDown: 'Those standing at it tear it down.',
+  storeAt: 'Each takes there everything they carry, keeping their own Food.',
+  fetchFrom: 'Each fetches as much as fits of the good from there.',
+  attack: 'They all attack it.',
+  climb: 'Those standing next to it climb over.',
+  creativeMove: 'They all stand there at once, their way and work dropped, what they carry kept.',
+}
+
+/** More on what picking does, for the banner's second line, where the prompt doesn't say it all. */
+export function pickHint(target: PickTarget): string | undefined {
+  if (target.kind === 'resident') return RESIDENT_HINTS[target.mode]
+  if (target.kind === 'group') return GROUP_HINTS[target.mode]
+  if (target.kind === 'plan') return target.error && `Nothing picked: ${target.error}.`
+  if (target.kind === 'realm')
+    return target.error
+      ? `Not there: ${target.error}.`
+      : target.vehicle
+        ? VEHICLE_HINTS[target.vehicle]
+        : target.building
+          ? 'Then who builds it: the nearest idle residents are ticked.'
+          : 'Then who walks there: the nearest idle resident is ticked.'
+  if (target.kind === 'realmLine') {
+    if (target.error) return `No line there: ${target.error}.`
+    return target.from
+      ? `Straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles; then who builds it, sharing the line.`
+      : 'Then where it ends, then who builds it.'
+  }
+  return undefined
+}
+
+/** Whether the screen is mainly touched rather than pointed at with a mouse. */
+export function useTouchScreen(): boolean {
+  return useMediaQuery('(pointer: coarse)')
+}
+
+/** Whether the screen matches a CSS media query, kept up to date as it changes. */
+export function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia?.(query).matches ?? false)
+  useEffect(() => {
+    const list = window.matchMedia?.(query)
+    if (!list) return
+    const onChange = () => setMatches(list.matches)
+    onChange()
+    list.addEventListener('change', onChange)
+    return () => list.removeEventListener('change', onChange)
+  }, [query])
+  return matches
+}
+
+/**
+ * The banner shown while picking: "Click where …" with a mouse, "Tap where …" on a touch
+ * screen.
+ */
+export function pickPrompt(target: PickTarget, touch: boolean): string {
+  const verb = touch ? 'Tap' : 'Click'
+  if (target.kind === 'resident') return `${verb} ${RESIDENT_PROMPTS[target.mode]}`
+  if (target.kind === 'group') return `${verb} ${GROUP_PROMPTS[target.mode]}`
+  if (target.kind === 'army') return `${verb} ${ARMY_PROMPTS[target.mode]}`
+  if (target.kind === 'plan') return `${verb} ${target.prompt}`
+  if (target.kind === 'realm')
+    return target.vehicle
+      ? `${verb} ${VEHICLE_PROMPTS[target.vehicle]}`
+      : target.building
+        ? `${verb} where the ${BUILDING_NAMES[target.building].toLowerCase()} goes`
+        : `${verb} where to walk to`
+  if (target.kind === 'realmLine')
+    return `${verb} where the ${target.building} ${target.from ? 'ends' : 'starts'}`
+  return `${verb} ${PARAM_PROMPTS[target.param.type]} for ${target.param.name}`
+}
+
+/**
+ * What a click or tap on a tile does while picking (`CONTEXT.md`: Picking a target): a click
+ * picks it at once, the preview having shown under the pointer before. A touch screen has no
+ * pointer to hover, so a tap previews the tile instead, and a tap elsewhere moves the preview;
+ * Confirm on the banner, or a second tap on the tile previewed, picks it.
+ */
+export function pickTap(
+  previewed: { x: number; y: number } | undefined,
+  tile: { x: number; y: number },
+  touch: boolean,
+): { pick: { x: number; y: number } } | { preview: { x: number; y: number } } {
+  if (!touch) return { pick: tile }
+  if (previewed && previewed.x === tile.x && previewed.y === tile.y) return { pick: tile }
+  return { preview: tile }
+}
+
+/** Whether the target waits for a wall line's end, whose material the banner picks. */
+export function picksWallLine(target: PickTarget | undefined): boolean {
+  if (target?.kind === 'realmLine') return target.building === 'wall'
+  return (
+    (target?.kind === 'resident' || target?.kind === 'group') &&
+    (target.mode === 'wallFrom' || target.mode === 'wallTo')
+  )
+}

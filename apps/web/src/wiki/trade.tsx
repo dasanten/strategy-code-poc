@@ -74,7 +74,7 @@ import {
   NPC_FOOD_REFILL_DAYS,
 } from '@csp/balance'
 import { NPC_SMITHY_WEAPON } from '@csp/shared-types'
-import { GOOD_LABELS } from '../Residents.js'
+import { GOOD_LABELS } from '../residents/Residents.js'
 import { Table } from './parts.js'
 import { goodName } from './names.js'
 import { days, num, pct, priceAt, realTimeOf } from './wiki-view.js'

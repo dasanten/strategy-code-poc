@@ -163,7 +163,7 @@ const UNIT_SIZE: Record<UnitToken, number> = {
 }
 
 /** How much bigger unit tokens are drawn than they first were, so they are easy to spot and click. */
-export const UNIT_GROWTH = 1.5
+const UNIT_GROWTH = 1.5
 
 /** The smallest a unit token's radius gets when zoomed out, in screen pixels. */
 export const MIN_UNIT_RADIUS = 8

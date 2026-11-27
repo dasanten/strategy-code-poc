@@ -1,5 +1,5 @@
 import { Container, Graphics, Text } from 'pixi.js'
-import { THEME, hex } from '../theme.js'
+import { THEME, hex } from '../ui/theme.js'
 import { GLYPH_COLOR } from './tokens.js'
 
 /** Label text size in pixels; labels keep their size at every zoom. */

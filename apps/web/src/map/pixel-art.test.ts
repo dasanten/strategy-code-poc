@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { GOODS } from '../world.js'
-import { FOOTPRINT } from '../footprint.js'
-import { SHARES_A_TILE } from '../building.js'
+import { GOODS } from '../world/world.js'
+import { FOOTPRINT } from '../building/footprint.js'
+import { SHARES_A_TILE } from '../building/building.js'
 import { NODE_KINDS } from '@csp/shared-types'
 import { BUILDING_NAMES } from './palette.js'
 import {
