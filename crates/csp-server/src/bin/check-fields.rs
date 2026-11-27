@@ -16,6 +16,7 @@ use csp_server::field_check::{
 };
 
 fn main() -> ExitCode {
+    csp_npc::install(); // T1719 experiment
     let (own, default) = (script_check_env(false), script_check_env(true));
     let conn = match open_db(db_path(), None) {
         Ok(conn) => conn,

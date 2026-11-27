@@ -6,9 +6,9 @@
 mod common;
 
 use csp_shared::world::WorldState;
-use csp_sim::npc_behaviour::step_npc_cities;
-use csp_sim::npc_defence::step_npc_defence;
-use csp_sim::npc_hire::step_npc_hire;
+use csp_npc::npc_behaviour::step_npc_cities;
+use csp_npc::npc_defence::step_npc_defence;
+use csp_npc::npc_hire::step_npc_hire;
 use serde_json::{json, Value};
 
 use common::{assert_same_json, read_json, terrain_of};

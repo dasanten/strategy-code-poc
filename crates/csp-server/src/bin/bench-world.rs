@@ -11,6 +11,7 @@ use csp_server::bench::bench_world;
 use csp_shared::balance::MAP_SIZE;
 
 fn main() -> ExitCode {
+    csp_npc::install(); // T1719 experiment
     let args: Vec<String> = std::env::args().skip(1).collect();
     let size = match args.first().map(|a| a.parse::<i32>()) {
         None => MAP_SIZE,

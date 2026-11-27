@@ -10,7 +10,7 @@ use csp_shared::balance::{
     WORKPLACE_MAX_WORKERS, WORKPLACE_WRECK_WORTH, WORK_OUTPUT_PER_DAY, WORK_STRENGTH_AVERAGE,
 };
 use csp_shared::terrain::{Terrain, TerrainMap};
-use csp_sim::npc_cities::found_npc_city;
+use csp_npc::npc_cities::found_npc_city;
 use csp_sim::queries::city::city_price;
 use csp_sim::random::Mulberry32;
 use csp_sim::world::create_world;

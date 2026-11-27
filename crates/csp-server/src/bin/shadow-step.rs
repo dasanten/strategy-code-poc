@@ -11,6 +11,7 @@ use std::{io, path::PathBuf, process::ExitCode};
 use csp_server::{server::TickSettings, shadow::serve};
 
 fn main() -> ExitCode {
+    csp_npc::install(); // T1719 experiment
     let mut args = std::env::args().skip(1);
     let Some(db) = args.next() else { return usage() };
     let mut settings =

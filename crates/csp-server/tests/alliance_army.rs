@@ -10,7 +10,7 @@ use csp_shared::world::{
 use csp_sim::alliances::step_alliances;
 use csp_sim::armies::step_armies;
 use csp_sim::invariants::{check_all, world_invariants};
-use csp_sim::npc_behaviour::npc_home;
+use csp_npc::npc_behaviour::npc_home;
 use csp_sim::order_sender::OrderSender;
 use csp_sim::orders::{order_kinds, OrderQueue, OrderReply};
 use csp_sim::queries::alliance::{alliance_of, commander_of};

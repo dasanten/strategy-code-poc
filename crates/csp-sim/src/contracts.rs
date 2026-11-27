@@ -19,7 +19,7 @@ use serde_json::Value;
 
 use crate::armies::leave_armies;
 use crate::events::record_event;
-use crate::npc_behaviour::walk_to;
+use crate::npc_hooks::walk_to;
 use crate::order_meta::OrderMeta;
 use crate::order_sender::{realm_of, OrderSender};
 use crate::orders::{str_field, OrderKind};

@@ -130,7 +130,7 @@ pub fn trade_org_repairs(world: &mut WorldState) -> usize {
             .cities
             .iter()
             .find(|c| Some(&c.id) == city.as_ref())
-            .map(|c| crate::npc_chain::trade_org_reserve(world, c))
+            .map(|c| crate::npc_hooks::trade_org_reserve(world, c))
             .unwrap_or_default();
         let mut lacks = Stock::new();
         for (good, units) in repair_materials_of(&world.buildings[i]) {

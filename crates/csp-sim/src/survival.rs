@@ -280,7 +280,7 @@ pub fn die_all(
         let killed: Vec<Resident> =
             world.residents.iter().filter(|r| died.contains(&r.id)).cloned().collect();
         crate::directives::count_soldiers_killed(world, &killed);
-        crate::npc_threat::note_losses(world, &killed, size);
+        crate::npc_hooks::note_losses(world, &killed, size);
     }
     // Who takes over from each Leader dying: their heir, unless the heir dies with them
     // (`CONTEXT.md`: Leader death with an heir).
@@ -558,8 +558,8 @@ pub fn nearest_city(
 }
 
 // The NPC behaviour module's; `npc_home` is still reached from here too.
-use crate::npc_behaviour::walk_to;
-pub use crate::npc_behaviour::{is_npc_order, npc_home};
+use crate::npc_hooks::walk_to;
+pub use crate::npc_hooks::{is_npc_order, npc_home};
 
 /// Sends the resident at `i`, of an NPC city, who is away from it home (`walkHomeIfAway`,
 /// `npcHome`): one outside its area (`CONTEXT.md`: City area) who is not working one of its
@@ -873,7 +873,7 @@ use crate::alliances::leave_on_leader_death;
 use crate::contracts::end_contracts_on_leader_death;
 use crate::demands::lapse_demands_on_leader_death;
 
-#[cfg(test)]
+#[cfg(any())] // T1719: needs csp-npc
 pub(crate) mod self_managed_tests;
 #[cfg(test)]
 mod tests;

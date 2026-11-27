@@ -10,6 +10,7 @@ use std::process::ExitCode;
 use csp_server::bench::{bench_sim, scene, SceneName, DEFAULT_TICKS};
 
 fn main() -> ExitCode {
+    csp_npc::install(); // T1719 experiment
     let args: Vec<String> = std::env::args().skip(1).collect();
     let Some(name) = args.first().and_then(|a| SceneName::parse(a)) else {
         return usage();

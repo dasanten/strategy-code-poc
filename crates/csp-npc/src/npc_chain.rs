@@ -131,11 +131,7 @@ pub fn holds_batch(stock: Option<&Stock>, input: &Stock) -> bool {
 }
 
 /// A good a city is short of, and how much of what it wants of it it lacks, 0 to 1 (`Shortage`).
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Shortage {
-    pub good: Good,
-    pub share: f64,
-}
+pub use crate::npc_hooks::Shortage;
 
 /// What an NPC city lacks of its reserve, the shortest first (`reserveLacks`): what its storages
 /// lack of it (`npc_reserve`; a Trade Org city, what its warehouses lack of their stock floor,

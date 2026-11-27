@@ -78,7 +78,7 @@ pub fn positions_on_map(world: &WorldState, terrain: &TerrainMap) -> Out {
 }
 
 /// The terrains each kind of node lies on (`NODE_TERRAINS`).
-pub(crate) fn node_terrains(kind: ResourceKind) -> &'static [Terrain] {
+pub fn node_terrains(kind: ResourceKind) -> &'static [Terrain] {
     match kind {
         ResourceKind::Forest => &[Terrain::Forest],
         ResourceKind::Stone => &[Terrain::Hills],

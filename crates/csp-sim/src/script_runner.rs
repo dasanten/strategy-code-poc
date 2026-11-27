@@ -1840,12 +1840,12 @@ fn scout_edge(
     can_enter: &dyn Fn(i32, i32) -> bool,
     skip: &[(i32, i32)],
 ) -> Option<(i32, i32)> {
-    crate::npc_scouts::scout_edge(world, city, r, size, can_enter, skip)
+    crate::npc_hooks::scout_edge(world, city, r, size, can_enter, skip)
 }
 
 fn scout_ended(world: &mut WorldState, city_id: &str, reason: Option<&str>) {
     if let Some(city) = world.cities.iter_mut().find(|c| c.id == city_id) {
-        crate::npc_scouts::scout_ended(city, reason);
+        crate::npc_hooks::scout_ended(city, reason);
     }
 }
 
@@ -2251,8 +2251,8 @@ pub fn seen_by(world: &WorldState, size: i32, side: &str) -> Arc<Vec<SeenEntity>
 
 #[cfg(test)]
 mod build_line_tests;
-#[cfg(test)]
-pub(crate) mod default_host;
+#[cfg(any(test, feature = "test-support"))]
+pub mod default_host;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

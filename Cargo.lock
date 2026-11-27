@@ -355,12 +355,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "csp-npc"
+version = "0.0.0"
+dependencies = [
+ "csp-lang",
+ "csp-shared",
+ "csp-sim",
+ "flate2",
+ "indexmap",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "sha2",
+ "ts-rs",
+]
+
+[[package]]
 name = "csp-server"
 version = "0.0.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
  "csp-lang",
+ "csp-npc",
  "csp-shared",
  "csp-sim",
  "dotenvy",
@@ -404,6 +421,7 @@ name = "csp-sim"
 version = "0.0.0"
 dependencies = [
  "csp-lang",
+ "csp-npc",
  "csp-shared",
  "flate2",
  "indexmap",

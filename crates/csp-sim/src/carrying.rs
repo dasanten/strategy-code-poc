@@ -398,7 +398,7 @@ fn take(
     // A daughter's builder fetching from its supplying mother takes what the daughter lacks and
     // Food, and steals nothing (`CONTEXT.md`: Founding; #1379).
     let from_mother = match &a.spot {
-        GoodsSpot::Storage { storage_id } => crate::npc_founding::mother_fetch(
+        GoodsSpot::Storage { storage_id } => crate::npc_hooks::mother_fetch(
             world,
             world.residents[ri].city_id.as_deref(),
             storage_id,

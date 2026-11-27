@@ -281,7 +281,7 @@ pub trait Walk {
     fn walk(&mut self, world: &mut WorldState, scratch: &mut Scratch) -> usize;
 
     /// The same walking as the road crews' way finder (`WayFinder`), if it finds ways.
-    fn ways(&mut self) -> Option<&mut dyn crate::npc_roads::WayFinder> {
+    fn ways(&mut self) -> Option<&mut dyn crate::npc_hooks::WayFinder> {
         None
     }
 }
@@ -318,7 +318,7 @@ pub struct Scratch {
     pub debt_payments: crate::trade_org_debt::DebtLedger,
     /// What lent residents took from their NPC city's storages in the latest `stepNpcHire`, for
     /// `npc-lending-keeps-reserve`.
-    pub lent_gear: Vec<crate::npc_hire::LentGear>,
+    pub lent_gear: Vec<crate::npc_hooks::LentGear>,
     /// The Players' explored terrain and the map's regions, shared with the server (`Game`):
     /// where a new node may come into being and who had explored its tile (`CONTEXT.md`: Running
     /// dry). Without it the regions are worked out from the terrain and nobody explored anything.

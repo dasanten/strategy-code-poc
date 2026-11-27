@@ -10,26 +10,23 @@
 //! buy-offs of the latest tick) is listed with `ledgered` and run with [`Ledgers`]
 //! (`check_with`); without them it finds nothing.
 
-pub(crate) mod buildings;
-pub(crate) mod carriages;
-pub(crate) mod cities;
-pub(crate) mod construction;
-pub(crate) mod fighting;
-pub(crate) mod goods;
-pub(crate) mod horses;
-pub(crate) mod map;
-pub(crate) mod npc_cities;
-pub(crate) mod npc_fighting;
-pub(crate) mod npc_founding;
-pub(crate) mod realms;
-pub(crate) mod residents;
-pub(crate) mod scripts;
-mod shared;
-pub(crate) mod survival;
-pub(crate) mod trade;
-pub(crate) mod trade_org;
-pub(crate) mod vessels;
-pub(crate) mod walls;
+pub mod buildings;
+pub mod carriages;
+pub mod cities;
+pub mod construction;
+pub mod fighting;
+pub mod goods;
+pub mod horses;
+pub mod map;
+pub mod realms;
+pub mod residents;
+pub mod scripts;
+pub mod shared;
+pub mod survival;
+pub mod trade;
+pub mod trade_org;
+pub mod vessels;
+pub mod walls;
 
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{Stock, WorldState};
@@ -70,7 +67,7 @@ pub struct Ledgers<'a> {
     pub offers: Option<&'a OfferLedger>,
     pub debt_payments: Option<&'a DebtLedger>,
     pub buy_offs: &'a [BuyOffRecord],
-    pub lent_gear: &'a [crate::npc_hire::LentGear],
+    pub lent_gear: &'a [crate::npc_hooks::LentGear],
 }
 
 impl Invariant {
@@ -94,7 +91,7 @@ impl Invariant {
 }
 
 /// An invariant over the world alone.
-const fn invariant(
+pub const fn invariant(
     name: &'static str,
     check: fn(&WorldState, &TerrainMap) -> Vec<InvariantViolation>,
 ) -> Invariant {
@@ -102,7 +99,7 @@ const fn invariant(
 }
 
 /// An invariant over a tick's ledgers: without them it finds nothing.
-const fn ledgered(name: &'static str, check: LedgerCheck) -> Invariant {
+pub const fn ledgered(name: &'static str, check: LedgerCheck) -> Invariant {
     fn nothing(_: &WorldState, _: &TerrainMap) -> Vec<InvariantViolation> {
         Vec::new()
     }
@@ -110,7 +107,7 @@ const fn ledgered(name: &'static str, check: LedgerCheck) -> Invariant {
 }
 
 /// Every domain's invariants, by the name of its file.
-pub const DOMAINS: &[(&str, &[Invariant])] = &[
+const CORE_DOMAINS: &[(&str, &[Invariant])] = &[
     ("map", map::INVARIANTS),
     ("residents", residents::INVARIANTS),
     ("survival", survival::INVARIANTS),
@@ -126,15 +123,21 @@ pub const DOMAINS: &[(&str, &[Invariant])] = &[
     ("walls", walls::INVARIANTS),
     ("trade", trade::INVARIANTS),
     ("trade_org", trade_org::INVARIANTS),
-    ("npc_cities", npc_cities::INVARIANTS),
-    ("npc_founding", npc_founding::INVARIANTS),
-    ("npc_fighting", npc_fighting::INVARIANTS),
-    ("scripts", scripts::INVARIANTS),
 ];
+
+/// Every domain's invariants, by the name of its file; the NPC ones (`csp-npc`) before `scripts`.
+pub fn domains() -> Vec<(&'static str, &'static [Invariant])> {
+    let mut all = CORE_DOMAINS.to_vec();
+    if crate::npc_hooks::installed() {
+        all.extend(crate::npc_hooks::npc_invariants());
+    }
+    all.push(("scripts", scripts::INVARIANTS));
+    all
+}
 
 /// Every world invariant, domain by domain.
 pub fn world_invariants() -> Vec<Invariant> {
-    DOMAINS.iter().flat_map(|(_, list)| list.iter().copied()).collect()
+    domains().into_iter().flat_map(|(_, list)| list.iter().copied()).collect()
 }
 
 /// Runs the invariants and lists every violation (`checkInvariants`).
@@ -257,7 +260,7 @@ pub fn js_json(v: &impl serde::Serialize) -> String {
 }
 
 /// A violation of `invariant` about `ids`.
-pub(crate) fn violation(invariant: &str, message: String, ids: &[&str]) -> InvariantViolation {
+pub fn violation(invariant: &str, message: String, ids: &[&str]) -> InvariantViolation {
     InvariantViolation {
         invariant: invariant.into(),
         message,

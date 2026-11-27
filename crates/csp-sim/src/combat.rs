@@ -200,7 +200,7 @@ fn is_aggression(world: &WorldState, a: &Resident, t: &Resident, size: i32) -> b
             return false;
         }
         // An NPC city's soldier out after a thief it knows of takes back what was taken.
-        if crate::npc_hunts::hunting(world, a, t) {
+        if crate::npc_hooks::hunting(world, a, t) {
             return false;
         }
     }

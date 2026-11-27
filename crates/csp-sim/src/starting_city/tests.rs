@@ -14,7 +14,7 @@ use csp_shared::world::{AlarmKind, BuildingKind, Good, ResidentOrder, Stock, Wor
 use super::*;
 use crate::alarms::raise_outsider;
 use crate::invariants::check_all;
-use crate::npc_cities::{find_npc_city_site, found_npc_city};
+use crate::npc_hooks::{find_npc_city_site, found_npc_city};
 use crate::queries::city_area::{in_city_area, is_city_building};
 use crate::queries::residents::{age_in_years, is_armed};
 use crate::queues::tests::resident;
@@ -108,7 +108,7 @@ fn a_realm_keeps_when_it_began_for_its_shelter() {
     world.tick = 5_000;
     found_starting_city(&mut world, terrain, 1, None);
     assert_eq!(world.realms[0].founded_at, Some(5_000.0));
-    assert!(crate::npc_demands::sheltered(&world, &world.realms[0].id));
+    assert!(crate::npc_hooks::sheltered(&world, &world.realms[0].id));
 }
 
 #[test]

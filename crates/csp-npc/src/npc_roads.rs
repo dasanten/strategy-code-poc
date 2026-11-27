@@ -37,38 +37,7 @@ use crate::walking::Walking;
 
 /// What a road crew asks for a way (`WayFinder`): `Walking` in the game, a found path a little at
 /// a time.
-pub trait WayFinder {
-    /// The way a resident of `side` would walk; asked again until it is settled. `key` names it.
-    fn way(
-        &mut self,
-        key: &str,
-        from: Point,
-        to: Point,
-        side: Option<&str>,
-        area: Option<HashSet<usize>>,
-    ) -> PathResult;
-}
-
-/// The way finder for one call, borrowed again from an optional one (as `tick::reborrow`).
-pub fn reborrow<'s>(ways: &'s mut Option<&mut dyn WayFinder>) -> Option<&'s mut dyn WayFinder> {
-    match ways {
-        Some(w) => Some(&mut **w),
-        None => None,
-    }
-}
-
-impl WayFinder for Walking {
-    fn way(
-        &mut self,
-        key: &str,
-        from: Point,
-        to: Point,
-        side: Option<&str>,
-        area: Option<HashSet<usize>>,
-    ) -> PathResult {
-        Walking::way(self, key, from, to, side, area)
-    }
-}
+pub use crate::npc_hooks::{reborrow, WayFinder};
 
 /// What one tile of road takes (`roadMaterials`).
 fn road_materials() -> Stock {

@@ -91,15 +91,7 @@ fn by_strength() -> Vec<Good> {
 /// A weapon or piece of protection a lent resident took from the lender's storage
 /// (`LentGear`), with what the city held of it after and its reserve of it before, for
 /// `npc-lending-keeps-reserve`.
-#[derive(Debug, Clone, PartialEq)]
-pub struct LentGear {
-    pub contract_id: String,
-    pub city_id: String,
-    pub resident_id: String,
-    pub good: Good,
-    pub left: f64,
-    pub reserve: f64,
-}
+pub use crate::npc_hooks::LentGear;
 
 /// The city's lent residents take weapons and armour from its storages along (`armLent`,
 /// `CONTEXT.md`: Hiring from an NPC city; ADR 0033), only from its surplus, what it holds above

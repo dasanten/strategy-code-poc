@@ -14,12 +14,12 @@ use csp_shared::world::{
 };
 
 use super::*;
-use crate::npc_behaviour::npc_home;
-use crate::npc_chain::short_goods;
-use crate::npc_cities::found_npc_city;
-use crate::npc_coins::earns_coins;
-use crate::npc_plan::plan_city;
-use crate::npc_scouts::knows_node;
+use crate::npc_hooks::npc_home;
+use crate::npc_hooks::short_goods;
+use crate::npc_hooks::found_npc_city;
+use crate::npc_hooks::earns_coins;
+use crate::npc_hooks::plan_city;
+use crate::npc_hooks::knows_node;
 use crate::npc_test_world::Runner;
 use crate::queries::names::{held, placed};
 use crate::queries::npc_trade::{npc_reserve, NPC_SMITHY_WEAPON};

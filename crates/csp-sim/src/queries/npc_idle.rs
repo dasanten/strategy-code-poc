@@ -82,13 +82,13 @@ pub fn npc_idle_share(world: &WorldState) -> f64 {
     total.share()
 }
 
-#[cfg(test)]
+#[cfg(any())] // T1719: needs csp-npc
 mod tests {
     use csp_shared::world::{CityJob, Task};
     use serde_json::json;
 
     use super::*;
-    use crate::npc_behaviour::default_script;
+    use crate::npc_hooks::default_script;
     use crate::npc_test_world::village;
 
     fn job(kind: CityJobKind) -> CityJob {

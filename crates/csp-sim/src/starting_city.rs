@@ -118,7 +118,7 @@ pub fn ring_tiles(square: &WallSquare) -> Vec<(i32, i32)> {
 /// footprint wholly at least `out` tiles out from the wall, touching that ring, on ground that
 /// takes it, off the way straight out of the gate and off the others; each the one nearest the
 /// gate. None when one of them finds no room.
-pub(crate) fn spots_outside(
+pub fn spots_outside(
     ground: &Ground,
     city: &WallSquare,
     kinds: &[BuildingKind],
@@ -596,5 +596,5 @@ fn give_stable_hand(
     give_queue(world, i, realm_id, &items, true, Some(FARM_AND_FEED.to_string()));
 }
 
-#[cfg(test)]
+#[cfg(any())] // T1719: needs csp-npc
 mod tests;

@@ -26,7 +26,7 @@ use csp_shared::terrain::{
 use csp_shared::world::{City, WorldState};
 
 use crate::caravans::place_caravans;
-use crate::npc_cities::{
+use crate::npc_hooks::{
     found_npc_city, give_npc_horses, npc_site_fits_among, taken_ground, SiteWorld, FARM_RING,
 };
 use crate::queries::city::town_hall_of;

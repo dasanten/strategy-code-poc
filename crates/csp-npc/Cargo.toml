@@ -1,0 +1,25 @@
+[package]
+name = "csp-npc"
+description = "T1719 experiment (throwaway): NPC cities as their own crate."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+csp-sim.workspace = true
+csp-shared.workspace = true
+csp-lang.workspace = true
+indexmap.workspace = true
+ts-rs.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rustc-hash.workspace = true
+
+[dev-dependencies]
+csp-sim = { workspace = true, features = ["test-support"] }
+sha2.workspace = true
+flate2.workspace = true
+
+[lints]
+workspace = true

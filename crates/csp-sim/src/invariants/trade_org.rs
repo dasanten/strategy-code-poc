@@ -34,9 +34,9 @@ pub(super) const INVARIANTS: &[Invariant] = &[
         crate::temperament::trading_posts_have_no_temperament(w)
     }),
     invariant("trade-org-breeds-no-horses", |w, _t| {
-        crate::npc_stable::trade_org_breeds_no_horses(w)
+        crate::npc_hooks::trade_org_breeds_no_horses(w)
     }),
-    invariant("trade-org-sends-no-one", |w, _t| crate::npc_plan::trade_org_sends_no_one(w)),
+    invariant("trade-org-sends-no-one", |w, _t| crate::npc_hooks::trade_org_sends_no_one(w)),
 ];
 
 /// The Trade Organization stays apart (`tradeOrgSound`).

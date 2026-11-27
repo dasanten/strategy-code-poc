@@ -17,8 +17,8 @@ use csp_shared::world::{
 
 use crate::crimes::{building_organization, city_organization, organization_of};
 use crate::events::record_event;
-use crate::npc_behaviour::workplace_of;
-use crate::npc_chain::own_workplaces;
+use crate::npc_hooks::workplace_of;
+use crate::npc_hooks::own_workplaces;
 use crate::queries::building::workers_of;
 use crate::queries::city::town_hall_of;
 use crate::queries::names::{kind_name, placed};

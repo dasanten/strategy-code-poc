@@ -31,7 +31,7 @@ use crate::crimes::city_organization;
 use crate::directive::directive_targets;
 use crate::events::record_event;
 use crate::goods_deps::new_id;
-use crate::npc_behaviour::{npc_home, walk_to};
+use crate::npc_hooks::{npc_home, walk_to};
 use crate::queries::city::town_hall_of;
 use crate::queries::city_area::in_city_area;
 use crate::queries::goods::units_that_fit;

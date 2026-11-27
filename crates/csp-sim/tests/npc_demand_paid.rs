@@ -10,7 +10,7 @@ mod transfers_fixture;
 use csp_shared::balance::{NPC_DEMAND_COINS, NPC_DEMAND_REFUSED_STANDING};
 use csp_shared::world::{Building, Good, WorldState};
 use csp_sim::demands::{demands_sound, send_npc_demand, step_demands};
-use csp_sim::npc_demands::npc_demands_sound;
+use csp_npc::npc_demands::npc_demands_sound;
 use csp_sim::queries::standing::standing_of;
 use csp_sim::standing::change_standing;
 use serde_json::{json, Value};

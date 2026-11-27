@@ -42,7 +42,7 @@ fn run_apart(world: &WorldState, city: &City, r: &Resident) -> bool {
     if city.realm_id.is_some() {
         return false;
     }
-    crate::npc_founding::founding_party(world.city_plans.get(&city.id)).contains(&r.id)
+    crate::npc_hooks::founding_party(world.city_plans.get(&city.id)).contains(&r.id)
         || caravan_crew(world).contains(&r.id)
         || punishers(world).contains(&r.id)
 }

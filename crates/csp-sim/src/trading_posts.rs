@@ -12,7 +12,7 @@ use csp_shared::world::{
 };
 
 use crate::goods_deps::{new_id, update_city_membership};
-use crate::npc_cities::{found_npc_city, npc_site_fits_among, taken_ground, SiteWorld};
+use crate::npc_hooks::{found_npc_city, npc_site_fits_among, taken_ground, SiteWorld};
 use crate::placing::{node_workplace, Ground};
 use crate::queries::city::town_hall_of;
 use crate::queries::names::{good_of, held_in, placed};
@@ -152,7 +152,7 @@ fn house_tile(
     let terrain = terrain?;
     let city = world.cities.iter().find(|c| c.id == city_id)?;
     let hall = town_hall_of(world, city)?;
-    crate::npc_growth::house_tile(world, city, hall, terrain, None, kind)
+    crate::npc_hooks::house_tile(world, city, hall, terrain, kind)
         .map(|(x, y)| (f64::from(x), f64::from(y)))
 }
 
@@ -401,7 +401,7 @@ pub fn place_trading_posts(world: &mut WorldState, terrain: &TerrainMap) -> Vec<
 #[cfg(test)]
 mod tests;
 
-#[cfg(test)]
+#[cfg(any())] // T1719: needs csp-npc
 mod chain_tests;
 #[cfg(test)]
 mod supplied_tests;

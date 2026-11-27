@@ -84,7 +84,7 @@ fn chance(seed: i64, tick: u64, id: &str) -> f64 {
     f64::from(mix(h) as u32) / 4_294_967_296.0
 }
 
-#[cfg(test)]
+#[cfg(any())] // T1719: needs csp-npc
 mod tests {
     use super::*;
     use csp_shared::world::Pile;

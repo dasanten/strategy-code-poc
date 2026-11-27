@@ -21,7 +21,7 @@ use crate::capture::{hand_over_city, return_post};
 use crate::events::record_event;
 use crate::goods_deps::new_id;
 use crate::invariants::InvariantViolation;
-use crate::npc_plan::plan_due;
+use crate::npc_hooks::plan_due;
 use crate::offers::{sees_storage_of, set_aside_for_demand};
 use crate::order_meta::OrderMeta;
 use crate::order_sender::OrderSender;
@@ -374,7 +374,7 @@ fn answered(
         Answer::Lapsed => DemandWhat::Lapsed,
     };
     tell_both(world, d, what, what, Extra { leader_died: None, handed_over });
-    crate::npc_demands::npc_demand_ended(world, d, answer == Answer::Accepted);
+    crate::npc_hooks::npc_demand_ended(world, d, answer == Answer::Accepted);
     if answer != Answer::Accepted {
         debt_demand_ended(world, d);
     }
@@ -822,7 +822,7 @@ pub fn step_demands(world: &mut WorldState) {
     world.demands.retain(|d| tick < d.deadline);
     for d in &lapsed {
         tell_both(world, d, DemandWhat::Lapsed, DemandWhat::Lapsed, Extra::default());
-        crate::npc_demands::npc_demand_ended(world, d, false);
+        crate::npc_hooks::npc_demand_ended(world, d, false);
         debt_demand_ended(world, d);
     }
 }

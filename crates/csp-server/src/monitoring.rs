@@ -207,7 +207,7 @@ impl<L: LogSink> TickReporter for ServerReporter<L> {
                 .attribute("world_seed", seed)
                 .capture();
             // What NPC cities are after and fear (`CONTEXT.md`: Stance, Threat; T98.9).
-            let intent = csp_sim::npc_stance::intent_report(world);
+            let intent = csp_npc::npc_stance::intent_report(world);
             for (stance, n) in &intent.stances {
                 metrics::gauge(format!("npc.stance.{stance}"), *n as f64)
                     .attribute("world_seed", seed)

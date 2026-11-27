@@ -40,6 +40,7 @@ fn ask(question: &str) -> io::Result<String> {
 }
 
 fn main() -> ExitCode {
+    csp_npc::install(); // T1719 experiment
     let args: Vec<String> = std::env::args().skip(1).collect();
     // A new world goes into a database of its own, never the server's.
     if args.first().is_some_and(|a| a == "new-world") {

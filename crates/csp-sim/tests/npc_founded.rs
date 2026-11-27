@@ -8,7 +8,7 @@ mod common;
 use csp_shared::balance::{NPC_TOWN, NPC_VILLAGE};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::City;
-use csp_sim::npc_cities::{find_npc_city_site, found_npc_city, give_npc_horses};
+use csp_npc::npc_cities::{find_npc_city_site, found_npc_city, give_npc_horses};
 use csp_sim::random::Mulberry32;
 use csp_sim::world::create_world;
 use serde_json::{json, Value};

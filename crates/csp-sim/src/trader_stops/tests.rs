@@ -10,7 +10,7 @@ use csp_shared::world::{Good, Heading, HorseStats, Stock, TradeSide, WorldState}
 
 use super::*;
 use crate::invariants::check_all;
-use crate::npc_cities::found_npc_city;
+use crate::npc_hooks::found_npc_city;
 use crate::queries::carriages::crew_ids_of;
 use crate::queries::names::{held, held_in};
 use crate::queries::trade_quotes::{quote_trader_trade, trader_standing_at};
@@ -218,7 +218,7 @@ fn outside_any_ring_of_walls_so_a_closed_gate_doesnt_stop_it() {
     let hall = town_hall_of(&world, city(&world, &c)).unwrap();
     let (hx, hy) = (hall.x, hall.y);
     let inside = wall_map(&world, &terrain).inside;
-    let home = crate::npc_behaviour::npc_home(&world, &c).unwrap();
+    let home = crate::npc_hooks::npc_home(&world, &c).unwrap();
     assert!(inside.contains(&tile_index(terrain.size, home.x as i32, home.y as i32)));
     let (x, y) = stop_tile(&world, &terrain, city(&world, &c), (100.0, 500.0)).unwrap();
     assert!(!inside.contains(&tile_index(terrain.size, x, y)));
@@ -740,7 +740,7 @@ fn visited(extra: &[(Good, f64)]) -> Visited {
     use crate::queries::npc_trade::npc_reserve;
     let Fixture { mut world, terrain, .. } = fixture();
     let c = village(&mut world, &terrain, 300, 500, 9.0);
-    let storage = crate::npc_behaviour::npc_home(&world, &c).unwrap().id.clone();
+    let storage = crate::npc_hooks::npc_home(&world, &c).unwrap().id.clone();
     let si = world.buildings.iter().position(|b| b.id == storage).unwrap();
     world.buildings[si].stock = Some(Stock::new());
     let reserve = npc_reserve(&world, city(&world, &c));
@@ -764,7 +764,7 @@ fn visited(extra: &[(Good, f64)]) -> Visited {
 }
 
 fn plan(v: &mut Visited) {
-    crate::npc_plan::plan_city(&mut v.world, &v.city, Some(&v.terrain), None, None);
+    crate::npc_hooks::plan_city(&mut v.world, &v.city, Some(&v.terrain), None, None);
 }
 
 fn sent(world: &WorldState, c: &str) -> Option<csp_shared::world::CityTrader> {

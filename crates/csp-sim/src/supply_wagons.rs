@@ -18,7 +18,7 @@ use csp_shared::world::{
 
 use crate::caravans::{free_hands, horse_lies_down, new_caravan_carriage};
 use crate::goods_deps::new_id;
-use crate::npc_behaviour::{npc_home, walk_to};
+use crate::npc_hooks::{npc_home, walk_to};
 use crate::queries::army::army_spot;
 use crate::queries::carriages::carriage_capacity;
 use crate::queries::city::town_hall_of;

@@ -1692,7 +1692,7 @@ impl<'a> ScriptBindings<'a> {
                     .side
                     .as_deref()
                     .filter(|_| self.npc())
-                    .and_then(|side| crate::npc_founding::supplying_mother(world, side))
+                    .and_then(|side| crate::npc_hooks::supplying_mother(world, side))
                     .map(|c| c.id.clone());
                 let mothers = |b: &Building| {
                     b.kind == BuildingKind::Storage

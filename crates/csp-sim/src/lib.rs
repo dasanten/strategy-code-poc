@@ -36,8 +36,8 @@ pub mod explored;
 pub mod explored_edge;
 #[doc(hidden)]
 pub mod fixture_ages;
-#[cfg(test)]
-mod game_test_world;
+#[cfg(any(test, feature = "test-support"))]
+pub mod game_test_world;
 pub mod gates;
 pub mod gathering;
 pub mod goods_deps;
@@ -58,47 +58,12 @@ pub mod lent;
 pub mod loading;
 pub mod mending;
 pub mod mirror;
-#[cfg(test)]
-mod movement_test_world;
+pub mod npc_hooks;
+#[cfg(any(test, feature = "test-support"))]
+pub mod movement_test_world;
 pub mod names;
 pub mod new_veins;
 pub mod node_gen;
-pub mod npc_acting_first;
-pub mod npc_behaviour;
-pub mod npc_chain;
-pub mod npc_cities;
-pub mod npc_coins;
-pub mod npc_defence;
-pub mod npc_demands;
-pub mod npc_escort;
-pub mod npc_founding;
-pub mod npc_growth;
-pub mod npc_hire;
-pub mod npc_hunts;
-pub mod npc_inner_wall;
-pub mod npc_mending;
-pub mod npc_patrols;
-pub mod npc_plan;
-pub mod npc_posts;
-pub mod npc_repair;
-pub mod npc_retaliate;
-pub mod npc_revive;
-pub mod npc_roads;
-pub mod npc_scores;
-pub mod npc_scouts;
-#[cfg(test)]
-mod npc_slow;
-pub mod npc_stable;
-pub mod npc_stance;
-pub mod npc_stone_walls;
-pub mod npc_supply;
-pub mod npc_take_node;
-#[cfg(test)]
-mod npc_test_world;
-pub mod npc_threat;
-pub mod npc_towers;
-pub mod npc_trader;
-pub mod npc_training;
 pub mod offers;
 pub mod order_meta;
 pub mod order_sender;
@@ -110,16 +75,16 @@ pub mod pathfinding;
 pub mod persuasion;
 pub mod placing;
 pub mod player_start;
-#[cfg(test)]
-mod poc_tests;
+#[cfg(any(test, feature = "test-support"))]
+pub mod poc_tests;
 pub mod queries;
 pub mod queue;
 pub mod queue_tree;
 pub mod queues;
 pub mod rally;
 pub mod random;
-#[cfg(test)]
-mod realm_test_world;
+#[cfg(any(test, feature = "test-support"))]
+pub mod realm_test_world;
 pub mod region_map;
 pub mod regions;
 pub mod relocating;
@@ -152,8 +117,8 @@ pub mod starting_city;
 pub mod starting_sites;
 pub mod stealing;
 pub mod stock_floor;
-#[cfg(test)]
-mod stone_upgrade_tests;
+#[cfg(any(test, feature = "test-support"))]
+pub mod stone_upgrade_tests;
 pub mod storing;
 pub mod supply_wagons;
 pub mod survival;
@@ -162,10 +127,10 @@ pub mod teardown;
 pub mod temperament;
 pub mod terrain_gen;
 pub mod territory;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub mod test_support;
-#[cfg(test)]
-mod test_world;
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_world;
 pub mod tick;
 pub mod trade_org;
 pub mod trade_org_army;

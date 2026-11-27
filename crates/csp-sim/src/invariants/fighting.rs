@@ -13,7 +13,7 @@ pub(super) const INVARIANTS: &[Invariant] = &[
     invariant("contracts-sound", |w, _| crate::contracts::contracts_sound(w)),
     invariant("demands-sound", |w, _| crate::demands::demands_sound(w)),
     invariant("supply-lines-sound", |w, _| crate::armies::supply_lines_sound(w)),
-    invariant("threat-sound", |w, _| crate::npc_threat::threat_sound(w)),
+    invariant("threat-sound", |w, _| crate::npc_hooks::threat_sound(w)),
     invariant("supply-wagons-sound", |w, _| crate::supply_wagons::supply_wagons_sound(w)),
     invariant("interrupted-runs-defence", |w, _| crate::defence::interrupted_sound(w)),
     invariant("given-under-attack-sound", |w, _| crate::defence::given_under_attack_sound(w)),

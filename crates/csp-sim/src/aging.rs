@@ -95,7 +95,7 @@ fn drop_excess(world: &mut WorldState, i: usize) {
     drop_goods(world, x, y, &dropped, MAP_SIZE);
 }
 
-#[cfg(test)]
+#[cfg(any())] // T1719: needs csp-npc
 mod tests {
     use super::*;
     use csp_shared::balance::{

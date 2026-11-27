@@ -517,7 +517,7 @@ impl Walk for Budgeted<'_> {
         steps.len()
     }
 
-    fn ways(&mut self) -> Option<&mut dyn csp_sim::npc_roads::WayFinder> {
+    fn ways(&mut self) -> Option<&mut dyn csp_npc::npc_roads::WayFinder> {
         self.walking.ways()
     }
 }

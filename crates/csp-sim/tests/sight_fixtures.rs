@@ -125,7 +125,7 @@ fn without_hire_spare(mut v: Value) -> Value {
 /// part of its reserve, which the frozen TypeScript knew nothing of. `npc_stone_walls` and
 /// `needs_grow_tests` test it in Rust.
 fn without_wall_stone(world: &csp_shared::world::WorldState, mut v: Value) -> Value {
-    use csp_sim::npc_stone_walls::wall_stone_set_aside;
+    use csp_npc::npc_stone_walls::wall_stone_set_aside;
     let aside = |id: &str| {
         world
             .cities

@@ -16,11 +16,11 @@ use csp_shared::world::{
 };
 use csp_sim::alarms::start_alarm;
 use csp_sim::invariants::check_all;
-use csp_sim::npc_behaviour::{npc_home, step_npc_cities};
-use csp_sim::npc_cities::found_npc_city;
-use csp_sim::npc_patrols::{next_stop, npc_patrols_sound, patrols_wanted, share_patrols};
-use csp_sim::npc_plan::plan_city;
-use csp_sim::npc_posts::free_soldiers;
+use csp_npc::npc_behaviour::{npc_home, step_npc_cities};
+use csp_npc::npc_cities::found_npc_city;
+use csp_npc::npc_patrols::{next_stop, npc_patrols_sound, patrols_wanted, share_patrols};
+use csp_npc::npc_plan::plan_city;
+use csp_npc::npc_posts::free_soldiers;
 use csp_sim::queries::city::town_hall_of;
 use csp_sim::queries::names::placed;
 use csp_sim::random::Mulberry32;

@@ -14,7 +14,7 @@ use csp_shared::world::{City, JoinRequest, Outweighed, RealmEventWhat, WorldStat
 
 use crate::capture::join_realm;
 use crate::events::record_event;
-use crate::npc_plan::plan_due;
+use crate::npc_hooks::plan_due;
 use crate::order_meta::OrderMeta;
 use crate::orders::str_field;
 use crate::queries::city::{for_sale, town_hall_of};

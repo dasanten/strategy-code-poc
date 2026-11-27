@@ -1126,7 +1126,7 @@ impl Walk for Walking {
         steps.len()
     }
 
-    fn ways(&mut self) -> Option<&mut dyn crate::npc_roads::WayFinder> {
+    fn ways(&mut self) -> Option<&mut dyn crate::npc_hooks::WayFinder> {
         Some(self)
     }
 }

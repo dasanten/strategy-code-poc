@@ -15,7 +15,7 @@ use super::*;
 use crate::caravans::place_caravans;
 use crate::combat::attack_order;
 use crate::invariants::check_all;
-use crate::npc_cities::found_npc_city;
+use crate::npc_hooks::found_npc_city;
 use crate::order_sender::OrderSender;
 use crate::orders::{order_kinds, OrderQueue, OrderReply};
 use crate::queries::city_area::{occupier_of, OCCUPATION_TICKS};

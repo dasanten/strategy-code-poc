@@ -5,12 +5,12 @@ use std::collections::HashSet;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::WorldState;
 
-use super::shared::{kind_of, Out};
-use super::{invariant, violation, Invariant};
+use crate::invariants::shared::{kind_of, Out};
+use crate::invariants::{invariant, violation, Invariant};
 use crate::npc_behaviour::run_by_npc_city;
 use crate::order_meta::running_meta;
 
-pub(super) const INVARIANTS: &[Invariant] = &[
+pub const INVARIANTS: &[Invariant] = &[
     invariant("npc-orders-allowed", npc_orders_allowed),
     invariant("city-plans-sound", |w, _t| crate::npc_plan::city_plans_sound(w)),
     invariant("steel-only-with-coal", |w, _t| crate::npc_chain::steel_only_with_coal(w)),

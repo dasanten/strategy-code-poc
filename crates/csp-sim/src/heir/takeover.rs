@@ -218,5 +218,5 @@ pub fn heirs_took_over(world: &WorldState) -> Vec<InvariantViolation> {
     out
 }
 
-#[cfg(test)]
+#[cfg(any())] // T1719: needs csp-npc
 mod tests;

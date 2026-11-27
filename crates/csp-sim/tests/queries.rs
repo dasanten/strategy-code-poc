@@ -18,7 +18,7 @@ use csp_shared::world::{
     Building, BuildingKind, City, CityLayout, ConstructionSite, Good, Horse, HorseStats, Realm,
     Resident, Standing, Stock, Temperament, TradeOrgCity, WorldState,
 };
-use csp_sim::npc_hire::{npc_lending_keeps_reserve, step_npc_hire, LentGear};
+use csp_npc::npc_hire::{npc_lending_keeps_reserve, step_npc_hire, LentGear};
 use csp_sim::queries::building::recipe_for;
 use csp_sim::queries::city::{city_price, npc_city_refuses, sells_to, town_hall_of};
 use csp_sim::queries::horse_market::{

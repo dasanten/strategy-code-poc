@@ -14,6 +14,7 @@ publish = false
 csp-shared = { path = "crates/csp-shared" }
 csp-lang = { path = "crates/csp-lang" }
 csp-sim = { path = "crates/csp-sim" }
+csp-npc = { path = "crates/csp-npc" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 thiserror = "2"
@@ -45,6 +46,9 @@ opt-level = 3
 
 # The tick itself (ADR 0040, T111.1): the suite runs about a quarter faster at the same incremental
 # build time.
+[profile.dev.package.csp-npc]
+opt-level = 3
+
 [profile.dev.package.csp-sim]
 opt-level = 3
 

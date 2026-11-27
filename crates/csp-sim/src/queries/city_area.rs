@@ -351,7 +351,7 @@ fn occupation_of(world: &WorldState, city: &City, size: i32) -> Option<(String, 
             Some(TRADE_ORG.to_string())
         } else {
             r.owner.clone().or_else(|| {
-                crate::npc_retaliate::marching_for(world, &r.id, r.city_id.as_deref())
+                crate::npc_hooks::marching_for(world, &r.id, r.city_id.as_deref())
                     .filter(|c| *c != city.id)
             })
         };
@@ -392,7 +392,7 @@ pub fn stands_occupying(world: &WorldState, city: &City, r: &Resident, size: i32
     !hired_by_trade_org(world, &r.id)
         && (r.owner.is_some()
             || city_takers(world, city).contains(&r.id)
-            || crate::npc_retaliate::marching_for(world, &r.id, r.city_id.as_deref()).is_some())
+            || crate::npc_hooks::marching_for(world, &r.id, r.city_id.as_deref()).is_some())
 }
 
 /// Food in a city's storages, but for what is set aside for offers (`storedFood`).

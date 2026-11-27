@@ -3,6 +3,7 @@
 use csp_server::client_types::{export_into, workspace_root, GENERATED_DIR};
 
 fn main() {
+    csp_npc::install(); // T1719 experiment
     let dir = workspace_root().join(GENERATED_DIR);
     if dir.exists() {
         std::fs::remove_dir_all(&dir).expect("clear the old generated files");

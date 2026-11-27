@@ -219,13 +219,13 @@ pub fn step_world(
         step_caravans(world, size, scratch);
         step_traders(world, size, terrain, scratch);
         step_npc_defence(world, size, scratch);
-        crate::npc_hunts::step_npc_hunts(world, size);
-        crate::npc_take_node::step_npc_take_nodes(world, terrain);
+        crate::npc_hooks::step_npc_hunts(world, size);
+        crate::npc_hooks::step_npc_take_nodes(world, terrain);
         // NPC cities seek allies and hire mercenaries on their own (`CONTEXT.md`: Acting first),
         // before the Trade Org army answers offers.
-        crate::npc_acting_first::step_npc_acting_first(world, size);
+        crate::npc_hooks::step_npc_acting_first(world, size);
         // And retaliate against those who hurt them (`CONTEXT.md`: Retaliating).
-        crate::npc_retaliate::step_npc_retaliate(world, size);
+        crate::npc_hooks::step_npc_retaliate(world, size);
         step_trade_org_army(world, size, scratch);
         step_npc_hire(world, size, scratch);
         // Gear handed out with lent soldiers is theirs to fight with now.
@@ -402,10 +402,10 @@ fn step_rest(
     step_outweighed(world, size);
     // And take threat from the armed residents they see, letting old threats and danger places fade
     // (`CONTEXT.md`: Threat).
-    crate::npc_threat::step_threat(world, size);
+    crate::npc_hooks::step_threat(world, size);
     // And pick their stance at the first of them each game day (`CONTEXT.md`: Stance).
-    crate::npc_stance::step_stances(world, size);
-    crate::npc_demands::step_npc_demands(world);
+    crate::npc_hooks::step_stances(world, size);
+    crate::npc_hooks::step_npc_demands(world);
     // Who is up on a wall walk, now that walls broke, changed hands and residents moved this tick.
     crate::wall_walk::step_wall_walk(world);
     let actions = steps
@@ -496,10 +496,10 @@ fn count_wrecked(world: &mut WorldState, wrecked: Vec<Felled>, _scratch: &mut Sc
 
 // T86.10: the NPC cities (`npc_defence`, `npc_hire`, `npc_behaviour`, `outsiders`).
 fn step_npc_defence(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
-    crate::npc_defence::step_npc_defence(world, size);
+    crate::npc_hooks::step_npc_defence(world, size);
 }
 fn step_npc_hire(world: &mut WorldState, size: i32, scratch: &mut Scratch) {
-    scratch.lent_gear = crate::npc_hire::step_npc_hire(world, size);
+    scratch.lent_gear = crate::npc_hooks::step_npc_hire(world, size);
 }
 /// Returns the milliseconds the cities spent planning.
 fn step_npc_cities(
@@ -511,7 +511,7 @@ fn step_npc_cities(
 ) -> f64 {
     // The walking finds the road crews' ways (`WayFinder`).
     let ways = walking.and_then(|w| w.ways());
-    crate::npc_behaviour::step_npc_cities(world, size, Some(terrain), ways)
+    crate::npc_hooks::step_npc_cities(world, size, Some(terrain), ways)
 }
 fn step_outsiders(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
     crate::outsiders::step_outsiders(world, size);

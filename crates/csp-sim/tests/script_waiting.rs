@@ -13,7 +13,7 @@ use serde_json::json;
 
 use csp_sim::defence::start_defence;
 use csp_sim::invariants::check_all;
-use csp_sim::npc_cities::found_npc_city;
+use csp_npc::npc_cities::found_npc_city;
 use csp_sim::order_sender::OrderSender;
 use csp_sim::orders::{order_kinds, OrderQueue};
 use csp_sim::random::Mulberry32;

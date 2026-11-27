@@ -1,8 +1,8 @@
 //! NPC cities founding new ones: the party, its load, the site and the founding wave.
 
-use super::{invariant, Invariant};
+use crate::invariants::{invariant, Invariant};
 
-pub(super) const INVARIANTS: &[Invariant] = &[
+pub const INVARIANTS: &[Invariant] = &[
     invariant("founding-parties-sound", |w, _t| crate::npc_founding::founding_parties_sound(w)),
     invariant("full-wait-sound", |w, _t| crate::npc_founding::full_wait_sound(w)),
     invariant("founding-site-clear", |w, t| crate::npc_founding::founding_site_clear(w, t.size)),

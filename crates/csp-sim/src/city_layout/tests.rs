@@ -15,9 +15,9 @@ use csp_shared::world::{
 
 use super::*;
 use crate::invariants::check_all;
-use crate::npc_behaviour::npc_home;
-use crate::npc_cities::found_npc_city;
-use crate::npc_growth::{house_tile, new_wall, next_project, wall_rings, Rings};
+use crate::npc_hooks::npc_home;
+use crate::npc_hooks::found_npc_city;
+use crate::npc_hooks::{house_tile, new_wall, next_project, wall_rings, Rings};
 use crate::npc_test_world::{fill_houses, plains, storage_of, village, Village, WALL};
 use crate::queries::building::{build_problem, building_at, TerrainLookup};
 use crate::queries::names::{kind_name, placed};

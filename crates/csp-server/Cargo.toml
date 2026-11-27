@@ -20,6 +20,7 @@ path = "src/main.rs"
 [dependencies]
 csp-shared.workspace = true
 csp-sim.workspace = true
+csp-npc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

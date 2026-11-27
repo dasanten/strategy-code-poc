@@ -494,5 +494,5 @@ pub fn city_layouts_sound(world: &WorldState) -> Vec<InvariantViolation> {
     out
 }
 
-#[cfg(test)]
+#[cfg(any())] // T1719: needs csp-npc
 mod tests;

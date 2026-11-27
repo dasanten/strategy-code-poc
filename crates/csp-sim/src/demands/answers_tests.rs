@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::invariants::{check_invariants, world_invariants};
-use crate::npc_plan::plan_due;
+use crate::npc_hooks::plan_due;
 use crate::offers::{offers_sound, step_offers};
 use crate::orders::{order_kinds, OrderQueue, OrderReply};
 use crate::persuasion::{outweighed_now, outweighed_sound, step_outweighed};

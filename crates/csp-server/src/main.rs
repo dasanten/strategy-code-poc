@@ -7,6 +7,7 @@ use csp_server::{config::Config, log::init_logging, server};
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    csp_npc::install(); // T1719 experiment
     let config = match Config::from_env() {
         Ok(config) => config,
         Err(e) => {

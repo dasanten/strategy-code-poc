@@ -28,9 +28,9 @@ use super::persuasion::respect_seen_by;
 use super::residents::{can_work, is_armed};
 use super::standing::standing_of;
 use super::warehouse::{price_for, Price};
-use crate::npc_behaviour::npc_home;
-use crate::npc_chain::{chain_good, reserve_lacks};
-use crate::npc_scouts::knows_node;
+use crate::npc_hooks::npc_home;
+use crate::npc_hooks::{chain_good, reserve_lacks};
+use crate::npc_hooks::knows_node;
 
 /// An NPC city's finished storages (`npcStorages`): where it trades and is paid.
 pub fn npc_storages<'w>(world: &'w WorldState, city: &City) -> Vec<&'w Building> {
@@ -174,7 +174,7 @@ pub fn npc_tools_wanted(world: &WorldState, city: &City) -> f64 {
 /// Whether an NPC city has a smithy of its own, finished or begun (`CONTEXT.md`: Tools, NPC
 /// reserve): only then does it keep Tools in its reserve.
 pub fn has_smithy(world: &WorldState, city: &City) -> bool {
-    crate::npc_chain::own_workplaces(world, city).iter().any(|b| b.kind == BuildingKind::Smithy)
+    crate::npc_hooks::own_workplaces(world, city).iter().any(|b| b.kind == BuildingKind::Smithy)
 }
 
 /// How many soldiers an NPC city keeps (`npcSoldierTarget`): `NPC_SOLDIER_SHARE` of its adults,
@@ -186,7 +186,7 @@ pub fn npc_soldier_target(adults: f64) -> f64 {
 /// How many soldiers `city` keeps for its `adults` (`CONTEXT.md`: Soldiers in peace, Stance): those by
 /// its size (`npc_soldier_target`), more under Fortify (`NPC_STANCE.fortify_soldiers`).
 pub fn npc_city_soldier_target(city: &City, adults: f64) -> f64 {
-    (adults * NPC_SOLDIER_SHARE * crate::npc_stance::soldiers_factor(city)).ceil()
+    (adults * NPC_SOLDIER_SHARE * crate::npc_hooks::soldiers_factor(city)).ceil()
 }
 
 /// An NPC city's finished smithy, its own or among its workplaces, if any (`CONTEXT.md`: NPC
@@ -282,7 +282,7 @@ pub fn npc_reserve(world: &WorldState, city: &City) -> Stock {
     // A founding party carries its own Food along (`CONTEXT.md`: Founding), so the mother's
     // reserve doesn't count its members (T100.8).
     let party: HashSet<String> =
-        crate::npc_founding::founding_party(world.city_plans.get(&city.id)).into_iter().collect();
+        crate::npc_hooks::founding_party(world.city_plans.get(&city.id)).into_iter().collect();
     let theirs: f64 = city_residents(world, &city.id)
         .iter()
         .filter(|r| party.contains(&r.id))
@@ -313,7 +313,7 @@ pub fn npc_reserve(world: &WorldState, city: &City) -> Stock {
     add(&mut reserve, [("stone", NPC_TRADE.reserve_stone_per_step)], steps - 1.0);
     // A town building or upgrading its wall in stone sets Stone aside for it (Epic 113): its
     // roads, repairs and trade leave it, and only its walls spend it (`holds_for_walls`).
-    let aside = crate::npc_stone_walls::wall_stone_set_aside(world, city);
+    let aside = crate::npc_hooks::wall_stone_set_aside(world, city);
     if aside > 0.0 {
         *reserve.entry(Good::Stone).or_insert(0.0) += aside;
     }

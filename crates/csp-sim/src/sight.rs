@@ -864,7 +864,7 @@ fn places(
             crate::temperament::temperament_of(world.seed, c)
         };
         // And its stance, as a mood line (`CONTEXT.md`: Stance); Grow too, which it stores as none.
-        shown.stance = crate::queries::city::for_sale(c).then(|| crate::npc_stance::stance_of(c));
+        shown.stance = crate::queries::city::for_sale(c).then(|| crate::npc_hooks::stance_of(c));
         // In Retaliate, against whom, by name (`CONTEXT.md`: Retaliating).
         let retaliating_against = shown
             .retaliating

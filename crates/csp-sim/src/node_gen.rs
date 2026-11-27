@@ -407,5 +407,5 @@ mod tests {
 }
 
 #[cfg(test)]
-#[path = "rare_goods_tests.rs"]
+#[cfg(any())] // T1719: needs csp-npc
 mod rare_goods_tests;

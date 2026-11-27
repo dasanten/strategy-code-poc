@@ -14,7 +14,7 @@ use csp_shared::terrain::{Terrain, TerrainMap};
 use csp_shared::world::{BuildingKind, Good, ResourceKind, SkillName, Stat, Stock, WorldState};
 use csp_sim::invariants::{
     check_all, invariants_for_tick, should_check_invariants, world_invariants, InvariantViolation,
-    DOMAINS,
+    domains,
 };
 use csp_sim::queries::balance::carry_capacity;
 use csp_sim::queries::building::building_at;
@@ -474,11 +474,11 @@ fn every_domain_file_is_joined_into_the_list() {
         .filter(|name| name != "mod" && name != "shared")
         .collect();
     files.sort();
-    let mut domains: Vec<String> = DOMAINS.iter().map(|(name, _)| name.to_string()).collect();
-    domains.sort();
-    assert_eq!(domains, files);
+    let mut names: Vec<String> = domains().iter().map(|(name, _)| name.to_string()).collect();
+    names.sort();
+    assert_eq!(names, files);
     let joined: Vec<&str> = world_invariants().iter().map(|i| i.name).collect();
-    for (domain, list) in DOMAINS {
+    for (domain, list) in domains() {
         assert!(!list.is_empty(), "{domain} lists no invariant");
         assert!(list.iter().all(|i| joined.contains(&i.name)), "{domain} is not joined in");
     }

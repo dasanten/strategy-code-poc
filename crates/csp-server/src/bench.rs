@@ -249,7 +249,7 @@ fn found_npc_city(
     y: i32,
     rand: &mut dyn FnMut() -> f64,
 ) {
-    csp_sim::npc_cities::found_npc_city(world, terrain, &kind, x, y, rand, None);
+    csp_npc::npc_cities::found_npc_city(world, terrain, &kind, x, y, rand, None);
 }
 
 fn mulberry(seed: u32) -> impl FnMut() -> f64 {

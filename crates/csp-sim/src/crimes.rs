@@ -306,7 +306,7 @@ fn learn(world: &mut WorldState, ci: usize, org: &str) {
         CrimeKind::Capture => CRIME_STANDING_LOSS.capture,
     };
     change_standing(world, org, &crime.culprit.org, -loss);
-    crate::npc_threat::note_crime_known(world, org, &crime.culprit.org, crime.kind);
+    crate::npc_hooks::note_crime_known(world, org, &crime.culprit.org, crime.kind);
     record_event(
         world,
         Some(org),

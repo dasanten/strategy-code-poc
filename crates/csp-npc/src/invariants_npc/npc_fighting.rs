@@ -3,11 +3,11 @@
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{ResidentOrder, WorldState};
 
-use super::shared::Out;
-use super::{invariant, ledgered, violation, Invariant};
+use crate::invariants::shared::Out;
+use crate::invariants::{invariant, ledgered, violation, Invariant};
 use crate::npc_behaviour::run_by_npc_city;
 
-pub(super) const INVARIANTS: &[Invariant] = &[
+pub const INVARIANTS: &[Invariant] = &[
     invariant("npc-fights-outsiders", npc_fights_outsiders),
     ledgered("npc-lending-keeps-reserve", |_, l| {
         crate::npc_hire::npc_lending_keeps_reserve(l.lent_gear)

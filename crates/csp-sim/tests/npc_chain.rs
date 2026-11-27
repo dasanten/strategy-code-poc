@@ -6,11 +6,11 @@
 mod common;
 
 use csp_shared::world::WorldState;
-use csp_sim::npc_chain::{
+use csp_npc::npc_chain::{
     chain_store, own_workplaces, reserve_lacks, shortages, trade_org_reserve, warehouse_stock,
     Shortage, SurplusWork,
 };
-use csp_sim::npc_coins::earns_coins;
+use csp_npc::npc_coins::earns_coins;
 use serde_json::{json, Value};
 
 use common::{assert_same_json, read_json, terrain_of};

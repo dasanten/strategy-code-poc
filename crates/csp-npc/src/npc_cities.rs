@@ -57,44 +57,7 @@ pub fn npc_site_fits(
 
 /// What `npc_site_fits` reads of the world besides the ground, taken once for a search that tries
 /// many sites: where every city's town hall stands and where every Player's resident stands.
-pub struct SiteWorld {
-    halls: Vec<(f64, f64)>,
-    players: Vec<(f64, f64)>,
-    /// How far from every hall a site stands: `NPC_CITY_MIN_DISTANCE`, or a daughter's
-    /// (`daughter_min_distance`).
-    min_distance: f64,
-}
-
-impl SiteWorld {
-    pub fn new(world: &WorldState) -> Self {
-        SiteWorld {
-            halls: world
-                .cities
-                .iter()
-                .filter_map(|c| town_hall_of(world, c))
-                .map(|h| (h.x, h.y))
-                .collect(),
-            players: world
-                .residents
-                .iter()
-                .filter(|r| r.owner.is_some())
-                .map(|r| (r.x, r.y))
-                .collect(),
-            min_distance: NPC_CITY_MIN_DISTANCE,
-        }
-    }
-
-    /// As it is, keeping `min_distance` from every hall instead.
-    pub fn keeping(self, min_distance: f64) -> Self {
-        SiteWorld { min_distance, ..self }
-    }
-
-    /// As `new`, but with no city to keep `NPC_CITY_MIN_DISTANCE` from: a heartland's trading post
-    /// stands near its middle however near the next city is.
-    pub fn players_only(world: &WorldState) -> Self {
-        SiteWorld { halls: Vec::new(), ..SiteWorld::new(world) }
-    }
-}
+pub use crate::npc_hooks::SiteWorld;
 
 /// `npc_site_fits` with the world's halls and Players' residents already taken (`SiteWorld`).
 pub fn npc_site_fits_among(
