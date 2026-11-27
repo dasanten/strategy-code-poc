@@ -1,3 +1,4 @@
+import { rmSync, writeFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error: a plain module of `pnpm check`, with no types.
 import { checkedPart, headerOf, missingPaths, pathsIn } from './check-paths.mjs'
@@ -27,9 +28,29 @@ describe('the path check of `pnpm check` (T124.5)', () => {
     ])
   })
 
-  it('counts a path git ignores as there', () => {
-    const docs = [['docs/some.md', 'Built into `packages/lang-wasm/generated/`.']]
+  it('counts what a machine makes for itself, and a folder named as gone, as there', () => {
+    const docs = [
+      [
+        'docs/some.md',
+        'Built into `packages/lang-wasm/generated/`; see `.claude/launch.json`, ' +
+          '`.claude/worktrees/nightly-year-report.md` and the end of `apps/web/src/shared/`.',
+      ],
+    ]
     expect(missingPaths({ docs, code: [] })).toEqual([])
+  })
+
+  it('goes by what git tracks, not by what lies on this machine (#1684)', () => {
+    const local = 'scripts/only-on-this-machine.tmp'
+    writeFileSync(local, '')
+    try {
+      const docs = [['docs/some.md', 'See `' + local + '`, `scripts/` and `docs/nowhere/`.']]
+      expect(missingPaths({ docs, code: [] })).toEqual([
+        ['docs/some.md', local],
+        ['docs/some.md', 'docs/nowhere/'],
+      ])
+    } finally {
+      rmSync(local)
+    }
   })
 
   it('takes only repo paths, not globs, placeholders or words with a slash', () => {
