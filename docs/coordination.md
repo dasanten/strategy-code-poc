@@ -67,9 +67,9 @@ broken file was pushed. Resolve with an editor, not a one-liner.
   their area keeps, `docs/architecture/`) don't overlap, and of which neither needs the other's
   result. Two tickets that both bump the world format, or edit the same tick step, run one after
   the other.
-- **Epic numbers** come from the table in `docs/tasks.md`, not from GitHub, so two planning
-  sessions can pick the same one: read `docs/tasks.md` and `gh issue list --label epic` again
-  right before creating an epic.
+- **Epic numbers** come from the tables in `docs/tasks.md` (open epics) and `docs/log.md`
+  (finished ones), not from GitHub, so two planning sessions can pick the same one: read both and
+  `gh issue list --label epic` again right before creating an epic.
 
 ## Checks under load
 

@@ -39,8 +39,8 @@ describe('the path check of `pnpm check` (T124.5)', () => {
   })
 
   it('leaves out the log of past work and replaced ADRs', () => {
-    const tasks = 'history `apps/server/x.ts`\n## Epics\n`docs/y.md`'
-    expect(pathsIn(checkedPart('docs/tasks.md', tasks))).toEqual(['docs/y.md'])
+    const tasks = 'rules `docs/x.md`\n## Epics\n`docs/y.md`'
+    expect(pathsIn(checkedPart('docs/tasks.md', tasks))).toEqual(['docs/x.md', 'docs/y.md'])
     expect(checkedPart('docs/log.md', '`apps/server`')).toBe('')
     expect(checkedPart('docs/adr/0001-x.md', '# X\n\nStatus: superseded by ADR 0030.\n`a/b`')).toBe(
       '',

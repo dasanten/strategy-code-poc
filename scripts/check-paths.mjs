@@ -4,8 +4,7 @@
 // own (`ROOTS`); a glob or placeholder (`*`, `<id>`, `{…}`) is not one. A path git ignores (a
 // build output) counts as there. In a crate's header a TypeScript file named alone (`x.ts`) is
 // checked too: no tracked file may be missing that name. Exempt: the ADRs whose status says
-// another replaced them, the docs of what was (`HISTORY`), and in `docs/tasks.md` the log of past
-// work before its epic table.
+// another replaced them and the docs of what was (`HISTORY`, among them the log `docs/log.md`).
 import { execFileSync } from 'node:child_process'
 import console from 'node:console'
 import { existsSync, readFileSync } from 'node:fs'
@@ -99,10 +98,6 @@ export const HISTORY = [
 export function checkedPart(file, text) {
   if (HISTORY.includes(file)) return ''
   if (file.startsWith('docs/adr/') && isReplaced(text)) return ''
-  if (file === 'docs/tasks.md') {
-    const epics = text.search(/^## Epics/m)
-    return epics < 0 ? text : text.slice(epics)
-  }
   return text
 }
 

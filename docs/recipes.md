@@ -11,9 +11,29 @@ them in the PR.
 Every recipe ends the same way:
 
 1. Run `pnpm generate` when the crates changed, and commit what it writes (`packages/balance`,
-   `script-data.json`, `packages/shared-types/src/generated`). `pnpm check` fails on a stale one.
+   `script-data.json`, `packages/shared-types/src/generated`). It runs `pnpm types:rust`, `pnpm balance:rust` and
+   `pnpm script-data:rust`, the commands the recipes below name. `pnpm check` fails on a stale one.
 2. While working, run the tests of the crate you change: `cargo nextest run -p csp-sim <filter>`.
 3. Before finishing, `pnpm check:rust` once and `pnpm check <base>`, and fix what they ask for.
+
+## The checks and the tests
+
+- `pnpm check <base>` (ADR 0013), with `<base>` the branch the change goes into
+  (`origin/epic/<n>-<slug>`, or `origin/dev` for a bug): it regenerates (when the change touches
+  the crates), runs lint, `pnpm knip` (no unused export, file or dependency; `knip.jsonc`),
+  typecheck and only the client tests the change affects, and says what it ran. `pnpm test` is
+  the client's full suite; CI runs it and `pnpm check:rust`'s steps.
+- `pnpm check:rust`: fmt, clippy with warnings as errors, and `cargo nextest run`. It shares the
+  machine with other sessions' checks (ADR 0040) and may say it is waiting for one.
+- While working, `cargo nextest run -p csp-sim [filter]`, the crate you change: it doesn't
+  rebuild `csp-server`.
+- A test over 5 s is a regression to fix, not to tag.
+- Each crate's integration tests build into one binary: a new file in `tests/` goes into that
+  crate's `tests/all.rs` (a test fails when one is missing).
+- Cargo links with `rust-lld` (`.cargo/config.toml`), so it runs from PowerShell or bash alike.
+- The client's types are generated from the crates (`ts-rs`): after changing a type the client
+  sees, `pnpm types:rust`, and commit `packages/shared-types/src/generated/` (a Rust test fails
+  when it is stale; `docs/architecture/generated.md`).
 
 ## A new rule in the simulation
 
@@ -34,7 +54,9 @@ tests;`), as `rally.rs` and `rally/tests.rs` do.
 6. What a script sees of it, if anything: a field in its script view (`script_tables/views/`) or a
    query (see "A script function or table entry").
 7. Its wiki section in `apps/web/src/wiki/<topic>.tsx`: the prose by hand, its numbers from
-   `@csp/balance`, never typed into the text.
+   `@csp/balance`, never typed into the text. The files are named by subject (hunger is in
+   `food.tsx`, walking in `transport.tsx`); `WIKI_TOPICS` in `apps/web/src/wiki/Wiki.tsx` lists
+   them with their titles.
 8. A rule that changes what NPC cities do: also "An NPC behaviour".
 9. A rule that changes what a save holds: also "A change to the shape of the world state".
 
@@ -73,7 +95,10 @@ The world is never reset (ADR 0006): a save written by today's server loads into
 ## A balance number
 
 1. One declaration, with its comment, inside the `balance!` block of its domain's file in
-   `crates/csp-shared/src/balance/` (`mod.rs` lists the files; read its header). A number of a
+   `crates/csp-shared/src/balance/` (`mod.rs` lists the files; read its header). The files are
+   named by domain, mostly as the section files of `docs/context/` and the modules of `csp-sim`
+   are (`starting_city.rs`, `survival.rs`, `travel.rs`); the number's name is in the file. A
+   number of a
    building kind, good, vessel or siege machine is a field of its spec (`building_specs.rs`,
    `good_specs.rs`, `craft_specs.rs`) instead. A number the client has no use for stands outside
    the block and says `Not exported` in its comment.
