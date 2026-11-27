@@ -4,6 +4,10 @@
 //! stone never run dry. A Player who saw the node keeps it on their map until they see the tile
 //! again.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod build_common;
 mod scripts_common;
 

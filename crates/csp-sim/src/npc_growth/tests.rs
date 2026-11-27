@@ -1,5 +1,9 @@
 //! How an NPC city and an NPC village grow, over the shared village (`npc_test_world`).
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::HashSet;
 
 use csp_shared::balance::{

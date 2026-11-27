@@ -4,6 +4,10 @@
 //! and the `diplomacyFor` view (T87.6; `contracts_for` is checked instead). A Leader's death goes
 //! through `end_contracts_on_leader_death`, as `dieAll` (T86.3) calls it.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::{STANDING_CONTRACT_BROKEN_LOSS, STANDING_PER_PAID_WEEK};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::time::TICKS_PER_GAME_DAY;

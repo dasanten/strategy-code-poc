@@ -1,5 +1,9 @@
 //! Path finding tests, and the path fixtures.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;

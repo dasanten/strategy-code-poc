@@ -9,6 +9,10 @@
 //! checks that the places it names could make sense ([`step_place_problem`]); whether it can start
 //! is checked when its turn comes.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::HashSet;
 use std::sync::Arc;
 

@@ -4,6 +4,10 @@
 //! library half (renaming, resetting, following the game's default) is
 //! `crates/csp-server/tests/default_scripts.rs`.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod build_common;
 mod scripts_common;
 

@@ -284,7 +284,7 @@ fn json_of(frames: &mut Vec<(String, bool)>, msg: &Message) -> Option<(Value, St
                 .expect("a binary frame is gzipped JSON");
             (text, true)
         }
-        _ => return None,
+        Message::Ping(_) | Message::Pong(_) | Message::Close(_) | Message::Frame(_) => return None,
     };
     let v: Value = serde_json::from_str(&text).unwrap();
     frames.push((v["type"].as_str().unwrap_or_default().to_owned(), binary));

@@ -2,6 +2,10 @@
 //! finished haven that touches the water, finished like any construction site, becomes an empty
 //! boat of the finisher's realm on the nearest free water tile next to it.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod build_common;
 
 use build_common::{

@@ -2,6 +2,10 @@
 //! from their `-0` world by the Rust `step_world`, with an unhurried walking (path searches run to
 //! the end within the tick, as the dumper's `UnhurriedWalking`), compared as parsed JSON.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod common;
 
 use std::sync::Arc;

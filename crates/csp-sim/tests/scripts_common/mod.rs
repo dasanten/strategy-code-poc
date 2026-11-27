@@ -4,6 +4,9 @@
 //! in `TASKS`, from 1; Run script runs it by that id. Other scripts of theirs go in `library`, by
 //! id. Every Player has explored the whole map.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
 #![allow(dead_code)]
 
 use std::collections::HashMap;

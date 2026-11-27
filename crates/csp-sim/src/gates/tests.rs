@@ -2,6 +2,10 @@
 //! closes before them", the gate cases of "allies at walls and gates"). The wall map's own cases
 //! and wall defence are T86.6's and T86.7's; `gatesSound` is T86.13's.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::sync::Arc;
 
 use csp_shared::terrain::TerrainMap;

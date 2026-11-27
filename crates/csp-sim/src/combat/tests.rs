@@ -1,6 +1,10 @@
 //! Combat cases. Most step the conflict phases alone (`test_world::step`); those that walk or flee
 //! by the Defend default step the running game (`game_test_world`).
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::{
     AVERAGE_HORSE_STATS, BLOW_BASE, BLOW_PER_STRENGTH, COMBAT_SKILL_LIMIT, DODGE_LIMIT, MAX_HEALTH,
     MAX_HUNGER, MIN_BLOW_DAMAGE, PROTECTION_DEFENCE, SIGHT_RANGE, STRIKE_TICKS,

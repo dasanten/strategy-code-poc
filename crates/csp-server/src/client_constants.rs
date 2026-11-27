@@ -367,7 +367,7 @@ fn whole(value: Value) -> Value {
         },
         Value::Array(items) => Value::Array(items.into_iter().map(whole).collect()),
         Value::Object(map) => Value::Object(map.into_iter().map(|(k, v)| (k, whole(v))).collect()),
-        other => other,
+        other @ (Value::Null | Value::Bool(_) | Value::String(_)) => other,
     }
 }
 

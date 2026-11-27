@@ -173,6 +173,8 @@ fn world(told: f64) -> WorldState {
 }
 
 /// A Player's `scriptFieldDropped` events, as (field, [(script id, name)]).
+// Picks one kind of event: every other kind, also one to come, is not a dropped field.
+#[allow(clippy::wildcard_enum_match_arm)]
 fn dropped(w: &WorldState, user: i64) -> Vec<(String, Vec<(u64, String)>)> {
     events_for(w, user as u64, 0)
         .into_iter()

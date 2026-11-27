@@ -1,6 +1,10 @@
 //! The Hitch order (T86.17; `CONTEXT.md`: Hitched horse): the horse a resident chooses pulls the
 //! carriage.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod build_common;
 
 use build_common::*;

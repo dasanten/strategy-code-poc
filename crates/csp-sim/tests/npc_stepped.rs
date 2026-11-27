@@ -3,6 +3,10 @@
 //! `src/npc/npc-stepped.json`, written by `src/npc/gen-expected.mts`. Their plans, the orders and
 //! scripts they give, pairs, gates and new horses must come out the same, tick for tick.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod common;
 
 use csp_shared::world::WorldState;

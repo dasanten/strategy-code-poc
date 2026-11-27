@@ -4,6 +4,10 @@
 //! again. The same seed places it on the same tile; the nodes of each kind and richness stay as
 //! many; with no fitting tile anywhere, the node comes back where it was.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod build_common;
 
 use std::collections::BTreeMap;

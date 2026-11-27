@@ -2,6 +2,10 @@
 //! to be, and what that says about a tile. Where the next building goes among those is
 //! `house_tile`'s (in `npc_growth`).
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::{HashMap, HashSet};
 use std::f64::consts::FRAC_1_SQRT_2;
 

@@ -4,6 +4,10 @@
 //! that ends unpaid breaks the contract; at the end the residents walk home. A side is a Player's
 //! realm, the Trade Organization (`TRADE_ORG`) or an NPC city.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::{HashMap, HashSet};
 
 use csp_shared::balance::{

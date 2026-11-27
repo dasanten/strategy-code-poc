@@ -165,7 +165,7 @@ impl Repeat {
     pub fn until(&self) -> Option<&Condition> {
         match self {
             Repeat::Until(u) => Some(&u.until),
-            _ => None,
+            Repeat::Times(_) | Repeat::Forever(_) => None,
         }
     }
 }
@@ -193,7 +193,7 @@ fn collect_steps<'a>(items: &'a [QueueItem], out: &mut Vec<&'a QueueStep>) {
     for item in items {
         match item {
             QueueItem::Step(s) => out.push(s),
-            block => {
+            block @ (QueueItem::Repeat(_) | QueueItem::If(_)) => {
                 for part in block.parts() {
                     collect_steps(part, out);
                 }

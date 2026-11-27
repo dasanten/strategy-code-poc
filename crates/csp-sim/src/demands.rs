@@ -4,6 +4,10 @@
 //! The game answers for an NPC city and the Trade Organization, at the next planning pass (ADR
 //! 0016).
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::{
     DEMANDS_PER_GAME_DAY, DEMAND_DECLINED_STANDING_LOSS, DEMAND_MAX_DAYS, DEMAND_NOTE_MAX_LENGTH,
     DEMAND_TRADE_ORG_STANDING_LOSS, NPC_DEMAND_COINS, NPC_DEMAND_DAYS, NPC_PLAN_TICKS,

@@ -1,5 +1,9 @@
 //! Horses going Down (T86.17; `CONTEXT.md`: Down, Reviving, Horses have no inventory).
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod build_common;
 
 use build_common::*;

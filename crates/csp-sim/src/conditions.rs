@@ -2,6 +2,10 @@
 //! until asks, checked by the server for one resident. A condition is about the resident themself
 //! or one place of their own realm, never anything their Player couldn't know.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::MAX_HEALTH;
 use csp_shared::balance::MAX_HUNGER;
 use csp_shared::time::game_time;

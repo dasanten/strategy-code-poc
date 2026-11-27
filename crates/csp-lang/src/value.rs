@@ -248,7 +248,14 @@ impl Value {
                 let items: Vec<Value> = object.borrow().iter().map(|(_, v)| v.clone()).collect();
                 items.into_iter().for_each(|item| drop(item.freeze()));
             }
-            _ => {}
+            Value::Null
+            | Value::Bool(_)
+            | Value::Number(_)
+            | Value::String(_)
+            | Value::List(_)
+            | Value::Object(_)
+            | Value::Function(_)
+            | Value::Native(_) => {}
         }
         self
     }
@@ -272,14 +279,26 @@ impl Value {
     pub fn as_number(&self) -> Option<f64> {
         match self {
             Value::Number(n) => Some(*n),
-            _ => None,
+            Value::Null
+            | Value::Bool(_)
+            | Value::String(_)
+            | Value::List(_)
+            | Value::Object(_)
+            | Value::Function(_)
+            | Value::Native(_) => None,
         }
     }
 
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Value::String(s) => Some(s),
-            _ => None,
+            Value::Null
+            | Value::Bool(_)
+            | Value::Number(_)
+            | Value::List(_)
+            | Value::Object(_)
+            | Value::Function(_)
+            | Value::Native(_) => None,
         }
     }
 
@@ -336,7 +355,7 @@ pub fn truthy(value: &Value) -> bool {
         Value::Bool(b) => *b,
         Value::Number(n) => *n != 0.0,
         Value::String(s) => !s.is_empty(),
-        _ => true,
+        Value::List(_) | Value::Object(_) | Value::Function(_) | Value::Native(_) => true,
     }
 }
 

@@ -2,6 +2,10 @@
 //! `realm_test_world::send`, `walkTo` (T86.4) by `movement_test_world::order_from`. The world steps
 //! with `Walking`.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::sync::Arc;
 
 use csp_shared::balance::{TRADE_ORG_ARMY, TRADE_ORG_HQ};

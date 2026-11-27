@@ -6,6 +6,10 @@
 //! this in its planning pass and keeps the project in its plan; each tick it only gives its
 //! builders their part in it (`take_part`).
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::f64::consts::PI;

@@ -2,6 +2,10 @@
 //! what stays with the realm, what goes self-managed, the realm log, the invariant, and that
 //! without an heir, or with one dying with the Leader, the realm ends as before.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::FORMER_PLAYER_STANDING;
 use csp_shared::world::{
     Alliance, DeathCause, MercenaryContract, RealmEventWhat, ResidentOrder, Standing, WorldState,

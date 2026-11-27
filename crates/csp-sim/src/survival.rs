@@ -8,6 +8,10 @@
 //! the rules of other tickets do on a Leader's death is called through the hooks at the bottom of
 //! the file, each marked with the ticket that ports it.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::{HashMap, HashSet};
 
 use csp_shared::balance::{

@@ -5,6 +5,10 @@
 //! (the timed `task` step, a script step ending itself, Planning ahead's
 //! work/store/road/teach/mount steps, sight) are left to T86.14.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use super::*;
 use crate::order_sender::OrderSender;
 use crate::orders::{OrderQueue, OrderReply};

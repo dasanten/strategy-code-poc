@@ -2,6 +2,10 @@
 //! mine on a far node, sets residents to work it and a carriage to haul its ore home, and leaves
 //! the realm running overnight. Everything happens through orders, as the Player would give them.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::sync::Arc;
 
 use csp_shared::balance::{AVERAGE_HORSE_STATS, HAUL_KEEP_FOOD, MAX_HEALTH};

@@ -72,7 +72,10 @@ mod tokenize_ {
             .map(|t| match t.kind {
                 TokenKind::String(s) => Some(s),
                 TokenKind::End => None,
-                other => panic!("{other:?}"),
+                other @ (TokenKind::Number(_)
+                | TokenKind::Identifier(_)
+                | TokenKind::Keyword(_)
+                | TokenKind::Punctuator(_)) => panic!("{other:?}"),
             })
             .collect();
         assert_eq!(values, [Some("it's".to_string()), Some("say \"hi\"".to_string()), None]);
@@ -173,7 +176,12 @@ mod parse_ {
             .map(|s| match s {
                 Statement::If(_) => "If",
                 Statement::Let(_) => "Let",
-                _ => "other",
+                Statement::While(_)
+                | Statement::ForOf(_)
+                | Statement::FunctionDeclaration(_)
+                | Statement::Return(_)
+                | Statement::Block(_)
+                | Statement::ExpressionStatement(_) => "other",
             })
             .collect();
         assert_eq!(kinds, ["If", "Let", "If"]);

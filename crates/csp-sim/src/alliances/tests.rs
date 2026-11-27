@@ -3,6 +3,10 @@
 //! the sync); a Leader's death goes through `leave_on_leader_death` and ends the realm by hand, as
 //! `dieAll` (T86.3) does.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::ALLIANCE_LEAVE_DELAY;
 use csp_shared::world::{AllianceLeftWhy, RealmEventWhat, WorldState};
 use serde_json::{json, Value};

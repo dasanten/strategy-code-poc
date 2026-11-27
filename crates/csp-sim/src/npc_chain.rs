@@ -4,6 +4,10 @@
 //! same list (`next_project`). The Trade Organization's cities run the same chain for their
 //! warehouses, whose stock floor is their reserve. Queries only: nothing moves.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::{MAP_SIZE, NPC_SURPLUS_CAP, NPC_SURPLUS_PAST_CAP};
 use csp_shared::world::{Building, BuildingKind, City, CityProject, Good, Stock, WorldState};
 

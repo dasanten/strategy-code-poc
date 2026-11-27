@@ -4,6 +4,10 @@
 //! The views are JSON values built by spreading entities into objects (`{ is, ...entity, org }`),
 //! key for key, so the wire shape is stable.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::{HashMap, HashSet};
 use ts_rs::TS;
 

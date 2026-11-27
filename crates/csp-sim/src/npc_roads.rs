@@ -5,6 +5,10 @@
 //! its nearest neighbour's area. A way is worked out once and kept in the plan as plain data
 //! (`CityPlan.roads`); its streets are worked out each pass.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::HashSet;
 
 use csp_shared::balance::{

@@ -3,6 +3,10 @@
 //! sends its army through its normal rules until the goals are met, an admin lifts it, or the
 //! target buys it off where the admin allows it.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::HashSet;
 use ts_rs::TS;
 

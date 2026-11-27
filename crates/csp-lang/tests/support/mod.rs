@@ -54,7 +54,9 @@ pub fn value(expression: &str) -> Value {
 pub fn error_with(source: &str, options: RunOptions, setup: impl FnOnce(&mut Globals)) -> String {
     match exec_with(source, options, setup).result {
         RunResult::Error { message, .. } => message,
-        other => panic!("expected an error, got {other:?}"),
+        other @ (RunResult::Done { .. } | RunResult::OutOfSteps { .. }) => {
+            panic!("expected an error, got {other:?}")
+        }
     }
 }
 
@@ -103,6 +105,6 @@ pub fn shape(node: &Json) -> Json {
                 .map(|(k, v)| (k.clone(), shape(v)))
                 .collect(),
         ),
-        other => other.clone(),
+        other @ (Json::Null | Json::Bool(_) | Json::Number(_) | Json::String(_)) => other.clone(),
     }
 }

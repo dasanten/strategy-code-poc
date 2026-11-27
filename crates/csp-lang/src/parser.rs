@@ -75,7 +75,11 @@ impl Parser {
         let token = self.peek().clone();
         let ty = match &token.kind {
             TokenKind::Identifier(word) => ParamType::from_word(word),
-            _ => None,
+            TokenKind::Number(_)
+            | TokenKind::String(_)
+            | TokenKind::Keyword(_)
+            | TokenKind::Punctuator(_)
+            | TokenKind::End => None,
         };
         let Some(ty) = ty else {
             let types = PARAM_TYPES
@@ -140,7 +144,12 @@ impl Parser {
                     self.advance();
                     return Ok(ParamDefault::Word(word.clone()));
                 }
-                _ => {
+                TokenKind::Number(_)
+                | TokenKind::String(_)
+                | TokenKind::Identifier(_)
+                | TokenKind::Keyword(_)
+                | TokenKind::Punctuator(_)
+                | TokenKind::End => {
                     let words =
                         choices.iter().map(|c| format!("\"{c}\"")).collect::<Vec<_>>().join(" or ");
                     return Err(error(
@@ -168,7 +177,7 @@ impl Parser {
                 self.advance();
                 Ok(ParamDefault::Number(n))
             }
-            _ => Err(error(
+            TokenKind::Number(_) | TokenKind::String(_) | TokenKind::Identifier(_) | TokenKind::Keyword(_) | TokenKind::Punctuator(_) | TokenKind::End => Err(error(
                 at(&token),
                 format!(
                     "The default of \"param {name}\" must be a whole number of zero or more but found {}",
@@ -365,7 +374,20 @@ impl Parser {
             Expression::Identifier(e) => AssignTarget::Identifier(e),
             Expression::Member(e) => AssignTarget::Member(e),
             Expression::Index(e) => AssignTarget::Index(e),
-            _ => return Err(error(equals, "Only a name, \"a.b\" or \"a[i]\" can be assigned to")),
+            Expression::Number(_)
+            | Expression::String(_)
+            | Expression::Boolean(_)
+            | Expression::Null(_)
+            | Expression::List(_)
+            | Expression::Object(_)
+            | Expression::Function(_)
+            | Expression::Unary(_)
+            | Expression::Binary(_)
+            | Expression::Logical(_)
+            | Expression::Assign(_)
+            | Expression::Call(_) => {
+                return Err(error(equals, "Only a name, \"a.b\" or \"a[i]\" can be assigned to"))
+            }
         };
         // Right-associative: `a = b = 1` sets both.
         let value = self.expression()?;
@@ -419,7 +441,11 @@ impl Parser {
                     .iter()
                     .enumerate()
                     .find_map(|(l, ops)| ops.iter().find(|(q, _)| *q == p).map(|(_, op)| (l, *op))),
-                _ => None,
+                TokenKind::Number(_)
+                | TokenKind::String(_)
+                | TokenKind::Identifier(_)
+                | TokenKind::Keyword(_)
+                | TokenKind::End => None,
             };
             let Some((operator_level, operator)) = found.filter(|(l, _)| *l >= level) else {
                 return Ok(left);
@@ -441,7 +467,12 @@ impl Parser {
         let operator = match self.peek().kind {
             TokenKind::Punctuator(Punctuator::Bang) => UnaryOperator::Not,
             TokenKind::Punctuator(Punctuator::Minus) => UnaryOperator::Minus,
-            _ => return self.postfix(),
+            TokenKind::Number(_)
+            | TokenKind::String(_)
+            | TokenKind::Identifier(_)
+            | TokenKind::Keyword(_)
+            | TokenKind::Punctuator(_)
+            | TokenKind::End => return self.postfix(),
         };
         let start = self.advance();
         self.enter()?;
@@ -567,7 +598,7 @@ impl Parser {
             TokenKind::End => {
                 return Err(error(at(&token), "The script ends where a value was expected"));
             }
-            _ => {}
+            TokenKind::Keyword(_) | TokenKind::Punctuator(_) => {}
         }
         Err(error(at(&token), format!("Expected a value but found {}", describe(&token))))
     }
@@ -621,7 +652,12 @@ impl Parser {
                 self.advance();
                 Ok(k.as_str().to_string())
             }
-            _ => Err(error(at(&token), format!("Expected {what} but found {}", describe(&token)))),
+            TokenKind::Number(_)
+            | TokenKind::String(_)
+            | TokenKind::Punctuator(_)
+            | TokenKind::End => {
+                Err(error(at(&token), format!("Expected {what} but found {}", describe(&token))))
+            }
         }
     }
 

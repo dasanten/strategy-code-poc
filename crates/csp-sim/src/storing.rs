@@ -2,6 +2,10 @@
 //! a stable or a carriage of their side and puts goods down or takes them there, through the take
 //! and put actions of `carrying.rs`.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::OWN_FOOD;
 use csp_shared::footprint::covers;
 use csp_shared::terrain::wrap_distance;
