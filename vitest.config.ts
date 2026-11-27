@@ -5,6 +5,8 @@ export default defineConfig({
   ssr: { resolve: { conditions: ['source'] } },
   test: {
     include: ['packages/*/src/**/*.test.ts', 'apps/*/src/**/*.test.ts', 'scripts/**/*.test.ts'],
+    // The browser tests (`apps/web/browser/`, Epic 126) are Playwright's: `pnpm test:browser`.
+    exclude: ['**/node_modules/**', 'apps/*/browser/**'],
     // Worlds on the 10 m grid have 16 times the tiles: generating and running one takes a while.
     testTimeout: 30_000,
     hookTimeout: 120_000,

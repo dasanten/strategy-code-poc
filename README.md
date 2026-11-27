@@ -86,6 +86,25 @@ Skip ahead on the Creative bar runs ticks as fast as the machine allows, checkin
 the live game's rate (0.1) even where every normal tick checks them all, as in development: a
 game day on a small world takes about 15 seconds.
 
+### Browser tests
+
+`pnpm test:browser` plays the main flows in a real browser (Epic 126, ADR 0048). It builds the
+server and the client, makes a small world with a fixed seed into a database of its own, creates an
+admin in it, starts a creative server on a free port and runs the Playwright tests in
+`apps/web/browser/` against it, then stops the server, also when a flow fails. Any console error or
+failed request fails a flow. It uses the Chrome installed on the machine (`BROWSER_CHANNEL=msedge`
+for Edge), never touches `data/` and is not part of `pnpm check`: it runs at an epic's gate, beside
+`pnpm test:slow`.
+
+```sh
+pnpm test:browser                 # every flow
+pnpm test:browser -- --headed     # watch them; any other Playwright argument works too
+```
+
+Each run writes into `.browser-test/<time>/`, removed when every flow passes. When one fails the
+folder stays, named in the last line: a screenshot, a trace (`pnpm --filter @csp/web exec
+playwright show-trace <trace.zip>`), the server log and the world.
+
 Other scripts:
 
 ```sh

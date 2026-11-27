@@ -10,6 +10,8 @@ export default tseslint.config(
       '**/dist/**',
       '**/node_modules/**',
       '.claude/**',
+      // `pnpm test:browser`'s run folders: a failed run's traces and screenshots.
+      '.browser-test/**',
       // Written by `pnpm types:rust` from the Rust crates (ADR 0030).
       'packages/shared-types/src/generated/**',
       // Written by `pnpm wasm:build` (T88.3).
