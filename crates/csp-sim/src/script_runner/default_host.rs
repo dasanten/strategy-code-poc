@@ -16,6 +16,7 @@ use super::{
 use crate::default_scripts::{default_script, TASKS};
 use crate::order_sender::OrderSender;
 use crate::orders::{order_kinds, OrderKinds};
+use crate::queues::{QueueHost, QueueRunner};
 use crate::scripts::RunnableScript;
 use crate::sight::InvariantViolation;
 use crate::tick::Scratch;
@@ -81,7 +82,17 @@ impl DefaultScriptHost for Host {
 /// (`defaultScripts`).
 pub struct DefaultScripts {
     pub kinds: OrderKinds,
-    runner: ScriptRunner,
+    pub runner: ScriptRunner,
+    host: Arc<Host>,
+}
+
+/// The Players as the senders of their queues' steps.
+struct Senders(Arc<Host>);
+
+impl QueueHost for Senders {
+    fn sender(&self, user_id: u64) -> Option<OrderSender> {
+        self.0.senders.iter().find(|s| s.user_id == user_id).cloned()
+    }
 }
 
 impl DefaultScripts {
@@ -101,8 +112,13 @@ impl DefaultScripts {
         kinds.insert("setDefenceScript", SetDefenceScriptOrder { host: host.clone() });
         kinds.insert("setAlarmScript", SetAlarmScriptOrder { host: host.clone() });
         kinds.insert("task", TaskOrder::new(host.clone()));
-        let runner = ScriptRunner::new(terrain, host, kinds.clone());
-        DefaultScripts { kinds, runner }
+        let runner = ScriptRunner::new(terrain, host.clone(), kinds.clone());
+        DefaultScripts { kinds, runner, host }
+    }
+
+    /// A runner of the Players' queues, with these order kinds.
+    pub fn queue_runner(&self, terrain: Option<Arc<TerrainMap>>) -> QueueRunner {
+        QueueRunner::new(Box::new(Senders(self.host.clone())), self.kinds.clone(), terrain)
     }
 
     /// Runs every running script once, as the game does before the world steps (`runAll`), with

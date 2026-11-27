@@ -4,6 +4,13 @@
 //!
 //! The run's random numbers are its own ([`Draws`]), never the simulation's: the same seed gives
 //! the same orders, and the simulation, being deterministic, the same run.
+//!
+//! Every order kind is given: [`generators::GENERATORS`] makes each kind's requests, and the world
+//! ([`world::random_world`]) has what the kinds need. Residents also run queues and the default
+//! scripts, so orders come from the queue runner and the scripts too.
+
+pub mod generators;
+pub mod world;
 
 use std::fmt::Write as _;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -11,16 +18,16 @@ use std::sync::Arc;
 
 use csp_shared::balance::MAX_HUNGER;
 use csp_shared::terrain::TerrainMap;
-use csp_shared::world::{BuildingKind, Good, WorldState};
+use csp_shared::world::{Building, BuildingKind, Resident, WorldState};
 use serde_json::{json, Map, Value};
 
 use crate::invariants::InvariantViolation;
-use crate::order_meta::ORDER_METAS;
 use crate::order_sender::OrderSender;
-use crate::orders::{order_kinds, OrderQueue, OrderReply};
-use crate::script_actions::Request;
+use crate::orders::{OrderQueue, OrderReply};
+use crate::script_runner::default_host::DefaultScripts;
 use crate::tick::{run_tick, Scratch, ScriptErrorWhere, TickHealth, TickOptions, TickReporter};
 use crate::walking::Walking;
+use generators::GENERATORS;
 
 /// The run's own random numbers (splitmix64), seeded by the run's seed.
 pub struct Draws(u64);
@@ -124,6 +131,24 @@ impl std::fmt::Display for Failure {
 pub struct Outcome {
     pub seed: u64,
     pub given: Vec<Given>,
+    pub busy: Busy,
+}
+
+
+/// How busy the residents were with orders that come from elsewhere than the run's requests.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Busy {
+    /// Resident-ticks with a queue, whose steps the queue runner gives.
+    pub queued: u64,
+    /// Resident-ticks with a running script, whose orders the script runner gives.
+    pub scripted: u64,
+    /// Requests accepted for a resident that had a queue or a script then.
+    pub interrupted: u64,
+}
+
+/// Whether the resident runs a queue or a script.
+fn busy_now(world: &WorldState, id: &str) -> bool {
+    world.residents.iter().any(|r| r.id == id && (r.queue.is_some() || r.script.is_some()))
 }
 
 impl Outcome {
@@ -169,21 +194,37 @@ impl TickReporter for Kept {
     }
 }
 
-/// The share of a Player's residents given a random order each tick.
-const ORDERS_PER_RESIDENT: f64 = 0.15;
+/// Requests given each tick, each for a Player's resident drawn at random.
+const REQUESTS_PER_TICK: usize = 6;
+/// How often, against an idle one, a resident running a queue or a script is drawn: random
+/// orders interrupt them now and then, not at once.
+const BUSY_WEIGHT: usize = 1;
+const IDLE_WEIGHT: usize = 4;
 /// The share of requests that walk the resident to something in the world, so that residents
 /// spread out and stand where other orders need them.
-const WALKS: f64 = 0.2;
+const WALKS: f64 = 0.15;
 /// The share of requests sent by another Player than the resident's own.
-const FROM_ANOTHER_PLAYER: f64 = 0.1;
-/// The share of fields left out of a request.
-const FIELD_LEFT_OUT: f64 = 0.1;
-/// The share of field values that are nonsense of the wrong type.
-const NONSENSE: f64 = 0.05;
+const FROM_ANOTHER_PLAYER: f64 = 0.05;
+/// The share of requests with a field left out.
+const FIELD_LEFT_OUT: f64 = 0.05;
+/// The share of requests with a field of nonsense of the wrong type.
+const NONSENSE: f64 = 0.03;
+/// The share of requests about another resident of the world than the entry chose.
+const SOMEONE_ELSE: f64 = 0.02;
 
-/// Runs `ticks` ticks of random orders on `world` from `seed`. Every world invariant (`check_all`'s, with the
-/// tick's ledgers, as the game runs them) is checked after every tick; the first tick that breaks
-/// one, or panics, ends the run as a [`Failure`].
+/// The order kinds the run gives, with the script orders a host adds (here the game's default
+/// scripts, as `DefaultScripts` runs them), and the runner of the residents' scripts.
+pub fn run_kinds(terrain: Arc<TerrainMap>, users: &[u64]) -> DefaultScripts {
+    let senders: Vec<OrderSender> =
+        users.iter().map(|u| OrderSender::player(*u, &format!("Player {u}"))).collect();
+    DefaultScripts::new(terrain, &senders)
+}
+
+/// Runs `ticks` ticks of random orders on `world` from `seed`. Every world invariant
+/// (`check_all`'s, with the tick's ledgers, as the game runs them) is checked after every tick;
+/// the first tick that breaks one, or panics, ends the run as a [`Failure`]. The first tick's
+/// requests give some residents of each realm a looping queue and some a task, which their
+/// default script carries out, so that orders also come from the queues and the scripts.
 pub fn random_run(
     world: &mut WorldState,
     terrain: TerrainMap,
@@ -191,42 +232,33 @@ pub fn random_run(
     ticks: u64,
 ) -> Result<Outcome, Box<Failure>> {
     let terrain = Arc::new(terrain);
-    let kinds = order_kinds();
-    let names: Vec<&'static str> =
-        ORDER_METAS.iter().map(|m| m.kind).filter(|k| kinds.contains(k)).collect();
-    let mut queue = OrderQueue::new(kinds, Some(terrain.clone()));
+    let users: Vec<u64> = world.realms.iter().map(|r| r.user_id).collect();
+    let mut scripts = run_kinds(terrain.clone(), &users);
+    let mut queues = scripts.queue_runner(Some(terrain.clone()));
+    let mut queue = OrderQueue::new(scripts.kinds.clone(), Some(terrain.clone()));
     let mut walking = Walking::without_budget(terrain.clone());
     let mut scratch = Scratch::default();
     let mut draws = Draws::new(seed);
     let mut given: Vec<Given> = Vec::new();
-    let users: Vec<u64> = world.realms.iter().map(|r| r.user_id).collect();
+    let mut busy = Busy::default();
     let fail = |tick, broke, given: &Vec<Given>| {
         Box::new(Failure { seed, tick, broke, given: given.clone() })
     };
-    for _ in 0..ticks {
+    for tick in 0..ticks {
         // Kept fed, so the run is about orders, not hunger.
         for r in &mut world.residents {
             r.hunger = MAX_HUNGER;
         }
-        let pool = Pool::of(world, terrain.size);
-        for owner in pool.player_residents(world) {
-            if !draws.chance(ORDERS_PER_RESIDENT) {
-                continue;
-            }
-            let (resident_id, realm_id) = owner;
-            let own_user = world.realms.iter().find(|r| r.id == realm_id).map_or(0, |r| r.user_id);
-            let user_id = if draws.chance(FROM_ANOTHER_PLAYER) {
-                *draws.pick(&users).unwrap_or(&own_user)
-            } else {
-                own_user
-            };
-            let order = if draws.chance(WALKS) {
-                let (x, y) = draws.pick(&pool.tiles).copied().unwrap_or((0, 0));
-                json!({ "kind": "walkTo", "residentId": resident_id, "x": x, "y": y })
-            } else {
-                let kind = *draws.pick(&names).expect("order kinds");
-                random_order(&mut draws, &pool, kind, &resident_id)
-            };
+        let requests = if tick == 0 {
+            first_requests(world)
+        } else {
+            requests(&mut draws, world, &terrain, &users)
+        };
+        for r in &world.residents {
+            busy.queued += u64::from(r.queue.is_some());
+            busy.scripted += u64::from(r.script.is_some());
+        }
+        for (user_id, order) in requests {
             let sender = OrderSender::player(user_id, &format!("Player {user_id}"));
             let reply = catch_unwind(AssertUnwindSafe(|| {
                 queue.receive(world, &sender, &json!("random"), &order)
@@ -239,6 +271,9 @@ pub fn random_run(
                     return Err(fail(world.tick, Broke::Panic(panic_text(p.as_ref())), &given));
                 }
             };
+            if refused.is_none() && order["residentId"].as_str().is_some_and(|id| busy_now(world, id)) {
+                busy.interrupted += 1;
+            }
             given.push(Given { tick: world.tick, user_id, order, refused });
         }
         let mut kept = Kept::default();
@@ -246,6 +281,8 @@ pub fn random_run(
         let mut opts = TickOptions::new(&mut kept, 1.0, f64::INFINITY);
         opts.walking = Some(&mut walking);
         opts.orders = Some(&mut queue);
+        opts.queues = Some(&mut queues);
+        opts.scripts = Some(&mut scripts.runner);
         opts.now = Some(Box::new(|| 0.0));
         opts.rand = Some(&mut every_tick);
         run_tick(world, &terrain, &mut scratch, opts);
@@ -256,7 +293,106 @@ pub fn random_run(
             return Err(fail(world.tick, Broke::Invariants(kept.violations), &given));
         }
     }
-    Ok(Outcome { seed, given })
+    Ok(Outcome { seed, given, busy })
+}
+
+/// What starts the run: in each realm two residents walk a looping queue between their town hall
+/// and their storage, and two more are given Work at their farm, which their default script
+/// carries out.
+fn first_requests(world: &WorldState) -> Vec<(u64, Value)> {
+    let mut out = Vec::new();
+    for realm in &world.realms {
+        let city = world.cities.iter().find(|c| c.realm_id.as_deref() == Some(realm.id.as_str()));
+        let Some(city) = city else { continue };
+        let of = |kind: BuildingKind| {
+            world.buildings.iter().find(|b| b.kind == kind && b.city_id.as_ref() == Some(&city.id))
+        };
+        let (Some(hall), Some(storage)) = (of(BuildingKind::TownHall), of(BuildingKind::Storage))
+        else {
+            continue;
+        };
+        let own: Vec<&Resident> = world
+            .residents
+            .iter()
+            .filter(|r| r.owner.as_deref() == Some(realm.id.as_str()))
+            .filter(|r| !r.id.starts_with(world::PLACED) && r.id != realm.leader_id)
+            .collect();
+        let walk = |b: &Building| {
+            json!({ "order": { "kind": "walkTo", "x": b.x as i64, "y": b.y as i64 }, "minutes": 2 })
+        };
+        for r in own.iter().take(2) {
+            let steps = json!([walk(hall), walk(storage)]);
+            let q = json!({ "kind": "queue", "residentId": r.id, "steps": steps, "loop": true });
+            out.push((realm.user_id, q));
+        }
+        let farm = of(BuildingKind::Farm).map(|b| b.id.as_str());
+        for r in own.iter().skip(2).take(2) {
+            let o = json!({
+                "kind": "task", "task": "work", "residentId": r.id, "workplaceId": farm,
+            });
+            out.push((realm.user_id, o));
+        }
+    }
+    out
+}
+
+/// A tick's random requests: each for a Player's resident drawn at random (one running a queue or
+/// a script less often), of a kind drawn at random, made by its entry and then perhaps spoiled.
+fn requests(
+    draws: &mut Draws,
+    world: &WorldState,
+    terrain: &TerrainMap,
+    users: &[u64],
+) -> Vec<(u64, Value)> {
+    let mut drawn: Vec<&Resident> = Vec::new();
+    for r in &world.residents {
+        let Some(realm) = r.owner.as_deref() else { continue };
+        if r.id.starts_with(world::PLACED) || !world.realms.iter().any(|x| x.id == realm) {
+            continue;
+        }
+        let busy = r.queue.is_some() || r.script.is_some();
+        let weight = if busy { BUSY_WEIGHT } else { IDLE_WEIGHT };
+        drawn.extend(std::iter::repeat_n(r, weight));
+    }
+    let mut out = Vec::new();
+    for _ in 0..REQUESTS_PER_TICK {
+        let Some(me) = draws.pick(&drawn).copied() else { break };
+        let realm = me.owner.as_deref().expect("a Player's resident");
+        let own_user = world.realms.iter().find(|r| r.id == realm).map_or(0, |r| r.user_id);
+        let user = if draws.chance(FROM_ANOTHER_PLAYER) {
+            *draws.pick(users).unwrap_or(&own_user)
+        } else {
+            own_user
+        };
+        let kind =
+            if draws.chance(WALKS) { "walkTo" } else { draws.pick(GENERATORS).expect("kinds").0 };
+        let mut g = generators::Gen { draws: std::cell::RefCell::new(&mut *draws), world, terrain, me, realm, user };
+        let mut fields = generators::make(&mut g, kind);
+        spoil(draws, world, &mut fields);
+        fields.insert("kind".into(), json!(kind));
+        out.push((user, Value::Object(fields)));
+    }
+    out
+}
+
+/// Now and then a field left out, a field of nonsense, or another resident of the world.
+fn spoil(draws: &mut Draws, world: &WorldState, fields: &mut Map<String, Value>) {
+    let names: Vec<String> = fields.keys().cloned().collect();
+    if draws.chance(FIELD_LEFT_OUT) {
+        if let Some(name) = draws.pick(&names) {
+            fields.remove(name);
+        }
+    }
+    if draws.chance(NONSENSE) {
+        if let Some(name) = draws.pick(&names) {
+            let value = nonsense(draws);
+            fields.insert(name.clone(), value);
+        }
+    }
+    if draws.chance(SOMEONE_ELSE) && fields.contains_key("residentId") {
+        let all: Vec<&str> = world.residents.iter().map(|r| r.id.as_str()).collect();
+        fields.insert("residentId".into(), json!(draws.pick(&all).copied().unwrap_or("nobody")));
+    }
 }
 
 fn panic_text(p: &(dyn std::any::Any + Send)) -> String {
@@ -264,196 +400,6 @@ fn panic_text(p: &(dyn std::any::Any + Send)) -> String {
         .map(|s| s.to_string())
         .or_else(|| p.downcast_ref::<String>().cloned())
         .unwrap_or_else(|| "a panic".into())
-}
-
-/// What a request can name: the ids of everything in the world, by the list it is in, and the
-/// tiles where things are.
-struct Pool {
-    /// The ids of each list of the world (`residents`, `buildings`, `offers`, ...).
-    ids: Map<String, Value>,
-    /// Where each id with a place is.
-    at: std::collections::HashMap<String, (i64, i64)>,
-    tiles: Vec<(i64, i64)>,
-    size: i64,
-}
-
-impl Pool {
-    /// Everything the world has an id for, read from its saved form so a new list is in it
-    /// without an edit here.
-    fn of(world: &WorldState, size: i32) -> Pool {
-        let saved = serde_json::to_value(world).expect("a world saves");
-        let mut ids = Map::new();
-        let mut tiles = Vec::new();
-        let mut at = std::collections::HashMap::new();
-        for (list, items) in saved.as_object().expect("a world is an object") {
-            let Some(items) = items.as_array() else { continue };
-            let of_list: Vec<Value> = items
-                .iter()
-                .filter_map(|it| it.get("id").filter(|id| id.is_string()).cloned())
-                .collect();
-            for it in items {
-                if let (Some(x), Some(y)) =
-                    (it.get("x").and_then(Value::as_f64), it.get("y").and_then(Value::as_f64))
-                {
-                    let tile = (x.floor() as i64, y.floor() as i64);
-                    tiles.push(tile);
-                    if let Some(id) = it.get("id").and_then(Value::as_str) {
-                        at.insert(id.to_string(), tile);
-                    }
-                }
-            }
-            if !of_list.is_empty() {
-                ids.insert(list.clone(), Value::Array(of_list));
-            }
-        }
-        Pool { ids, at, tiles, size: size as i64 }
-    }
-
-    /// Each resident a Player's realm owns, with that realm.
-    fn player_residents(&self, world: &WorldState) -> Vec<(String, String)> {
-        world
-            .residents
-            .iter()
-            .filter_map(|r| {
-                let realm = r.owner.as_deref()?;
-                world.realms.iter().any(|x| x.id == realm).then(|| (r.id.clone(), realm.into()))
-            })
-            .collect()
-    }
-
-    /// An id from the world lists `lists`, or from any list when they have none; half the time
-    /// one near `near` when there is one, since most orders need their target close by.
-    fn id(&self, draws: &mut Draws, lists: &[&str], near: (i64, i64)) -> Value {
-        let mut candidates: Vec<&Value> = Vec::new();
-        for l in lists {
-            if let Some(Value::Array(a)) = self.ids.get(*l) {
-                candidates.extend(a);
-            }
-        }
-        if candidates.is_empty() {
-            candidates = self.ids.values().filter_map(Value::as_array).flatten().collect();
-        }
-        if draws.chance(0.5) {
-            let close: Vec<&Value> = candidates
-                .iter()
-                .copied()
-                .filter(|v| {
-                    let p = v.as_str().and_then(|id| self.at.get(id));
-                    p.is_some_and(|p| (p.0 - near.0).abs() <= 2 && (p.1 - near.1).abs() <= 2)
-                })
-                .collect();
-            if !close.is_empty() {
-                candidates = close;
-            }
-        }
-        draws.pick(&candidates).map_or(json!("nobody"), |v| (*v).clone())
-    }
-
-    /// A tile at or next to something in the world, half the time to `near`.
-    fn tile(&self, draws: &mut Draws, near: (i64, i64)) -> (i64, i64) {
-        let (x, y) = if draws.chance(0.5) {
-            near
-        } else {
-            draws.pick(&self.tiles).copied().unwrap_or((0, 0))
-        };
-        let wrap = |v: i64| v.rem_euclid(self.size);
-        (wrap(x + draws.between(-3, 3)), wrap(y + draws.between(-3, 3)))
-    }
-}
-
-/// The fields a request of `kind` has, as its script actions name them; for a kind no script
-/// action asks for, every field any action names (and those only such kinds read), each half
-/// the time: a field a kind doesn't read is left alone.
-fn fields_of(kind: &str, draws: &mut Draws) -> Vec<&'static str> {
-    let field = |name: &'static str| name.trim_end_matches('?');
-    let named = |m: &crate::order_meta::OrderMeta| -> Vec<&'static str> {
-        m.script
-            .iter()
-            .flat_map(|a| match a.request {
-                Request::Fields(args) => args.iter().map(|x| field(x.field)).collect::<Vec<_>>(),
-                Request::ByHand(params) => params.iter().map(|p| field(p)).collect(),
-            })
-            .collect()
-    };
-    let meta = ORDER_METAS.iter().find(|m| m.kind == kind).expect("a declared kind");
-    let mut fields = named(meta);
-    if fields.is_empty() {
-        let mut every: Vec<&'static str> = ORDER_METAS.iter().flat_map(|m| named(m)).collect();
-        every.extend(ONLY_REQUESTED);
-        every.sort();
-        every.dedup();
-        fields = every.into_iter().filter(|_| draws.chance(0.5)).collect();
-    }
-    fields.sort();
-    fields.dedup();
-    fields
-}
-
-/// Fields read by kinds no script action asks for, so no action names them.
-const ONLY_REQUESTED: &[&str] = &[
-    "open",
-    "name",
-    "gateId",
-    "armyId",
-    "residentIds",
-    "realmId",
-    "residents",
-    "soldiers",
-    "days",
-    "pricePerWeek",
-    "contractId",
-    "weeks",
-    "allianceId",
-    "realmName",
-    "steps",
-    "waypointId",
-];
-
-/// A random request of `kind` about resident `resident_id`, its fields filled from the world.
-fn random_order(draws: &mut Draws, pool: &Pool, kind: &str, resident_id: &str) -> Value {
-    let mut order = Map::new();
-    order.insert("kind".into(), json!(kind));
-    order.insert("residentId".into(), json!(resident_id));
-    let near = pool.at.get(resident_id).copied().unwrap_or((0, 0));
-    let (x, y) = pool.tile(draws, near);
-    for name in fields_of(kind, draws) {
-        if name == "kind" || draws.chance(FIELD_LEFT_OUT) {
-            continue;
-        }
-        let value = if draws.chance(NONSENSE) {
-            nonsense(draws)
-        } else {
-            match name {
-                "x" => json!(x),
-                "y" => json!(y),
-                "steps" => queue_steps(draws, pool, resident_id),
-                _ => value_for(draws, pool, name, (x, y), near),
-            }
-        };
-        order.insert(name.into(), value);
-    }
-    // Now and then about someone else of the world.
-    if draws.chance(0.05) {
-        order.insert("residentId".into(), pool.id(draws, &["residents"], near));
-    }
-    Value::Object(order)
-}
-
-/// The steps of a queue: one to three random requests of kinds a queue can hold.
-fn queue_steps(draws: &mut Draws, pool: &Pool, resident_id: &str) -> Value {
-    let kinds: Vec<&str> = ORDER_METAS.iter().filter(|m| m.queue_step).map(|m| m.kind).collect();
-    let n = draws.between(1, 3);
-    let steps: Vec<Value> = (0..n)
-        .map(|_| {
-            let kind = *draws.pick(&kinds).unwrap_or(&"walkTo");
-            let mut order = random_order(draws, pool, kind, resident_id);
-            if let Some(o) = order.as_object_mut() {
-                o.remove("residentId");
-            }
-            json!({ "order": order })
-        })
-        .collect();
-    json!(steps)
 }
 
 /// What a training ground teaches.
@@ -477,104 +423,6 @@ fn nonsense(draws: &mut Draws) -> Value {
     let choices =
         [json!(null), json!(-1), json!(1.5), json!("nope"), json!(true), json!([]), json!({})];
     draws.pick(&choices).cloned().unwrap_or(Value::Null)
-}
-
-/// A good's name.
-fn good(draws: &mut Draws) -> Value {
-    serde_json::to_value(draws.pick(Good::ALL).expect("goods")).expect("a good")
-}
-
-/// A value for the field `name` of a request, guessed from its name and taken from the world.
-fn value_for(
-    draws: &mut Draws,
-    pool: &Pool,
-    name: &str,
-    at: (i64, i64),
-    near: (i64, i64),
-) -> Value {
-    let tile = |draws: &mut Draws| {
-        let (x, y) = pool.tile(draws, at);
-        json!({ "x": x, "y": y })
-    };
-    match name {
-        "material" if draws.chance(0.8) => json!(if draws.chance(0.5) { "wood" } else { "stone" }),
-        "good" | "gives" | "wants" | "makes" | "material" | "food" => good(draws),
-        "slot" => json!(draws.pick(&["weapon", "shield", "armour"]).copied().unwrap_or("weapon")),
-        "subject" => json!(draws.pick(SUBJECTS).copied().unwrap_or("strength")),
-        "building" | "buildingKind" => {
-            serde_json::to_value(draws.pick(BuildingKind::ALL).expect("kinds")).expect("a kind")
-        }
-        "goods" => {
-            let mut m = Map::new();
-            m.insert(good(draws).as_str().unwrap_or("food").into(), json!(draws.between(1, 10)));
-            Value::Object(m)
-        }
-        "from" | "to" | "at" | "tile" => {
-            if draws.chance(0.6) {
-                tile(draws)
-            } else {
-                pool.id(draws, &["buildings", "carriages"], near)
-            }
-        }
-        "open" | "unload" | "asCrew" | "shoot" | "loop" | "ownFood" | "keep" => {
-            json!(draws.chance(0.5))
-        }
-        "name" | "realmName" | "note" | "cityName" => {
-            json!(draws.pick(&["Ash", "Brook", "Cole", ""]).copied().unwrap_or("Ash"))
-        }
-        _ if name.ends_with("Ids") || name == "group" => {
-            let n = draws.between(1, 3);
-            json!((0..n).map(|_| pool.id(draws, &lists_for(name), near)).collect::<Vec<_>>())
-        }
-        _ if name.ends_with("Id") || name == "target" => pool.id(draws, &lists_for(name), near),
-        _ if is_count(name) => json!(draws.between(0, 12)),
-        _ => nonsense(draws),
-    }
-}
-
-/// Whether a field is a count of something.
-fn is_count(name: &str) -> bool {
-    let lower = name.to_ascii_lowercase();
-    [
-        "units",
-        "times",
-        "count",
-        "amount",
-        "days",
-        "weeks",
-        "soldiers",
-        "residents",
-        "price",
-        "n",
-        "load",
-    ]
-    .iter()
-    .any(|w| lower.ends_with(w))
-}
-
-/// The world lists an id field names a thing of, by the field's name; none means any list.
-fn lists_for(name: &str) -> Vec<&'static str> {
-    let base = name.trim_end_matches("Ids").trim_end_matches("Id").to_ascii_lowercase();
-    let lists: &[&str] = match base.as_str() {
-        "resident" | "partner" | "heir" | "newleader" | "leader" | "member" | "residents" => {
-            &["residents"]
-        }
-        "building" | "storage" | "stable" | "wall" | "gate" | "workplace" | "home" | "haven"
-        | "site" | "warehouse" => &["buildings"],
-        "city" | "fromcity" | "tocity" => &["cities"],
-        "realm" | "to" => &["realms"],
-        "horse" | "horses" => &["horses"],
-        "carriage" | "vessel" | "machine" | "boat" => &["carriages"],
-        "army" => &["armies"],
-        "offer" => &["offers"],
-        "contract" => &["contracts"],
-        "alliance" => &["alliances"],
-        "directive" => &["directives"],
-        "demand" => &["demands"],
-        "target" => &["residents", "buildings", "horses", "carriages"],
-        _ => &[],
-    };
-    lists.to_vec()
 }
 
 /// A run's counts, one line, for the PR and the test's output.
