@@ -119,6 +119,8 @@ pub mod queues;
 pub mod rally;
 pub mod random;
 #[cfg(test)]
+mod random_orders;
+#[cfg(test)]
 mod realm_test_world;
 pub mod region_map;
 pub mod regions;

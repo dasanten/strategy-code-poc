@@ -223,3 +223,16 @@ pub fn world_with_city() -> WorldState {
     crate::starting_city::found_starting_city(&mut world, terrain, 1, None);
     world
 }
+
+/// A small Plains world where Players 1 and 2 have founded their starting cities, near enough to
+/// each other that orders between them (attack, steal, trade, offers) have a target: the world
+/// of the random-order run (Epic 125).
+pub fn two_realms_world(size: i32) -> (WorldState, csp_shared::terrain::TerrainMap) {
+    use csp_shared::terrain::{Terrain, TerrainMap};
+    let terrain = TerrainMap { size, tiles: vec![Terrain::Plains as u8; (size * size) as usize] };
+    let mut world = crate::world::create_world(&terrain, 1);
+    for user in [1, 2] {
+        crate::starting_city::found_starting_city(&mut world, &terrain, user, None);
+    }
+    (world, terrain)
+}
