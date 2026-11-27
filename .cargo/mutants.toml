@@ -1,0 +1,32 @@
+# `cargo mutants` (ADR 0048, T130.2), run by `pnpm mutants <base>` (`scripts/mutants.mjs`).
+# It changes a line and runs the tests; a change no test notices is a line the tests do not hold.
+
+test_tool = "nextest"
+
+# Lines no rule lives in: tests and their worlds, the bench binaries, logging, balance numbers.
+# `#[cfg(test)]` modules and `#[test]` functions are skipped by cargo-mutants itself; these globs
+# also leave out the test files whose module is declared elsewhere. The repo has no generated Rust
+# file (the generated files are TypeScript and JSON, `docs/architecture/generated.md`); the frozen
+# fixtures are data. The balance numbers are values to tune, not rules: a test pinning each would
+# only be rewritten with it.
+exclude_globs = [
+  "**/tests/**",
+  "**/tests.rs",
+  "**/*_tests.rs",
+  "**/*test_world.rs",
+  "**/test_support.rs",
+  "crates/csp-sim/fixtures/**",
+  "crates/csp-server/src/bin/bench-*.rs",
+  "crates/csp-server/src/log.rs",
+  "crates/csp-shared/src/balance.rs",
+  "crates/csp-shared/src/balance/**",
+]
+
+# Mutants by name: text a person reads (formatting, messages, strings returned), and logging.
+exclude_re = [
+  "impl (std::)?(fmt::)?(Display|Debug) for",
+  "-> String with",
+  "::messages? ",
+  "::(welcome_message|describe|short_text|log_summary|panic_message) ",
+  "tracing::",
+]
