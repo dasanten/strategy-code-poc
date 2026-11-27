@@ -3,6 +3,10 @@
 //! finisher's realm. Its crew walk onto it; with its crew size there one of them pushes it, slowly,
 //! the crew going along. Blows break it, leaving part of its materials; its realm tears it down.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::{
     BROKEN_MATERIALS_RETURNED, BUILD_MATERIALS, BUILD_WORK, LIFESPAN_MAX, OWN_FOOD, RAM_CREW,
     RAM_STRENGTH, SIEGE_PUSH_SHARE, TEARDOWN_MATERIALS_RETURNED,

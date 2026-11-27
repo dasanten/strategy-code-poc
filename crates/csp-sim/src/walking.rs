@@ -2,6 +2,10 @@
 //! Riding, Passenger): the walk-to order, and `Walking`, which finds paths a little at a time and
 //! turns moving orders into steps, then resolves the steps.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;

@@ -2,6 +2,10 @@
 //! getting off and loading are queue steps like any other, so a saved queue takes a resident
 //! across a lake and back.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::sync::Arc;
 
 use csp_shared::balance::{LIFESPAN_MAX, OWN_FOOD};

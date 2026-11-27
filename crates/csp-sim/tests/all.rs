@@ -198,6 +198,8 @@ mod vein_stands;
 mod veins;
 #[path = "wall_map.rs"]
 mod wall_map;
+#[path = "wildcard_allows.rs"]
+mod wildcard_allows;
 #[path = "work.rs"]
 mod work;
 #[path = "work_started_directly.rs"]

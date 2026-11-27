@@ -9,6 +9,10 @@
 //! changes from tick to tick; a patch that has grown back full leaves the list at the turn of the
 //! day.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::HashSet;
 
 use csp_shared::balance::{GATHER_REACH, PATCH_REGROW_DAYS, PATCH_REST_DAYS, PATCH_SIZE};

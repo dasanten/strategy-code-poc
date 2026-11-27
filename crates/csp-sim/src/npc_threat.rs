@@ -12,6 +12,10 @@
 //! Nothing acts on threat yet; danger places by a way grow the escort a city sends along it
 //! (`danger_escorts`). All of it is the city's own mind: nobody else sees it.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::{HashMap, HashSet};
 
 use csp_shared::balance::{

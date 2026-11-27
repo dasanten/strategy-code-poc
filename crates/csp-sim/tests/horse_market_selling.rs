@@ -1,6 +1,10 @@
 //! Selling a horse at an NPC city's stable (T86.17; `CONTEXT.md`: Horse market): what it pays, the
 //! Coins and the horse both moving, and each reason it won't go.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod build_common;
 
 use build_common::*;

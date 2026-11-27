@@ -9,6 +9,10 @@
 //! never spins. An If block's `branch` is set exactly while the current step is inside it, to the
 //! part it is in.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::HashMap;
 
 use csp_shared::world::{

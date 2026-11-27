@@ -26,6 +26,8 @@ rustc-hash = "2"
 
 [workspace.lints.clippy]
 all = "warn"
+# Epic 127: a `_ =>` over an enum must say why it also covers what comes later.
+wildcard_enum_match_arm = "warn"
 
 # Fast tests are a requirement (ADR 0030): dependencies optimised even in dev, and the crates the
 # simulation runs in (`csp-lang`, `csp-sim`, `csp-shared`, below) too, so a simulation test runs in

@@ -3,6 +3,10 @@
 //! city keeps soldiers by its size and closes its gates while armed outsiders are near. Only
 //! orders a Player could give (ADR 0002), or opening and closing its own gates as a realm does.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::HashSet;
 
 use csp_shared::balance::{

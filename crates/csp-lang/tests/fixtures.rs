@@ -88,7 +88,9 @@ fn printable(value: &Value) -> Json {
         Value::Object(object) => Json::Object(
             object.borrow().iter().map(|(k, v)| (k.to_string(), printable(v))).collect(),
         ),
-        other => support::json(other),
+        other @ (Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_)) => {
+            support::json(other)
+        }
     }
 }
 

@@ -2,6 +2,10 @@
 //! stop, Swap, Horse market, Delivery): the buy, sell, swap and horse orders, carried out the
 //! tick they are given, and the invariants over this tick's trades.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::{
     DELIVERY_LOAD, GOOD_WEIGHT, MAP_SIZE, NPC_HORSES_KEPT, STANDING_TRADE_COINS_PER_POINT,
 };

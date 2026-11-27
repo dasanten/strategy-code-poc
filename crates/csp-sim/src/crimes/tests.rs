@@ -1,5 +1,9 @@
 //! Crimes and witnesses, where the conflict phases run them (`test_world::step`).
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::{CRIME_MEMORY_DAYS, CRIME_STANDING_LOSS, SIGHT_RANGE};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{

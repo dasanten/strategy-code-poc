@@ -2,6 +2,10 @@
 //! carriage between two stops, unloading and loading through the take and put actions of
 //! `carrying.rs`.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::{CARRIAGE_CAPACITY, GOOD_WEIGHT};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{

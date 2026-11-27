@@ -3,6 +3,10 @@
 //! dead one down once it has nothing better to do; with no other node known, the good stays short
 //! and its trader buys it. The HQ takes the next nearest node, however far.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::HashSet;
 
 use csp_shared::balance::{NPC_NODE_REACH, NPC_TOWN};

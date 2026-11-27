@@ -9,6 +9,10 @@
 //! instead of frozen. The world index ([`WorldIndex`]) comes along explicitly too, and carries the
 //! map's size.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::cell::OnceCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;

@@ -5,6 +5,10 @@
 //! young, so a Leader dies and the realm ends) and `fixtures/worlds/hq-0.json` (the Trade Org HQ,
 //! its stock floor).
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod common;
 
 use csp_shared::balance::{HQ_FLOOR_FACTOR, WAREHOUSE_FLOOR};

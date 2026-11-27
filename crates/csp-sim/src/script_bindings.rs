@@ -11,6 +11,10 @@
 //! The data a query answers is built as plain JSON (`serde_json::Value`), as the TypeScript
 //! builds plain objects, then turned into a script value through the query's view.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 pub(crate) mod irregular;
 
 use std::cell::OnceCell;

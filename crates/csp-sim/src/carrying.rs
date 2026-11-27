@@ -2,6 +2,10 @@
 //! pick-up and drop orders, and the take and put actions every goods order requests, resolved one
 //! after another at the end of the tick (ADR 0002).
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::collections::HashSet;
 
 use csp_shared::balance::MAP_SIZE;

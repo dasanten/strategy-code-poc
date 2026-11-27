@@ -10,6 +10,10 @@
 //! buy-offs of the latest tick) is listed with `ledgered` and run with [`Ledgers`]
 //! (`check_with`); without them it finds nothing.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 pub(crate) mod buildings;
 pub(crate) mod carriages;
 pub(crate) mod cities;

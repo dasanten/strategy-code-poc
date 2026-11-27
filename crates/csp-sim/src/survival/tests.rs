@@ -1,5 +1,9 @@
 //! Tests of survival; each test left out says why and which ticket brings it.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use super::*;
 use csp_shared::balance::{
     ticks_for_age, ADULT_AGE, HUNGER_ENDURANCE_LIMIT, START_FOOD, TERRAIN_FOOD,

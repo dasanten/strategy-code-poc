@@ -59,7 +59,7 @@ fn normalised(v: &Value) -> Value {
         Value::Object(o) => {
             Value::Object(o.iter().map(|(k, v)| (k.clone(), normalised(v))).collect())
         }
-        other => other.clone(),
+        other @ (Value::Null | Value::Bool(_) | Value::String(_)) => other.clone(),
     }
 }
 

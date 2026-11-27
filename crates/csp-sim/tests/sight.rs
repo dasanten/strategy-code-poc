@@ -1,6 +1,10 @@
 //! Sight. The worlds it starts from (`worldWithCity`, two and three Players' starting cities on
 //! `cityTerrain()`) come from `fixtures/sight/`; sight needs only the map's size.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod common;
 
 use std::collections::{HashMap, HashSet};

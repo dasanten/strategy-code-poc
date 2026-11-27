@@ -2,6 +2,10 @@
 //! finish now, which leaves the world as finishing at normal speed would. Every invariant holds
 //! after each action; none of them is an order kind or a script call.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod build_common;
 
 use build_common::*;

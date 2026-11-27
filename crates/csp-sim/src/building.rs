@@ -2,6 +2,10 @@
 //! construction site, putting work into it, and what a finished one becomes. Road and wall lines
 //! build their tiles through here too (`road_line`).
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::{terrain_at, TerrainMap};
 use csp_shared::world::{

@@ -376,7 +376,16 @@ pub fn realms_seen(entities: &[SeenEntity]) -> Vec<&str> {
         .filter_map(|e| match e {
             SeenEntity::Resident(r) => r.owner.as_deref(),
             SeenEntity::City(c) => Some(c.city.id.as_str()),
-            _ => None,
+            SeenEntity::Building(_)
+            | SeenEntity::Horse(_)
+            | SeenEntity::Carriage(_)
+            | SeenEntity::Pile(_)
+            | SeenEntity::Army(_)
+            | SeenEntity::Caravan(_)
+            | SeenEntity::Trader(_)
+            | SeenEntity::Vessel(_)
+            | SeenEntity::Machine(_)
+            | SeenEntity::Patch(_) => None,
         })
         .collect()
 }
@@ -392,7 +401,18 @@ pub fn storages_seen(entities: &[SeenEntity]) -> Vec<Option<&str>> {
             {
                 Some(b.building.city_id.as_deref())
             }
-            _ => None,
+            SeenEntity::Resident(_)
+            | SeenEntity::Building(_)
+            | SeenEntity::City(_)
+            | SeenEntity::Horse(_)
+            | SeenEntity::Carriage(_)
+            | SeenEntity::Pile(_)
+            | SeenEntity::Army(_)
+            | SeenEntity::Caravan(_)
+            | SeenEntity::Trader(_)
+            | SeenEntity::Vessel(_)
+            | SeenEntity::Machine(_)
+            | SeenEntity::Patch(_) => None,
         })
         .collect()
 }

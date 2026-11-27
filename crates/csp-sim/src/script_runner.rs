@@ -8,6 +8,10 @@
 //! ticks while the script keeps running. Any other order from the Player ends the script
 //! (`OrderQueue`).
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;

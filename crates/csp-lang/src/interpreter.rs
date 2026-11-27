@@ -352,7 +352,12 @@ impl<'p> Interpreter<'p, '_> {
         match node {
             Statement::Block(block) => self.block(block, scope),
             Statement::If(s) => self.if_statement(s, scope),
-            _ => {
+            Statement::Let(_)
+            | Statement::While(_)
+            | Statement::ForOf(_)
+            | Statement::FunctionDeclaration(_)
+            | Statement::Return(_)
+            | Statement::ExpressionStatement(_) => {
                 self.enter(node.position())?;
                 let outcome = self.statement_in(node, scope);
                 self.depth -= 1;
@@ -584,7 +589,14 @@ impl<'p> Interpreter<'p, '_> {
         match callee {
             Value::Native(native) => self.call_native(&native, args, at),
             Value::Function(function) => self.call_function(&function, args, at),
-            other => fail(format!("{} is not a function", capitalised(&describe(&other))), at),
+            other @ (Value::Null
+            | Value::Bool(_)
+            | Value::Number(_)
+            | Value::String(_)
+            | Value::List(_)
+            | Value::Object(_)) => {
+                fail(format!("{} is not a function", capitalised(&describe(&other))), at)
+            }
         }
     }
 
@@ -597,7 +609,15 @@ impl<'p> Interpreter<'p, '_> {
         match op {
             BinaryOperator::Eq => return Ok(Value::Bool(left.strict_equals(&right))),
             BinaryOperator::NotEq => return Ok(Value::Bool(!left.strict_equals(&right))),
-            _ => {}
+            BinaryOperator::Less
+            | BinaryOperator::LessEq
+            | BinaryOperator::Greater
+            | BinaryOperator::GreaterEq
+            | BinaryOperator::Add
+            | BinaryOperator::Sub
+            | BinaryOperator::Mul
+            | BinaryOperator::Div
+            | BinaryOperator::Rem => {}
         }
         if op == BinaryOperator::Add
             && (matches!(left, Value::String(_)) || matches!(right, Value::String(_)))
@@ -625,7 +645,14 @@ impl<'p> Interpreter<'p, '_> {
                     BinaryOperator::Less => l < r,
                     BinaryOperator::LessEq => l <= r,
                     BinaryOperator::Greater => l > r,
-                    _ => l >= r,
+                    BinaryOperator::GreaterEq => l >= r,
+                    BinaryOperator::Eq
+                    | BinaryOperator::NotEq
+                    | BinaryOperator::Add
+                    | BinaryOperator::Sub
+                    | BinaryOperator::Mul
+                    | BinaryOperator::Div
+                    | BinaryOperator::Rem => unreachable!("not a comparison"),
                 },
                 (Value::String(l), Value::String(r)) => {
                     let order = js::compare_strings(l, r);
@@ -633,7 +660,14 @@ impl<'p> Interpreter<'p, '_> {
                         BinaryOperator::Less => order.is_lt(),
                         BinaryOperator::LessEq => order.is_le(),
                         BinaryOperator::Greater => order.is_gt(),
-                        _ => order.is_ge(),
+                        BinaryOperator::GreaterEq => order.is_ge(),
+                        BinaryOperator::Eq
+                        | BinaryOperator::NotEq
+                        | BinaryOperator::Add
+                        | BinaryOperator::Sub
+                        | BinaryOperator::Mul
+                        | BinaryOperator::Div
+                        | BinaryOperator::Rem => unreachable!("not a comparison"),
                     }
                 }
                 _ => {
@@ -670,7 +704,13 @@ impl<'p> Interpreter<'p, '_> {
             BinaryOperator::Sub => l - r,
             BinaryOperator::Mul => l * r,
             BinaryOperator::Div => l / r,
-            _ => l % r,
+            BinaryOperator::Rem => l % r,
+            BinaryOperator::Eq
+            | BinaryOperator::NotEq
+            | BinaryOperator::Less
+            | BinaryOperator::LessEq
+            | BinaryOperator::Greater
+            | BinaryOperator::GreaterEq => unreachable!("compared above"),
         };
         if !result.is_finite() {
             return fail("The number is too large", at);
@@ -795,7 +835,12 @@ impl<'p> Interpreter<'p, '_> {
                     let length = match object {
                         Value::List(list) => list.borrow().items.len(),
                         Value::String(s) => js::utf16_len(s),
-                        _ => unreachable!(),
+                        Value::Null
+                        | Value::Bool(_)
+                        | Value::Number(_)
+                        | Value::Object(_)
+                        | Value::Function(_)
+                        | Value::Native(_) => unreachable!(),
                     };
                     return Ok(Value::Number(length as f64));
                 }
@@ -822,7 +867,13 @@ impl<'p> Interpreter<'p, '_> {
                 };
                 Ok(object.borrow().get(key).cloned().unwrap_or(Value::Null))
             }
-            _ => fail(format!("Can't read {} of {}", describe_key(key), describe(object)), at),
+            Value::Null
+            | Value::Bool(_)
+            | Value::Number(_)
+            | Value::Function(_)
+            | Value::Native(_) => {
+                fail(format!("Can't read {} of {}", describe_key(key), describe(object)), at)
+            }
         }
     }
 
@@ -834,7 +885,14 @@ impl<'p> Interpreter<'p, '_> {
                     Value::Number(n) if is_integer(*n) && *n >= 0.0 && *n <= length as f64 => {
                         *n as usize
                     }
-                    _ => {
+                    Value::Null
+                    | Value::Bool(_)
+                    | Value::Number(_)
+                    | Value::String(_)
+                    | Value::List(_)
+                    | Value::Object(_)
+                    | Value::Function(_)
+                    | Value::Native(_) => {
                         return fail(
                             format!(
                                 "A list of {length} can be written at 0 to {length}, not {}",
@@ -878,7 +936,14 @@ impl<'p> Interpreter<'p, '_> {
                 object.borrow_mut().insert(&**key, value);
                 Ok(())
             }
-            _ => fail(format!("Can't set {} of {}", describe_key(key), describe(object)), at),
+            Value::Null
+            | Value::Bool(_)
+            | Value::Number(_)
+            | Value::String(_)
+            | Value::Function(_)
+            | Value::Native(_) => {
+                fail(format!("Can't set {} of {}", describe_key(key), describe(object)), at)
+            }
         }
     }
 
@@ -906,7 +971,9 @@ fn text(value: &Value, at: Position) -> Eval<Rc<str>> {
         Value::Number(n) => Ok(Rc::from(js::number_to_string(*n))),
         Value::Bool(b) => Ok(Rc::from(if *b { "true" } else { "false" })),
         Value::Null => Ok(Rc::from("null")),
-        _ => fail("Only numbers, strings, booleans and null can be joined to a string", at),
+        Value::List(_) | Value::Object(_) | Value::Function(_) | Value::Native(_) => {
+            fail("Only numbers, strings, booleans and null can be joined to a string", at)
+        }
     }
 }
 
@@ -926,7 +993,13 @@ pub fn describe(value: &Value) -> String {
 fn describe_key(key: &Value) -> String {
     match key {
         Value::String(s) => format!("\"{s}\""),
-        _ => describe(key),
+        Value::Null
+        | Value::Bool(_)
+        | Value::Number(_)
+        | Value::List(_)
+        | Value::Object(_)
+        | Value::Function(_)
+        | Value::Native(_) => describe(key),
     }
 }
 

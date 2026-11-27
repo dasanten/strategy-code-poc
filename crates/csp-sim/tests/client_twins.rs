@@ -11,6 +11,10 @@
 //! (`csp/no-rule-copy`) refuses a client function named after a `queries/` function that is not
 //! among them.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod common;
 
 use std::collections::HashSet;

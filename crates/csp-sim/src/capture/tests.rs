@@ -1,6 +1,10 @@
 //! Occupying and capturing, where the conflict phases run it (`test_world::step` for `stepWorld`);
 //! refilling and the trading posts step the whole world.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::{MAX_HEALTH, MAX_HUNGER, OCCUPATION_GAME_DAYS};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::time::TICKS_PER_GAME_DAY;

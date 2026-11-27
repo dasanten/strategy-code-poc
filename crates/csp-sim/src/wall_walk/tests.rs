@@ -2,6 +2,10 @@
 //! wall's side gets up, down only to the side they came from, paths count the time and go up only
 //! when sent there; the step that keeps being up true to the walls, and its invariants.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::sync::Arc;
 
 use csp_shared::balance::{FALL_DAMAGE, MAX_HEALTH, WALK_TICKS_PER_TILE, WALL_WALK_TICKS};

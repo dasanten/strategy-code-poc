@@ -2,6 +2,10 @@
 //! by tile, with every invariant checked after each tick. The restart halfway needs the saves of
 //! `csp-server` and is tested there.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod build_common;
 
 use build_common::*;

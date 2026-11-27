@@ -25,6 +25,12 @@ Every recipe ends the same way:
   the client's full suite; CI runs it and `pnpm check:rust`'s steps.
 - `pnpm check:rust`: fmt, clippy with warnings as errors, and `cargo nextest run`. It shares the
   machine with other sessions' checks (ADR 0040) and may say it is waiting for one.
+- Clippy rejects a `_ =>` over an enum (`wildcard_enum_match_arm`, Epic 127): name the variants,
+  so a new kind of content doesn't compile until the rule says what it does with it. A wildcard
+  that truly means "every other kind, also one to come" gets `#[allow]` on its function, with
+  the reason beside it (an `#[allow]` on the arm itself has no effect). Files that still allow it
+  whole are counted by `crates/csp-sim/tests/wildcard_allows.rs`, which lets the count only go
+  down.
 - While working, `cargo nextest run -p csp-sim [filter]`, the crate you change: it doesn't
   rebuild `csp-server`.
 - A test over 5 s is a regression to fix, not to tag.

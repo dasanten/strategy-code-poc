@@ -4,6 +4,10 @@
 //! ported `Walking` (T86.4); `checkInvariants` comes with T86.13, so the runs check
 //! `deliveries-sound`.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod common;
 #[path = "goods_support/mod.rs"]
 #[macro_use]

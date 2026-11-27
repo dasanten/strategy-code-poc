@@ -3,6 +3,10 @@
 //! or never runs dry), never as a number; others see nothing of it. The log of each realm working
 //! it says once when it turns to thinning and once at nearly gone.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod build_common;
 
 use build_common::*;

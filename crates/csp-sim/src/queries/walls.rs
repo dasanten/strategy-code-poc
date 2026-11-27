@@ -1,6 +1,10 @@
 //! The wall queries that combat and respect need (`CONTEXT.md`: Walls in combat). Movement's wall
 //! map (`wallMap`, `mayStep`, `climbLanding`) is T86.6's to add here.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::balance::{
     BROKEN_MATERIALS_RETURNED, MAP_SIZE, SIGHT_RANGE, STONE_WALL_STRENGTH, TOWER_SIGHT_RANGE,
     WALL_STRENGTH,

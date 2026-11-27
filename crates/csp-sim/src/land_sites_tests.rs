@@ -1,5 +1,9 @@
 //! The Trade Organization and the NPC cities on the new land (T100.5; ADR 0004).
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use std::sync::{Arc, OnceLock};
 
 use csp_shared::balance::{MAP_SIZE, NPC_STARTING_SITE_CLEARANCE, NPC_VILLAGE};

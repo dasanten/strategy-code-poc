@@ -1,6 +1,10 @@
 //! Test helpers for the rule tests: small worlds built by hand, and `world_with_city` as the
 //! TypeScript built it (`foundStartingCity` on `cityTerrain`).
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 use csp_shared::terrain::{Terrain, TerrainMap};
 use csp_shared::world::{Building, BuildingKind, City, Resident, Stat, StatRecord, WorldState};
 

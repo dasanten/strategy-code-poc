@@ -2,6 +2,10 @@
 //! resident's hands from the patch of the Forest or Hills tile they stand on, at a pace between a
 //! poor node's and a normal one's; the patch runs out and grows back.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod build_common;
 
 use build_common::*;

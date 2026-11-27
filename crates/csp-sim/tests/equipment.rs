@@ -3,6 +3,10 @@
 //! putting the equipped one down equips the next, and a save from before Equipment equips each
 //! resident's best carried gear on its first tick.
 
+// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
+// why the wildcard is right, then remove this line.
+#![allow(clippy::wildcard_enum_match_arm)]
+
 mod common;
 #[macro_use]
 mod goods_support;

@@ -265,7 +265,12 @@ impl<'e> Checker<'e> {
             match s {
                 Statement::Let(s) => self.set(&s.name, UNKNOWN),
                 Statement::FunctionDeclaration(s) => self.set(&s.name, UNKNOWN),
-                _ => {}
+                Statement::If(_)
+                | Statement::While(_)
+                | Statement::ForOf(_)
+                | Statement::Return(_)
+                | Statement::Block(_)
+                | Statement::ExpressionStatement(_) => {}
             }
         }
         for s in body {
