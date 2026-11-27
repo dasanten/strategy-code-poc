@@ -2,6 +2,7 @@
 //! their `crate::` paths into the core working unchanged.
 pub use csp_sim::*;
 pub mod hooks;
+pub use hooks::install;
 pub mod invariants_npc;
 pub mod npc_acting_first;
 pub mod npc_behaviour;
