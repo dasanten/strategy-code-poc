@@ -4,10 +4,6 @@
 //! can't hold an undeclared field, and the horse, carriage and trader cases come with T86.14's
 //! fixture worlds.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use super::*;
 use crate::queues::tests::resident;
 use crate::script_views::{script_value_problems, SCRIPT_VIEWS};
@@ -98,6 +94,8 @@ fn setup() -> (WorldState, TerrainMap) {
 }
 
 /// What each expression in `calls` answers in one run of a1's script.
+// A JSON value: every shape but an object, also one to come, fails the test.
+#[allow(clippy::wildcard_enum_match_arm)]
 fn answers(calls: &[(&str, &str)], prepare: impl FnOnce(&mut WorldState)) -> Map<String, Json> {
     let (mut world, terrain) = setup();
     prepare(&mut world);

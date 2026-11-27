@@ -3,10 +3,6 @@
 //! holds, a description and, for one that can be `null`, when it is. The tables themselves are in
 //! [`crate::script_tables`].
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use serde_json::Value;
 use ts_rs::TS;
 
@@ -97,6 +93,8 @@ fn type_of(value: &Value) -> &'static str {
 /// each with its path (`residents[0].stats`). A missing field reads as `null` in a script, so it
 /// counts as a hidden one. Empty for a value that fits. Invariant (ADR 0004, 0011): every value
 /// the server hands a script fits.
+// A JSON value: under a list type every shape but an array, also one to come, is no list.
+#[allow(clippy::wildcard_enum_match_arm)]
 pub fn script_value_problems(value: Option<&Value>, t: ScriptType, path: &str) -> Vec<String> {
     let Some(value) = value.filter(|v| !v.is_null()) else { return Vec::new() };
     let plain = |name: &str| {

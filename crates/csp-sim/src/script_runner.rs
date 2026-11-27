@@ -8,10 +8,6 @@
 //! ticks while the script keeps running. Any other order from the Player ends the script
 //! (`OrderQueue`).
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -397,7 +393,14 @@ fn as_order(o: &OrderRequest, task: Task) -> OrderRequest {
         Task::Breed => ("breed", pick(&[("stableId", "stableId"), ("horseIds", "horseIds")])),
         Task::Build => ("build", pick(&[("building", "building"), ("material", "material")])),
         Task::Train => ("train", pick(&[("buildingId", "groundId")])),
-        _ => ("workAt", pick(&[("makes", "makes")])),
+        // Work; `task_problem` answers the others before it asks for this order.
+        Task::Work
+        | Task::FeedStable
+        | Task::Defend
+        | Task::BuildLine
+        | Task::Explore
+        | Task::Alarm
+        | Task::Gather => ("workAt", pick(&[("makes", "makes")])),
     };
     OrderRequest { kind: kind.into(), fields }
 }
@@ -1013,6 +1016,8 @@ fn options(steps: u64) -> RunOptions {
 
 /// A script's memory after a run as plain data to keep, or why it can't be kept
 /// (`keepMemory`); then the memory from before the run stays.
+// A JSON value: a memory that is no object, whatever its shape, is kept empty.
+#[allow(clippy::wildcard_enum_match_arm)]
 pub fn keep_memory(memory: &Object) -> Result<ScriptMemory, String> {
     match plain_value(&Value::Object(memory.clone()), SCRIPT_MEMORY_MAX as usize) {
         Ok(p) => Ok(match p.value {
@@ -1034,6 +1039,8 @@ pub fn keep_memory(memory: &Object) -> Result<ScriptMemory, String> {
 }
 
 /// A memory as a fresh script value to run with (`structuredClone(running.memory)`).
+// A script value: one that is no object, whatever its kind, runs as an empty memory.
+#[allow(clippy::wildcard_enum_match_arm)]
 fn memory_object(memory: &ScriptMemory) -> Object {
     match Value::from_json(&Json::Object(memory.clone())) {
         Value::Object(o) => o,
@@ -2121,7 +2128,15 @@ fn target_known(task: Task) -> Option<(&'static str, &'static [&'static str], &'
             ("haulers-have-a-route", &["to", "carriageId"], "Haul without a route or carriage")
         }
         Task::BuildLine => ("line-builders-have-a-line", &["line"], "Build line without a line"),
-        _ => return None,
+        Task::TearDown
+        | Task::Repair
+        | Task::Breed
+        | Task::FeedStable
+        | Task::Defend
+        | Task::Train
+        | Task::Explore
+        | Task::Alarm
+        | Task::Gather => return None,
     })
 }
 

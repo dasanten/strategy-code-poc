@@ -3,10 +3,6 @@
 //! A script isn't typed as a resident's or an army's, so both APIs are in, and `me` holds either;
 //! a default script (it has a task) runs only as a resident's and gets that API alone.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use std::collections::{HashMap, HashSet};
 
 use csp_lang::checker::{CheckEnv, CheckedGlobal, CheckedType, ShapeFields};
@@ -23,7 +19,9 @@ fn checked(t: ScriptType) -> CheckedType {
     match t {
         ScriptType::View(v) => CheckedType::shape(v),
         ScriptType::List(of) => CheckedType::list(checked(*of)),
-        _ => CheckedType::Unknown,
+        ScriptType::Number | ScriptType::String | ScriptType::Boolean | ScriptType::Any => {
+            CheckedType::Unknown
+        }
     }
 }
 

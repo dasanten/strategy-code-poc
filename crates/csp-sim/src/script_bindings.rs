@@ -11,10 +11,6 @@
 //! The data a query answers is built as plain JSON (`serde_json::Value`), as the TypeScript
 //! builds plain objects, then turned into a script value through the query's view.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 pub(crate) mod irregular;
 
 use std::cell::OnceCell;
@@ -1067,6 +1063,8 @@ impl<'a> ScriptBindings<'a> {
     }
 
     /// Who occupies a seen city's town hall and the ticks left (`occupationSeen`).
+    // Picks the seen cities: every other kind of seen thing, also one to come, is no city.
+    #[allow(clippy::wildcard_enum_match_arm)]
     fn occupation_seen(&self, id: &str) -> Map<String, Json> {
         let mut m = Map::new();
         let city = self.seen_places().iter().find_map(|e| match e {
@@ -1191,9 +1189,9 @@ impl<'a> ScriptBindings<'a> {
                 let known: HashSet<&str> = self
                     .seen()
                     .iter()
-                    .filter_map(|e| match e {
-                        SeenEntity::Building(b) => Some(b.building.id.as_str()),
-                        _ => None,
+                    .filter_map(|e| {
+                        let SeenEntity::Building(b) = e else { return None };
+                        Some(b.building.id.as_str())
                     })
                     .collect();
                 let side = self.side.as_deref();
@@ -1904,21 +1902,23 @@ impl<'a> ScriptBindings<'a> {
                         ScriptType::View("waypoint"),
                     )
                 }
-                ty => match picked_id.and_then(|id| param_target(world, side, ty, id)) {
-                    Some(ParamTarget::Building(b)) => view_value(
-                        &self.param_building(b).unwrap_or(Json::Null),
-                        ScriptType::View("building"),
-                    ),
-                    Some(ParamTarget::Carriage(k)) => {
-                        let mut m = to_json(k);
-                        let ids: Vec<Json> =
-                            passengers_of(world, &k.id).iter().map(|r| json!(r.id)).collect();
-                        m.insert("passengerIds".into(), Json::Array(ids));
-                        m.insert("standsStill".into(), Json::Bool(stands_still(world, k)));
-                        view_value(&Json::Object(m), ScriptType::View("carriage"))
+                ty @ (ParamType::Building | ParamType::Storage) => {
+                    match picked_id.and_then(|id| param_target(world, side, ty, id)) {
+                        Some(ParamTarget::Building(b)) => view_value(
+                            &self.param_building(b).unwrap_or(Json::Null),
+                            ScriptType::View("building"),
+                        ),
+                        Some(ParamTarget::Carriage(k)) => {
+                            let mut m = to_json(k);
+                            let ids: Vec<Json> =
+                                passengers_of(world, &k.id).iter().map(|r| json!(r.id)).collect();
+                            m.insert("passengerIds".into(), Json::Array(ids));
+                            m.insert("standsStill".into(), Json::Bool(stands_still(world, k)));
+                            view_value(&Json::Object(m), ScriptType::View("carriage"))
+                        }
+                        None => Value::Null,
                     }
-                    None => Value::Null,
-                },
+                }
             };
             entries.push((decl.name.clone(), value));
         }
@@ -2080,9 +2080,8 @@ fn requests_sound(
             Some(kind) if allowed.contains(&order.kind.as_str()) => {
                 if for_whom.and_then(Json::as_str) != Some(id) {
                     let who = if army { "army" } else { "resident" };
-                    let named = for_whom.map_or("undefined".to_string(), |v| match v {
-                        Json::String(s) => s.clone(),
-                        other => js_stringify(other),
+                    let named = for_whom.map_or("undefined".to_string(), |v| {
+                        v.as_str().map_or_else(|| js_stringify(v), str::to_string)
                     });
                     fail(format!("for another {who}, {named}"));
                 } else if let Some(reason) = kind.validate(world, sender, order, Some(terrain)) {
