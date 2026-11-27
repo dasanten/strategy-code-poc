@@ -14,6 +14,7 @@
     "dev:web": "pnpm --filter @csp/web dev",
     "start": "cargo run --release -p csp-server --bin csp-server",
     "test": "node scripts/wasm-build.mjs && vitest run",
+    "test:browser": "node scripts/test-browser.mjs",
     "check": "node scripts/check.mjs",
     "generate": "pnpm types:rust && pnpm balance:rust && pnpm script-data:rust",
     "types:rust": "cargo run -q -p csp-server --bin export-types",

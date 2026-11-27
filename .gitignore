@@ -19,3 +19,6 @@ target/
 
 # The editor's WebAssembly checker, built by `pnpm wasm:build` (T88.3)
 packages/lang-wasm/generated/
+
+# The browser tests' run folders (`pnpm test:browser`): kept only when a flow fails
+.browser-test/
