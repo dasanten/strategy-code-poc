@@ -169,6 +169,10 @@ pub fn compute_territory(world: &WorldState, size: i32) -> Territory {
 /// Hands `reached` every tile within `reach` of the nearest of `tiles` (straight line, the short
 /// way round), by index, with that distance, each tile once (`nearestWithin`): an exact distance
 /// transform over the box round the tiles.
+///
+/// On a map narrower than the box (the tiles' extent and twice the reach), the box holds some
+/// tiles twice and the tiles' wrapped copies lie in it too: the grid then reaches `reach` further
+/// on that side, holds every copy, and each tile takes the nearer of its distances (bug #1724).
 fn nearest_within(
     tiles: &[(i32, i32)],
     reach: f64,
@@ -183,15 +187,26 @@ fn nearest_within(
         .collect();
     let x0 = at.iter().map(|p| p.0).min().expect("a tile") - reach_i;
     let y0 = at.iter().map(|p| p.1).min().expect("a tile") - reach_i;
-    let w = size.min(at.iter().map(|p| p.0).max().expect("a tile") + reach_i - x0 + 1);
-    let h = size.min(at.iter().map(|p| p.1).max().expect("a tile") + reach_i - y0 + 1);
-    let (wu, hu) = (w as usize, h as usize);
-    let far = f64::from(w + h).powi(2);
+    let w = at.iter().map(|p| p.0).max().expect("a tile") + reach_i - x0 + 1;
+    let h = at.iter().map(|p| p.1).max().expect("a tile") + reach_i - y0 + 1;
+    let wraps = w > size || h > size;
+    // The grid: the box, and on a side wider than the map a margin of the reach round it.
+    let mx = if w > size { reach_i } else { 0 };
+    let my = if h > size { reach_i } else { 0 };
+    let (gx0, gy0, gw, gh) = (x0 - mx, y0 - my, w + 2 * mx, h + 2 * my);
+    let (wu, hu) = (gw as usize, gh as usize);
+    let far = f64::from(gw + gh).powi(2);
     let mut grid = vec![far; wu * hu];
     for &(x, y) in &at {
-        let (gx, gy) = (x - x0, y - y0);
-        if gx >= 0 && gy >= 0 && gx < w && gy < h {
-            grid[gy as usize * wu + gx as usize] = 0.0;
+        // Every copy of the tile in the grid: on a box narrower than the map, the tile alone.
+        let mut cy = y - (y - gy0).div_euclid(size) * size;
+        while cy < gy0 + gh {
+            let mut cx = x - (x - gx0).div_euclid(size) * size;
+            while cx < gx0 + gw {
+                grid[(cy - gy0) as usize * wu + (cx - gx0) as usize] = 0.0;
+                cx += size;
+            }
+            cy += size;
         }
     }
     // Squared distances along each column, then along each row (Felzenszwalb and Huttenlocher).
@@ -205,16 +220,26 @@ fn nearest_within(
             grid[y * wu + x] = d[y];
         }
     }
-    for y in 0..hu {
+    // A tile the box holds twice is handed on once, at the nearer of its distances.
+    let mut nearer: IndexMap<usize, f64> = IndexMap::new();
+    for y in my as usize..(my + h) as usize {
         let d = transform_1d(&grid[y * wu..(y + 1) * wu], wu);
-        for (x, &sq) in d.iter().enumerate() {
+        for (x, &sq) in d.iter().enumerate().skip(mx as usize).take(w as usize) {
             let dist = sq.sqrt();
             if dist <= reach {
-                let ty = wrap(first.1 + y0 + y as i32, size);
-                let tx = wrap(first.0 + x0 + x as i32, size);
-                reached((ty * size + tx) as usize, dist);
+                let ty = wrap(first.1 + gy0 + y as i32, size);
+                let tx = wrap(first.0 + gx0 + x as i32, size);
+                let i = (ty * size + tx) as usize;
+                if !wraps {
+                    reached(i, dist);
+                } else if nearer.get(&i).is_none_or(|&seen| dist < seen) {
+                    nearer.insert(i, dist);
+                }
             }
         }
+    }
+    for (i, dist) in nearer {
+        reached(i, dist);
     }
 }
 
@@ -254,4 +279,62 @@ fn transform_1d(f: &[f64], n: usize) -> Vec<f64> {
 pub fn territory_owner(territory: &Territory, x: i32, y: i32) -> Option<&str> {
     let size = territory.size;
     territory.owners.get(&((wrap(y, size) * size + wrap(x, size)) as usize)).map(String::as_str)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every tile within `reach` of the nearest of `tiles`, the short way round, by brute force.
+    fn brute(tiles: &[(i32, i32)], reach: f64, size: i32) -> Vec<(usize, f64)> {
+        let mut out = Vec::new();
+        for y in 0..size {
+            for x in 0..size {
+                let d = tiles
+                    .iter()
+                    .map(|t| {
+                        f64::from(wrap_delta(t.0, x, size))
+                            .hypot(f64::from(wrap_delta(t.1, y, size)))
+                    })
+                    .fold(f64::INFINITY, f64::min);
+                if d <= reach {
+                    out.push(((y * size + x) as usize, d));
+                }
+            }
+        }
+        out.sort_by_key(|p| p.0);
+        out
+    }
+
+    fn fast(tiles: &[(i32, i32)], reach: f64, size: i32) -> Vec<(usize, f64)> {
+        let mut out = Vec::new();
+        nearest_within(tiles, reach, size, &mut |i, d| out.push((i, d)));
+        out.sort_by_key(|p| p.0);
+        out
+    }
+
+    #[test]
+    fn nearest_within_measures_the_short_way_on_a_map_narrower_than_its_box() {
+        // Bug #1724, scaled down: tiles spanning 29 rows and a reach of 37 on a 96-tile map.
+        let tiles: Vec<(i32, i32)> = (-17..=11).map(|dy| (65, wrap(23 + dy, 96))).collect();
+        let reached = fast(&tiles, 37.0, 96);
+        let (x, y) = (82, 66);
+        let d = reached.iter().find(|p| p.0 == (y * 96 + x) as usize).expect("reached").1;
+        assert!((d - 17f64.hypot(32.0)).abs() < 1e-9, "{d}");
+        for (size, tiles, reach) in [
+            (96, tiles.clone(), 37.0),
+            (20, vec![(3, 4), (5, 4), (18, 19)], 12.0),
+            (16, vec![(0, 0)], 15.0),
+            (12, vec![(1, 1), (6, 7), (11, 0)], 20.0),
+            (10, vec![(2, 8)], 4.0),
+            (40, vec![(0, 0), (39, 39), (20, 0)], 21.0),
+        ] {
+            let (got, want) = (fast(&tiles, reach, size), brute(&tiles, reach, size));
+            assert_eq!(got.len(), want.len(), "size {size} tiles {tiles:?}: tiles reached");
+            for (g, w) in got.iter().zip(&want) {
+                assert_eq!(g.0, w.0, "size {size} tiles {tiles:?}");
+                assert!((g.1 - w.1).abs() < 1e-9, "size {size} tile {}: {} not {}", g.0, g.1, w.1);
+            }
+        }
+    }
 }
