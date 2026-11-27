@@ -203,7 +203,8 @@ NPC cities only give their residents orders, which request actions as a Player's
 
 The client is in `apps/web/src/`, one folder per area (`residents/`, `city/`, `army/`,
 `diplomacy/`, `trade/`, `transport/`, `realm/`, ...). The screen's frame is in `screen/`, the map
-in `map/` (ADR 0044: the layout; `docs/context/screen.md`: its terms).
+in `map/` (ADR 0044: the layout; `docs/context/screen.md`: its terms). `docs/architecture/client.md`
+says what each folder holds and how the world reaches the screen.
 
 **A panel:**
 
@@ -214,8 +215,9 @@ in `map/` (ADR 0044: the layout; `docs/context/screen.md`: its terms).
    `sideTab(...)` in `screen/GameSidebar.tsx`. Typecheck then asks for its icon in `TAB_ICONS`
    (`ui/ui-icons.ts`), and `screen/hud-view.test.ts` for its place in the strip; nothing asks for
    the `sideTab(...)`, so check that it shows.
-   A card or its tab goes in `screen/SelectionCard.tsx` and `screen/selection-view.ts`
-   (ADR 0012).
+   A tab of the resident card is one in `CARD_TABS` (`residents/residents-view.ts`; ADR 0012);
+   an order panel above the command bar, `screen/order-panel-view.ts` and
+   `screen/CommandBar.tsx`. Its CSS goes in the `styles/` file of its area.
 3. Its look from `ui/Kit.tsx`, `ui/panel-head.tsx` and the theme (`ui/theme.ts`; ADR 0044: Pixel
    frontier), goods through `ui/GoodsGrid.tsx`, icons through `ui/Icon.tsx`.
 4. What it needs of the world comes from `useWorld` (`world/useWorld.ts`); rules from
@@ -224,13 +226,14 @@ in `map/` (ADR 0044: the layout; `docs/context/screen.md`: its terms).
 
 **A map layer:**
 
-1. What it draws in a file of its own in `map/` (`map/plans.ts` and `map/places.ts` are small
+1. What it needs of the world in `MapWorld` (`map/map-world.ts`, filled in `GameMap.tsx`).
+2. What it draws in a file of its own in `map/` (`map/plans.ts` and `map/places.ts` are small
    examples): a pure function that works out what to draw, tested in `map/<name>.test.ts`, and one
    that draws it onto a Pixi `Graphics` with the camera (`map/camera.ts`).
-2. Its call in the frame's draw in `screen/MapView.tsx`: onto `under` (below the tokens: grid,
+3. Its call in `draw` or `drawOverlay` in `screen/MapView.tsx`: onto `under` (below the tokens: grid,
    city areas, roads) or `overlay` (above them), or a container of its own added to the stage in
    its order (`app.stage.addChild(...)`). Colours from `map/palette.ts`.
-3. If it shows at some zoom tiers only, say which (`map/levels.ts`); if the legend names it,
+4. If it shows at some zoom tiers only, ask `zoomTier` (ADR 0008); if the legend names it,
    `map/legend.ts`. Typecheck and the tests ask for none of this: the layer is only seen in the
    browser.
 
