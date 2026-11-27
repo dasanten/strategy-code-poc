@@ -118,8 +118,8 @@ on having run before it, where the code says so; otherwise it is unknown.
 30. `tick += 1`: the tick turns.
 31. `repair::step_decay`, `repair::trade_org_repairs`: decay at the turn of the day.
 32. `gathering::step_patches`: patches grown back leave the list.
-33. `ruins::step_ruins`: a building with no condition left is a ruin; old ruins collapse. Then
-    `rally::end_rallies` again: a rally at a workplace that just fell to ruin ends with the tick.
+33. `ruins::step_ruins`, `rally::end_rallies`: a building with no condition left is a ruin; old
+    ruins collapse; a rally at a workplace that just fell to ruin ends with the tick.
 34. `step_aging`: growing up and dying of old age.
 35. `answer_demands`: demands answered.
 36. `step_alliances`: one tick of alliances.
