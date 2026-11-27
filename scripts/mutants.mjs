@@ -17,6 +17,7 @@
 import { spawn, spawnSync } from 'node:child_process'
 import console from 'node:console'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { clearTimeout, setTimeout } from 'node:timers'
@@ -138,11 +139,26 @@ const read = (dir, name) => {
   const file = path.join(dir, 'mutants.out', name)
   return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean) : []
 }
+/**
+ * The scratch copies this run made (`cargo-mutants-<tree>-*.tmp`, about 7 GB each). cargo-mutants
+ * removes its own when it finishes, but not when the cap stopped it.
+ */
+function removeScratchCopies() {
+  const prefix = `cargo-mutants-${path.basename(root)}-`
+  for (const entry of fs.readdirSync(os.tmpdir(), { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.startsWith(prefix)) continue
+    const dir = path.join(os.tmpdir(), entry.name)
+    if (fs.statSync(dir).birthtimeMs < started) continue
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
+  }
+}
+
 const sum = { total: 0, missed: [], caught: 0, timeouts: 0, unviable: 0 }
 for (const run of runs) {
   if (capped) break
   const dir = path.join(outDir, run.name)
   const code = await runMutants(run, dir)
+  removeScratchCopies()
   // cargo-mutants exits 2 when it found missed mutants and 3 on timeouts: findings, not failures.
   if (!capped && ![0, 2, 3].includes(code)) failures.push(`${run.name} exited ${code}`)
   const listed = path.join(dir, 'mutants.out', 'mutants.json')
