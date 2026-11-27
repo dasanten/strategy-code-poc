@@ -177,7 +177,7 @@ async function tileAt(page: Page, x: number, y: number) {
  * it reads the tile in the middle of the map, drags the map by the difference and corrects until
  * the readout names the tile. Returns where it now is on the screen.
  */
-export async function showTile(page: Page, tile: { x: number; y: number }): Promise<Spot> {
+async function showTile(page: Page, tile: { x: number; y: number }): Promise<Spot> {
   const box = await page.getByRole('img', { name: 'World map' }).boundingBox()
   if (!box) throw new Error('The map is not on the screen')
   // Far out the map draws regions, not buildings: zoom in to the middle tier first.
