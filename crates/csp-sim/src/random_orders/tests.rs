@@ -12,7 +12,8 @@ const LEAST_ACCEPTED: f64 = 0.1;
 /// Runs a fixed seed, failing with its seed, tick and orders when it breaks.
 fn fixed_seed(seed: u64) {
     let (mut world, terrain) = two_realms_world(SIZE);
-    let outcome = random_run(&mut world, terrain, seed, TICKS).unwrap_or_else(|f| panic!("{f}"));
+    let outcome = random_run(&mut world, terrain, seed, TICKS)
+        .unwrap_or_else(|f| panic!("{}", report(&f, "twoRealms", SIZE, &mut |_| {})));
     eprintln!("{} ({:?})", summary(&outcome), outcome.kinds_accepted());
     let share = outcome.accepted() as f64 / outcome.given.len().max(1) as f64;
     assert!(

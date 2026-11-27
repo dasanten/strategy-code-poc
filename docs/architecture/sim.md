@@ -218,5 +218,6 @@ script sees, one module per table), `script_views` (ADR 0011), `script_check`, `
 goods rules call in other modules), and, test-only, `test_support`, `test_world`,
 `game_test_world`, `movement_test_world`, `realm_test_world`, `npc_test_world`, `npc_slow` (the
 slow NPC runs), `random_orders` (the random-order run: random requests to `test_world`'s
-`two_realms_world`, every invariant after every tick, a failure named by its seed; ADR 0048),
+`two_realms_world`, every invariant after every tick, a failure shrunk to a replay file of its
+fewest orders, `replays/` the replays kept as regression tests; ADR 0048),
 `poc_tests`, `stone_upgrade_tests`.
