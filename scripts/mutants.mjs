@@ -17,6 +17,7 @@ import console from 'node:console'
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
+import { clearTimeout, setTimeout } from 'node:timers'
 
 const CAP_MINUTES = 30
 const THREADS = 8
@@ -74,7 +75,11 @@ for (const name of crates.filter((c) => ALSO_TESTED_BY[c])) {
 const plain = crates.filter((c) => !ALSO_TESTED_BY[c])
 if (plain.length > 0) runs.push({ name: 'rest', mutate: plain, tests: null })
 
-const env = { ...process.env, CARGO_BUILD_JOBS: String(THREADS), NEXTEST_TEST_THREADS: String(THREADS) }
+const env = {
+  ...process.env,
+  CARGO_BUILD_JOBS: String(THREADS),
+  NEXTEST_TEST_THREADS: String(THREADS),
+}
 const started = Date.now()
 const deadline = started + capMinutes * 60 * 1000
 let capped = false
