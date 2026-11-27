@@ -1,6 +1,6 @@
 # NPC spare hands always have work, and news of far nodes is carried home
 
-Status: decided (2026-11-05, with Daniel). Changes NPC city and Full city.
+Status: decided (2026-11-05, with Daniel). Changes NPC city and Full city. Changed by ADR 0029 (the planner scores its jobs).
 
 Big NPC cities stood idle: once nothing was short of the reserve, workers were released and nothing
 else gave them a job. Daniel: they should build roads and send people to explore, gain resource nodes

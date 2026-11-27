@@ -110,7 +110,7 @@ const TILE_KINDS: Partial<Record<BuildingKind, string>> = {
 }
 
 /**
- * The pixel sprite (`docs/art.md`: Pixel art, ADR 0043) the Build menu shows for a kind: the map's
+ * The pixel sprite (`docs/art.md`: Pixel art, ADR 0047) the Build menu shows for a kind: the map's
  * own slice for it, a tower, wall or gate by the material picked, a carriage, vessel or siege
  * machine from the units sheet, and a wall, gate or road as one of its pieces. Undefined when the
  * registry has no slice for it; whether a slice has anything drawn in it yet is only known once

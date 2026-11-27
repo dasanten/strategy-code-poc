@@ -1,6 +1,6 @@
 # World storage, migrations and per-Player sync
 
-Status: decided (2026-10-18, with Daniel). Replaces the storage and map parts of ADR 0001.
+Status: decided (2026-10-18, with Daniel). Replaces the storage and map parts of ADR 0001. Its sync of explored terrain is replaced by ADR 0034; ADR 0035 set it aside once (one reset).
 
 ## Decisions
 

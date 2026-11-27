@@ -1,6 +1,6 @@
 # Demands are instant words with terms
 
-Status: decided (2026-11-04, with Daniel).
+Status: decided (2026-11-04, with Daniel). ADR 0033 changes how an NPC city answers a demand.
 
 Players, and the Trade Organization, want to tell someone "give the city back or we attack". The
 game had no way to say that, and no way to hand over a city short of being conquered.

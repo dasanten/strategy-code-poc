@@ -167,7 +167,7 @@ sites, 4 nodes, 6 units, 4 emblems, 12 goods and pile); about 65 with the option
 
 ## Pixel art
 
-Daniel's own art (ADR 0043), drawn in Aseprite and kept in `art/pixel/`. The Player sees it with
+Daniel's own art (ADR 0047), drawn in Aseprite and kept in `art/pixel/`. The Player sees it with
 the **Pixel** art style (`docs/context/screen.md`: Art style); whatever isn't drawn yet keeps the painted look.
 
 ### Files

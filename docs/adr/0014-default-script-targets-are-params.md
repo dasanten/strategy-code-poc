@@ -1,6 +1,6 @@
 # Default scripts take their target as a param
 
-Status: decided (2026-10-29, with Daniel). Builds on ADR 0009 (tasks run default scripts).
+Status: decided (2026-10-29, with Daniel). Builds on ADR 0046 (tasks run default scripts).
 
 A task order hands its default script the target in the script's memory (`memory.workplaceId`,
 `memory.stableId`, …) before it starts. The same script started any other way (Run script, or a

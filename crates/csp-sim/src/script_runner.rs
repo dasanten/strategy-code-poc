@@ -541,7 +541,7 @@ fn is_training_subject(v: &Json) -> bool {
     serde_json::from_value::<csp_shared::world::TrainingSubject>(v.clone()).is_ok()
 }
 
-/// The task order (`taskOrder`, `CONTEXT.md`: Order, Default script; ADR 0009): one of the
+/// The task order (`taskOrder`, `CONTEXT.md`: Order, Default script; ADR 0046): one of the
 /// Player's residents runs the Player's version of the task's default script, from a memory
 /// holding the task's target. It ends whatever the resident was doing.
 pub struct TaskOrder {
@@ -1530,7 +1530,7 @@ impl ScriptRunner {
         if let Some(v) = violations {
             let sound = if r.army { army_script_requests_sound } else { script_requests_sound };
             v.extend(sound(world, &self.terrain, sender, &r.id, &requests, &self.kinds));
-            // Invariant (ADR 0009): the game's defaults stay well within a resident's budget.
+            // Invariant (ADR 0046): the game's defaults stay well within a resident's budget.
             if matches!(result, RunResult::OutOfSteps { .. })
                 && script.follows_default
                 && steps >= SCRIPT_STEP_BUDGET
@@ -1850,7 +1850,7 @@ fn scout_ended(world: &mut WorldState, city_id: &str, reason: Option<&str>) {
 }
 
 /// An NPC city's residents run the game's default of their task (`runNpcScripts`, `CONTEXT.md`:
-/// NPC city, Default script; ADR 0009), through the same interpreter and game API as a Player's
+/// NPC city, Default script; ADR 0046), through the same interpreter and game API as a Player's
 /// scripts, with the city as the sender: it sees what its residents see, explored or not.
 /// Returns how many scripts ran, for tick health.
 pub fn run_npc_scripts(

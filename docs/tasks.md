@@ -7,7 +7,7 @@ the next one and works it into a PR (`.claude/commands/next-ticket.md`).
 **Priority rule:** bugs first, then epics in order, so the game becomes playable sooner:
 survive → produce → transport → grow → trade → fight → alliances → scripts → roads. Exception:
 the UI redesign (Epic 17, ADR 0008), then the livelier pace and default scripts (Epic 18, ADR
-0009), go ahead of the remaining gameplay epics. The admin map (Epic 19) runs in parallel with
+0046), go ahead of the remaining gameplay epics. The admin map (Epic 19) runs in parallel with
 Epic 18, ahead of Bandits. Agreed with Daniel on 2026-10-28: Quick wins 2 (Epic 30), Food pickup
 (31), Outpost storage (32) and UI overhaul and mobile (33), in that order, go ahead of Bandits.
 Agreed with Daniel on 2026-10-29: Faster checks (Epic 34, ADR 0013) first, since every other

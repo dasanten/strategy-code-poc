@@ -85,7 +85,7 @@ async function sheetPixels(file: string) {
 }
 
 /**
- * Adds the pixel art (`pixel-art.ts`, ADR 0043): every slice with something drawn in it, and the
+ * Adds the pixel art (`pixel-art.ts`, ADR 0047): every slice with something drawn in it, and the
  * part of it on the sheet's tint layer, packed into one texture. It is drawn crisp when scaled up
  * and smooth when scaled down, each slice with its own edge repeated around it so that pieces
  * that join, like walls and roads, show no seam.

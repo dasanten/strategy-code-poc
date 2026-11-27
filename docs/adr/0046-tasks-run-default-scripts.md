@@ -1,6 +1,6 @@
 # UI tasks run default scripts in the game language
 
-Status: decided (2026-10-22, with Daniel). Changes how ADR 0002's UI orders are built.
+Status: decided (2026-10-22, with Daniel). Changes how ADR 0002's UI orders are built. Numbered ADR 0009 until T124.4 (2026-11-27), which left 0009 to the epic branches.
 
 Every task the UI can give that repeats or decides (work a workplace, build, haul, tear down) is a
 **default script** written in the game's own language (`docs/context/control.md`: Default script, Order).
