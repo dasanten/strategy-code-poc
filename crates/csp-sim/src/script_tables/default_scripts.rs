@@ -1,4 +1,4 @@
-//! The default scripts' names and sources (`CONTEXT.md`: Default script; ADR 0009). Each source is
+//! The default scripts' names and sources (`CONTEXT.md`: Default script; ADR 0046). Each source is
 //! its own file in `default_scripts/`, in the game's own language; `.gitattributes` keeps them on
 //! LF line endings, as `include_str!` takes them as they are.
 

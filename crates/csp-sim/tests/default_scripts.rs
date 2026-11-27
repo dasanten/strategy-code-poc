@@ -1,5 +1,5 @@
 //! The world half of `apps/server/src/default-scripts.test.ts`, ported (T86.17, part 5): Default
-//! scripts (`CONTEXT.md`: Default script, Memory, Step budget; ADR 0009) in the running world:
+//! scripts (`CONTEXT.md`: Default script, Memory, Step budget; ADR 0046) in the running world:
 //! Work, Haul, Tear down and Build from the UI, waiting while their order runs, a group building,
 //! and the step budget. The library half (renaming, resetting, following the game's default) is
 //! `crates/csp-server/tests/default_scripts.rs`.

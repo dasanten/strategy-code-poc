@@ -1,6 +1,6 @@
 # Hybrid control: UI orders plus optional scripts
 
-Status: decided (2026-10-18, with Daniel)
+Status: decided (2026-10-18, with Daniel). Extended by ADR 0011 (script views); ADR 0046 changes how its UI orders are built.
 
 Players control the world in two ways: through **UI orders** for common jobs (assign residents
 to a mine, set up a supply route, station a guard) and through **scripts** in our own language

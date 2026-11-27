@@ -8,7 +8,7 @@
 //! keep their numbers.
 //!
 //! Each Player also has their own version of every default script (`CONTEXT.md`: Default script;
-//! ADR 0009), made the first time their library is used. Until they edit it, it takes each new
+//! ADR 0046), made the first time their library is used. Until they edit it, it takes each new
 //! game default as a new version ([`ensure_default_scripts`]); once edited it stays theirs until
 //! they reset it. Default scripts can't be renamed or deleted.
 //!

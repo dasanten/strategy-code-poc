@@ -4,7 +4,7 @@ import type { GearMarks } from './figures.js'
 import { PIXEL_SLICES } from './pixel-slices.js'
 
 /**
- * The pixel art registry (`docs/art.md`: Pixel art, ADR 0043): which slice of which exported sheet
+ * The pixel art registry (`docs/art.md`: Pixel art, ADR 0047): which slice of which exported sheet
  * draws each game kind. A slice with nothing drawn in it yet is left out of the atlas when it
  * loads, so whoever draws asks the atlas first and falls back to the painted look.
  */

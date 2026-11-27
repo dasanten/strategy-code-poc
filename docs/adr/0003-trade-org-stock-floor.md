@@ -1,7 +1,7 @@
 # Trade Organization warehouses never drop below a floor
 
 Status: decided (2026-10-18, with Daniel). Revised the same day: originally "refill without
-limit", changed to a floor so the Trade Organization takes part in the real economy.
+limit", changed to a floor so the Trade Organization takes part in the real economy. Changed for trading posts by ADR 0023; the HQ keeps its floor.
 
 Changed by ADR 0023 (2026-11-04): only the HQ's warehouses top up; trading posts no longer do.
 

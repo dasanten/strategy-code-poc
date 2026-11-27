@@ -1,6 +1,6 @@
 # The NPC planner scores its jobs, and big cities get more to do
 
-Status: decided (2026-11-06, with Daniel). Changes ADR 0026; keeps ADR 0016's planning pass.
+Status: decided (2026-11-06, with Daniel). Changes ADR 0026; keeps ADR 0016's planning pass. Amended by ADR 0039.
 
 Production has an NPC city of 108 with at least 65 standing still on the storage, after Living NPC
 cities (ADR 0026). A staged city of about 110 run for 40 game days shows 37 to 70 on the storage tile

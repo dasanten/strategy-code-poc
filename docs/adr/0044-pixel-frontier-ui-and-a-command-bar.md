@@ -9,7 +9,7 @@ colours, zoom tiers, the art registry, tabs on cards, pick mode, bottom sheets o
 ## Context
 
 The dark translucent "command table" of ADR 0008 was picked before the game had its own art. Daniel
-now draws the map in pixel art (ADR 0043), and the UI around it looks like another program. The
+now draws the map in pixel art (ADR 0047), and the UI around it looks like another program. The
 layout has also filled up: nine drawers on a rail, a card top right that hides the tile under it,
 and a card that scrolls through thirty orders. Daniel asked for a completely new design that keeps
 every screen and function.
