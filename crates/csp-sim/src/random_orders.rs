@@ -6,21 +6,23 @@
 //! the same orders, and the simulation, being deterministic, the same run.
 
 use std::fmt::Write as _;
-use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::sync::Arc;
 
-use csp_shared::balance::MAX_HUNGER;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{BuildingKind, Good, WorldState};
 use serde_json::{json, Map, Value};
 
 use crate::invariants::InvariantViolation;
 use crate::order_meta::ORDER_METAS;
-use crate::order_sender::OrderSender;
-use crate::orders::{order_kinds, OrderQueue, OrderReply};
+use crate::orders::order_kinds;
 use crate::script_actions::Request;
-use crate::tick::{run_tick, Scratch, ScriptErrorWhere, TickHealth, TickOptions, TickReporter};
-use crate::walking::Walking;
+
+mod play;
+mod replay;
+mod shrink;
+
+pub use play::play;
+pub use replay::{replay, Broken, Replay, Step};
+pub use shrink::report;
 
 /// The run's own random numbers (splitmix64), seeded by the run's seed.
 pub struct Draws(u64);
@@ -149,26 +151,6 @@ impl Outcome {
     }
 }
 
-/// What the tick reports, kept to be looked at once it is over.
-#[derive(Default)]
-struct Kept {
-    violations: Vec<InvariantViolation>,
-    errors: Vec<String>,
-}
-
-impl TickReporter for Kept {
-    fn invariant_violations(&mut self, _: &WorldState, violations: &[InvariantViolation]) {
-        self.violations.extend_from_slice(violations);
-    }
-    fn tick_health(&mut self, _: &WorldState, _: &TickHealth) {}
-    fn tick_error(&mut self, _: &WorldState, error: &str) {
-        self.errors.push(format!("tick panicked: {error}"));
-    }
-    fn script_error(&mut self, _: &WorldState, error: &str, _: &ScriptErrorWhere) {
-        self.errors.push(format!("script error: {error}"));
-    }
-}
-
 /// The share of a Player's residents given a random order each tick.
 const ORDERS_PER_RESIDENT: f64 = 0.15;
 /// The share of requests that walk the resident to something in the world, so that residents
@@ -183,32 +165,34 @@ const NONSENSE: f64 = 0.05;
 
 /// Runs `ticks` ticks of random orders on `world` from `seed`. Every world invariant (`check_all`'s, with the
 /// tick's ledgers, as the game runs them) is checked after every tick; the first tick that breaks
-/// one, or panics, ends the run as a [`Failure`].
+/// one, or panics, ends the run as a [`Failure`]: [`report`] shrinks it to a replay file.
 pub fn random_run(
     world: &mut WorldState,
     terrain: TerrainMap,
     seed: u64,
     ticks: u64,
 ) -> Result<Outcome, Box<Failure>> {
-    let terrain = Arc::new(terrain);
+    random_run_with(world, terrain, seed, ticks, &mut |_| {})
+}
+
+/// [`random_run`] with `rule` run on the world before every tick, as a rule of the simulation
+/// would: a rule broken on purpose, for the tests of the shrinking.
+pub fn random_run_with(
+    world: &mut WorldState,
+    terrain: TerrainMap,
+    seed: u64,
+    ticks: u64,
+    rule: &mut dyn FnMut(&mut WorldState),
+) -> Result<Outcome, Box<Failure>> {
+    let size = terrain.size;
     let kinds = order_kinds();
     let names: Vec<&'static str> =
         ORDER_METAS.iter().map(|m| m.kind).filter(|k| kinds.contains(k)).collect();
-    let mut queue = OrderQueue::new(kinds, Some(terrain.clone()));
-    let mut walking = Walking::without_budget(terrain.clone());
-    let mut scratch = Scratch::default();
     let mut draws = Draws::new(seed);
-    let mut given: Vec<Given> = Vec::new();
     let users: Vec<u64> = world.realms.iter().map(|r| r.user_id).collect();
-    let fail = |tick, broke, given: &Vec<Given>| {
-        Box::new(Failure { seed, tick, broke, given: given.clone() })
-    };
-    for _ in 0..ticks {
-        // Kept fed, so the run is about orders, not hunger.
-        for r in &mut world.residents {
-            r.hunger = MAX_HUNGER;
-        }
-        let pool = Pool::of(world, terrain.size);
+    let mut requests = |world: &WorldState, _: u64| {
+        let mut requests = Vec::new();
+        let pool = Pool::of(world, size);
         for owner in pool.player_residents(world) {
             if !draws.chance(ORDERS_PER_RESIDENT) {
                 continue;
@@ -227,43 +211,12 @@ pub fn random_run(
                 let kind = *draws.pick(&names).expect("order kinds");
                 random_order(&mut draws, &pool, kind, &resident_id)
             };
-            let sender = OrderSender::player(user_id, &format!("Player {user_id}"));
-            let reply = catch_unwind(AssertUnwindSafe(|| {
-                queue.receive(world, &sender, &json!("random"), &order)
-            }));
-            let refused = match reply {
-                Ok(OrderReply::Ack { .. }) => None,
-                Ok(OrderReply::Rejected { reason, .. }) => Some(reason),
-                Err(p) => {
-                    given.push(Given { tick: world.tick, user_id, order, refused: None });
-                    return Err(fail(world.tick, Broke::Panic(panic_text(p.as_ref())), &given));
-                }
-            };
-            given.push(Given { tick: world.tick, user_id, order, refused });
+            requests.push((user_id, order));
         }
-        let mut kept = Kept::default();
-        let mut every_tick = || 0.0;
-        let mut opts = TickOptions::new(&mut kept, 1.0, f64::INFINITY);
-        opts.walking = Some(&mut walking);
-        opts.orders = Some(&mut queue);
-        opts.now = Some(Box::new(|| 0.0));
-        opts.rand = Some(&mut every_tick);
-        run_tick(world, &terrain, &mut scratch, opts);
-        if let Some(e) = kept.errors.first() {
-            return Err(fail(world.tick, Broke::Panic(e.clone()), &given));
-        }
-        if !kept.violations.is_empty() {
-            return Err(fail(world.tick, Broke::Invariants(kept.violations), &given));
-        }
-    }
+        requests
+    };
+    let given = play(world, terrain, seed, ticks, &mut requests, rule)?;
     Ok(Outcome { seed, given })
-}
-
-fn panic_text(p: &(dyn std::any::Any + Send)) -> String {
-    p.downcast_ref::<&str>()
-        .map(|s| s.to_string())
-        .or_else(|| p.downcast_ref::<String>().cloned())
-        .unwrap_or_else(|| "a panic".into())
 }
 
 /// What a request can name: the ids of everything in the world, by the list it is in, and the

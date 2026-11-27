@@ -133,6 +133,32 @@ The world is never reset (ADR 0006): a save written by today's server loads into
    live, and reports a violation to Sentry (`crates/csp-server/src/monitoring.rs`), grouped by the
    invariant's name. A violation crashes nothing.
 
+## A failure of the random-order run
+
+The random-order run (`crates/csp-sim/src/random_orders.rs`, ADR 0048) gives random orders to a
+small world and checks every invariant after every tick. When a seed breaks one, the test does
+not print the run's thousands of orders: `report` shrinks it first (`random_orders/shrink.rs`),
+dropping orders, then ticks, while the same invariant (or the same panic) still breaks, and
+prints what is left and the replay file it wrote, `target/random-orders/seed-<seed>.json` (under
+`CARGO_TARGET_DIR` when it is set). The file is plain data: the world's maker and size, the
+ticks, what broke, and each order with the tick of the run it is given before.
+
+To turn it into the fix's regression test:
+
+1. Open a bug issue with the seed and the printed orders (the run finds bugs; it changes no rule).
+2. Copy the file into `crates/csp-sim/src/random_orders/replays/`, named after the bug
+   (`1234-what-breaks.json`), and set its `"note"` to the bug's number and what breaks.
+3. `every_replay_keeps_the_invariants` replays every file there: it fails until the fix is in,
+   with the replay's failure. Fix the rule; the test passes, and keeps the bug from coming back.
+4. The orders name the world's ids, so a change to the random run's world (`two_realms_world`)
+   can make a replay's orders refused and the file pass without testing anything. Such a change
+   writes its replays again from their seeds, or adds a world maker to `Replay::start` that keeps
+   the old world.
+
+`example-stray-hall.json` there is an example, made from a rule broken on purpose in its test
+only (`walkers_leave_a_stray_hall` in `random_orders/shrink/tests.rs`): with that rule it breaks
+`cities-from-buildings` again, without it it holds.
+
 ## A script function or table entry
 
 Everything a script reads or asks for goes through the game API (ADR 0002). The tables are in

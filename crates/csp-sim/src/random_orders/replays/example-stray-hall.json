@@ -1,0 +1,35 @@
+{
+  "note": "The example: written by a_failure_shrinks_to_the_orders_that_break_it_and_prints_them from a rule broken on purpose in the test only (walkers_leave_a_stray_hall). Without that rule it keeps the invariants, as every replay here must.",
+  "world": "twoRealms",
+  "size": 128,
+  "seed": 1,
+  "ticks": 3,
+  "broke": {
+    "invariant": {
+      "name": "cities-from-buildings",
+      "message": "stray-hall makes no city"
+    }
+  },
+  "orders": [
+    {
+      "tick": 0,
+      "userId": 2,
+      "order": {
+        "kind": "walkTo",
+        "residentId": "r259",
+        "x": 99,
+        "y": 32
+      }
+    },
+    {
+      "tick": 1,
+      "userId": 1,
+      "order": {
+        "kind": "walkTo",
+        "residentId": "r125",
+        "x": 23,
+        "y": 78
+      }
+    }
+  ]
+}
