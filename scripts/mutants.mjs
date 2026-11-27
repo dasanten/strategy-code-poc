@@ -5,8 +5,10 @@
 // It never fails: it exits 0 whatever it finds, and says so when it stopped at its time cap.
 //
 // cargo-mutants builds in a scratch copy of the tree (without `target/`, so the worktree's build is
-// not disturbed): one copy at a time, cargo and nextest at `THREADS` threads, so it shares the
-// machine (ADR 0040). What it leaves out is in `.cargo/mutants.toml`. A mutant runs the tests of
+// not disturbed): `JOBS` copies, each building and testing one mutant at a time with cargo and
+// nextest at `THREADS` threads, so it shares the machine (ADR 0040). The tests stop at the first
+// failure (the `mutants` nextest profile), which is enough to catch a mutant. There is no baseline
+// run of the unchanged tree: run it on a tree whose tests pass, as `dev` and a checked branch are. What it leaves out is in `.cargo/mutants.toml`. A mutant runs the tests of
 // its own crate; one in `csp-shared` also those of `csp-sim`, which hold the shared crate's rules.
 // So it runs twice: the shared crate's mutants, then the rest's, both inside one time cap.
 //
@@ -20,7 +22,11 @@ import process from 'node:process'
 import { clearTimeout, setTimeout } from 'node:timers'
 
 const CAP_MINUTES = 30
-const THREADS = 8
+const JOBS = 2
+const THREADS = 6
+/** Per mutant, with no baseline to measure from: the csp-sim suite takes 1 to 2.5 min. */
+const TEST_TIMEOUT_S = 600
+const BUILD_TIMEOUT_S = 900
 /** Crates whose rules are held by another crate's tests too. */
 const ALSO_TESTED_BY = { 'csp-shared': ['csp-sim'] }
 
@@ -79,6 +85,7 @@ const env = {
   ...process.env,
   CARGO_BUILD_JOBS: String(THREADS),
   NEXTEST_TEST_THREADS: String(THREADS),
+  NEXTEST_PROFILE: 'mutants',
 }
 const started = Date.now()
 const deadline = started + capMinutes * 60 * 1000
@@ -93,8 +100,14 @@ function runMutants(run, dir) {
     '--output',
     dir,
     '--jobs',
-    '1',
+    String(JOBS),
     '--no-shuffle',
+    '--baseline',
+    'skip',
+    '--timeout',
+    String(TEST_TIMEOUT_S),
+    '--build-timeout',
+    String(BUILD_TIMEOUT_S),
     ...run.mutate.flatMap((name) => ['--package', name]),
     ...(run.tests ?? []).flatMap((name) => ['--test-package', name]),
   ]
@@ -148,6 +161,6 @@ writeReport([
   `- crates changed: ${crates.join(', ')}`,
   `- duration: ${minutes(took)}` +
     (capped ? `, stopped at the ${capMinutes} min cap after ${done} mutants` : ''),
-  ...failures.map((f) => `- cargo mutants ${f} (baseline failed? its mutants.out/debug.log)`),
+  ...failures.map((f) => `- cargo mutants ${f} (its mutants.out/debug.log says why)`),
   ...sum.missed.map((line) => `  - missed: \`${line}\``),
 ])

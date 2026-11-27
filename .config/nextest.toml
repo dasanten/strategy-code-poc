@@ -30,3 +30,7 @@ and not test(/::the_walls_fingerprint_is_cheaper_than_the_key$/)
 filter = "test(/::generates_the_full_size_map_as_the_rules_say$/)"
 threads-required = "num-test-threads"
 priority = 100
+
+# `pnpm mutants` (T130.2): a mutant is caught by its first failing test, so the run stops there.
+[profile.mutants]
+fail-fast = true
