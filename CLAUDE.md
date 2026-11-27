@@ -7,7 +7,9 @@
 - **Decisions:** `docs/adr/`. The game vision in `CONTEXT.md` and `docs/context/` wins over ADR 0001 where they
   conflict.
 - **Adding content** (a building kind, a good, a vessel or siege machine, an order): the steps are
-  in `docs/adding-content.md`.
+  in `docs/adding-content.md`. The other common changes (a rule, a world format bump, a balance
+  number, an invariant, a script function, a client query, an NPC behaviour, a panel or map layer):
+  `docs/recipes.md`.
 - **What to do next:** GitHub tickets, how they work in `docs/tasks.md`. `/next-ticket` picks the
   next one and works it into a PR. PRs reference their tickets (`Closes #n`, `Part of #epic`).
 - **CI minutes are scarce** (ADR 0009): ticket PRs go into the epic branch `epic/<n>-<slug>` and
