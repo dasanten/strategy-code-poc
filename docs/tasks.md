@@ -282,8 +282,8 @@ I sleep.
 | 120 | [Fewer collisions](https://github.com/dasanten/strategy-code-poc/issues/1560) | done |
 | 121 | [Content defined once](https://github.com/dasanten/strategy-code-poc/issues/1568) | done |
 | 122 | [One copy of the rules](https://github.com/dasanten/strategy-code-poc/issues/1579) | done |
-| 123 | [Client tidy](https://github.com/dasanten/strategy-code-poc/issues/1588) | ticketed |
-| 124 | [Agent docs](https://github.com/dasanten/strategy-code-poc/issues/1595) | ticketed, after 123 |
+| 123 | [Client tidy](https://github.com/dasanten/strategy-code-poc/issues/1588) | done |
+| 124 | [Agent docs](https://github.com/dasanten/strategy-code-poc/issues/1595) | in progress (`epic/124-agent-docs`) |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
