@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SKILL_LABELS } from './Residents.js'
+import { SKILL_LABELS } from '../residents/Residents.js'
 import { SKILL_NAMES } from './world.js'
 
 describe('the skills the client lists', () => {
