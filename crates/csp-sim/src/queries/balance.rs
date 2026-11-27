@@ -1,6 +1,6 @@
-//! The helpers of `packages/shared/src/balance.ts` that take a resident and that building, work
-//! and training use: building and work pace, skills learned by doing, training gains, carry
-//! capacity. The numbers are `csp_shared::balance`'s.
+//! The balance helpers that take a resident and that building, work and training use: building and
+//! work pace, skills learned by doing, training gains, carry capacity. The numbers are
+//! `csp_shared::balance`'s.
 
 use csp_shared::balance::trained_cap;
 use csp_shared::balance::{

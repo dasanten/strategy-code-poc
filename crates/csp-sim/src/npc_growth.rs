@@ -1,10 +1,10 @@
-//! How an NPC city grows (`apps/server/src/npc-growth.ts`, `CONTEXT.md`: NPC city): it pairs its
-//! adults, builds a house when it has a food surplus and no free housing, a farm when the farmers
-//! it wants don't fit, and the workplace for a material it needs but has no workplace for. With no
-//! room left inside its wall it builds on its edge, puts up a new wall `NPC_WALL_STEP` tiles
-//! further out and then tears down the old one. All through the orders a Player's residents take
-//! (ADR 0002). The city decides all this in its planning pass and keeps the project in its plan;
-//! each tick it only gives its builders their part in it (`take_part`).
+//! How an NPC city grows (`CONTEXT.md`: NPC city): it pairs its adults, builds a house when it has
+//! a food surplus and no free housing, a farm when the farmers it wants don't fit, and the
+//! workplace for a material it needs but has no workplace for. With no room left inside its wall
+//! it builds on its edge, puts up a new wall `NPC_WALL_STEP` tiles further out and then tears down
+//! the old one. All through the orders a Player's residents take (ADR 0002). The city decides all
+//! this in its planning pass and keeps the project in its plan; each tick it only gives its
+//! builders their part in it (`take_part`).
 
 use std::cell::RefCell;
 use std::collections::HashSet;

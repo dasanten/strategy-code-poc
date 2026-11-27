@@ -46,7 +46,7 @@ Trade Organization founding anything, any cap on daughters beyond "full" and fre
 ## Tickets, in order
 
 Each ticket is a vertical slice with its tests and invariants (ADR 0004) and updates its Wiki
-section. Balance numbers are first picks for `packages/shared/src/balance.ts`; list them in the
+section. Balance numbers are first picks for `crates/csp-shared/src/balance/`; list them in the
 PR.
 
 ### T1. Crew food in the Work default

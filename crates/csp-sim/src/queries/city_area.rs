@@ -1,6 +1,6 @@
-//! The city-shape queries of `packages/shared/src/city.ts` (`CONTEXT.md`: City building, City
-//! area, Occupying a town hall, House): which city a building belongs to, where a city's area is,
-//! its housing, and who occupies its town hall.
+//! The city-shape queries (`CONTEXT.md`: City building, City area, Occupying a town hall, House):
+//! which city a building belongs to, where a city's area is, its housing, and who occupies its town
+//! hall.
 
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet};

@@ -43,4 +43,4 @@ one for a known name ran `scrypt`, so the response time told which names exist.
 - The back-off lives **in memory**: a restart forgets it, and it remembers a bounded number of
   names, dropping the oldest past that. The numbers (`LOGIN_FAILURES_BEFORE_BACKOFF`,
   `LOGIN_BACKOFF_MS`, `LOGIN_BACKOFF_MAX_MS`, `LOGIN_BACKOFF_TRACKED_NAMES`) are constants in
-  `apps/server/src/auth.ts`.
+  `crates/csp-server/src/auth.rs`.

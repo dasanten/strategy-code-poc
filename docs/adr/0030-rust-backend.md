@@ -3,7 +3,7 @@
 Status: decided (2026-11-07, with Daniel). Supersedes decision 3 of ADR 0001 ("TypeScript on
 both server and client") for the server; the client stays TypeScript. Builds on ADR 0002 (the
 game API is the single source of truth), ADR 0006 (the world is never reset) and ADR 0013 (fast
-local checks).
+local checks). Amended by ADR 0040 (local checks, slow tests).
 
 Daniel read `docs/proposals/rust-rewrite.md`, which recommended against a rewrite for now, and
 decided for it: the server (`apps/server`), the shared game code (`packages/shared`) and the

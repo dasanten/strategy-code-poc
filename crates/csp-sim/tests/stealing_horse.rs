@@ -1,6 +1,6 @@
-//! `apps/server/src/stealing-horse.test.ts`, ported (T86.17, part 5): mounting another
-//! organization's horse, hitching it to the realm's own carriage, driving off in another's
-//! carriage (`CONTEXT.md`: Stealing a carriage or horse), and never by accident.
+//! Mounting another organization's horse, hitching it to the realm's own carriage, driving off in
+//! another's carriage (`CONTEXT.md`: Stealing a carriage or horse), and never by accident (T86.17,
+//! part 5).
 
 mod build_common;
 mod scripts_common;

@@ -1,7 +1,7 @@
-//! The server's log (`apps/server/src/log.ts`): `tracing`, written as pino wrote it so whatever
-//! reads the logs keeps working. JSON lines in production, one object per line with pino's
-//! `level` (10 trace … 50 error), `time` (ms), `pid`, `hostname` and `msg`, and the event's
-//! fields at the top level; readable lines for a human at a terminal in development.
+//! The server's log: `tracing`, written as pino writes it so whatever reads the logs keeps working.
+//! JSON lines in production, one object per line with pino's `level` (10 trace … 50 error), `time`
+//! (ms), `pid`, `hostname` and `msg`, and the event's fields at the top level; readable lines for a
+//! human at a terminal in development.
 //!
 //! An event's fields are its `tracing` fields, plus the object in its `fields` field (a JSON
 //! string, see [`log_event`]) merged in: what pino's first argument was.

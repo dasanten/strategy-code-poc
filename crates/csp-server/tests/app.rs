@@ -1,5 +1,5 @@
-//! The HTTP routes (`app.test.ts`, the requests of `first-day.test.ts` and the script library API
-//! of `scripts.test.ts`), driven through the router as Fastify's `inject` drives the app.
+//! The HTTP routes, with the requests of the first-day card and the script library API, driven
+//! through the router as Fastify's `inject` drives an app.
 use std::sync::Arc;
 
 use axum::body::{to_bytes, Body};

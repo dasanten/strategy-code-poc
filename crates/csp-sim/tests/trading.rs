@@ -1,7 +1,7 @@
-//! `apps/server/src/trading.test.ts`, one test per `it`. The post is laid out by hand as
-//! `foundTradingPost` (T86.9) leaves its warehouse: a Trade Org post city with a warehouse holding
-//! `TRADING_POST`'s coins and goods; the HQ is the one the TypeScript founded in the `hq-0`
-//! fixture. Each step checks `goodsOnlyFromNothingAtTheFloor`; `checkInvariants` comes with T86.13.
+//! Trading, one test per case. The post is laid out by hand as `foundTradingPost` (T86.9) leaves
+//! its warehouse: a Trade Org post city with a warehouse holding `TRADING_POST`'s coins and goods;
+//! the HQ is the one in the `hq-0` fixture. Each step checks `goodsOnlyFromNothingAtTheFloor`;
+//! `checkInvariants` comes with T86.13.
 
 mod common;
 #[macro_use]

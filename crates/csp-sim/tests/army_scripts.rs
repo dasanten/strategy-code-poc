@@ -1,6 +1,5 @@
-//! `army-scripts.test.ts`, one test per `it`: scripts for armies (`CONTEXT.md`: Running a script,
-//! Army). The script library is the test host's (`tasks_support`), where the TypeScript keeps it
-//! in a database; a script saved with a syntax error has no version that can run, as there.
+//! Scripts for armies (`CONTEXT.md`: Running a script, Army). The script library is the test
+//! host's (`tasks_support`); a script saved with a syntax error has no version that can run.
 
 mod goods_support;
 mod tasks_support;

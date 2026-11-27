@@ -1,5 +1,5 @@
 //! Occupying a town hall and capturing a city (`CONTEXT.md`: Occupying a town hall, Capturing a
-//! city, Integrating, What joins with a city), ported from `apps/server/src/capture.ts`.
+//! city, Integrating, What joins with a city).
 
 use std::collections::HashSet;
 

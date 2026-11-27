@@ -1,8 +1,8 @@
-//! Mercenary contracts (`apps/server/src/contracts.ts`, `CONTEXT.md`: Mercenary contract, Trade
-//! Org army, Hiring from an NPC city): one realm rents some of its residents to another for coins
-//! over a number of game days. One side offers, the other accepts; each game week is paid in
-//! advance with a pay order; a week that ends unpaid breaks the contract; at the end the residents
-//! walk home. A side is a Player's realm, the Trade Organization (`TRADE_ORG`) or an NPC city.
+//! Mercenary contracts (`CONTEXT.md`: Mercenary contract, Trade Org army, Hiring from an NPC
+//! city): one realm rents some of its residents to another for coins over a number of game days.
+//! One side offers, the other accepts; each game week is paid in advance with a pay order; a week
+//! that ends unpaid breaks the contract; at the end the residents walk home. A side is a Player's
+//! realm, the Trade Organization (`TRADE_ORG`) or an NPC city.
 
 use std::collections::{HashMap, HashSet};
 

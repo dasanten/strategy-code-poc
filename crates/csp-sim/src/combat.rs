@@ -1,6 +1,6 @@
 //! Combat (`CONTEXT.md`: Combat, Walls in combat, Crime, Loot, Down, Under attack, On a carriage
-//! under attack), ported from `apps/server/src/combat.ts`: the attack order, the blows it
-//! requests (ADR 0002) and their resolution one after another at the end of the tick.
+//! under attack): the attack order, the blows it requests (ADR 0002) and their resolution one
+//! after another at the end of the tick.
 
 use std::collections::{HashMap, HashSet};
 

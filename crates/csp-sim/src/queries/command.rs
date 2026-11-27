@@ -1,5 +1,5 @@
-//! Who may order whom (`commands`, `commandsCarriage`, `stealsCarriage` of
-//! `packages/shared/src/alliance.ts`), on top of `alliance.rs`'s `commander_of`.
+//! Who may order whom (`commands`, `commandsCarriage`, `stealsCarriage`), on top of `alliance.rs`'s
+//! `commander_of`.
 
 use csp_shared::world::{Carriage, Resident, WorldState};
 

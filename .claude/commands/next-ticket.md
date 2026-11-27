@@ -3,7 +3,8 @@ description: Pick the next GitHub ticket and work it into a pull request
 ---
 
 Work the next ticket of this repo (dasanten/strategy-code-poc) into a ready-for-review PR,
-following `docs/tasks.md` and `CLAUDE.md`. `$ARGUMENTS` may name a ticket number to take instead.
+following `docs/tasks.md` and `CLAUDE.md`. Working beside other sessions (a check that fails
+under load, a conflict in a generated file, the build cache): `docs/coordination.md`. `$ARGUMENTS` may name a ticket number to take instead.
 
 ## 1. Pick
 
@@ -32,21 +33,14 @@ branches from `origin/dev` instead (ADR 0010).
   goes into its section file, a new term also into the index.
 - A missing **rule** (what happens) is not yours to invent: comment the question on the ticket,
   swap `in progress` for `needs Daniel`, and pick the next ticket.
-- A missing **number** is yours: pick a sensible value in its domain's file
-  (in `crates/csp-shared/src/balance/`, one commented constant each; then `pnpm balance:rust`) and
-  list it in the PR.
-- New simulation rules come with invariants and tests (ADR 0004); a change to world state shape
-  bumps `WORLD_FORMAT_VERSION` with a migration in `crates/csp-server/src/world_format.rs` and a
-  test (ADR 0006); actions and queries go
-  through the game API, orders only request actions (ADR 0002).
-- A ticket that changes a rule also updates its wiki section, `apps/web/src/wiki/<topic>.tsx`.
+- A missing **number** is yours (`CLAUDE.md`: Balance numbers); list it in the PR.
+- Follow the rules in `CLAUDE.md`; the step lists for the change are in `docs/adding-content.md`
+  and `docs/recipes.md`, the map of the code in `docs/architecture/`.
 - If the next ticket cannot ship without this one (or the reverse), do both in this PR.
 - Tick the ticket's "Done when" boxes as they become true (edit the issue body).
-- While working on the crates, run the tests of the crate you change
-  (`cargo nextest run -p csp-sim [filter]`), not the whole check (ADR 0040).
 - Before committing: `pnpm check:rust` once when the change touches `crates/`, and
-  `pnpm check origin/epic/<n>-<slug>` (a `bug`: `origin/dev`), which runs lint, typecheck and the
-  client tests the change affects (ADR 0013).
+  `pnpm check origin/epic/<n>-<slug>` (a `bug`: `origin/dev`; what they run:
+  `docs/recipes.md`).
 
 ## 4. Pull request
 
@@ -61,8 +55,9 @@ branches from `origin/dev` instead (ADR 0010).
   `Closes #<ticket>` line per ticket and `Part of #<epic>`.
 - Turn on Auto-fix for the PR.
 - Leave `in progress` on the ticket until the PR merges. Never merge yourself: the coordinating
-  session merges into the epic branch after its own local run and closes the tickets by hand
-  (GitHub only closes them on merges into `main`).
+  session merges into the epic branch (at once when the PR contains the epic tip, else after its
+  own run on the merge; `docs/coordination.md`) and closes the tickets by hand (GitHub only
+  closes them on merges into `main`).
 
 ## 5. Keep going
 

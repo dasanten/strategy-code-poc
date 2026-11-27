@@ -1,6 +1,5 @@
-//! `npc-chain.test.ts`: the reserve-driven chain (`CONTEXT.md`: NPC city, NPC reserve): spare
-//! hands go to the good shortest of the reserve, and the city builds the workplace that makes it,
-//! up from the node.
+//! The reserve-driven chain (`CONTEXT.md`: NPC city, NPC reserve): spare hands go to the good
+//! shortest of the reserve, and the city builds the workplace that makes it, up from the node.
 
 use std::collections::{HashMap, HashSet};
 

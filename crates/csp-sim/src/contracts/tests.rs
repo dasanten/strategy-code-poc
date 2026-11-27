@@ -1,8 +1,8 @@
-//! `apps/server/src/contracts.test.ts`. Left out until their tickets land: the walking and sight
-//! of hired residents (T86.4, T85.5's `entitiesInSight` over walked residents), armies of
-//! mercenaries (`formArmy`, T86.7), hauling for the hirer (T86.5), `checkInvariants` after each
-//! tick (T86.13) and the `diplomacyFor` view (T87.6; `contracts_for` is checked instead). A
-//! Leader's death goes through `end_contracts_on_leader_death`, as `dieAll` (T86.3) calls it.
+//! Mercenary contracts. Left out until their tickets land: the walking and sight of hired
+//! residents (T86.4, T85.5's `entitiesInSight` over walked residents), armies of mercenaries
+//! (`formArmy`, T86.7), hauling for the hirer (T86.5), `checkInvariants` after each tick (T86.13)
+//! and the `diplomacyFor` view (T87.6; `contracts_for` is checked instead). A Leader's death goes
+//! through `end_contracts_on_leader_death`, as `dieAll` (T86.3) calls it.
 
 use csp_shared::balance::{STANDING_CONTRACT_BROKEN_LOSS, STANDING_PER_PAID_WEEK};
 use csp_shared::terrain::TerrainMap;

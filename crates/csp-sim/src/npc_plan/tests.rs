@@ -1,4 +1,4 @@
-//! `npc-plan.test.ts`.
+//! The planning pass of the cities the game runs.
 
 use std::collections::HashSet;
 

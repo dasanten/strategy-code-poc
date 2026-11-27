@@ -1,6 +1,5 @@
-//! The WebSocket side (ADR 0006; `apps/server/src/realtime.ts`): only logged-in sessions
-//! connect; each client gets what its Player sees and their realm log on connect, then the
-//! changes every tick; orders come back the same way.
+//! The WebSocket side (ADR 0006): only logged-in sessions connect; each client gets what its Player
+//! sees and their realm log on connect, then the changes every tick; orders come back the same way.
 //!
 //! The socket tasks do only what needs no world: the origin, the session, the connection cap,
 //! the message allowance, and passing frames on. Everything that reads or changes the world (the

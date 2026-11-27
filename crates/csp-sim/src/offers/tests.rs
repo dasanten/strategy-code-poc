@@ -1,6 +1,6 @@
-//! `offers.test.ts`: posting, set-aside goods, accepting, ending and the invariants, through the
-//! order queue and the world step as the game runs them. Its cases about scripts and what can be
-//! seen of an offer are left to the script and sight tests.
+//! Posting, set-aside goods, accepting, ending and the invariants, through the order queue and the
+//! world step as the game runs them. Cases about scripts and what can be seen of an offer are left
+//! to the script and sight tests.
 
 use std::sync::Arc;
 

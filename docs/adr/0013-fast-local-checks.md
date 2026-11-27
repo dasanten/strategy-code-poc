@@ -1,7 +1,7 @@
 # Fast local checks, the full suite only in CI
 
 Status: decided (2026-10-29, with Daniel). Amends ADR 0009: local checks no longer run the whole
-test suite.
+test suite. Amended by ADR 0040 (checks share the machine).
 
 `pnpm test` takes about 4 minutes on an idle machine (142 files, about 1,700 tests). With several
 ticket sessions checking at once it takes close to 10, and it runs twice per ticket: once in the

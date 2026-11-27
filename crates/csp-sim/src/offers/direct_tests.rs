@@ -1,5 +1,5 @@
-//! `direct-offers.test.ts`: sending, accepting and ending Direct offers. The client view of them
-//! (`diplomacyFor`) comes with the server.
+//! Sending, accepting and ending Direct offers. The client view of them (`diplomacyFor`) comes with
+//! the server.
 
 use std::sync::Arc;
 

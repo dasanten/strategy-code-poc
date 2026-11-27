@@ -5,8 +5,8 @@ return.
 
 Every kind of thing a script can get (`me`, a resident from `residents()`, a building, a city, a
 pile, a node, a last-seen entry, …) has a declared **script view** (`docs/context/control.md`: Script view): a
-fixed list of fields with a description each, kept as plain data in `packages/shared` beside
-`SCRIPT_API`. The server builds every object a script gets _from_ its view, so a script sees
+fixed list of fields with a description each, kept as plain data in `crates/csp-sim/src/script_views.rs`
+beside the game API. The server builds every object a script gets _from_ its view, so a script sees
 exactly those fields and nothing more. A field the Player isn't allowed to see is always there and
 `null`, and its description says when. Until now scripts got the server's internal objects as
 they were (`toValue(resident)`).

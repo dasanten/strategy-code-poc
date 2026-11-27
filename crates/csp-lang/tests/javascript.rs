@@ -1,6 +1,5 @@
-//! Not in the TypeScript tests: what the TypeScript language did through JavaScript without
-//! saying so, checked against Node (the expected values are what `node` printed for the same
-//! script on the frozen `packages/lang`).
+//! What the script language does through JavaScript without saying so, checked against Node (the
+//! expected values are what `node` printed for the same script on the original implementation).
 
 mod support;
 

@@ -1,8 +1,8 @@
-//! Goods that came into the world during the current tick (`apps/server/src/goods-made.ts`), by
-//! the rules that may bring them in: work at a workplace, a building torn down or broken giving
-//! back some of its materials, and the Trade Org's stock floor (ADR 0003). Kept beside the world,
-//! not in it ([`crate::tick::Scratch::made`]): it is only for checking that goods appear nowhere
-//! else (`goodsOnlyFromNothingAtTheFloor`).
+//! Goods that came into the world during the current tick, by the rules that may bring them in:
+//! work at a workplace, a building torn down or broken giving back some of its materials, and the
+//! Trade Org's stock floor (ADR 0003). Kept beside the world, not in it
+//! ([`crate::tick::Scratch::made`]): it is only for checking that goods appear nowhere else
+//! (`goodsOnlyFromNothingAtTheFloor`).
 
 use csp_shared::world::{Stock, WorldState};
 

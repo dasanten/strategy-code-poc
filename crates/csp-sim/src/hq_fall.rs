@@ -1,5 +1,5 @@
-//! The Fall of the HQ (`hq-fall.ts`, `CONTEXT.md`: Fall of the HQ): captured, the Trade Org HQ is a
-//! city like any other, and everything the Trade Organization had under way ends with it.
+//! The Fall of the HQ (`CONTEXT.md`: Fall of the HQ): captured, the Trade Org HQ is a city like
+//! any other, and everything the Trade Organization had under way ends with it.
 
 use csp_shared::world::{
     BuildingKind, DebtWhat, DeliveryKind, EndedWithHq, RealmEventWhat, WorldState,

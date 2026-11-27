@@ -1,7 +1,6 @@
-//! `working-a-site.test.ts`: working a site (`CONTEXT.md`: Working a site). Work given or queued
-//! on a construction site of a workplace kind builds it first, as Build would, with materials from
-//! the nearest storage of the realm holding them, then works it once it is finished, with no new
-//! order.
+//! Working a site (`CONTEXT.md`: Working a site). Work given or queued on a construction site of a
+//! workplace kind builds it first, as Build would, with materials from the nearest storage of the
+//! realm holding them, then works it once it is finished, with no new order.
 
 use std::sync::Arc;
 

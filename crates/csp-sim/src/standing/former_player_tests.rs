@@ -1,6 +1,6 @@
-//! `apps/server/src/former-player.test.ts`, ported one to one. A Leader's death is `endRealm`'s
-//! (T86.3); `after_death` does the part of it these rules see: the realm is gone, its city is a
-//! city of no realm, and it remembers its Player (`rememberFormerPlayer`).
+//! Tests of a city remembering its former Player. A Leader's death is `endRealm`'s (T86.3);
+//! `after_death` does the part of it these rules see: the realm is gone, its city is a city of no
+//! realm, and it remembers its Player (`rememberFormerPlayer`).
 
 use csp_shared::balance::{
     CITY_PRICE_STANDING_SWING, FORMER_PLAYER_STANDING, PERSUADE_STANDING, STANDING_DRIFT_PER_DAY,

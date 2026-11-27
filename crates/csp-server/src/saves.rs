@@ -1,7 +1,6 @@
-//! World saves (`apps/server/src/saves.ts` and `terrain.ts`, ADR 0006): rolling gzipped-JSON rows
-//! in `world_saves`, tagged with the world format they were written in, pruned to the newest few
-//! and one an hour for a week; the terrain stored once beside them. The same rows the TypeScript
-//! server writes and reads.
+//! World saves and the terrain (ADR 0006): rolling gzipped-JSON rows in `world_saves`, tagged with
+//! the world format they were written in, pruned to the newest few and one an hour for a week; the
+//! terrain stored once beside them.
 
 use std::{
     io::{Read, Write},

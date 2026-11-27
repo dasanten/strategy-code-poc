@@ -1,13 +1,8 @@
-//! A new world and one step of it (`apps/server/src/world.ts`, ADR 0002): `create_world`, the
-//! nearest free tile, and `step_world` with `step_rest`, every rule of a tick in its order.
-//!
-//! **The step is a skeleton the rule tickets fill (Epic 86).** Each rule is called here in the
-//! TypeScript's order by its TypeScript name in Rust spelling, and each is, for now, a no-op stub
-//! at the bottom of this file. A ticket that ports a rule deletes its stub and adds a `use` of
-//! its module; it may change the arguments of its own call line (each stub takes what the
-//! TypeScript passes, plus the tick's [`Scratch`]), and adds the field of [`StepResult`] it
-//! returns (`survival`, `combat`, `horses_died`, `aging`, `captures`). Nothing else here needs to
-//! change.
+//! A new world and one step of it (ADR 0002): `create_world`, the nearest free tile, and
+//! `step_world` with `step_rest`, every rule of a tick in its order. The order carries behaviour:
+//! a rule is called where it is because of what ran before it. A rule lives in its own module;
+//! some are called through a short hook at the bottom of this file, which hands it what it takes
+//! of the tick's [`Scratch`]. What a step reports for the tick goes into [`StepResult`].
 
 use std::collections::HashSet;
 
@@ -442,10 +437,9 @@ fn step_rest(
 }
 
 // ------------------------------------------------------------------------------------------------
-// The hooks the rule tickets fill. Each is a no-op stub for now, named as the TypeScript names
-// the rule, with the TypeScript's arguments and the tick's scratch. A request returns the
-// actions it requested (counted in `StepResult::actions`), a resolve without a list returns how
-// many it resolved. A ticket deletes its stubs and adds a `use` of its module.
+// The hooks: each calls its rule's module with what it takes of the tick's scratch. A request
+// returns the actions it requested (counted in `StepResult::actions`), a resolve without a list
+// returns how many it resolved.
 // ------------------------------------------------------------------------------------------------
 
 // T100.5: the Trade Organization and the NPC cities on the land. A post or trader stop the HQ has
@@ -464,7 +458,7 @@ fn place_on_the_land(
     assert!(broken.is_empty(), "world {} has no carriage way: {}", world.seed, broken.join("; "));
 }
 
-// Road materials (`road-line.ts`) and offers (`offers.ts`); carrying, storing, hauling, buying and
+// Road materials (`road_line`) and offers (`offers`); carrying, storing, hauling, buying and
 // trading are called from their own modules above.
 fn request_road_materials(world: &mut WorldState, _scratch: &mut Scratch) -> Vec<CarryAction> {
     crate::road_line::request_road_materials(world)
@@ -476,8 +470,8 @@ fn step_offers(world: &mut WorldState, _scratch: &mut Scratch) {
     crate::offers::step_offers(world);
 }
 
-// T86.9 (`caravans.ts`, `traders.ts`, `trade-org-army.ts`, `trade-org-punishment.ts`,
-// `trade-org-debt.ts`, `trade-org-wrecks.ts`).
+// T86.9: caravans, traders and the Trade Organization (`caravans`, `traders`, `trade_org_army`,
+// `trade_org_punishment`, `trade_org_debt`, `trade_org_wrecks`).
 fn step_caravans(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
     crate::caravans::step_caravans(world, size);
 }
@@ -500,7 +494,7 @@ fn count_wrecked(world: &mut WorldState, wrecked: Vec<Felled>, _scratch: &mut Sc
     crate::trade_org_wrecks::count_wrecked(world, &wrecked);
 }
 
-// T86.10 (`npc-defence.ts`, `npc-hire.ts`, `npc-behaviour.ts`, `outsiders.ts`).
+// T86.10: the NPC cities (`npc_defence`, `npc_hire`, `npc_behaviour`, `outsiders`).
 fn step_npc_defence(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
     crate::npc_defence::step_npc_defence(world, size);
 }
@@ -523,7 +517,7 @@ fn step_outsiders(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
     crate::outsiders::step_outsiders(world, size);
 }
 
-// `demands.ts`.
+// Demands (`demands`).
 fn answer_demands(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
     crate::demands::answer_demands(world, size);
 }
@@ -531,7 +525,7 @@ fn step_demands(world: &mut WorldState, _scratch: &mut Scratch) {
     crate::demands::step_demands(world);
 }
 
-// T86.13 (`last-seen.ts`).
+// T86.13 (`last_seen`).
 fn step_last_seen(world: &mut WorldState, size: i32, scratch: &mut Scratch) {
     let Scratch { last_seen, index, sight, .. } = scratch;
     crate::last_seen::step_last_seen(world, size, last_seen, index, sight.as_mut());

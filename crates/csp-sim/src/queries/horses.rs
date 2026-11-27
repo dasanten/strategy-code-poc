@@ -1,4 +1,4 @@
-//! Horse queries of `packages/shared/src/horses.ts`.
+//! Horse queries.
 
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::footprint::is_at;

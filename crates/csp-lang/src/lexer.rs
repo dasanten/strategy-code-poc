@@ -1,8 +1,8 @@
 //! The lexer: turns script source into tokens, each with the line and column (1-based) it starts
-//! at. The twin of `packages/lang/src/lexer.ts`.
+//! at.
 //!
-//! Columns count UTF-16 code units, as the TypeScript does (a JavaScript string is UTF-16), so a
-//! position means the same in both and in the editor.
+//! Columns count UTF-16 code units (a JavaScript string is UTF-16), so a position means the same in
+//! the editor.
 
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};

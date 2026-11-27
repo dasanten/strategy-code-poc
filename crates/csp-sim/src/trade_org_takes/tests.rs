@@ -1,4 +1,4 @@
-//! `apps/server/src/trade-org-takes.test.ts`, ported one to one.
+//! Tests of the Trade Organization taking a city for a debt.
 
 use std::sync::Arc;
 

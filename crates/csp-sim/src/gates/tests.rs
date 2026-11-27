@@ -1,7 +1,6 @@
-//! The gate order's and walking's cases of `apps/server/src/walls.test.ts` ("the gate order", "a
-//! walker finds a new way when a gate closes before them", the gate cases of "allies at walls and
-//! gates"). The wall map's own cases and wall defence are T86.6's and T86.7's; `gatesSound` is
-//! T86.13's.
+//! The gate order's and walking's cases ("the gate order", "a walker finds a new way when a gate
+//! closes before them", the gate cases of "allies at walls and gates"). The wall map's own cases
+//! and wall defence are T86.6's and T86.7's; `gatesSound` is T86.13's.
 
 use std::sync::Arc;
 

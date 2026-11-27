@@ -1,7 +1,7 @@
-//! Survival (`apps/server/src/survival.ts`, `CONTEXT.md`: Hunger, Eating, Down, Reviving, Leader
-//! death, Loot, Refilling): the hunger meter, eating what one carries, going Down and dying of
-//! hunger, a Leader's death ending their realm, piles of what the dead carried, and refilling
-//! from a storage, a workplace's pile or a carriage.
+//! Survival (`CONTEXT.md`: Hunger, Eating, Down, Reviving, Leader death, Loot, Refilling): the
+//! hunger meter, eating what one carries, going Down and dying of hunger, a Leader's death ending
+//! their realm, piles of what the dead carried, and refilling from a storage, a workplace's pile
+//! or a carriage.
 //!
 //! Where the TypeScript keeps a resident object across a death, this keeps its id and finds it in
 //! `world.residents` when it is needed; [`die`] removes it and hands back what was removed. What

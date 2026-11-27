@@ -1,5 +1,4 @@
-//! `apps/server/src/hq-growth.test.ts`, ported one to one. The world steps with the ported
-//! `Walking`.
+//! How the Trade Org HQ grows. The world steps with the ported `Walking`.
 
 use std::sync::Arc;
 

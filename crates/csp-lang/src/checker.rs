@@ -1,8 +1,7 @@
 //! A static check over a parsed script: names that are declared nowhere, calls with the wrong
-//! number of arguments, and fields an object of a known shape doesn't have. The twin of
-//! `packages/lang/src/checker.ts`. Its findings are warnings, never errors: wherever it isn't
-//! sure, it stays quiet. It knows nothing of the game: the names a script gets and the shapes of
-//! their values are passed in.
+//! number of arguments, and fields an object of a known shape doesn't have. Its findings are
+//! warnings, never errors: wherever it isn't sure, it stays quiet. It knows nothing of the game:
+//! the names a script gets and the shapes of their values are passed in.
 
 use std::collections::{HashMap, HashSet};
 

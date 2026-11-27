@@ -1,5 +1,4 @@
-//! `apps/server/src/npc-standing-idle.test.ts`: Standing idle (`CONTEXT.md`): an NPC city's idle
-//! adults wait at its houses, not on its storage.
+//! Standing idle (`CONTEXT.md`): an NPC city's idle adults wait at its houses, not on its storage.
 
 mod ts_match;
 

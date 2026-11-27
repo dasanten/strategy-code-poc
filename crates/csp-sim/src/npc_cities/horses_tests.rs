@@ -1,6 +1,6 @@
-//! `apps/server/src/npc-horses.test.ts`, ported (T86.17): NPC cities have horses and breed them
-//! (`CONTEXT.md`: NPC horses, Breeding, Horse stats): two to start with and Food by them, a stable
-//! over them, and foals up to the number wanted for their size.
+//! NPC cities have horses and breed them (T86.17; `CONTEXT.md`: NPC horses, Breeding, Horse
+//! stats): two to start with and Food by them, a stable over them, and foals up to the number
+//! wanted for their size.
 
 use csp_shared::balance::{
     NpcCitySize, HORSE_FOOD_PER_DAY, MAX_HUNGER, NPC_HORSES_BASE, NPC_RESIDENTS_PER_HORSE,

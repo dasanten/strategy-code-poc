@@ -1,5 +1,4 @@
-//! `apps/server/src/stealing.test.ts`: stealing a carriage by driving it off (`CONTEXT.md`:
-//! Stealing a carriage or horse).
+//! Stealing a carriage by driving it off (`CONTEXT.md`: Stealing a carriage or horse).
 
 mod build_common;
 mod ts_match;

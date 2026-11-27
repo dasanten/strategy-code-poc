@@ -1,10 +1,5 @@
 //! The benchmarks (ADR 0030): `bench-world` (world generation by stage) and `bench-sim` (ms per
-//! tick per phase). The twin of `scripts/bench-ts.mts` (T84.7): the same tables line for line, so
-//! the Rust and the TypeScript numbers compare directly. Results go under `## Measurements` in
-//! `docs/proposals/rust-rewrite.md`.
-//!
-//! `bench-ts.mts suite` (the TypeScript test suite's wall time) has no twin: `cargo nextest run`
-//! prints its own.
+//! tick per phase), T84.7. Results go under `## Measurements` in `docs/proposals/rust-rewrite.md`.
 //!
 //! `bench-broadcast` (T99.7, no twin) times the Broadcast phase with Players connected, one of
 //! them remembering every building; its results go under ADR 0034's Measurements.

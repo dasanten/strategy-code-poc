@@ -1,6 +1,5 @@
-//! `apps/server/src/relocate-steps.test.ts`, ported (T86.17, part 5): Relocate in queues and
-//! scripts (`CONTEXT.md`: Relocate, Queue, Script). A queue step or a script's `relocate(cityId)`
-//! gives the same order as the card, checked the same way.
+//! Relocate in queues and scripts (T86.17, part 5; `CONTEXT.md`: Relocate, Queue, Script). A queue
+//! step or a script's `relocate(cityId)` gives the same order as the card, checked the same way.
 
 mod build_common;
 mod scripts_common;

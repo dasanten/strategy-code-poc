@@ -1,4 +1,4 @@
-//! `apps/server/src/trade-org-wrecks.test.ts`, ported one to one.
+//! Tests of the Trade Organization tearing down workplaces for a debt.
 
 use std::sync::Arc;
 

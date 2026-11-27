@@ -1,6 +1,6 @@
-//! `apps/server/src/npc-revive.test.ts`, ported (T86.17, part 5): an NPC city revives its own
-//! (`CONTEXT.md`: Reviving), one grown resident per Down resident in or near its area, never a
-//! soldier and a spare hand first, while its storage holds Food.
+//! An NPC city revives its own (T86.17, part 5; `CONTEXT.md`: Reviving): one grown resident per
+//! Down resident in or near its area, never a soldier and a spare hand first, while its storage
+//! holds Food.
 
 use std::collections::BTreeMap;
 

@@ -1,4 +1,4 @@
-//! A Trade Org army's supply wagon (`supply-wagons.ts`, `CONTEXT.md`: Trade Org debt, Supply line,
+//! A Trade Org army's supply wagon (`CONTEXT.md`: Trade Org debt, Supply line,
 //! Caravan crew lost): a carriage of the HQ with a driver, which loads Food at the HQ, follows the
 //! soldiers and takes on what they took, comes home with them and unloads into the warehouses. The
 //! soldiers refill from it. Taking from it or stealing it is a crime like any against the Trade

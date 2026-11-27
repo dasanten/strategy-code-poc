@@ -1,10 +1,9 @@
 //! Terrain (`CONTEXT.md`: Terrain, Map): the byte stored per tile and the helpers that take
-//! coordinates round the map's joins. Ported from `packages/shared/src/terrain.ts`.
+//! coordinates round the map's joins.
 //!
 //! Tile coordinates and the map's size are `i32`: a grid of whole tiles, which may be negative
-//! before `wrap` brings them back. The speeds and food costs per terrain are in
-//! [`crate::balance`] (`TERRAIN_SPEED`, `TERRAIN_FOOD`, `CARRIAGE_SPEED`), where `balance.ts`
-//! has them.
+//! before `wrap` brings them back. The speeds and food costs per terrain are in [`crate::balance`]
+//! (`TERRAIN_SPEED`, `TERRAIN_FOOD`, `CARRIAGE_SPEED`).
 
 use std::collections::HashSet;
 

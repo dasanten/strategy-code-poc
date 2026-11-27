@@ -1,5 +1,5 @@
-//! Carriage queries of `packages/shared/src/carriages.ts`, read only: its horse, its driver and
-//! passengers, what it holds and how loaded it looks, a caravan's crew.
+//! Carriage queries, read only: its horse, its driver and passengers, what it holds and how loaded
+//! it looks, a caravan's crew.
 
 use csp_shared::balance::{
     CARAVAN_ESCORTS, CARAVAN_FOOD, CARAVAN_FOOD_PER_ESCORT, CARRIAGE_HALF_LOAD, CARRIAGE_LIGHT_LOAD,

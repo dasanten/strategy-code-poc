@@ -1,4 +1,4 @@
-//! `apps/server/src/caravan-escorts.test.ts`, ported one to one.
+//! Caravan escorts: who walks with the caravan and what they do on the way.
 
 use std::sync::Arc;
 

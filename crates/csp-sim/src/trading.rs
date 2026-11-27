@@ -1,6 +1,6 @@
-//! Trading (`apps/server/src/trading.ts`, `CONTEXT.md`: Trading with the Trade Organization,
-//! Trading with an NPC city, Trader stop, Swap, Horse market, Delivery): the buy, sell, swap and
-//! horse orders, carried out the tick they are given, and the invariants over this tick's trades.
+//! Trading (`CONTEXT.md`: Trading with the Trade Organization, Trading with an NPC city, Trader
+//! stop, Swap, Horse market, Delivery): the buy, sell, swap and horse orders, carried out the
+//! tick they are given, and the invariants over this tick's trades.
 
 use csp_shared::balance::{
     DELIVERY_LOAD, GOOD_WEIGHT, MAP_SIZE, NPC_HORSES_KEPT, STANDING_TRADE_COINS_PER_POINT,

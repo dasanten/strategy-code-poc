@@ -1,4 +1,4 @@
-//! `npc-inner-wall.test.ts`, its slow simulation: a big city building its inner ring for real.
+//! Slow simulation: a big city building its inner ring for real.
 
 use csp_shared::balance::BUILD_MATERIALS;
 use csp_shared::time::TICKS_PER_GAME_DAY;

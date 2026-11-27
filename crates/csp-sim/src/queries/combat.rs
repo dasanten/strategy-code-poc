@@ -1,5 +1,5 @@
-//! Combat queries (`CONTEXT.md`: Combat, Weapons and armour): the contact test of
-//! `packages/shared/src/combat.ts` and the blow helpers of `balance.ts`.
+//! Combat queries (`CONTEXT.md`: Combat, Weapons and armour): the contact test and the blow
+//! helpers.
 
 use csp_shared::balance::{
     BLOW_BASE, BLOW_PER_STRENGTH, COMBAT_SKILL_EFFECT, COMBAT_SKILL_LIMIT, COMBAT_SKILL_PER_BLOW,

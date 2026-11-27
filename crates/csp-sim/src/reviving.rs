@@ -1,5 +1,5 @@
-//! Reviving and Feeding a horse (`apps/server/src/reviving.ts` and shared `reviving.ts`,
-//! `CONTEXT.md`: Reviving, Feeding a horse): the feed order, and feeding as the world steps.
+//! Reviving and Feeding a horse (`CONTEXT.md`: Reviving, Feeding a horse): the feed order, and
+//! feeding as the world steps.
 
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::TerrainMap;

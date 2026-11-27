@@ -1,5 +1,5 @@
-//! `mountain-roads.test.ts`: carriages and riders cross Mountain on a finished road
-//! (`CONTEXT.md`: Road, Step, Carriage, Riding), and only there.
+//! Carriages and riders cross Mountain on a finished road (`CONTEXT.md`: Road, Step, Carriage,
+//! Riding), and only there.
 
 use std::sync::Arc;
 

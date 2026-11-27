@@ -1,5 +1,4 @@
-//! `apps/server/src/deliveries-robbed.test.ts`, one test per `it`, from `setup()` of
-//! `deliveries.fixture.ts` (`fixtures/trade/deliveries.json`).
+//! Robbed deliveries, one test per case, from the fixture `fixtures/trade/deliveries.json`.
 
 mod common;
 #[path = "goods_support/mod.rs"]

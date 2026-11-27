@@ -1,6 +1,5 @@
-//! `apps/server/src/deliveries.test.ts`, one test per `it`. Each starts from `setup()` of
-//! `deliveries.fixture.ts` as the TypeScript wrote it (`fixtures/trade/deliveries.json`): the
-//! trading post is an NPC village (`foundTradingPost`, T86.10) and Mara's city a starting city
+//! Deliveries, one test per case. Each starts from the fixture `fixtures/trade/deliveries.json`:
+//! the trading post is an NPC village (`foundTradingPost`, T86.10) and Mara's city a starting city
 //! (`foundStartingCity`, T86.8), neither of which Rust lays out yet. The caravans walk with the
 //! ported `Walking` (T86.4); `checkInvariants` comes with T86.13, so the runs check
 //! `deliveries-sound`.

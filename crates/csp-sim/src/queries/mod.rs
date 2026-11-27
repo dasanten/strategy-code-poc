@@ -1,7 +1,7 @@
-//! Read-only world queries of `packages/shared` that sight calls (ADR 0002: the game API orders,
-//! scripts and the UI share), ported with their rules unchanged (ADR 0030). Nothing here changes
-//! the world. Each module is named after its TypeScript file; each function keeps its TypeScript
-//! name in Rust spelling, so the rule tickets find them here instead of porting them again.
+//! Read-only world queries that sight calls (ADR 0002: the game API orders, scripts and the UI
+//! share), ported from the TypeScript with their rules unchanged (ADR 0030). Nothing here changes
+//! the world. Each function keeps its TypeScript name in Rust spelling, so the rule tickets find
+//! them here instead of porting them again.
 //!
 //! Where the TypeScript leaves a map size out (`covers(b, x, y)`, `isAt(p, b)`), it is
 //! `MAP_SIZE`; these do the same, which only matters for a footprint across a smaller map's join.

@@ -1,6 +1,6 @@
-//! Relocating (`CONTEXT.md`: Relocate, Group), ported from `apps/server/src/relocating.ts`: a
-//! resident of the Player's realm walks to another of its cities and moves in on stepping into its
-//! area. The order is a plain `validate`/`apply` pair for the order queue (T86.2) to wire.
+//! Relocating (`CONTEXT.md`: Relocate, Group): a resident of the Player's realm walks to another of
+//! its cities and moves in on stepping into its area. The order is a plain `validate`/`apply` pair
+//! for the order queue (T86.2) to wire.
 
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap_distance, TerrainMap};

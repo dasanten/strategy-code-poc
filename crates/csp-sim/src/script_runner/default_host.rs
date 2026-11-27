@@ -1,4 +1,4 @@
-//! For tests without a script library (`test-default-scripts.ts`): tasks given as from the UI,
+//! For tests without a script library: tasks given as from the UI,
 //! every Player running the game's default scripts unedited (`CONTEXT.md`: Default script). A
 //! Player's version of a task's default has the id `user_id * 100` plus the task's place in
 //! `TASKS`, from 1; Run script runs it by that id. Every Player has explored the whole map.

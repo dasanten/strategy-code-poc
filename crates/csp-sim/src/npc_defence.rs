@@ -1,8 +1,7 @@
-//! NPC cities defending themselves (`apps/server/src/npc-defence.ts`, `CONTEXT.md`: NPC city,
-//! Combat, Trading post, Alarm): a trading post and the HQ send their armed residents in their
-//! area after attackers there; any NPC city keeps soldiers by its size and closes its gates while
-//! armed outsiders are near. Only orders a Player could give (ADR 0002), or opening and closing its
-//! own gates as a realm does.
+//! NPC cities defending themselves (`CONTEXT.md`: NPC city, Combat, Trading post, Alarm): a
+//! trading post and the HQ send their armed residents in their area after attackers there; any NPC
+//! city keeps soldiers by its size and closes its gates while armed outsiders are near. Only
+//! orders a Player could give (ADR 0002), or opening and closing its own gates as a realm does.
 
 use std::collections::HashSet;
 

@@ -1,4 +1,4 @@
-//! Offer queries of `packages/shared/src/offers.ts` (`CONTEXT.md`: Offer).
+//! Offer queries (`CONTEXT.md`: Offer).
 
 use csp_shared::world::offers::SeenOffer;
 use csp_shared::world::{Offer, Stock, WorldState};

@@ -1,5 +1,5 @@
-//! Driving (`apps/server/src/driving.ts`, `CONTEXT.md`: Carriage, Hitched horse, Supply line,
-//! Stealing a carriage or horse): the drive, unhitch and hitch orders.
+//! Driving (`CONTEXT.md`: Carriage, Hitched horse, Supply line, Stealing a carriage or horse): the
+//! drive, unhitch and hitch orders.
 
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::TerrainMap;

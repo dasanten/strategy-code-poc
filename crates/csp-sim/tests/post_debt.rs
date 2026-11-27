@@ -1,5 +1,5 @@
-//! `apps/server/src/post-debt.test.ts`: a trading post taken, and the debt the Trade Organization
-//! makes of it (`CONTEXT.md`: Trade Organization debt).
+//! A trading post taken, and the debt the Trade Organization makes of it (`CONTEXT.md`: Trade
+//! Organization debt).
 
 mod ts_match;
 

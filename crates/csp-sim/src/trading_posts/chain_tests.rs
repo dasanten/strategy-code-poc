@@ -1,5 +1,5 @@
-//! `apps/server/src/trading-post-chain.test.ts`, ported one to one: trading posts and the HQ run
-//! the chain (`CONTEXT.md`: Trading post, Trade Org HQ): their warehouses' stock floor is their
+//! Trading posts and the HQ run the chain (`CONTEXT.md`: Trading post, Trade Org HQ): their
+//! warehouses' stock floor is their
 //! reserve, their spare hands work and build for what is short of it, and the output goes into the
 //! warehouse.
 

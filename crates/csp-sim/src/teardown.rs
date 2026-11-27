@@ -1,5 +1,5 @@
-//! The tear-down order (`apps/server/src/teardown.ts`, `CONTEXT.md`: Tearing down): work at
-//! taking down the building or construction site on the resident's tile, whoever's it is.
+//! The tear-down order (`CONTEXT.md`: Tearing down): work at taking down the building or
+//! construction site on the resident's tile, whoever's it is.
 
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::footprint::is_at;

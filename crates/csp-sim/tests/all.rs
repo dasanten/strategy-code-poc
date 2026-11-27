@@ -152,6 +152,8 @@ mod ship_sailing;
 mod sight;
 #[path = "sight_fixtures.rs"]
 mod sight_fixtures;
+#[path = "sim_map.rs"]
+mod sim_map;
 #[path = "smithy.rs"]
 mod smithy;
 #[path = "smoke.rs"]

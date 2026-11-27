@@ -1,6 +1,6 @@
-//! An NPC city founds a daughter (`apps/server/src/npc-founding.ts`, `CONTEXT.md`: Full city,
-//! Founding): once full, it sends a party with the materials of a town hall and a storage to a site
-//! out of a realm's territory, and the party's town hall becomes a city of its own.
+//! An NPC city founds a daughter (`CONTEXT.md`: Full city, Founding): once full, it sends a party
+//! with the materials of a town hall and a storage to a site out of a realm's territory, and the
+//! party's town hall becomes a city of its own.
 
 use std::collections::HashSet;
 use std::f64::consts::PI;

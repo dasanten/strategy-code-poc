@@ -1,6 +1,6 @@
-//! A Player's script library (`CONTEXT.md`: Script; `apps/server/src/scripts.ts`, its database
-//! half): named scripts with every saved version kept. Scripts belong to the account, so they
-//! outlast the realm and a Leader's death.
+//! A Player's script library (`CONTEXT.md`: Script), its database half: named scripts with every
+//! saved version kept. Scripts belong to the account, so they outlast the realm and a Leader's
+//! death.
 //!
 //! The active version is the one that runs. Saving a version without syntax errors makes it
 //! active, so a saved change is picked up on the next tick; a version with errors is kept in the
@@ -8,7 +8,7 @@
 //! keep their numbers.
 //!
 //! Each Player also has their own version of every default script (`CONTEXT.md`: Default script;
-//! ADR 0009), made the first time their library is used. Until they edit it, it takes each new
+//! ADR 0046), made the first time their library is used. Until they edit it, it takes each new
 //! game default as a new version ([`ensure_default_scripts`]); once edited it stays theirs until
 //! they reset it. Default scripts can't be renamed or deleted.
 //!

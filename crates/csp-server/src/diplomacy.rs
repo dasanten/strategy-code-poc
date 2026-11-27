@@ -1,9 +1,8 @@
-//! A Player's alliance matters as their realm sees them (`diplomacyFor` of
-//! `packages/shared/src/alliance.ts`), sent with the welcome and each tick they changed, and what
-//! it is made of that no rule needs: the demands, Direct offers, deliveries and join requests as a
-//! side sees them (`demandsFor`, `directOffersFor`, `deliveriesFor`, `joinRequestsFor`) and the
-//! ways a carried Direct offer can go (`carriedWaysFor`). Only the sockets send them, so they live
-//! here, beside the welcome.
+//! A Player's alliance matters as their realm sees them (`diplomacy_for`), sent with the welcome
+//! and each tick they changed, and what it is made of that no rule needs: the demands, Direct
+//! offers, deliveries and join requests as a side sees them (`demandsFor`, `directOffersFor`,
+//! `deliveriesFor`, `joinRequestsFor`) and the ways a carried Direct offer can go
+//! (`carriedWaysFor`). Only the sockets send them, so they live here, beside the welcome.
 
 use std::collections::HashSet;
 

@@ -41,7 +41,7 @@
   becomes possible is added at the end of its group, and the rows are sorted afresh only when
   something else is picked (ADR 0019). A group card has the same rows, with the group's own
   reasons.
-- **Art style:** how the map is drawn, picked by the Player in the map's legend and remembered per browser (ADR 0043): **Tokens** (line art only), **Painted** (painted
+- **Art style:** how the map is drawn, picked by the Player in the map's legend and remembered per browser (ADR 0047): **Tokens** (line art only), **Painted** (painted
   sprites where there are some, tokens otherwise) or **Pixel** (Daniel's pixel art, and the
   Painted look for whatever has none yet; the default since ADR 0044, for whoever hasn't picked
   one). It changes nothing in the world. In Pixel,

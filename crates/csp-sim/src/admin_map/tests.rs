@@ -1,5 +1,5 @@
-//! `apps/server/src/admin-map.test.ts`, its world view, places and inspection. "admin map API"
-//! (the HTTP routes and their admin check) is the shell's (T87.5).
+//! The admin map's world view, places and inspection. "admin map API" (the HTTP routes and their
+//! admin check) is the shell's (T87.5).
 
 use std::collections::HashMap;
 

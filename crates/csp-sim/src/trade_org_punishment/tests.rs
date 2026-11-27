@@ -1,5 +1,5 @@
-//! `apps/server/src/trade-org-punishment.test.ts`, ported one to one. Orders go through the order
-//! queue as a Player's do; the world steps with the ported `Walking`.
+//! Tests of the Trade Organization's punishment. Orders go through the order queue as a Player's
+//! do; the world steps with `Walking`.
 
 use std::sync::Arc;
 

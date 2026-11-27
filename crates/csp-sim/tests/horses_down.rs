@@ -1,5 +1,4 @@
-//! `apps/server/src/horses-down.test.ts`, ported (T86.17): horses going Down (`CONTEXT.md`: Down,
-//! Reviving, Horses have no inventory).
+//! Horses going Down (T86.17; `CONTEXT.md`: Down, Reviving, Horses have no inventory).
 
 mod build_common;
 

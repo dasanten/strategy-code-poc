@@ -1,8 +1,8 @@
-//! `script-runner.test.ts`. The TypeScript keeps the scripts in a database (`createScript`,
-//! `saveScript`, `deleteScript`); here [`Library`] stands in for it with the same rules: a version
-//! that doesn't parse never becomes active. The cases over the realm log, budgets, memory, errors
-//! and the script log are ported one to one; the sight-per-phase and game-error cases need the
-//! socket layer and a failing host, and are left to T86.14.
+//! Tests of the script runner. The server keeps the scripts in a database (create, save and
+//! delete); here [`Library`] stands in for it with the same rules: a version that doesn't parse
+//! never becomes active. The cases over the realm log, budgets, memory, errors and the script log
+//! are here; the sight-per-phase and game-error cases need the socket layer and a failing host,
+//! and are left to T86.14.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

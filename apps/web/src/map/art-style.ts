@@ -1,5 +1,5 @@
 /**
- * How the map is drawn (`CONTEXT.md`: Art style, ADR 0043): line art tokens only, the painted
+ * How the map is drawn (`CONTEXT.md`: Art style, ADR 0047): line art tokens only, the painted
  * sprites over them, or Daniel's pixel art with the painted look for whatever isn't drawn yet.
  * The Player picks it in the legend; it is remembered per browser.
  */

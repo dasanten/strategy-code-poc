@@ -1,6 +1,6 @@
-//! Trading with and hiring from an NPC city, read only (`packages/shared/src/npc-trade.ts`,
-//! `CONTEXT.md`: Trading with an NPC city, Hiring from an NPC city, NPC reserve): its stock, its
-//! reserve, its prices, what it asks for its residents and whom it would lend.
+//! Trading with and hiring from an NPC city, read only (`CONTEXT.md`: Trading with an NPC city,
+//! Hiring from an NPC city, NPC reserve): its stock, its reserve, its prices, what it asks for its
+//! residents and whom it would lend.
 
 use csp_shared::world::PricedGood;
 use std::cmp::Ordering;

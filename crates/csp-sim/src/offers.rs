@@ -1,6 +1,6 @@
-//! Offers and Direct offers (`apps/server/src/offers.ts`, `CONTEXT.md`: Offer, Direct offer): the
-//! orders that post, send, accept, decline and take down offers, accepting them as the world
-//! steps, and offers following their storages at the end of each tick.
+//! Offers and Direct offers (`CONTEXT.md`: Offer, Direct offer): the orders that post, send,
+//! accept, decline and take down offers, accepting them as the world steps, and offers following
+//! their storages at the end of each tick.
 
 use csp_shared::balance::{DIRECT_OFFER_DAYS, MAP_SIZE, WAREHOUSE_BASE_PRICE};
 use csp_shared::footprint::is_at;

@@ -1,9 +1,9 @@
-//! An NPC city's road crew (`apps/server/src/npc-roads.ts`, `CONTEXT.md`: NPC road, City layout,
-//! Spare hands' work; ADR 0026): with nothing short, up to `npc_road_crew` of its spare hands build
-//! its layout's streets beside the buildings that stand, then road from its home to each of its
-//! workplaces outside its area, nearest first, then on to the nearest Trade Org warehouse in its
-//! trader's reach and the edge of its nearest neighbour's area. A way is worked out once and kept
-//! in the plan as plain data (`CityPlan.roads`); its streets are worked out each pass.
+//! An NPC city's road crew (`CONTEXT.md`: NPC road, City layout, Spare hands' work; ADR 0026):
+//! with nothing short, up to `npc_road_crew` of its spare hands build its layout's streets beside
+//! the buildings that stand, then road from its home to each of its workplaces outside its area,
+//! nearest first, then on to the nearest Trade Org warehouse in its trader's reach and the edge of
+//! its nearest neighbour's area. A way is worked out once and kept in the plan as plain data
+//! (`CityPlan.roads`); its streets are worked out each pass.
 
 use std::collections::HashSet;
 

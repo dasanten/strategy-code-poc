@@ -1,7 +1,6 @@
-//! Renaming a resident, a city or a horse (`CONTEXT.md`: Renaming a resident, Realm name,
-//! Renaming a city, Renaming a horse), ported from `apps/server/src/renaming.ts`: the Player's
-//! choice of a name, free, at once and from anywhere (ADR 0002). The orders are plain
-//! `validate`/`apply` functions for the order queue (T86.2) to wire.
+//! Renaming a resident, a city or a horse (`CONTEXT.md`: Renaming a resident, Realm name, Renaming
+//! a city, Renaming a horse): the Player's choice of a name, free, at once and from anywhere (ADR
+//! 0002). The orders are plain `validate`/`apply` functions for the order queue (T86.2) to wire.
 
 use csp_shared::balance::{CITY_NAME_MAX_LENGTH, HORSE_NAME_MAX_LENGTH, RESIDENT_NAME_MAX_LENGTH};
 use csp_shared::world::{OrderRequest, Realm, WorldState};

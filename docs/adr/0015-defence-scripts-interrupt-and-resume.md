@@ -1,6 +1,6 @@
 # A struck resident runs a defence script, then goes back to what they did
 
-Status: decided (2026-10-30, with Daniel). Builds on ADR 0002 (orders plus scripts) and ADR 0009
+Status: decided (2026-10-30, with Daniel). Builds on ADR 0002 (orders plus scripts) and ADR 0046
 (tasks run default scripts).
 
 Today a blow gives the struck resident a built-in order: armed, an `attack` on the attacker;

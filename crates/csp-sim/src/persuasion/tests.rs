@@ -1,6 +1,6 @@
-//! `apps/server/src/persuasion.test.ts` and the respect queries of shared `persuasion.ts`, ported
-//! one to one. `diplomacyFor` (the Player's view of the asks) is T86.11's; the full invariant
-//! check after a city joins is T86.13's. Respect by strength near the city is ADR 0033's (T96.1).
+//! Persuading a city, and the respect queries. `diplomacyFor` (the Player's view of the asks) is
+//! T86.11's; the full invariant check after a city joins is T86.13's. Respect by strength near the
+//! city is ADR 0033's (T96.1).
 
 use csp_shared::balance::{
     BLOW_BASE, COMBAT_SKILL_LIMIT, NPC_PLAN_TICKS, PERSUADE_ASK_AGAIN_DAYS, PERSUADE_CHECK_TICKS,

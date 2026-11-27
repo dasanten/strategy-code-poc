@@ -1,4 +1,4 @@
-//! `swap.test.ts`: a swap (`CONTEXT.md`: Swap): goods for goods in person at a warehouse or an NPC
+//! Swap (`CONTEXT.md`: Swap): goods for goods in person at a warehouse or an NPC
 //! city's storage, a sale and a purchase at once, rounded up on the side given, with what is over
 //! back in Coins as far as the place holds them.
 

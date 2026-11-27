@@ -1,5 +1,5 @@
-//! The Trade Org army (`CONTEXT.md`: Trade Org army, Trade Org HQ), ported from
-//! `apps/server/src/trade-org-army.ts`: the HQ's soldiers, which it arms itself
+//! The Trade Org army (`CONTEXT.md`: Trade Org army, Trade Org HQ): the HQ's soldiers, which it
+//! arms itself
 //! (`step_npc_defence`). In mercenary contracts the Trade Organization is a side like a realm
 //! (`TRADE_ORG`): it hires out its spare soldiers, keeps its inner ring clear by force, and hires
 //! Players' residents itself when it has lost too many. Like an NPC city it only gives orders a

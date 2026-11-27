@@ -1,7 +1,6 @@
-//! Whether an NPC city has a way to earn Coins (`apps/server/src/npc-coins.ts`, `CONTEXT.md`: NPC
-//! reserve). A city with none doesn't count Coins as short (`shortages`), so its war chest can't
-//! keep it from being full (`CONTEXT.md`: Full city). Its war chest stays in its reserve for
-//! everything else.
+//! Whether an NPC city has a way to earn Coins (`CONTEXT.md`: NPC reserve). A city with none
+//! doesn't count Coins as short (`shortages`), so its war chest can't keep it from being full
+//! (`CONTEXT.md`: Full city). Its war chest stays in its reserve for everything else.
 
 use csp_shared::balance::NPC_TRADER_REACH;
 use csp_shared::terrain::wrap_distance;

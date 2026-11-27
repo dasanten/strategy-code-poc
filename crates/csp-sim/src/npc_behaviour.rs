@@ -1,6 +1,6 @@
-//! What the cities the game runs do each tick (`apps/server/src/npc-behaviour.ts`, `CONTEXT.md`:
-//! NPC city): they only give their residents orders, which request actions like a Player's orders
-//! do (ADR 0002); the world resolves them later in the tick.
+//! What the cities the game runs do each tick (`CONTEXT.md`: NPC city): they only give their
+//! residents orders, which request actions like a Player's orders do (ADR 0002); the world
+//! resolves them later in the tick.
 //!
 //! Residents are referred to by their place in `world.residents`: a city's tick neither adds nor
 //! removes anyone, so the places hold through it. A city's plan stays in `world.city_plans`, where

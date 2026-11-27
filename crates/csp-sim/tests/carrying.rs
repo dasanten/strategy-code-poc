@@ -1,4 +1,4 @@
-//! `apps/server/src/carrying.test.ts`, one test per `it`.
+//! Carrying, one test per case.
 
 mod common;
 #[macro_use]

@@ -1,6 +1,6 @@
 //! The rules module: the rules that take only values (T122.5), called by name, and the throwaway
 //! mirror of what the client sees, read by a world-reading rule (T122.1).
-//! `apps/web/src/wasm-rules.test.ts` checks the same through the WebAssembly build.
+//! `apps/web/src/world/wasm-rules.test.ts` checks the same through the WebAssembly build.
 
 use csp_lang_wasm::rules::WorldMirror;
 use csp_lang_wasm::value_rules::rule;

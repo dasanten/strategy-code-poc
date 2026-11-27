@@ -1,6 +1,6 @@
-//! `apps/server/src/walking.test.ts`. The order queue (T86.2) is not ported yet, so the walk-to
-//! order's tests call its `validate` and `apply` as `OrderQueue.receive` and `applyAll` would. The
-//! two invariant cases (`pathsAreSteps`, `checkInvariants`) come with T86.13.
+//! Tests of walking. The order queue (T86.2) is not ported yet, so the walk-to order's tests call
+//! its `validate` and `apply` as `OrderQueue.receive` and `applyAll` would. The two invariant cases
+//! (`pathsAreSteps`, `checkInvariants`) come with T86.13.
 
 use std::sync::Arc;
 

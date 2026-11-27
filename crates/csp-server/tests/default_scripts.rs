@@ -1,6 +1,6 @@
-//! The library half of `default-scripts.test.ts`, ported (T86.17, part 5): a Player's default
-//! scripts (`CONTEXT.md`: Default script; ADR 0009) follow the game's default until edited, can be
-//! reset, and can't be renamed or deleted. The cases that run the scripts in the world are
+//! The library half of the default scripts (T86.17, part 5): a Player's default scripts
+//! (`CONTEXT.md`: Default script; ADR 0046) follow the game's default until edited, can be reset,
+//! and can't be renamed or deleted. The cases that run the scripts in the world are
 //! `crates/csp-sim/tests/default_scripts.rs`.
 use csp_lang::check_script;
 use csp_server::db::open_db;

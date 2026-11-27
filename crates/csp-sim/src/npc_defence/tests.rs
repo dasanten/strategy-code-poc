@@ -1,4 +1,4 @@
-//! `npc-defence.test.ts`.
+//! NPC cities defending themselves.
 
 use csp_shared::balance::{
     CITY_AREA_MARGIN, MAX_HEALTH, NPC_GATE_WATCH_RANGE, NPC_TOWN, NPC_VILLAGE, TRADING_POST,

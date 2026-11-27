@@ -1,7 +1,6 @@
-//! `apps/server/src/armies.test.ts`: the army orders and what the army gives its members, with
-//! the conflict phases stepping; the cases where the army walks step the running game
-//! (`game_test_world`). Elsewhere a member's own order is set between `member_orders` and
-//! `leave_on_own_orders`, as the order queue does.
+//! The army orders and what the army gives its members, with the conflict phases stepping; the
+//! cases where the army walks step the running game (`game_test_world`). Elsewhere a member's own
+//! order is set between `member_orders` and `leave_on_own_orders`, as the order queue does.
 
 use csp_shared::balance::{ARMY_SPREAD, WALK_TICKS_PER_TILE};
 use csp_shared::world::{Army, ArmyOrder, ResidentOrder, Tile, WalkOrder, WorldState};

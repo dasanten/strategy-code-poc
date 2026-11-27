@@ -1,5 +1,4 @@
-//! `apps/server/src/npc-patrols.test.ts`, ported (T86.17): Patrols (`CONTEXT.md`: Soldier posts;
-//! ADR 0029).
+//! Patrols (T86.17; `CONTEXT.md`: Soldier posts; ADR 0029).
 
 mod build_common;
 

@@ -1,7 +1,6 @@
-//! `apps/server/src/carrying-output.test.ts`. Carrying the output (`CONTEXT.md`: Carrying the
-//! output, Own food): the Work default carries a workplace's output to the nearest storage of the
-//! realm once its pile holds a full load, one worker at a time, each keeping their own food:
-//! `foodTake`, by default `GET_FOOD_TAKE`.
+//! Carrying the output (`CONTEXT.md`: Carrying the output, Own food): the Work default carries a
+//! workplace's output to the nearest storage of the realm once its pile holds a full load, one
+//! worker at a time, each keeping their own food: `foodTake`, by default `GET_FOOD_TAKE`.
 
 mod build_common;
 mod ts_match;

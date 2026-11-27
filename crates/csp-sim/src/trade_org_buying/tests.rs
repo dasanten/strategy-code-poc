@@ -1,4 +1,4 @@
-//! `apps/server/src/trade-org-buying.test.ts`, ported one to one.
+//! Tests of a Trade Org army buying Food on the way.
 
 use std::sync::Arc;
 

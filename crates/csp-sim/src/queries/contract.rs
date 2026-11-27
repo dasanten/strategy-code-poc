@@ -1,6 +1,6 @@
-//! Mercenary contract queries of `packages/shared/src/contract.ts` (`CONTEXT.md`: Mercenary
-//! contract): its weeks, when it ends and when the next week is due, and a contract as one of its
-//! sides sees it. `contractOf` is T85.5's, in `alliance.rs`.
+//! Mercenary contract queries (`CONTEXT.md`: Mercenary contract): its weeks, when it ends and when
+//! the next week is due, and a contract as one of its sides sees it. `contractOf` is T85.5's, in
+//! `alliance.rs`.
 
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{City, ContractSide, MercenaryContract, WorldState};

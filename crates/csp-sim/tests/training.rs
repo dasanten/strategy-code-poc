@@ -1,7 +1,7 @@
-//! `apps/server/src/training.test.ts`, ported (T86.6). Left for the tickets whose parts they need:
-//! "refills from Food on the ground's tile" (`refillSource`, T86.3), `training in scripts` and
-//! `the Train default` (T86.12), `trainees sound` and the invariant checks of the long run
-//! (T86.13). The tests' `step` also runs the default scripts, which none of these give.
+//! Training (T86.6). Left for the tickets whose parts they need: "refills from Food on the
+//! ground's tile" (`refillSource`, T86.3), `training in scripts` and `the Train default` (T86.12),
+//! `trainees sound` and the invariant checks of the long run (T86.13). The tests' `step` also runs
+//! the default scripts, which none of these give.
 
 mod build_common;
 

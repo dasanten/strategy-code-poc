@@ -1,4 +1,4 @@
-//! `npc-far-nodes.test.ts`, its slow simulations: an NPC city builds on the far nodes its scouts
+//! Slow simulations of NPC cities on far nodes: an NPC city builds on the far nodes its scouts
 //! found (`CONTEXT.md`: NPC city, Scout; ADR 0026), and its road and crew follow out there.
 
 use csp_shared::balance::{BUILD_MATERIALS, CREW_FOOD, NPC_NODE_REACH, NPC_SURPLUS_CAP, NPC_TOWN};

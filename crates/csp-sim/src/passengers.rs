@@ -1,7 +1,7 @@
-//! Passengers (`apps/server/src/passengers.ts`, `CONTEXT.md`: Passenger, Beside a vessel): the
-//! board and get-off orders, the orders that get a passenger off first, and being aboard ending
-//! when it can't go on. Aboard a carriage a passenger stands on its tile; aboard a vessel, on its
-//! water tile, stepping on from a land tile beside it and off onto a free one.
+//! Passengers (`CONTEXT.md`: Passenger, Beside a vessel): the board and get-off orders, the orders
+//! that get a passenger off first, and being aboard ending when it can't go on. Aboard a carriage a
+//! passenger stands on its tile; aboard a vessel, on its water tile, stepping on from a land tile
+//! beside it and off onto a free one.
 
 use csp_shared::terrain::{is_passable_terrain, terrain_at, TerrainMap};
 use csp_shared::world::{OrderRequest, Resident, Vessel, VesselKind, WorldState};

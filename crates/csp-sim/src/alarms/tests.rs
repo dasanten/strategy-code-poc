@@ -1,8 +1,7 @@
-//! `alarms.test.ts`, the cases over the alarm rules themselves: who an alarm reaches and what it
-//! starts. The TypeScript runs each through the whole tick (orders, queues, the default scripts,
-//! combat); those end-to-end cases (the Alarm default going after the occupier, back to work, the
-//! defence script handing back) need the default scripts running on every rule and come with
-//! T86.14.
+//! The cases over the alarm rules themselves: who an alarm reaches and what it starts. Each runs
+//! the rules alone, not the whole tick (orders, queues, the default scripts, combat); the
+//! end-to-end cases (the Alarm default going after the occupier, back to work, the defence script
+//! handing back) need the default scripts running on every rule and come with T86.14.
 
 use super::*;
 use crate::queues::tests::resident;

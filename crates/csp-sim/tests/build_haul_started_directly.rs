@@ -1,8 +1,7 @@
-//! `apps/server/src/build-haul-started-directly.test.ts`, ported (T86.17): Build and Haul started
-//! directly (`CONTEXT.md`: Default script, Started directly; ADR 0014). Build's site is the param
-//! `site`; unset, the construction site on the resident's tile when it starts, which they join.
-//! Haul's carriage is the param `carriage`, but its route comes only from the Haul order: started
-//! without one it ends. Neither target is kept between starts.
+//! Build and Haul started directly (T86.17; `CONTEXT.md`: Default script, Started directly; ADR
+//! 0014). Build's site is the param `site`; unset, the construction site on the resident's tile
+//! when it starts, which they join. Haul's carriage is the param `carriage`, but its route comes
+//! only from the Haul order: started without one it ends. Neither target is kept between starts.
 
 mod build_common;
 mod p_scripts_host;

@@ -1,7 +1,7 @@
-//! The live-world check before scripts see exactly their script views (ADR 0011;
-//! `apps/server/src/field-check.ts`): the checker run over the active version of every Player's
-//! script, listing each field it reads that the views don't declare, with the script and the
-//! Player. Read only, so `check-fields` is safe to run while the server is up.
+//! The live-world check before scripts see exactly their script views (ADR 0011): the checker run
+//! over the active version of every Player's script, listing each field it reads that the views
+//! don't declare, with the script and the Player. Read only, so `check-fields` is safe to run while
+//! the server is up.
 //!
 //! At start, [`note_script_view_changes`] tells each Player whose script reads a field a script
 //! view dropped since the last start, in their realm log.

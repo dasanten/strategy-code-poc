@@ -1,6 +1,6 @@
-//! Picking up and putting down goods (`apps/server/src/carrying.ts`, `CONTEXT.md`: Core rule,
-//! Crime, Down, Outpost storage): the pick-up and drop orders, and the take and put actions every
-//! goods order requests, resolved one after another at the end of the tick (ADR 0002).
+//! Picking up and putting down goods (`CONTEXT.md`: Core rule, Crime, Down, Outpost storage): the
+//! pick-up and drop orders, and the take and put actions every goods order requests, resolved one
+//! after another at the end of the tick (ADR 0002).
 
 use std::collections::HashSet;
 

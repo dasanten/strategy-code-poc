@@ -1,6 +1,6 @@
-//! `apps/server/src/starting-city.test.ts`, and parity with the TypeScript: the `sight/*.json`
-//! fixtures are `createWorld(cityTerrain())` with `foundStartingCity` for Players 1 to n, so the
-//! Rust world founded the same way must be the same world. `checkInvariants` is T86.13's.
+//! Tests of the starting city, and parity with the frozen TypeScript: the `sight/*.json` fixtures
+//! are `createWorld(cityTerrain())` with `foundStartingCity` for Players 1 to n, so the Rust world
+//! founded the same way must be the same world. `checkInvariants` is T86.13's.
 
 use csp_shared::balance::NPC_VILLAGE;
 use csp_shared::balance::{

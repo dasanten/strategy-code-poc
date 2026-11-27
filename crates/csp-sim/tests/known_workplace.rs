@@ -1,5 +1,3 @@
-//! `apps/server/src/known-workplace.test.ts`, ported one to one.
-//!
 //! Any known workplace (`CONTEXT.md`: Script parameter, Queue): a Work step, a `workplace` param
 //! or an order may name a workplace or construction site the Player knows, in sight or last seen,
 //! whoever built it. Any other building, and every storage param, stays the realm's own.

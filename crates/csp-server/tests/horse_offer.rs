@@ -1,5 +1,5 @@
-//! `horse-offer.test.ts`, offering horses again (`CONTEXT.md`: Horse offer;
-//! `reopenHorseOffers`). The rest of that file is in `csp-sim/src/horse_grant/offer_tests.rs`.
+//! Offering horses again (`CONTEXT.md`: Horse offer; `reopenHorseOffers`). The other horse offer
+//! cases are in `csp-sim/src/horse_grant/offer_tests.rs`.
 
 use std::sync::{Arc, OnceLock};
 

@@ -1,7 +1,6 @@
-//! `poc.test.ts` (#1038): the PoC check (`CONTEXT.md`: Haul route; epic 6). A Player's starting
-//! city builds an iron mine on a far node, sets residents to work it and a carriage to haul its ore
-//! home, and leaves the realm running overnight. Everything happens through orders, as the Player
-//! would give them.
+//! The PoC check (#1038; `CONTEXT.md`: Haul route; epic 6). A Player's starting city builds an iron
+//! mine on a far node, sets residents to work it and a carriage to haul its ore home, and leaves
+//! the realm running overnight. Everything happens through orders, as the Player would give them.
 
 use std::sync::Arc;
 

@@ -1,4 +1,4 @@
-//! `apps/server/src/pathfinding.test.ts`, one test for each of its tests, and the path fixtures.
+//! Path finding tests, and the path fixtures.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
