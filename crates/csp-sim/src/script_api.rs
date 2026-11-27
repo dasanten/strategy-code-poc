@@ -3,10 +3,6 @@
 //! can list them. A resident's script gets [`SCRIPT_API`], an army's [`ARMY_SCRIPT_API`]: the same
 //! values and queries, but army actions. The tables are in [`crate::script_tables`].
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use csp_lang::{ParamInfo, ParamType, PARAM_TYPES};
 use serde_json::Value;
 use ts_rs::TS;
@@ -101,7 +97,8 @@ mod tests {
             match t {
                 ScriptType::View(v) => out.push(v),
                 ScriptType::List(of) => views(*of, out),
-                _ => {}
+                ScriptType::Number | ScriptType::String | ScriptType::Boolean | ScriptType::Any => {
+                }
             }
         }
         let mut named = Vec::new();

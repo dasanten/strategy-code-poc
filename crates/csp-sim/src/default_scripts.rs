@@ -3,10 +3,6 @@
 //! [`crate::script_tables`]; what giving a task writes into `memory` (`TaskMemory`) is plain data
 //! the task order builds (T86.12's `task` order in `script_runner`).
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use csp_lang::{ParamInfo, ParamType};
 use csp_shared::world::Task;
 use serde_json::Value;
@@ -68,7 +64,7 @@ pub fn target_param_of(task: Task) -> Option<&'static str> {
         Task::Breed => "stable",
         Task::FeedStable => "stable",
         Task::Train => "ground",
-        _ => return None,
+        Task::Defend | Task::BuildLine | Task::Explore | Task::Alarm | Task::Gather => return None,
     })
 }
 

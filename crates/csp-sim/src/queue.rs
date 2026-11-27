@@ -2,10 +2,6 @@
 //! are checked. Here rather than in `csp-shared` because the step check measures an order as
 //! `JSON.stringify` writes it, which `csp-lang`'s JavaScript helpers know.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use crate::conditions::condition_of;
 use crate::order_meta::{meta_of, OrderMeta, StepGroup};
 use csp_lang::js::{json_string, number_to_string, utf16_len};
@@ -421,6 +417,8 @@ pub fn queue_steps_problem(items: Option<&Value>) -> Option<String> {
 }
 
 /// `String(v)` for what a request sent as an order's kind.
+// A JSON value: in a list every shape but null, also one to come, is written as on its own.
+#[allow(clippy::wildcard_enum_match_arm)]
 pub(crate) fn js_string_of(v: Option<&Value>) -> String {
     match v {
         None => "undefined".into(),

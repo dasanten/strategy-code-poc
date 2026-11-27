@@ -2,10 +2,6 @@
 //! until asks, checked by the server for one resident. A condition is about the resident themself
 //! or one place of their own realm, never anything their Player couldn't know.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use csp_shared::balance::MAX_HEALTH;
 use csp_shared::balance::MAX_HUNGER;
 use csp_shared::time::game_time;
@@ -42,7 +38,13 @@ pub fn condition_of(v: Option<&Value>) -> Result<Condition, String> {
         Condition::Hour { hour, .. } if !whole(*hour) || *hour > LAST_HOUR => {
             Err("a condition's hour is a whole number from 0 to 23".into())
         }
-        _ => Ok(c),
+        Condition::Carries { .. }
+        | Condition::Load { .. }
+        | Condition::Stock { .. }
+        | Condition::Need { .. }
+        | Condition::Mounted { .. }
+        | Condition::Aboard { .. }
+        | Condition::Hour { .. } => Ok(c),
     }
 }
 
@@ -58,7 +60,13 @@ pub fn condition_place_problem(
         Condition::Stock { place_id, .. } if place_stock(world, realm_id, place_id).is_none() => {
             Some("not a storage, workplace or site of your realm")
         }
-        _ => None,
+        Condition::Carries { .. }
+        | Condition::Load { .. }
+        | Condition::Stock { .. }
+        | Condition::Need { .. }
+        | Condition::Mounted { .. }
+        | Condition::Aboard { .. }
+        | Condition::Hour { .. } => None,
     }
 }
 

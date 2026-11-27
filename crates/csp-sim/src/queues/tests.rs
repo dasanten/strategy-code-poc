@@ -5,10 +5,6 @@
 //! (the timed `task` step, a script step ending itself, Planning ahead's
 //! work/store/road/teach/mount steps, sight) are left to T86.14.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use super::*;
 use crate::order_sender::OrderSender;
 use crate::orders::{OrderQueue, OrderReply};
@@ -192,6 +188,8 @@ impl Setup {
         assert_eq!(queues_sound(&self.world, &terrain), vec![]);
     }
 
+    // Picks one kind of event: every other kind, also one to come, is no skipped step.
+    #[allow(clippy::wildcard_enum_match_arm)]
     fn skips(&self) -> Vec<(f64, String, String, Option<bool>)> {
         self.world
             .events
@@ -841,6 +839,8 @@ fn a_wait_until_already_true_ends_the_tick_after_it_started() {
 }
 
 #[test]
+// Picks one kind of event: every other kind, also one to come, is no note of a place gone.
+#[allow(clippy::wildcard_enum_match_arm)]
 fn a_wait_on_a_place_gone_waits_on_and_notes_it_once() {
     let mut s = setup();
     storages(&mut s, 5.0);

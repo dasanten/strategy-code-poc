@@ -9,10 +9,6 @@
 //! checks that the places it names could make sense ([`step_place_problem`]); whether it can start
 //! is checked when its turn comes.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -103,10 +99,7 @@ pub fn step_place_problem(
         .iter()
         .filter_map(|k| f.get(*k))
         .filter(|p| !p.is_null() && !p.as_object().is_some_and(is_tile))
-        .map(|p| match p {
-            Value::Object(o) => o.get("id").unwrap_or(&Value::Null),
-            other => other,
-        })
+        .map(|p| p.as_object().map_or(p, |o| o.get("id").unwrap_or(&Value::Null)))
         .collect();
     let spot = f.get("spot");
     let spot_carriage = spot.and_then(|s| s.get("carriageId"));
