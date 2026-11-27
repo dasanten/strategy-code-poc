@@ -26,8 +26,10 @@ the next one and works it into a PR (`.claude/commands/next-ticket.md`).
   `pnpm check` skips them, even when affected, and says how many; `pnpm test` runs them, and CI
   runs `pnpm test`.
 - **Epic PR:** when an epic's last ticket is on its branch, one PR `epic/<n>-…` → `dev` with
-  `Closes #<epic>` is merged after the local checks and `pnpm test:slow`, without waiting for its
-  CI (`docs/coordination.md`); whoever merges closes the epic by hand.
+  `Closes #<epic>` is merged after the local checks, `pnpm test:slow` and a code review of the
+  epic's diff against `dev`, without waiting for its CI (`docs/coordination.md`, ADR 0048). A bug
+  the review confirms is fixed on the epic branch first; the other findings go into the PR body
+  under "Review: not fixed". Whoever merges closes the epic by hand.
 - **Release:** when Daniel asks, one PR `dev` → `main` lists the epics and bugs it ships, runs CI
   and is merged once green. Only merges into `main` deploy.
 - **Rules vs numbers:** a missing game rule becomes a `needs Daniel` question and lands in

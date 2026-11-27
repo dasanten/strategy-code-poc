@@ -46,7 +46,13 @@ Check the PR itself, not just the note.
 4. **Next tickets:** after each merge, look for tickets that just became workable and start them.
 5. **Epic done:** when an epic's last ticket is merged, merge `origin/dev` into the epic branch
    locally and run `pnpm test:slow` (the slow NPC runs without the year runs, about 8 min; ADR
-   0040). Green: open one PR `epic/<n>-…` → `dev` with `Closes #<epic>` and merge it without
+   0040). Then run `/code-review` on `git diff origin/dev...epic/<n>-<slug>` at the default level
+   (never `max` or `ultra` unless Daniel asks; ADR 0048). A confirmed bug: start one session with
+   the finding as its brief, its PR into the epic branch, merged as any ticket's before going on.
+   A finding that needs a rule goes to Daniel; wait for the answer only if the code would
+   otherwise do something `docs/context/` does not say. Green and fixed: open one PR
+   `epic/<n>-…` → `dev` with `Closes #<epic>`, every other finding under "Review: not fixed" in
+   its body (one line each; a bug older than the epic also as a `bug` issue), merge it without
    waiting for CI, then close the epic by hand. The year and season runs (`pnpm test:year`) are
    no gate: they run each night on `dev`.
 6. **Bug PR into `dev`:** merge it after the local checks and close the bug with a comment naming
