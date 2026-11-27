@@ -34,6 +34,18 @@ in `.claude/skills/plan-features/COORDINATE.md`. How tickets, branches and PRs w
   NPC simulation couples rules that look unrelated: an epic once moved workers' places, and so who
   went home hungry, and a town stopped arming its soldiers. The season and year runs
   (`pnpm test:year`) are no gate: they run each night on `dev` and report a regression as a bug.
+- **An epic is reviewed before it goes into `dev`** (ADR 0048): a ticket PR merges on green checks
+  without anyone reading it, and its tests are written by the session that wrote its code. When
+  the last ticket is on the epic branch, the coordinator runs `/code-review` on the epic's diff
+  against `dev` (`git diff origin/dev...epic/<n>-<slug>`) at the default level, never `max` or
+  `ultra` unless Daniel asks: those start many reviewers for one epic.
+  - **A confirmed bug** is fixed on the epic branch before the epic PR merges: one session with
+    the finding as its brief, its PR into the epic branch like any ticket's.
+  - **Everything else** (cleanups, uncertain findings, a bug older than the epic) goes into the
+    epic PR's body under "Review: not fixed", one line each, and does not block. A bug older than
+    the epic is also filed as a `bug` issue.
+  - **A finding that needs a rule** is a `needs Daniel` question. The epic waits for the answer
+    only if the code would otherwise do something `docs/context/` does not say.
 - **A bug issue is closed** when its fix is on `dev`, with a comment naming the PR.
 
 ## The merge loop
