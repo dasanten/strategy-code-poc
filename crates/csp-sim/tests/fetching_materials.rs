@@ -115,7 +115,7 @@ fn run(
 ) {
     let map = Arc::new(terrain.clone());
     let mut runner = ScriptRunner::new(map.clone(), Arc::new(Host), order_kinds());
-    let mut walking = Walking::new(map);
+    let mut walking = Walking::without_budget(map);
     let mut scratch = Scratch::default();
     for _ in 0..ticks {
         if done(world) {

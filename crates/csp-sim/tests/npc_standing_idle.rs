@@ -195,7 +195,7 @@ fn doesnt_walk_back_to_the_storage_for_food_once_it_has_eaten() {
 fn stands_at_a_house_for_days_eating_and_leaves_when_given_a_job() {
     let Village { mut world, terrain, city, storage } = village();
     let map = Arc::new(terrain.clone());
-    let mut walking = Walking::new(map);
+    let mut walking = Walking::without_budget(map);
     world
         .buildings
         .iter_mut()

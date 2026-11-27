@@ -133,7 +133,7 @@ fn setup(owed: f64) -> Setup {
         terrain,
         hq,
         queue: OrderQueue::new(order_kinds(), Some(shared.clone())),
-        walking: Walking::new(shared),
+        walking: Walking::without_budget(shared),
         scratch: Scratch::default(),
     }
 }

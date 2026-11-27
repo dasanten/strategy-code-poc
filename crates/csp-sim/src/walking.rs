@@ -511,6 +511,13 @@ impl Walking {
         Walking { clock: Some(clock), ..Walking::new(terrain) }
     }
 
+    /// With a clock that stands still, so every search settles in the tick it is asked for however
+    /// busy the machine is (bug #1609). Tests use it: on the wall clock a loaded machine spreads a
+    /// search over more ticks, and walkers set off later than the test counts on.
+    pub fn without_budget(terrain: Arc<TerrainMap>) -> Walking {
+        Walking::with_clock(terrain, Box::new(|| 0.0))
+    }
+
     /// The walls and gates on the map, built again only when they change (`wallsOf`).
     fn walls_of(&mut self, world: &WorldState) -> Arc<WallMap> {
         let key = walls_fingerprint(world);

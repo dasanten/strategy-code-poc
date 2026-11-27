@@ -139,7 +139,7 @@ fn hitches_the_named_horse_among_several_and_that_one_is_driven_off() {
         json!({ "kind": "drive", "residentId": "w1", "carriageId": "k1", "x": 6, "y": 2 }),
     )
     .unwrap();
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     step_while_ordered(&mut world, &terrain, &mut walking);
     assert_eq!(carriage_at(&world, "k1"), (6.0, 2.0));
     assert_eq!(world.carriages[0].horse_id.as_deref(), Some("h2"));
@@ -157,7 +157,7 @@ fn leaves_drive_taking_the_first_free_horse_with_none_hitched() {
         json!({ "kind": "drive", "residentId": "w1", "carriageId": "k1", "x": 3, "y": 2 }),
     )
     .unwrap();
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     step_while_ordered(&mut world, &terrain, &mut walking);
     assert_eq!(world.carriages[0].horse_id.as_deref(), Some("h1"));
 }
@@ -186,7 +186,7 @@ fn lets_the_driver_drive_on_behind_the_new_horse_and_leaves_the_old_one_behind()
         json!({ "kind": "drive", "residentId": "w1", "carriageId": "k1", "x": 8, "y": 2 }),
     )
     .unwrap();
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     while world.carriages[0].x < 4.0 {
         step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);
@@ -322,7 +322,7 @@ mod as_a_queue_step {
     fn run(world: &mut WorldState, terrain: &TerrainMap, orders: &mut Orders) {
         let arc = Arc::new(terrain.clone());
         let mut queues = QueueRunner::new(Box::new(Host), order_kinds(), Some(arc.clone()));
-        let mut walking = Walking::new(arc);
+        let mut walking = Walking::without_budget(arc);
         let mut scratch = Scratch::default();
         orders.apply_all(world, terrain);
         for _ in 0..2000 {

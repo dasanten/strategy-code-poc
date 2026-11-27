@@ -127,7 +127,7 @@ fn run(
     ticks: usize,
     until: Option<&mut dyn FnMut(&Setup) -> bool>,
 ) {
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut until = until;
     let mut held = false;
     for _ in 0..ticks {

@@ -78,7 +78,7 @@ fn setup(library: Library) -> Setup {
         orders,
         queues,
         scripts,
-        walking: Walking::new(arc),
+        walking: Walking::without_budget(arc),
         scratch: Scratch::default(),
     }
 }

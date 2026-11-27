@@ -6,11 +6,8 @@ import { GOOD_KINDS, GOOD_SPECS } from '@csp/balance'
 import type { Good, SkillName, Weapon } from '@csp/shared-types'
 import { SKILL_NAMES as ALL_SKILL_NAMES } from '@csp/shared-types'
 
-/**
- * Every skill the client lists, in the order the UI lists them. Seafaring is left out for now, as
- * it was before the list came from Rust (decided overnight, Daniel to confirm: bug #1629).
- */
-export const SKILL_NAMES: readonly SkillName[] = ALL_SKILL_NAMES.filter((s) => s !== 'seafaring')
+/** Every skill the client lists, in the order the UI lists them: Rust's `SkillName`, Seafaring too. */
+export const SKILL_NAMES: readonly SkillName[] = ALL_SKILL_NAMES
 
 /**
  * Whether a resident or horse is Down (`CONTEXT.md`: Down), lying unconscious and doing nothing:

@@ -46,7 +46,7 @@ fn setup() -> Setup {
     );
     add_city(&mut world, "c1", Some("r1"), 80.0, 560.0, None);
     resident(&mut world, "a1", 80.0, 563.0, Some("r1"));
-    let walking = Walking::new(Arc::new(terrain.clone()));
+    let walking = Walking::without_budget(Arc::new(terrain.clone()));
     Setup { world, terrain, hq, walking, scratch: Scratch::default() }
 }
 

@@ -94,6 +94,20 @@ describe('doingLine', () => {
     expect(doingLine({ order }, {})).toBe('Relocating to another city')
   })
 
+  it('says a resident is handing in a transfer, to the city it goes to (`CONTEXT.md`: Transfer)', () => {
+    const order: ResidentOrder = {
+      kind: 'handIn',
+      good: 'wood',
+      units: 10,
+      carriageId: null,
+      toCityId: 'c2',
+    }
+    expect(doingLine({ order }, { cities: [{ id: 'c2', name: 'Redbank' }] })).toBe(
+      'Handing in a transfer to Redbank',
+    )
+    expect(doingLine({ order }, {})).toBe('Handing in a transfer')
+  })
+
   it('says what a teacher teaches (`CONTEXT.md`: Teacher)', () => {
     const teach = (subject: 'strength' | 'combat'): ResidentOrder => ({
       kind: 'teach',

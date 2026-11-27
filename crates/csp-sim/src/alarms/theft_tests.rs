@@ -98,7 +98,7 @@ fn setup_with(library: HashMap<u64, RunnableScript>) -> Setup {
     let scripts = DefaultScripts::with_library(terrain.clone(), &[me()], library);
     let orders = OrderQueue::new(scripts.kinds.clone(), Some(terrain.clone()));
     let queues = QueueRunner::new(Box::new(Senders), scripts.kinds.clone(), Some(terrain.clone()));
-    let walking = Walking::new(terrain.clone());
+    let walking = Walking::without_budget(terrain.clone());
     Setup { world, terrain, scripts, orders, queues, walking, scratch: Scratch::default() }
 }
 

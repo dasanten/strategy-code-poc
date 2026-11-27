@@ -156,7 +156,7 @@ impl OrderKind for Row {
 }
 
 pub(crate) static ROW_META: OrderMeta =
-    OrderMeta::request("row", &Row).queue_step(StepGroup::Move).script(&[ROW_ACTION]);
+    OrderMeta::request("row", &Row).queue_step(StepGroup::Move).adults_only().script(&[ROW_ACTION]);
 
 const ROW_ACTION: ScriptAction = ScriptAction {
     name: "row",
@@ -189,7 +189,8 @@ impl RunningOrder<Row> for RowOrder {
         Arrival::Done
     }
     fn resume(&mut self, _: &WorldState, _: &Resident) -> bool {
-        // The path found before the interruption is kept (#1619).
+        // Found again from where they stand: they may have moved meanwhile (#1619).
+        GoingMut::new(&mut self.path, &mut self.progress).reset_found();
         true
     }
     same_when_equal!();

@@ -98,7 +98,7 @@ fn run_script(
 ) -> usize {
     let arc = Arc::new(terrain.clone());
     let mut runner = ScriptRunner::new(arc.clone(), Arc::new(Host), order_kinds());
-    let mut walking = Walking::new(arc);
+    let mut walking = Walking::without_budget(arc);
     let mut scratch = Scratch::default();
     let mut ran = 0;
     while ran < ticks && !done(&world.residents[0]) {

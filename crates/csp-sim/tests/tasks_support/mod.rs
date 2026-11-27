@@ -167,7 +167,7 @@ impl Game {
     pub fn new(world: WorldState, terrain: TerrainMap, senders: Vec<OrderSender>) -> Self {
         let tasks = default_scripts(&terrain, senders);
         let queue = OrderQueue::new(tasks.kinds.clone(), Some(Arc::new(terrain.clone())));
-        let walking = Walking::new(Arc::new(terrain.clone()));
+        let walking = Walking::without_budget(Arc::new(terrain.clone()));
         Game { world, terrain, tasks, queue, walking, scratch: Scratch::default() }
     }
 

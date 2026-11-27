@@ -90,7 +90,7 @@ fn setup(source: &str) -> Setup {
     orders.receive(&world, &OrderSender::player(MARA, "Mara"), &json!("q"), &order);
     orders.apply_all(&mut world);
     let runner = ScriptRunner::new(Arc::new(terrain.clone()), host, kinds);
-    let walking = Walking::new(Arc::new(terrain.clone()));
+    let walking = Walking::without_budget(Arc::new(terrain.clone()));
     Setup { world, terrain, runner, walking, scratch: Scratch::default() }
 }
 
@@ -248,7 +248,7 @@ fn run_their_defaults_far_fewer_times_than_once_a_tick_each_on_their_way_to_work
     for c in &mut world.cities {
         c.scouted = Some(serde_json::from_value(json!({ "sectors": [], "done": true })).unwrap());
     }
-    let mut walking = Walking::new(Arc::new(land.clone()));
+    let mut walking = Walking::without_budget(Arc::new(land.clone()));
     let mut scratch = Scratch::default();
     // Settled at work, then each finds themself 30 tiles off and walks back.
     for _ in 0..20 {

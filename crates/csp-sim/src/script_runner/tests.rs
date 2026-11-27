@@ -230,7 +230,7 @@ fn hands_over_to_a_built_in_order_and_takes_control_back_when_it_is_done() {
         }";
     let id = s.lib.create(MARA, "there and back", source);
     s.give_script(id, &["a0"]);
-    let mut walking = Walking::new(s.terrain.clone());
+    let mut walking = Walking::without_budget(s.terrain.clone());
     let mut seen = Vec::new();
     for _ in 0..200 {
         let a0 = s.r("a0");

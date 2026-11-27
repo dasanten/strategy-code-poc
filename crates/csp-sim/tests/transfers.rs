@@ -114,7 +114,7 @@ impl Setup {
     }
     /// Steps the world at least once and then until `done`, at most `ticks` times (`runUntil`).
     fn run_until(&mut self, done: impl Fn(&WorldState) -> bool, ticks: usize) {
-        let mut walking = Walking::new(Arc::new(self.terrain.clone()));
+        let mut walking = Walking::without_budget(Arc::new(self.terrain.clone()));
         for t in 0..ticks {
             if t > 0 && done(&self.world) {
                 break;

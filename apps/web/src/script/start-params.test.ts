@@ -208,6 +208,19 @@ describe('the form before a script starts', () => {
     expect(startFormParams({ kind: 'task', task: 'work' }, summary(1, null))).toEqual(PARAMS)
   })
 
+  it('fills Repair’s building itself, as it does Tear down’s (bug #1630)', () => {
+    const building = { name: 'building', type: 'building' as const }
+    for (const t of ['repair', 'tearDown'] as const) {
+      const script = { ...summary(3, t), params: [building, ...PARAMS] }
+      expect(startFormParams({ kind: 'task', task: t }, script).map((p) => p.name)).toEqual([
+        'storage',
+        'rounds',
+        'take',
+      ])
+      expect(startFormParams({ kind: 'runScript', scriptId: 3 }, script)[0]).toEqual(building)
+    }
+  })
+
   it('leaves out a param the step gives itself, as Feed the stable once gives once', () => {
     const feed = {
       ...summary(3, 'feedStable'),

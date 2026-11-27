@@ -41,7 +41,7 @@ fn have_one_of_their_residents_breed_their_horses_through_the_default_task() {
     world.residents[idle].order = None;
     world.residents[idle].script = None;
     world.residents[idle].carried = Stock::from([(Good::Food, OWN_FOOD)]);
-    let mut walking = Walking::new(Arc::new(land.clone()));
+    let mut walking = Walking::without_budget(Arc::new(land.clone()));
     let mut scratch = Scratch::default();
     step_world(&mut world, &land, &mut scratch, Some(&mut walking), None);
     let script = serde_json::to_value(&world.residents[idle].script).unwrap();

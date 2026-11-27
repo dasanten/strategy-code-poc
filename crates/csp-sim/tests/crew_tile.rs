@@ -77,7 +77,7 @@ fn setup() -> Play {
         .push(building(json!({ "id": "mine", "kind": "mine", "cityId": "c1", "x": 5, "y": 5 })));
     let tasks = default_scripts(&terrain, vec![me()], None);
     let queue = OrderQueue::new(tasks.kinds.clone(), Some(Arc::new(terrain.clone())));
-    let walking = Walking::new(Arc::new(terrain.clone()));
+    let walking = Walking::without_budget(Arc::new(terrain.clone()));
     Play { world, terrain, tasks, queue, walking, scratch: Scratch::default() }
 }
 

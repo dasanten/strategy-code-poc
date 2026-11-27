@@ -47,7 +47,7 @@ fn step(world: &mut WorldState, map: &TerrainMap, walking: &mut Walking, scratch
 
 /// Ticks until the resident stands on (x, y) or `max` runs out.
 fn ticks_until(world: &mut WorldState, map: &TerrainMap, x: f64, y: f64) -> f64 {
-    let mut walking = Walking::new(Arc::new(map.clone()));
+    let mut walking = Walking::without_budget(Arc::new(map.clone()));
     let mut scratch = Scratch::default();
     for t in 1..=2000 {
         step(world, map, &mut walking, &mut scratch);
@@ -90,7 +90,7 @@ fn walks_the_whole_path_to_the_target_on_passable_tiles_only_then_stops() {
     ]);
     let mut world = one_walker(&map, 2.0, 2.0, 10.0);
     walk_to(&mut world.residents[0], 6.0, 2.0);
-    let mut walking = Walking::new(Arc::new(map.clone()));
+    let mut walking = Walking::without_budget(Arc::new(map.clone()));
     let mut scratch = Scratch::default();
     let mut visited = std::collections::HashSet::new();
     let mut t = 0;
@@ -141,7 +141,7 @@ fn takes_root_2_times_as_long_for_a_diagonal_step_as_for_a_straight_one() {
 fn takes_a_diagonal_step_only_between_two_steppable_tiles_using_up_root_2_of_progress() {
     let map = draw(&["......", "......", "...~..", "......", "......", "......"]);
     let mut world = one_walker(&map, 2.0, 2.0, 10.0);
-    let mut walking = Walking::new(Arc::new(map.clone()));
+    let mut walking = Walking::without_budget(Arc::new(map.clone()));
     let mut scratch = Scratch::default();
     let mut step = |world: &mut WorldState, x: f64, y: f64, path: Vec<(f64, f64)>| {
         world.residents[0].order = Some(ResidentOrder::WalkTo(WalkOrder {
@@ -190,7 +190,7 @@ fn drops_an_order_whose_target_cannot_be_reached() {
     let map = draw(&["....", ".~~.", ".~~.", "...."]);
     let mut world = one_walker(&map, 0.0, 0.0, 10.0);
     walk_to(&mut world.residents[0], 1.0, 1.0);
-    let mut walking = Walking::new(Arc::new(map.clone()));
+    let mut walking = Walking::without_budget(Arc::new(map.clone()));
     step(&mut world, &map, &mut walking, &mut Scratch::default());
     assert!(w1(&world).order.is_none());
 }
@@ -200,7 +200,7 @@ fn keeps_a_found_path_in_the_order_so_walking_goes_on_after_a_restart() {
     let open = open();
     let mut world = one_walker(&open, 2.0, 2.0, 10.0);
     walk_to(&mut world.residents[0], 8.0, 2.0);
-    let mut walking = Walking::new(Arc::new(open.clone()));
+    let mut walking = Walking::without_budget(Arc::new(open.clone()));
     step(&mut world, &open, &mut walking, &mut Scratch::default());
     match &w1(&world).order {
         Some(ResidentOrder::WalkTo(o)) => assert_eq!(o.path.as_ref().map(Vec::len), Some(6)),
@@ -253,4 +253,37 @@ fn rejects_someone_elses_resident_and_targets_that_arent_tiles() {
         Some("the target must be a tile")
     );
     assert!(WalkTo.validate(&world, &me, &o(2.0, "nobody"), None).is_some());
+}
+
+/// Bug #1609: on a clock that runs ahead for a while, as a busy machine's wall clock does, the
+/// tick's path budget is gone before the search is done, so the walker sets off ticks later;
+/// without a budget they set off in the tick they are sent, however busy the machine.
+#[test]
+fn a_busy_machine_delays_the_walk_on_the_wall_clock_but_not_without_a_budget() {
+    let open = open();
+    let first_step = |walking: &mut Walking| {
+        let mut world = one_walker(&open, 2.0, 2.0, 10.0);
+        walk_to(&mut world.residents[0], 12.0, 12.0);
+        let mut scratch = Scratch::default();
+        for t in 1..=50 {
+            step(&mut world, &open, walking, &mut scratch);
+            if (w1(&world).x, w1(&world).y) != (2.0, 2.0) {
+                return t;
+            }
+        }
+        panic!("never set off");
+    };
+    // Busy for its first calls: each one finds the tick's budget gone; then idle.
+    let (mut ms, mut calls) = (0.0, 0);
+    let busy = move || {
+        calls += 1;
+        if calls <= 20 {
+            ms += 2.0 * PATH_BUDGET_MS;
+        }
+        ms
+    };
+    let mut on_a_busy_clock = Walking::with_clock(Arc::new(open.clone()), Box::new(busy));
+    let mut without_budget = Walking::without_budget(Arc::new(open.clone()));
+    let unhurried = first_step(&mut without_budget);
+    assert!(first_step(&mut on_a_busy_clock) > unhurried);
 }

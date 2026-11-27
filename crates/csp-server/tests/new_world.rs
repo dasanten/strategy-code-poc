@@ -83,7 +83,7 @@ fn a_small_world_has_npc_cities_the_trade_org_and_posts_and_keeps_the_rules() {
 fn a_small_world_runs_a_game_day_keeping_the_invariants() {
     let (terrain, mut world) = generate(DEFAULT_SIZE, SEED);
     // A game day as the server runs it, the invariants held every three game hours.
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     let people = world.residents.len();
     for t in 1..=TICKS_PER_GAME_DAY as u64 {

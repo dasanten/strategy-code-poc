@@ -113,11 +113,11 @@ pub struct ScriptContext<'a> {
 }
 
 /// The order kinds a resident's script can request (`SCRIPT_ORDER_KINDS`): those its actions ask
-/// for. `load` is not among them, though loadShip and unloadShip ask for it (#1617).
+/// for, `load` among them (`loadShip`, `unloadShip`).
 pub fn script_order_kinds() -> Vec<&'static str> {
     let mut kinds: Vec<&'static str> = Vec::new();
     for (kind, _) in script_actions() {
-        if kind != "load" && !kinds.contains(&kind) {
+        if !kinds.contains(&kind) {
             kinds.push(kind);
         }
     }

@@ -295,7 +295,7 @@ fn brings_the_ore_to_the_pile_and_goes_back_to_work_one_fetcher_at_a_time() {
     }
     let mut runner = runner(&terrain);
     let mut scratch = Scratch::default();
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let pile = |w: &WorldState, g: Good| pile_at(w, 6.0, 6.0).map_or(0.0, |p| held(&p.goods, g));
     let mut trips = 0;
     let mut smelted = false;

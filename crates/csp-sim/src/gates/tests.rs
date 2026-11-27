@@ -100,7 +100,7 @@ fn a_walker_finds_a_new_way_when_a_gate_closes_before_them() {
     let terrain = terrain();
     let mut world = setup(&terrain);
     world.residents.push(resident("b1", Some("r2"), 8.0, 14.0));
-    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut walking = Walking::without_budget(Arc::new(terrain.clone()));
     let mut scratch = Scratch::default();
     let walk = |world: &WorldState| match &world.residents[0].order {
         Some(ResidentOrder::WalkTo(o)) => Some(o.clone()),

@@ -83,7 +83,7 @@ fn setup(s1: Stock) -> Setup {
         terrain,
         hq,
         queue: OrderQueue::new(order_kinds(), Some(shared.clone())),
-        walking: Walking::new(shared),
+        walking: Walking::without_budget(shared),
         scratch: Scratch::default(),
     }
 }
@@ -511,7 +511,7 @@ fn walks_to_a_city_farther_than_its_time_there_robs_it_and_comes_home_alive() {
         r.born_at = -20.0 * 24.0 * 3600.0;
         r.lifespan = 60.0;
     }
-    let mut walking = Walking::new(Arc::new(big.clone()));
+    let mut walking = Walking::without_budget(Arc::new(big.clone()));
     let mut scratch = Scratch::default();
     let mut run_big = |world: &mut WorldState, until: &dyn Fn(&WorldState) -> bool, most: usize| {
         for _ in 0..most {

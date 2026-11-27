@@ -55,7 +55,7 @@ fn drive_to(world: &mut WorldState, x: f64, y: f64) {
 
 /// Steps the world until the driver's order is done or 5000 ticks pass; returns the ticks.
 fn drive_out(world: &mut WorldState, map: &TerrainMap) -> u32 {
-    walk_out(world, map, &mut Walking::new(Arc::new(map.clone())), "w1", 5000)
+    walk_out(world, map, &mut Walking::without_budget(Arc::new(map.clone())), "w1", 5000)
 }
 
 fn drive_order(o: serde_json::Value) -> serde_json::Value {
@@ -137,7 +137,7 @@ fn moves_driver_carriage_and_horse_together_hitching_the_horse_then_stops() {
     let map = open();
     let mut world = setup(&map, 2.0, 2.0);
     drive_to(&mut world, 6.0, 2.0);
-    let mut walking = Walking::new(Arc::new(map.clone()));
+    let mut walking = Walking::without_budget(Arc::new(map.clone()));
     let mut scratch = Scratch::default();
     while world.residents[0].order.is_some() {
         step_world(&mut world, &map, &mut scratch, Some(&mut walking), None);
@@ -191,7 +191,7 @@ fn goes_round_a_mountain_ridge_through_its_pass_never_into_the_mountains() {
     let map = draw(&rows);
     let mut world = setup(&map, 2.0, 2.0);
     drive_to(&mut world, 2.0, 10.0);
-    let mut walking = Walking::new(Arc::new(map.clone()));
+    let mut walking = Walking::without_budget(Arc::new(map.clone()));
     let mut scratch = Scratch::default();
     let mut crossed_at = None;
     let mut t = 0;
@@ -244,7 +244,7 @@ fn frees_the_horse_on_the_tile_and_stops_the_carriages_driver() {
     let map = open();
     let mut world = setup(&map, 2.0, 2.0);
     drive_to(&mut world, 8.0, 2.0);
-    let mut walking = Walking::new(Arc::new(map.clone()));
+    let mut walking = Walking::without_budget(Arc::new(map.clone()));
     let mut scratch = Scratch::default();
     while world.carriages[0].x < 4.0 {
         step_world(&mut world, &map, &mut scratch, Some(&mut walking), None);

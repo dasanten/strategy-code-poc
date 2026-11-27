@@ -175,7 +175,10 @@ pub struct Runner {
 
 impl Runner {
     pub fn new(terrain: &TerrainMap) -> Self {
-        Runner { walking: Walking::new(Arc::new(terrain.clone())), scratch: Scratch::default() }
+        Runner {
+            walking: Walking::without_budget(Arc::new(terrain.clone())),
+            scratch: Scratch::default(),
+        }
     }
 
     /// One `stepWorld`.

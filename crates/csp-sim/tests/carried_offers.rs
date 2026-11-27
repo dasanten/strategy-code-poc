@@ -212,7 +212,7 @@ impl Setup {
     /// Steps until `done`, at least once, at most 20,000 ticks, checking every invariant now and
     /// then (`runUntil`).
     fn run_until(&mut self, mut done: impl FnMut(&WorldState) -> bool) {
-        let mut walking = Walking::new(self.terrain.clone());
+        let mut walking = Walking::without_budget(self.terrain.clone());
         let terrain = self.terrain.clone();
         let mut t = 0;
         while t < 20_000 && (t == 0 || !done(&self.world)) {

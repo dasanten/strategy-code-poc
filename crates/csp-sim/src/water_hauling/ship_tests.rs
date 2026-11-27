@@ -210,3 +210,28 @@ fn the_haul_task_sails_a_ship_given_as_its_carriage() {
     assert!(matches!(game.r("w1").order, Some(ResidentOrder::HaulByWater(_))));
     assert!(game.r("w1").script.is_some(), "the Haul default still runs");
 }
+
+/// Bug #1617: what `loadShip` and `unloadShip` ask for, the load order, is one a resident's script
+/// can request, and sound, so `script-requests-as-orders` has nothing to report.
+#[test]
+fn a_scripts_load_and_unload_requests_are_sound() {
+    let mut game = game();
+    game.world.vessels[0].load = [(Good::Wood, 5.0)].into_iter().collect();
+    let sender = crate::game_test_world::player(7);
+    let kinds = crate::orders::order_kinds();
+    for source in ["loadShip(\"s1\", {food: 10})", "unloadShip(\"s1\", {wood: 5})"] {
+        let (_, requests) =
+            crate::game_test_world::run_script(&game.world, &game.terrain, &sender, "w1", source);
+        assert_eq!(requests.len(), 1, "{source}");
+        assert_eq!(requests[0].kind, "load", "{source}");
+        let sound = crate::script_bindings::script_requests_sound(
+            &game.world,
+            &game.terrain,
+            &sender,
+            "w1",
+            &requests,
+            &kinds,
+        );
+        assert!(sound.is_empty(), "{source}: {sound:?}");
+    }
+}
