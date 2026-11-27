@@ -1,4 +1,8 @@
-import type { ScriptSummary } from '@csp/shared-types'
+import type { ScriptSummary, SeenCity } from '@csp/shared-types'
+import type { PreviewWorld } from '../pick/pick-preview.js'
+import type { RealmOrder } from '../realm/useRealmOrder.js'
+import type { useKnownGround } from '../map/useKnownGround.js'
+import { buildProblem } from './world-rules.js'
 import { horsesInNeed } from '../transport/reviving.js'
 import { isDown } from './world.js'
 import { isWater } from './terrain.js'
@@ -48,4 +52,30 @@ export function planWorld(
  */
 export function toFeed(world: NonNullable<ReturnType<typeof useWorld>['world']>) {
   return [...world.residents.filter(isDown), ...horsesInNeed(world.horses)]
+}
+/**
+ * What the pick waiting for a tile needs of the world to preview it (`pick-preview`): the known
+ * ground, and for a building kind picked before its tile, what the Build menu there would say.
+ */
+export function previewWorld(
+  world: NonNullable<ReturnType<typeof useWorld>['world']>,
+  ground: Pick<
+    ReturnType<typeof useKnownGround>,
+    'nodeAt' | 'wayGround' | 'realmBuildProblem' | 'knownGround'
+  >,
+  cityNames: SeenCity[],
+  realmOrder: RealmOrder | undefined,
+): PreviewWorld {
+  const { nodeAt, wayGround, realmBuildProblem, knownGround } = ground
+  return {
+    ...wayGround(world),
+    ...planWorld(world),
+    cityNames,
+    nodeAt: (x, y) => nodeAt?.(x, y),
+    buildProblem: (kind, x, y) =>
+      // A kind picked before its tile is judged as the Build menu there would (realm control).
+      realmOrder?.step === 'where'
+        ? realmBuildProblem(world, x, y, kind, realmOrder.material)
+        : buildProblem(kind, x, y, knownGround(world)),
+  }
 }
