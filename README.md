@@ -96,6 +96,12 @@ failed request fails a flow. It uses the Chrome installed on the machine (`BROWS
 for Edge), never touches `data/` and is not part of `pnpm check`: it runs at an epic's gate, beside
 `pnpm test:slow`.
 
+The flows find things by role and visible text, the words of `docs/context/screen.md`, never by CSS
+class. `apps/web/browser/play.ts` holds what they share: opening a tab or a resident, skipping game
+time with the Creative bar, and finding a place on the map, which is one canvas, the way a Player
+does: by pointing at it and reading the readout under the minimap and the pick banner ("House
+here"). The flows share one world and run in order, each picking its own resident.
+
 ```sh
 pnpm test:browser                 # every flow
 pnpm test:browser -- --headed     # watch them; any other Playwright argument works too

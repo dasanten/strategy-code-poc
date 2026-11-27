@@ -1,15 +1,31 @@
 import { test as base, expect, type Page } from '@playwright/test'
 
 /**
- * The browser tests' `test`: every flow fails on a console error, an uncaught error, a request
- * that failed or an answer of 400 or more, beyond the few a logged-out page expects (`EXPECTED`).
- * The problems are checked after the flow, so a flow that passes its own steps still fails on one.
+ * An answer a flow lets through while it waits for the `bug` issue that will stop it, named by
+ * number so the allowance goes when the bug is fixed (T126.2: a client bug a flow finds is a `bug`
+ * issue, not a fix in the flow).
  */
-export const test = base.extend<{ problems: string[] }>({
+export interface WaitingFor {
+  bug: number
+  path: string
+  status: number
+}
+
+/**
+ * The browser tests' `test`: every flow fails on a console error, an uncaught error, a request
+ * that failed or an answer of 400 or more, beyond the few a logged-out page expects (`EXPECTED`)
+ * and those a file waits for (`test.use({ waitingFor: [...] })`). The problems are checked after
+ * the flow, so a flow that passes its own steps still fails on one.
+ */
+export const test = base.extend<{ waitingFor: WaitingFor[]; problems: string[] }>({
+  waitingFor: [[], { option: true }],
   problems: [
-    async ({ page }, use) => {
+    async ({ page, waitingFor }, use) => {
       const problems: string[] = []
-      watch(page, problems)
+      for (const w of waitingFor) {
+        test.info().annotations.push({ type: 'waiting for', description: `#${w.bug}` })
+      }
+      watch(page, problems, [...EXPECTED, ...waitingFor])
       await use(problems)
       expect(problems, 'console errors and failed requests').toEqual([])
     },
@@ -22,12 +38,12 @@ export { expect }
 /** What a page asks before anyone logs in, and the error the browser logs for it. */
 const EXPECTED = [{ path: '/api/me', status: 401 }]
 
-function expected(url: string, status: number) {
+function expected(allowed: { path: string; status: number }[], url: string, status: number) {
   const { pathname } = new URL(url)
-  return EXPECTED.some((e) => e.path === pathname && e.status === status)
+  return allowed.some((e) => e.path === pathname && e.status === status)
 }
 
-function watch(page: Page, problems: string[]) {
+function watch(page: Page, problems: string[], allowed: { path: string; status: number }[]) {
   page.on('pageerror', (error) => problems.push(`uncaught: ${error.message}`))
   page.on('console', (message) => {
     if (message.type() !== 'error') return
@@ -42,7 +58,7 @@ function watch(page: Page, problems: string[]) {
     problems.push(`failed: ${request.method()} ${request.url()} ${request.failure()?.errorText}`)
   })
   page.on('response', (response) => {
-    if (response.status() < 400 || expected(response.url(), response.status())) return
+    if (response.status() < 400 || expected(allowed, response.url(), response.status())) return
     problems.push(`answer ${response.status()}: ${response.request().method()} ${response.url()}`)
   })
 }
