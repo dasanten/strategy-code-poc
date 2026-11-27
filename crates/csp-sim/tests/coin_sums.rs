@@ -1,6 +1,6 @@
-//! `coin-sums.test.ts`: the sums behind Coins (`CONTEXT.md`: Coins, Mint, Buying a city, Price
-//! anchor), for one full gold mine and the mint that strikes all it digs, with average workers of
-//! no skill. Balance numbers only, so no game time.
+//! The sums behind Coins (`CONTEXT.md`: Coins, Mint, Buying a city, Price anchor), for one full
+//! gold mine and the mint that strikes all it digs, with average workers of no skill. Balance
+//! numbers only, so no game time.
 
 use csp_shared::balance::Recipe;
 use csp_shared::balance::{

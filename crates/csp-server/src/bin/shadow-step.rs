@@ -1,4 +1,5 @@
-//! The Rust server's side of the shadow run (T88.5), driven by `scripts/shadow-run.mts`:
+//! The Rust server's side of the shadow run (T88.5), which stepped it in lock-step with the
+//! TypeScript server:
 //!
 //! ```text
 //! shadow-step <world.db> [--invariant-sample-rate r] [--slow-tick-ms ms] [--save-every-ticks n]

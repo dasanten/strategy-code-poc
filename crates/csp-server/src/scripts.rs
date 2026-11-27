@@ -1,6 +1,6 @@
-//! A Player's script library (`CONTEXT.md`: Script; `apps/server/src/scripts.ts`, its database
-//! half): named scripts with every saved version kept. Scripts belong to the account, so they
-//! outlast the realm and a Leader's death.
+//! A Player's script library (`CONTEXT.md`: Script), its database half: named scripts with every
+//! saved version kept. Scripts belong to the account, so they outlast the realm and a Leader's
+//! death.
 //!
 //! The active version is the one that runs. Saving a version without syntax errors makes it
 //! active, so a saved change is picked up on the next tick; a version with errors is kept in the

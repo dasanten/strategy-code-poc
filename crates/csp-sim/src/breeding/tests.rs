@@ -1,8 +1,7 @@
-//! `apps/server/src/breeding.test.ts`, the fast parts, ported one to one. `stepWorld` is the
-//! breeding phase alone (`request_breeding`, `resolve_breeding`, the tick turning): nothing else
-//! in the tick touches a stable here. The invariants are T86.13's, the Breed task is the default
-//! scripts' (T86.12), NPC cities' breeding is T86.10's; the walkTo order is T86.2's, so another
-//! order is set directly.
+//! The fast parts of breeding. `stepWorld` is the breeding phase alone (`request_breeding`,
+//! `resolve_breeding`, the tick turning): nothing else in the tick touches a stable here. The
+//! invariants are T86.13's, the Breed task is the default scripts' (T86.12), NPC cities' breeding
+//! is T86.10's; the walkTo order is T86.2's, so another order is set directly.
 
 use csp_shared::balance::{FOAL_STAT_SPREAD, MAX_HEALTH, MAX_HUNGER, STABLE_CAPACITY};
 use csp_shared::world::{

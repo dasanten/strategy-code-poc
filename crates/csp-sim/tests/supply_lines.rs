@@ -1,5 +1,5 @@
-//! `apps/server/src/supply-lines.test.ts`, ported (T86.17): refilling from a carriage, and the
-//! supply lines a haul route or a drive to an army makes.
+//! Refilling from a carriage, and the supply lines a haul route or a drive to an army makes
+//! (T86.17).
 
 mod build_common;
 

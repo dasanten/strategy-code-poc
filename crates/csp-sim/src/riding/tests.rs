@@ -1,5 +1,5 @@
-//! `apps/server/src/riding.test.ts`. `walkOut`'s `checkInvariants` after every tick and "the
-//! riders-on-horses invariant" come with T86.13.
+//! Tests of riding. `walkOut`'s `checkInvariants` after every tick and "the riders-on-horses
+//! invariant" come with T86.13.
 
 use std::collections::HashSet;
 use std::sync::Arc;

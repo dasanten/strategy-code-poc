@@ -1,7 +1,6 @@
-//! `apps/server/src/storing.test.ts`, one test per `it`. Residents walk with the goods tests'
-//! stand-in for `Walking` (`StraightWalk`, until T86.4); `storeFetchOrdersSound` and
-//! `checkInvariants` come with T86.13, and the part of "ends, saying why" that needs a path search
-//! (`no way`) with T86.4's `Walking`.
+//! Storing, one test per case. Residents walk with the goods tests' stand-in for `Walking`
+//! (`StraightWalk`, until T86.4); `storeFetchOrdersSound` and `checkInvariants` come with T86.13,
+//! and the part of "ends, saying why" that needs a path search (`no way`) with T86.4's `Walking`.
 
 mod common;
 #[macro_use]

@@ -1,5 +1,4 @@
-//! `apps/server/src/territory.test.ts`. The `territorySound` checks come with the invariants
-//! (T86.13).
+//! Tests of the territory. The `territorySound` checks come with the invariants (T86.13).
 
 use csp_shared::balance::{
     TERRITORY_CITY_BASE, TERRITORY_MAX_REACH, TERRITORY_PER_ARMED, TERRITORY_PER_RESIDENT,

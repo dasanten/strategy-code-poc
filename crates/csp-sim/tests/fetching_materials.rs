@@ -1,7 +1,6 @@
-//! `apps/server/src/fetching-materials.test.ts`. Fetching materials (`CONTEXT.md`: Fetching
-//! materials): the Build default builds a site, and while it lacks materials one of its builders,
-//! picked at random, fetches a load of what is missing from the nearest storage of the realm that
-//! holds it, one at a time.
+//! Fetching materials (`CONTEXT.md`: Fetching materials): the Build default builds a site, and
+//! while it lacks materials one of its builders, picked at random, fetches a load of what is
+//! missing from the nearest storage of the realm that holds it, one at a time.
 
 mod build_common;
 mod ts_match;

@@ -1,4 +1,4 @@
-//! Transfers between realms (`apps/server/src/transfers.ts`, `CONTEXT.md`: Transfer, Trade Org
+//! Transfers between realms (`CONTEXT.md`: Transfer, Trade Org debt, Guaranteed carriage): the
 //! debt, Guaranteed carriage): the Trade Organization carries goods or coins from one realm to a
 //! city of another. A caravan standing at a transfer's warehouse takes it on, after the
 //! deliveries ordered there, and carries it out instead of going on along its route

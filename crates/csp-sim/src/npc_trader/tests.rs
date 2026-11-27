@@ -1,4 +1,4 @@
-//! `npc-trader.test.ts`: the NPC trader (`CONTEXT.md`: NPC trader): a city with a full load of
+//! The NPC trader (`CONTEXT.md`: NPC trader): a city with a full load of
 //! surplus sends a spare hand to a Trade Org warehouse in reach, who sells it, buys what the city
 //! is short of and has no node for, and walks home. A village sends one at a time, a bigger city
 //! more by its size.

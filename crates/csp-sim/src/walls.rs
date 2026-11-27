@@ -1,7 +1,7 @@
 //! Walls and gates as the path searches see them (`CONTEXT.md`: Walls in combat): the `WallMap`
-//! and its step rules, ported from `packages/shared/src/walls.ts` (`WallTile`, `WallMap`,
-//! `strandedOnWall`, `mayStep`), and with the rules (T86.6) the rest of it: building the `WallMap`
-//! from the world (`wallMap`, `wallsKey`) and the world queries about walls and gates.
+//! and its step rules (`WallTile`, `WallMap`, `strandedOnWall`, `mayStep`), and with the rules
+//! (T86.6) the rest of it: building the `WallMap` from the world (`wallMap`, `wallsKey`) and the
+//! world queries about walls and gates.
 
 use std::collections::HashMap;
 

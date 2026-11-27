@@ -1,7 +1,6 @@
 //! Queues (`CONTEXT.md`: Queue, Repeat block): which orders can be steps and how a queue's items
-//! are checked (`packages/shared/src/queue.ts`). Here rather than in `csp-shared` because the step
-//! check measures an order as `JSON.stringify` writes it, which `csp-lang`'s JavaScript helpers
-//! know.
+//! are checked. Here rather than in `csp-shared` because the step check measures an order as
+//! `JSON.stringify` writes it, which `csp-lang`'s JavaScript helpers know.
 
 use crate::conditions::condition_of;
 use crate::order_meta::{meta_of, OrderMeta, StepGroup};

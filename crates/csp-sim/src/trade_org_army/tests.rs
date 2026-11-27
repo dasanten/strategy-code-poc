@@ -1,6 +1,6 @@
-//! `apps/server/src/trade-org-army.test.ts`, ported one to one. Orders go through their kinds:
-//! the contract orders (T86.11) by `realm_test_world::send`, `walkTo` (T86.4) by
-//! `movement_test_world::order_from`. The world steps with the ported `Walking`.
+//! Tests of the Trade Org army. Orders go through their kinds: the contract orders (T86.11) by
+//! `realm_test_world::send`, `walkTo` (T86.4) by `movement_test_world::order_from`. The world steps
+//! with `Walking`.
 
 use std::sync::Arc;
 

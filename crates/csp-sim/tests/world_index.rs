@@ -1,8 +1,7 @@
-//! `apps/server/src/world-index.test.ts`, ported one to one. Its busy worlds start from the
-//! fixture worlds (`generateWorld` is the world generation's port) and get, drawn from the seed,
-//! horses, roads (some sites), a building across the map's join, alliance armies and mercenary
-//! contracts, some started and some sharing residents, so every way `commanderOf` can answer
-//! comes up.
+//! The world index. Its busy worlds start from the fixture worlds (`generateWorld` is the world
+//! generation's port) and get, drawn from the seed, horses, roads (some sites), a building across
+//! the map's join, alliance armies and mercenary contracts, some started and some sharing
+//! residents, so every way `commanderOf` can answer comes up.
 
 mod common;
 

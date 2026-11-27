@@ -1,4 +1,4 @@
-//! `apps/server/src/renaming.test.ts`, ported one to one.
+//! Tests of the renaming orders.
 
 use std::sync::Arc;
 

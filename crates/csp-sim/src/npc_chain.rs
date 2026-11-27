@@ -1,9 +1,8 @@
-//! The chain an NPC city's reserve drives (`apps/server/src/npc-chain.ts`, `CONTEXT.md`: NPC city,
-//! NPC reserve): which goods it is short of, most first, and which workplace makes each. Its
-//! planning pass sends spare hands to the workplace of the good shortest (`plan_city`) and picks
-//! the next workplace to build from the same list (`next_project`). The Trade Organization's
-//! cities run the same chain for their warehouses, whose stock floor is their reserve. Queries
-//! only: nothing moves.
+//! The chain an NPC city's reserve drives (`CONTEXT.md`: NPC city, NPC reserve): which goods it is
+//! short of, most first, and which workplace makes each. Its planning pass sends spare hands to
+//! the workplace of the good shortest (`plan_city`) and picks the next workplace to build from the
+//! same list (`next_project`). The Trade Organization's cities run the same chain for their
+//! warehouses, whose stock floor is their reserve. Queries only: nothing moves.
 
 use csp_shared::balance::{MAP_SIZE, NPC_SURPLUS_CAP, NPC_SURPLUS_PAST_CAP};
 use csp_shared::world::{Building, BuildingKind, City, CityProject, Good, Stock, WorldState};

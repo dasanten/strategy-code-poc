@@ -1,5 +1,5 @@
-//! Running a script as a resident's or an army's order (`apps/server/src/script-runner.ts`,
-//! `CONTEXT.md`: Running a script, Memory, Step budget).
+//! Running a script as a resident's or an army's order (`CONTEXT.md`: Running a script, Memory,
+//! Step budget).
 //!
 //! The run-script order sets `Resident.script` or `Army.script`. Each tick, before the world
 //! steps, every running script's active version runs once with its memory and the game API bound

@@ -1,7 +1,6 @@
-//! `apps/server/src/transfers.test.ts`, one test per `it`. Each starts from `setup()` of
-//! `transfers.fixture.ts` as the TypeScript wrote it (`fixtures/trade/transfers.json`), as the
-//! deliveries tests do; the caravans walk with the ported `Walking` (T86.4), and the runs check
-//! `transfers-sound` (`checkInvariants` comes with T86.13).
+//! Transfers, one test per case. Each starts from the fixture `fixtures/trade/transfers.json`, as
+//! the deliveries tests do; the caravans walk with the ported `Walking` (T86.4), and the runs
+//! check `transfers-sound` (`checkInvariants` comes with T86.13).
 
 mod common;
 #[path = "goods_support/mod.rs"]

@@ -1,5 +1,5 @@
-//! Territory queries of `packages/shared/src/territory.ts` (`CONTEXT.md`: Territory): what
-//! projects control, how far, and who holds each tile.
+//! Territory queries (`CONTEXT.md`: Territory): what projects control, how far, and who holds each
+//! tile.
 
 use csp_shared::balance::{
     TERRITORY_CITY_BASE, TERRITORY_MAX_REACH, TERRITORY_PER_ARMED, TERRITORY_PER_RESIDENT,

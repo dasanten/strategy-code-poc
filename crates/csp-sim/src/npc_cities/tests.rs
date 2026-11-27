@@ -1,4 +1,4 @@
-//! `npc-cities.test.ts`.
+//! How the world's NPC cities come to be.
 
 use std::collections::HashSet;
 use std::sync::OnceLock;

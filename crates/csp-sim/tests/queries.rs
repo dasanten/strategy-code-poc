@@ -1,7 +1,6 @@
-//! The TypeScript tests of the read-only queries sight calls, ported: the `it` blocks of
-//! `npc-reaction.test.ts`, `npc-trade.test.ts`, `horse-market.test.ts` and `stock-floor.test.ts`
-//! that ask a query (or `entitiesInSight`) about a world built by hand. Those that give orders or
-//! step the world are the rules' to port (Epic 1003).
+//! Tests of the read-only queries sight calls: the cases of the NPC reaction, NPC trade, horse
+//! market and stock floor tests that ask a query (or `entitiesInSight`) about a world built by
+//! hand. Those that give orders or step the world are the rules' to test (Epic 1003).
 
 mod common;
 

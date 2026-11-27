@@ -1,4 +1,4 @@
-//! `npc-big-city.fixture.ts`: the staged big city, and what a run of it shows.
+//! The staged big city, and what a run of it shows.
 
 use std::collections::{BTreeMap, HashMap};
 

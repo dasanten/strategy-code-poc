@@ -1,6 +1,6 @@
-//! `apps/server/src/road-line.test.ts`, ported (T86.6): the line's tiles, the order's checks and
-//! the walks that build a line tile by tile, with every invariant checked after each tick. The
-//! restart halfway needs the saves of `csp-server` and is tested there.
+//! Road lines (T86.6): the line's tiles, the order's checks and the walks that build a line tile
+//! by tile, with every invariant checked after each tick. The restart halfway needs the saves of
+//! `csp-server` and is tested there.
 
 mod build_common;
 

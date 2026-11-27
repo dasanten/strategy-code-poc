@@ -1,4 +1,4 @@
-//! The Trade Organization punishes (`trade-org-punishment.ts`, `CONTEXT.md`: Trade Org reaction,
+//! The Trade Organization punishes (`CONTEXT.md`: Trade Org reaction,
 //! Self-interest): once it holds an Organization below `TRADE_ORG_PUNISHES_BELOW` and knows of
 //! crimes it did against it, it sends spare soldiers of its army to that Organization's city
 //! nearest the crime, to take back `TRADE_ORG_PUNISH.times` what it lost from the city's storages,

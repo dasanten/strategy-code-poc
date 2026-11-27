@@ -1,6 +1,5 @@
-//! `apps/server/src/default-scripts-log.test.ts`, ported (T86.17): the defaults' script log
-//! (`CONTEXT.md`: Script log). The game's default scripts log their decisions and turns, such as
-//! carrying a load off or getting Food, never every tick.
+//! The defaults' script log (T86.17; `CONTEXT.md`: Script log). The game's default scripts log
+//! their decisions and turns, such as carrying a load off or getting Food, never every tick.
 
 mod build_common;
 

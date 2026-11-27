@@ -1,4 +1,4 @@
-//! `trade-org.test.ts`'s slow simulation (#1038): the HQ left alone for seven game weeks.
+//! The Trade Org HQ's slow simulation (#1038): the HQ left alone for seven game weeks.
 
 use std::sync::Arc;
 

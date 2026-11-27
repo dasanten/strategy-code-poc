@@ -1,7 +1,6 @@
-//! The Leader handover (`CONTEXT.md`: Leader, Leader handover), ported from
-//! `apps/server/src/leader.ts`: the Player's choice of who leads their realm, plain data. Checked
-//! when it arrives and again when it applies. The order is a plain `validate`/`apply` pair for
-//! the order queue (T86.2) to wire.
+//! The Leader handover (`CONTEXT.md`: Leader, Leader handover): the Player's choice of who leads
+//! their realm, plain data. Checked when it arrives and again when it applies. The order is a
+//! plain `validate`/`apply` pair for the order queue (T86.2) to wire.
 
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::world::{OrderRequest, RealmEventWhat, WorldState};

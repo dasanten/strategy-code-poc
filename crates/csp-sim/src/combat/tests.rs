@@ -1,6 +1,5 @@
-//! `apps/server/src/combat.test.ts`, ported one to one. The TypeScript steps the whole world with
-//! the default scripts; most cases here step the conflict phases alone (`test_world::step`), and
-//! those that walk or flee by the Defend default step the running game (`game_test_world`).
+//! Combat cases. Most step the conflict phases alone (`test_world::step`); those that walk or flee
+//! by the Defend default step the running game (`game_test_world`).
 
 use csp_shared::balance::{
     AVERAGE_HORSE_STATS, BLOW_BASE, BLOW_PER_STRENGTH, COMBAT_SKILL_LIMIT, DODGE_LIMIT, MAX_HEALTH,

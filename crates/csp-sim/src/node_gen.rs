@@ -1,5 +1,5 @@
 //! Resource nodes placed when a world is created (`CONTEXT.md`: Resource node), ported bit for bit
-//! from the frozen `apps/server/src/node-gen.ts` (ADR 0030).
+//! from the frozen TypeScript (ADR 0030).
 //!
 //! The TypeScript asks every kind of every tile with a closure; here a table from each terrain to
 //! the kinds that may lie on it is built once, so most tiles (plains, water) cost one lookup.

@@ -7,7 +7,9 @@
 - **Decisions:** `docs/adr/`. The game vision in `CONTEXT.md` and `docs/context/` wins over ADR 0001 where they
   conflict.
 - **Adding content** (a building kind, a good, a vessel or siege machine, an order): the steps are
-  in `docs/adding-content.md`.
+  in `docs/adding-content.md`. The other common changes (a rule, a world format bump, a balance
+  number, an invariant, a script function, a client query, an NPC behaviour, a panel or map layer):
+  `docs/recipes.md`.
 - **What to do next:** GitHub tickets, how they work in `docs/tasks.md`. `/next-ticket` picks the
   next one and works it into a PR. PRs reference their tickets (`Closes #n`, `Part of #epic`).
 - **CI minutes are scarce** (ADR 0009): ticket PRs go into the epic branch `epic/<n>-<slug>` and
@@ -35,8 +37,8 @@
 - **Monitoring** (ADR 0004): new simulation rules come with invariants and tests.
 - **The server is Rust (ADR 0030)**, in the cargo workspace at the root (`crates/csp-shared`,
   `csp-lang`, `csp-lang-wasm`, `csp-sim`, `csp-server`); the client (`apps/web`) is TypeScript.
-  The TypeScript server, `packages/shared` and `packages/lang` were deleted at the cutover (T88.6;
-  the last commit with them is `21f7a29e`). The fixtures in `crates/csp-sim/fixtures/` are their
+  The TypeScript server and its packages were deleted at the cutover (T88.6; the last commit
+  with them is `21f7a29e`). The fixtures in `crates/csp-sim/fixtures/` are their
   frozen output: never edit one to make a test pass; a rule change that a fixture comparison fails
   on replaces that comparison with a Rust test of the new rule, and says so in the PR.
   The client's types are generated from the crates (`ts-rs`): after changing a type the client

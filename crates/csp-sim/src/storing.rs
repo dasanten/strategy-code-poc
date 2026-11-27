@@ -1,6 +1,6 @@
-//! Storing and fetching (`apps/server/src/storing.ts`, `CONTEXT.md`: Store, Fetch, Getting food):
-//! a resident walks to a storage, a stable or a carriage of their side and puts goods down or
-//! takes them there, through the take and put actions of `carrying.rs`.
+//! Storing and fetching (`CONTEXT.md`: Store, Fetch, Getting food): a resident walks to a storage,
+//! a stable or a carriage of their side and puts goods down or takes them there, through the take
+//! and put actions of `carrying.rs`.
 
 use csp_shared::balance::OWN_FOOD;
 use csp_shared::footprint::covers;

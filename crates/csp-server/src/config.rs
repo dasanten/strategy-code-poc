@@ -1,6 +1,5 @@
-//! The server's configuration from the environment (`apps/server/src/config.ts`): the same
-//! variables, the same defaults. One `.env` at the repo root serves server and client; real
-//! environment variables win over it.
+//! The server's configuration from the environment: variables with defaults. One `.env` at the repo
+//! root serves server and client; real environment variables win over it.
 
 use std::path::{Path, PathBuf};
 

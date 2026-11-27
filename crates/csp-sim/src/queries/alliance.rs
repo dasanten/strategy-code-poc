@@ -1,5 +1,4 @@
-//! Alliance and command queries of `packages/shared/src/alliance.ts` and `contract.ts`: who sees
-//! with whom, and whose orders a resident or carriage takes.
+//! Alliance and command queries: who sees with whom, and whose orders a resident or carriage takes.
 
 use csp_shared::world::{Alliance, Carriage, MercenaryContract, WorldState};
 

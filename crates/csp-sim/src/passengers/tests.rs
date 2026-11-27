@@ -1,7 +1,6 @@
-//! `apps/server/src/passengers.test.ts`, the cases on boarding, riding along and getting off.
-//! Still to come with their tickets: loading by `drop` and `unitsThatFitCarriage` (T86.5), the
-//! `stop` order and queue steps (T86.2, T86.12), refilling from a carriage (T86.3), and the
-//! `checkInvariants` checks (T86.13).
+//! The cases on boarding, riding along and getting off. Still to come with their tickets: loading
+//! by `drop` and `unitsThatFitCarriage` (T86.5), the `stop` order and queue steps (T86.2, T86.12),
+//! refilling from a carriage (T86.3), and the `checkInvariants` checks (T86.13).
 
 use std::sync::Arc;
 

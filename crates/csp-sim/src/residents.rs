@@ -1,6 +1,5 @@
-//! New residents and children (`apps/server/src/residents.ts`, `CONTEXT.md`: Resident, Child,
-//! Aging, Game-given names). The seeded generator and the string hash of that file are in
-//! [`crate::random`] (`Mulberry32`, `hash_str`).
+//! New residents and children (`CONTEXT.md`: Resident, Child, Aging, Game-given names). The
+//! seeded generator and the string hash are in [`crate::random`] (`Mulberry32`, `hash_str`).
 
 use std::collections::HashSet;
 

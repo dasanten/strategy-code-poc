@@ -1,5 +1,5 @@
-//! Climbing over walls (`apps/server/src/climbing.ts`, `CONTEXT.md`: Walls in combat, climbed):
-//! the climb order, and climbing a tick further each tick until over.
+//! Climbing over walls (`CONTEXT.md`: Walls in combat, climbed): the climb order, and climbing a
+//! tick further each tick until over.
 
 use csp_shared::balance::{CLIMB_TICKS, MAP_SIZE};
 use csp_shared::terrain::{wrap_delta, TerrainMap};

@@ -1,5 +1,5 @@
-//! Test helpers for the rule tests (`apps/server/src/test-terrain.ts`): small worlds built by
-//! hand, and `world_with_city` as the TypeScript builds it (`foundStartingCity` on `cityTerrain`).
+//! Test helpers for the rule tests: small worlds built by hand, and `world_with_city` as the
+//! TypeScript built it (`foundStartingCity` on `cityTerrain`).
 
 use csp_shared::terrain::{Terrain, TerrainMap};
 use csp_shared::world::{Building, BuildingKind, City, Resident, Stat, StatRecord, WorldState};

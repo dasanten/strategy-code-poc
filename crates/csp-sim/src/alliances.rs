@@ -1,10 +1,9 @@
-//! Alliances (`apps/server/src/alliances.ts`, `CONTEXT.md`: Alliance, Alliance leader, Alliance
-//! army, NPC city in an alliance): the alliance orders, members leaving, and one tick of alliances.
+//! Alliances (`CONTEXT.md`: Alliance, Alliance leader, Alliance army, NPC city in an alliance): the
+//! alliance orders, members leaving, and one tick of alliances.
 //!
 //! The orders are agreements between Players, not physical actions: they change the alliance
 //! records, plain data (ADR 0002). Each is checked when it arrives and again when it applies.
-//! Where the TypeScript compares objects (`world.alliances.includes(alliance)`, `parts.includes`),
-//! this compares ids, which are unique.
+//! Alliances and their parts are compared by id, which is unique.
 
 use std::collections::{HashMap, HashSet};
 

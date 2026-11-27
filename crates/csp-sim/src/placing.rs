@@ -1,7 +1,6 @@
-//! The ground as the game lays out buildings on it (`apps/server/src/placing.ts`, `CONTEXT.md`:
-//! Where buildings go, Footprint): which tiles footprints and resource nodes already cover, so the
-//! world generator and NPC cities can try many spots quickly. `buildProblem` stays the rule; this
-//! is the same check, kept fast.
+//! The ground as the game lays out buildings on it (`CONTEXT.md`: Where buildings go, Footprint):
+//! which tiles footprints and resource nodes already cover, so the world generator and NPC cities
+//! can try many spots quickly. `buildProblem` stays the rule; this is the same check, kept fast.
 
 use std::collections::{HashMap, HashSet};
 

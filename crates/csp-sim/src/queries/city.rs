@@ -1,5 +1,5 @@
-//! City queries of `packages/shared/src/city.ts`: its town hall and residents, what it eats, and
-//! buying an NPC city (`CONTEXT.md`: Buying a city, NPC city reaction).
+//! City queries: its town hall and residents, what it eats, and buying an NPC city (`CONTEXT.md`:
+//! Buying a city, NPC city reaction).
 
 use csp_shared::balance::{
     CITY_AREA_MARGIN, CITY_PRICE_BY_BUILDING, CITY_PRICE_PER_RESIDENT, CITY_PRICE_STANDING_SWING,

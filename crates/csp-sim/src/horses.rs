@@ -1,6 +1,6 @@
-//! Horses (`apps/server/src/horses.ts`, `CONTEXT.md`: Horse, Horse stats, Horse name, Horses have
-//! no inventory, Stable, Down, Reviving): new horses, one tick of their hunger, health, going Down
-//! and dying, and the invariant that a Down horse lies still.
+//! Horses (`CONTEXT.md`: Horse, Horse stats, Horse name, Horses have no inventory, Stable, Down,
+//! Reviving): new horses, one tick of their hunger, health, going Down and dying, and the
+//! invariant that a Down horse lies still.
 
 use std::collections::HashMap;
 

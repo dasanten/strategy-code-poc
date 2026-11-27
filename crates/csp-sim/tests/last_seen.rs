@@ -1,8 +1,7 @@
-//! `apps/server/src/last-seen.test.ts`, ported (T86.13). Its `twoRealms()` is the fixture
-//! `sight/two-realms.json` (`foundStartingCity` for Players 1 and 2 on `cityTerrain()`); Last
-//! seen needs only the map's size. Left out: "keeps a Trade Org warehouse with its prices", which
-//! founds a Trade Org HQ (T86.9). Where the TypeScript compares a remembered thing with the
-//! Player's sight now, these compare the JSON.
+//! Last seen (T86.13). Its `twoRealms()` is the fixture `sight/two-realms.json`
+//! (`foundStartingCity` for Players 1 and 2 on `cityTerrain()`); Last seen needs only the map's
+//! size. Left out: "keeps a Trade Org warehouse with its prices", which founds a Trade Org HQ
+//! (T86.9). A remembered thing is compared with the Player's sight now by their JSON.
 
 mod common;
 

@@ -1,5 +1,5 @@
-//! What the conflict tests share, as the TypeScript tests' `setup` helpers and `test-terrain.ts`
-//! give it: a plains world, residents with fixed stats, cities, and a step that runs the conflict
+//! What the conflict tests share, as the TypeScript tests' `setup` helpers and test terrain gave
+//! it: a plains world, residents with fixed stats, cities, and a step that runs the conflict
 //! phases in `stepRest`'s order. Test-only.
 
 use csp_shared::balance::{MAX_HEALTH, MAX_HUNGER};

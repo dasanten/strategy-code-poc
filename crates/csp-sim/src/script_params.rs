@@ -1,6 +1,6 @@
-//! Script parameters (`apps/server/src/script-params.ts`, `CONTEXT.md`: Script parameter): a
-//! script's `param name: type` lines, read as `params.name`, and the values the Player picks for
-//! them on a resident's card, kept per resident per script (`Resident.scriptParams`) as plain ids.
+//! Script parameters (`CONTEXT.md`: Script parameter): a script's `param name: type` lines, read as
+//! `params.name`, and the values the Player picks for them on a resident's card, kept per resident
+//! per script (`Resident.scriptParams`) as plain ids.
 
 use std::sync::Arc;
 

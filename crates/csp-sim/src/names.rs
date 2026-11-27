@@ -1,8 +1,7 @@
-//! Game-given names (`apps/server/src/names.ts`, `CONTEXT.md`: Game-given names): a name the game
-//! gives a resident is one no living resident of that realm has, an NPC city counting as a realm;
-//! a name it gives a city is one no city in the world has. When its list runs dry it adds a
-//! numeral ("Edda II") rather than repeating one. Players' renames stay free and may make
-//! duplicates.
+//! Game-given names (`CONTEXT.md`: Game-given names): a name the game gives a resident is one no
+//! living resident of that realm has, an NPC city counting as a realm; a name it gives a city is
+//! one no city in the world has. When its list runs dry it adds a numeral ("Edda II") rather than
+//! repeating one. Players' renames stay free and may make duplicates.
 //!
 //! Not to be confused with [`crate::queries::names`], the TypeScript strings of goods and kinds.
 

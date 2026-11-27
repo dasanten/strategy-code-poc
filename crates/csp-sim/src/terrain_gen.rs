@@ -1,6 +1,6 @@
 //! Terrain generation (`CONTEXT.md`: Map, Terrain, The land): the same seed gives the same map,
 //! byte for byte. One mainland in the middle of the map, islands off its coast and Sea all round
-//! (ADR 0035, T100.1); lakes, relief and forest as the frozen `apps/server/src/terrain-gen.ts`
+//! (ADR 0035, T100.1); lakes, relief and forest as the frozen TypeScript generator
 //! made them (ADR 0030), whose noise and float rules this keeps.
 //!
 //! Float parity with the TypeScript, kept for the stages ported from it:
@@ -14,7 +14,7 @@
 //!
 //! Speed: the full map has 33 million tiles. Buffers are reused from stage to stage, the lakes'
 //! distance from the sea is a breadth-first search that stops at the margin, and the stages report
-//! their time to a [`StageTimer`] with the names `scripts/bench-ts.mts` uses.
+//! their time to a [`StageTimer`] with the names the benchmark uses.
 
 use std::time::{Duration, Instant};
 

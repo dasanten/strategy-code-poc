@@ -1,5 +1,5 @@
-//! The Horse grant and the Horse offer (`apps/server/src/horse-grant.ts`, `CONTEXT.md`: Horse
-//! grant, Horse offer): new horses for a Player realm, in its stable or by its storage or Leader.
+//! The Horse grant and the Horse offer (`CONTEXT.md`: Horse grant, Horse offer): new horses for a
+//! Player realm, in its stable or by its storage or Leader.
 
 use std::collections::HashSet;
 

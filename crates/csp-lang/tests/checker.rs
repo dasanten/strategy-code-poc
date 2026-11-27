@@ -1,4 +1,5 @@
-//! `packages/lang/src/checker.test.ts`, ported one to one.
+//! The checker's cases: undeclared names, argument counts and fields a known shape lacks, and that
+//! it stays quiet where it isn't sure.
 
 use std::collections::HashMap;
 

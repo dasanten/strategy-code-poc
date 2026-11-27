@@ -1,6 +1,6 @@
-//! The Rust half of the shadow run (T88.5; ADR 0030, "The cutover"). `scripts/shadow-run.mts`
-//! starts the `shadow-step` binary on its copy of a save and steps it in lock-step with the
-//! TypeScript server, one JSON command a line on stdin, one answer a line on stdout:
+//! The Rust half of the shadow run (T88.5; ADR 0030, "The cutover"). The run started the
+//! `shadow-step` binary on its copy of a save and stepped it in lock-step with the TypeScript
+//! server, one JSON command a line on stdin, one answer a line on stdout:
 //!
 //! - `{"cmd":"step","probe":false}` runs one tick as the server does ([`Game::tick`]) and answers
 //!   `{"health":TickHealth|null,"notes":[…]}`, the notes being what the game logged at warn or

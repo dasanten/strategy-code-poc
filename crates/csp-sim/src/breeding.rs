@@ -1,6 +1,6 @@
-//! Breeding horses (`CONTEXT.md`: Breeding, Horse market), ported from
-//! `apps/server/src/breeding.ts`: a resident at a stable tends two horses, a tick at a time, until
-//! a foal is born. The breed order is a plain `validate`/`apply` pair for the order queue (T86.2).
+//! Breeding horses (`CONTEXT.md`: Breeding, Horse market): a resident at a stable tends two horses,
+//! a tick at a time, until a foal is born. The breed order is a plain `validate`/`apply` pair for
+//! the order queue (T86.2).
 
 use csp_shared::balance::{
     FOAL_STAT_SPREAD, MAP_SIZE, MAX_HEALTH, MAX_HUNGER, STABLE_BREED_DAYS, STABLE_CAPACITY,

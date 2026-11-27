@@ -1,4 +1,5 @@
-//! `packages/lang/src/params.test.ts`, ported one to one.
+//! Script parameters: declaring them in a script (`script_params`), their types, choices and
+//! defaults, and the checker's messages for a bad declaration.
 
 mod support;
 

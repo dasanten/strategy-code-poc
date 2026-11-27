@@ -1,5 +1,5 @@
-//! What the ported tests share: the `exec`/`value`/`error` helpers of `interpreter.test.ts` and a
-//! JSON comparison that reads numbers as JavaScript does.
+//! What the language tests share: the `exec`/`value`/`error` helpers and a JSON comparison that
+//! reads numbers as JavaScript does.
 #![allow(dead_code)]
 
 use std::cell::RefCell;

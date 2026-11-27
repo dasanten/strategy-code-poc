@@ -1,5 +1,4 @@
-//! Building queries of `packages/shared/src/building.ts`: what stands on a tile, the finished
-//! roads, recipes.
+//! Building queries: what stands on a tile, the finished roads, recipes.
 
 use std::collections::HashSet;
 

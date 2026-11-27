@@ -1,6 +1,6 @@
-//! The movement estimates of `packages/shared/src/estimates.ts` (`CONTEXT.md`: Doing, Estimates):
-//! how long a way takes and how much Food is eaten on it. The text helpers there (`aboutTime`,
-//! `timeLeft`, `workLeft`, ...) only word these for the client and stay with it.
+//! The movement estimates (`CONTEXT.md`: Doing, Estimates): how long a way takes and how much Food
+//! is eaten on it. The text helpers (`aboutTime`, `timeLeft`, `workLeft`, ...) only word these for
+//! the client and stay with it.
 
 use csp_shared::balance::{FOOD_PER_DAY, HORSE_FOOD_PER_DAY};
 use csp_shared::terrain::{step_length, Terrain};

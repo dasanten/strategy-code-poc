@@ -1,4 +1,4 @@
-//! `apps/server/src/supply-wagons.test.ts`, ported one to one.
+//! Tests of a Trade Org army's supply wagon.
 
 use std::sync::Arc;
 

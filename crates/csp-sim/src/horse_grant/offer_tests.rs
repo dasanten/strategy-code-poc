@@ -1,5 +1,5 @@
-//! `horse-offer.test.ts`: the Horse offer (`CONTEXT.md`: Horse offer). Its "offering horses
-//! again" cases need `reopenHorseOffers`, which is the server's: they are in
+//! The Horse offer (`CONTEXT.md`: Horse offer). Its "offering horses again" cases need
+//! `reopenHorseOffers`, which is the server's: they are in
 //! `crates/csp-server/tests/horse_offer.rs`.
 
 use std::sync::Arc;

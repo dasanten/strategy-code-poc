@@ -1,5 +1,5 @@
-//! `npc-alliances.test.ts`, the case on the `diplomacyFor` view and shared walls. The rest of that
-//! file is in `csp-sim/src/alliances/npc_tests.rs`.
+//! NPC cities in alliances: the case on the `diplomacyFor` view and shared walls. The other cases
+//! are in `csp-sim/src/alliances/npc_tests.rs`.
 
 use std::sync::Arc;
 

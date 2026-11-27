@@ -1,5 +1,5 @@
-//! `npc-coins.test.ts`: a city with no way to earn Coins doesn't count them as short
-//! (`CONTEXT.md`: NPC reserve, Full city; #996). Its war chest stays as it is for everything else.
+//! A city with no way to earn Coins doesn't count them as short (`CONTEXT.md`: NPC reserve, Full
+//! city; #996). Its war chest stays as it is for everything else.
 
 use csp_shared::balance::{
     NPC_NODE_REACH, NPC_TOWN, NPC_TRADER_REACH, NPC_WAR_CHEST_PER_RESIDENT, TRADER_STOP_REACH,

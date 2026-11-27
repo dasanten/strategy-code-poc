@@ -1,6 +1,5 @@
-//! Crimes and witnesses (`CONTEXT.md`: Crime, Witness, Lost post found out), ported from
-//! `apps/server/src/crimes.ts`: what counts as an Organization, noting a crime, and spreading the
-//! news of it until its victim knows.
+//! Crimes and witnesses (`CONTEXT.md`: Crime, Witness, Lost post found out): what counts as an
+//! Organization, noting a crime, and spreading the news of it until its victim knows.
 
 use std::collections::{HashMap, HashSet};
 
