@@ -1,5 +1,4 @@
-//! World queries about demands (`packages/shared/src/demand.ts`, `CONTEXT.md`: Demand; ADR 0002:
-//! the API orders and scripts share).
+//! World queries about demands (`CONTEXT.md`: Demand; ADR 0002: the API orders and scripts share).
 
 use std::collections::HashSet;
 

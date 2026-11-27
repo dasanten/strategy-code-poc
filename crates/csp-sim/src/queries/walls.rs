@@ -1,6 +1,5 @@
-//! The wall queries of `packages/shared/src/walls.ts` that combat and respect need (`CONTEXT.md`:
-//! Walls in combat). Movement's wall map (`wallMap`, `mayStep`, `climbLanding`) is T86.6's to
-//! add here.
+//! The wall queries that combat and respect need (`CONTEXT.md`: Walls in combat). Movement's wall
+//! map (`wallMap`, `mayStep`, `climbLanding`) is T86.6's to add here.
 
 use csp_shared::balance::{
     BROKEN_MATERIALS_RETURNED, MAP_SIZE, SIGHT_RANGE, STONE_WALL_STRENGTH, TOWER_SIGHT_RANGE,

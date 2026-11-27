@@ -1,6 +1,6 @@
-//! The build order and its sites (`apps/server/src/building.ts`, `CONTEXT.md`: Building,
-//! Construction site): laying out a construction site, putting work into it, and what a finished
-//! one becomes. Road and wall lines build their tiles through here too (`road_line`).
+//! The build order and its sites (`CONTEXT.md`: Building, Construction site): laying out a
+//! construction site, putting work into it, and what a finished one becomes. Road and wall lines
+//! build their tiles through here too (`road_line`).
 
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::{terrain_at, TerrainMap};

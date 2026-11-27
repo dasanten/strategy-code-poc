@@ -1,6 +1,6 @@
-//! `apps/server/src/horse-grant.test.ts`: the Horse grant (`CONTEXT.md`: Horse grant). The
-//! TypeScript runs it as world migration 47 → 48; the Rust server reads only saves from after the
-//! freeze (`csp-server`'s `world_format`), so these call `grant_horses` as that step does.
+//! The Horse grant (`CONTEXT.md`: Horse grant). It was once a world migration step; the Rust
+//! server reads only saves from after the freeze (`csp-server`'s `world_format`), so these call
+//! `grant_horses` as that step does.
 
 mod ts_match;
 

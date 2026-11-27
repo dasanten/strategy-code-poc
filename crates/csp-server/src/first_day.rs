@@ -1,6 +1,5 @@
-//! The first-day card (`CONTEXT.md`: First day; `apps/server/src/first-day.ts` with the card's
-//! rules from `packages/shared/src/first-day.ts`), kept per Player on their account row, not in
-//! the world, so it outlasts a Leader's death.
+//! The first-day card (`CONTEXT.md`: First day), kept per Player on their account row, not in the
+//! world, so it outlasts a Leader's death.
 
 use csp_shared::world::protocol::OrderRequest;
 use rusqlite::{params, Connection, OptionalExtension};

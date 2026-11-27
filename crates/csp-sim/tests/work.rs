@@ -1,9 +1,9 @@
-//! `apps/server/src/work.test.ts`, ported (T86.6). Left for the tickets whose rules they need:
-//! taking meals from a workplace's pile or a carriage there (survival, T86.3: "lets a worker
-//! running low take meals…", "catches a worker who runs low…", "lets a worker running low take
-//! meals from a carriage…"; T86.3 has landed, so these come with the next ticket that touches
-//! work); the starting-city runs (`a starting city`, T86.8 with T86.3); the invariant checks
-//! (`checkInvariants`, `workOrdersOnWorkplaces`, `refilledWhenLow`, T86.13).
+//! Work (T86.6). Left for the tickets whose rules they need: taking meals from a workplace's pile
+//! or a carriage there (survival, T86.3: "lets a worker running low take meals…", "catches a
+//! worker who runs low…", "lets a worker running low take meals from a carriage…"; T86.3 has
+//! landed, so these come with the next ticket that touches work); the starting-city runs (`a
+//! starting city`, T86.8 with T86.3); the invariant checks (`checkInvariants`,
+//! `workOrdersOnWorkplaces`, `refilledWhenLow`, T86.13).
 
 mod build_common;
 

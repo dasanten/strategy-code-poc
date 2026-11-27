@@ -1,6 +1,6 @@
-//! The script library against a real database (`scripts.test.ts`), with the game's default
-//! scripts. The HTTP cases are in `tests/app.rs`. Not ported: the Leader's-death case, which is
-//! about the world (scripts outlast the realm), not the library.
+//! The script library against a real database, with the game's default scripts. The HTTP cases are
+//! in `tests/app.rs`. Not covered: the Leader's-death case, which is about the world (scripts
+//! outlast the realm), not the library.
 use csp_server::db::open_db;
 use csp_server::scripts::{
     activate_version, active_source, check_script_library, create_script, default_script_id,

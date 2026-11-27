@@ -1,8 +1,8 @@
-//! `apps/server/src/directives.test.ts`. The Trade Org HQ is hand-made (its town hall, its coin
-//! warehouse and one goods warehouse) instead of `foundTradeOrgHq` (T86.9). Left out until their
-//! tickets land: the Trade Organization's refusals and punishments under a directive
-//! (`tradeOrgRefuses`, `stepPunishments`: T86.5, T86.9), the Players' view (`diplomacyFor`: T87.6),
-//! and `checkInvariants` (T86.13). Deaths go through `count_soldiers_killed`, as `dieAll` (T86.3)
+//! Admin directives. The Trade Org HQ is hand-made (its town hall, its coin warehouse and one
+//! goods warehouse) instead of `foundTradeOrgHq` (T86.9). Left out until their tickets land: the
+//! Trade Organization's refusals and punishments under a directive (`tradeOrgRefuses`,
+//! `stepPunishments`: T86.5, T86.9), the Players' view (`diplomacyFor`: T87.6), and
+//! `checkInvariants` (T86.13). Deaths go through `count_soldiers_killed`, as `dieAll` (T86.3)
 //! calls it for the killed.
 
 use csp_shared::terrain::TerrainMap;

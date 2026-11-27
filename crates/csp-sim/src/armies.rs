@@ -1,7 +1,7 @@
-//! Armies (`CONTEXT.md`: Army, Supply line), ported from `apps/server/src/armies.ts`: a named
-//! group of a realm's residents under one order. The army's order is plain data on the army
-//! (ADR 0002); each tick it gives its members walk or attack orders tagged with the army, and
-//! walking holds back a member who gets ahead. A member given an order of their own leaves.
+//! Armies (`CONTEXT.md`: Army, Supply line): a named group of a realm's residents under one order.
+//! The army's order is plain data on the army (ADR 0002); each tick it gives its members walk or
+//! attack orders tagged with the army, and walking holds back a member who gets ahead. A member
+//! given an order of their own leaves.
 //!
 //! The army orders are plain `validate`/`apply` functions over an [`ArmyRequest`]; the order
 //! queue (T86.2) wires them under their kinds.

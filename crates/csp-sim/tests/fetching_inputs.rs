@@ -1,5 +1,3 @@
-//! `apps/server/src/fetching-inputs.test.ts`, ported one to one.
-//!
 //! Fetching inputs (`CONTEXT.md`: Fetching inputs, Smelter / Mint, Smithy): at a smelter, mint or
 //! smithy whose pile and workers lack what it uses, one worker picked at random fetches a load
 //! from the Work default's `input`, else its `storage`, else the nearest storage of the realm

@@ -1,4 +1,4 @@
-//! Admin commands that work without logging in (`apps/server/src/cli/admin.ts`, ADR 0005):
+//! Admin commands that work without logging in (ADR 0005):
 //!
 //! ```text
 //! admin create <name>   creates an admin account (or makes one admin); the password comes from

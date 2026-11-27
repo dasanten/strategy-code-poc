@@ -1,6 +1,6 @@
-//! The editor's script checker (ADR 0030, T88.3): `csp-lang`'s checker, built to WebAssembly
-//! with `wasm-bindgen` into `packages/lang-wasm` (`@csp/lang-wasm`), so the editor finds what the
-//! server finds. Every function answers JSON in the TypeScript's shapes (`packages/lang`), which
+//! The editor's script checker (ADR 0030, T88.3): `csp-lang`'s checker, built to WebAssembly with
+//! `wasm-bindgen` into `packages/lang-wasm` (`@csp/lang-wasm`), so the editor finds what the server
+//! finds. Every function answers JSON in the shapes the editor reads, which
 //! `packages/lang-wasm/src/index.ts` parses; that keeps the module free of `js-sys` and small.
 //!
 //! [`script_data`] is the other half: the game's script tables (views, API, default scripts) as

@@ -1,6 +1,5 @@
-//! `apps/server/src/caravan-theft.test.ts`: so far only its slow simulation (#1038), from
-//! `setup()` of `deliveries.fixture.ts` (`fixtures/trade/deliveries.json`). The file's other cases
-//! are not ported yet.
+//! Caravan theft: so far only its slow simulation (#1038), from the fixture
+//! `fixtures/trade/deliveries.json`. The other cases are not written yet.
 
 mod common;
 #[path = "goods_support/mod.rs"]

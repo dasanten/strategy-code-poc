@@ -1,5 +1,5 @@
-//! `apps/server/src/hitching.test.ts`, ported (T86.17): the Hitch order (`CONTEXT.md`: Hitched
-//! horse), the horse a resident chooses pulls the carriage.
+//! The Hitch order (T86.17; `CONTEXT.md`: Hitched horse): the horse a resident chooses pulls the
+//! carriage.
 
 mod build_common;
 

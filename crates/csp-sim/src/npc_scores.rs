@@ -1,7 +1,7 @@
-//! What an NPC city's jobs are worth (`apps/server/src/npc-scores.ts`, `CONTEXT.md`: NPC city;
-//! ADR 0029). Its planning pass says what a free adult could do, as far as it knows, and these say
-//! what each is worth, so each goes to the highest-scoring job with room (`shareOut`). Pure, with
-//! the numbers in `balance/npc_planning.rs`.
+//! What an NPC city's jobs are worth (`CONTEXT.md`: NPC city; ADR 0029). Its planning pass says
+//! what a free adult could do, as far as it knows, and these say what each is worth, so each goes
+//! to the highest-scoring job with room (`shareOut`). Pure, with the numbers in
+//! `balance/npc_planning.rs`.
 
 use csp_shared::balance::{
     NpcJobWeights, NPC_JOB_MARGIN, NPC_JOB_SCORE, NPC_JOB_WEIGHTS, NPC_STANCE,

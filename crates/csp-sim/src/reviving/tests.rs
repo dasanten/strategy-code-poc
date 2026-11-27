@@ -1,6 +1,6 @@
-//! `reviving.test.ts`. Its script-action case runs through the default-scripts host and is left
-//! to the script runner's tests; the rest is here, through the order queue, the queue runner and
-//! the world step as the game runs them.
+//! Tests of reviving and feeding a horse. The script-action case runs through the
+//! default-scripts host and is left to the script runner's tests; the rest is here, through the
+//! order queue, the queue runner and the world step as the game runs them.
 
 use std::sync::Arc;
 

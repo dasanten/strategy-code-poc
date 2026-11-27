@@ -1,5 +1,5 @@
-//! The WebSocket side (`realtime.test.ts`), against a real server on a free port: the router,
-//! the hub and the game thread, as `index.ts` wires them, and a `tokio-tungstenite` client.
+//! The WebSocket side, against a real server on a free port: the router, the hub and the game
+//! thread, wired as the server wires them, and a `tokio-tungstenite` client.
 //!
 //! Most cases set Daniel's realm up by hand; those about founding, Last seen and the Region map
 //! found it as a Player does. Not ported here: the Leader's death and the script watch cases that

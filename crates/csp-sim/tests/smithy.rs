@@ -1,5 +1,4 @@
-//! `apps/server/src/smithy.test.ts`: the smithy, and weapons and armour (`CONTEXT.md`: Smithy,
-//! Weapons and armour).
+//! The smithy, and weapons and armour (`CONTEXT.md`: Smithy, Weapons and armour).
 
 mod build_common;
 mod ts_match;

@@ -1,9 +1,9 @@
-//! An NPC city's own trade runs (`apps/server/src/npc-trader.ts`, `CONTEXT.md`: NPC trader). Its
-//! planning pass sends spare hands, up to the number its size allows, each with a full load of a
-//! surplus good to the nearest Trade Org warehouse in reach; between passes the city walks each
-//! through their run with orders a Player could give (`run_trader`, ADR 0002). The runs are kept in
-//! the city's plan (`CityPlan.traders`). A trader goes to a Player's offer in reach when one suits
-//! the city, and only the planning pass looks for one (ADR 0016).
+//! An NPC city's own trade runs (`CONTEXT.md`: NPC trader). Its planning pass sends spare hands, up
+//! to the number its size allows, each with a full load of a surplus good to the nearest Trade Org
+//! warehouse in reach; between passes the city walks each through their run with orders a Player
+//! could give (`run_trader`, ADR 0002). The runs are kept in the city's plan (`CityPlan.traders`).
+//! A trader goes to a Player's offer in reach when one suits the city, and only the planning pass
+//! looks for one (ADR 0016).
 
 use std::collections::HashSet;
 

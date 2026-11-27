@@ -1,5 +1,4 @@
-//! Respect and persuading a city, the queries of `packages/shared/src/persuasion.ts`
-//! (`CONTEXT.md`: Respect, Persuading a city; ADR 0033).
+//! Respect and persuading a city, the queries (`CONTEXT.md`: Respect, Persuading a city; ADR 0033).
 
 use std::collections::{HashMap, HashSet};
 

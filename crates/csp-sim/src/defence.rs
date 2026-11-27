@@ -1,11 +1,10 @@
 //! Defence scripts (`CONTEXT.md`: Defence script, A Player's order under attack, On a carriage
-//! under attack; ADR 0015), ported from `apps/server/src/defence.ts`. A blow that leaves a Player's
-//! resident alive starts their defence script, the Defend default, which runs as `script` like any
-//! other; what they were doing is kept aside in `interrupted`, and when the defence script ends
-//! they go on with it.
+//! under attack; ADR 0015). A blow that leaves a Player's resident alive starts their defence
+//! script, the Defend default, which runs as `script` like any other; what they were doing is kept
+//! aside in `interrupted`, and when the defence script ends they go on with it.
 //!
-//! Alarms (`alarms.ts`, ADR 0028) are raised through the [`Alarms`] trait, which the script
-//! ticket (T86.12) implements; [`NoAlarms`] raises none.
+//! Alarms (ADR 0028) are raised through the [`Alarms`] trait, which the script ticket (T86.12)
+//! implements; [`NoAlarms`] raises none.
 
 use csp_shared::balance::DEFEND_CALM_TICKS;
 use csp_shared::world::{

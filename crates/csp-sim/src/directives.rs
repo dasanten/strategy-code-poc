@@ -1,7 +1,7 @@
-//! Admin directives (`apps/server/src/directives.ts`, `CONTEXT.md`: Admin directive): an admin
-//! orders the Trade Organization to weaken an Organization. The game forbids nothing: the Trade
-//! Organization refuses it trade and sends its army through its normal rules until the goals are
-//! met, an admin lifts it, or the target buys it off where the admin allows it.
+//! Admin directives (`CONTEXT.md`: Admin directive): an admin orders the Trade Organization to
+//! weaken an Organization. The game forbids nothing: the Trade Organization refuses it trade and
+//! sends its army through its normal rules until the goals are met, an admin lifts it, or the
+//! target buys it off where the admin allows it.
 
 use std::collections::HashSet;
 use ts_rs::TS;

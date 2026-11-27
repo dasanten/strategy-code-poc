@@ -1,4 +1,4 @@
-//! The world-state types of `packages/shared/src/offers.ts`.
+//! The world-state types of offers.
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;

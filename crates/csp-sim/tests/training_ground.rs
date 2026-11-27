@@ -1,4 +1,4 @@
-//! `apps/server/src/training-ground.test.ts`, ported one to one.
+//! Training grounds.
 
 use std::sync::Arc;
 

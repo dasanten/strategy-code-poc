@@ -1,6 +1,5 @@
-//! `apps/server/src/workplace-amounts.test.ts`. What a workplace's card says is made
-//! (`CONTEXT.md`: Workplace amounts): a simulated worker at the skill's cap makes `madePerDay` a
-//! game day, give or take a batch, at each kind of workplace.
+//! What a workplace's card says is made (`CONTEXT.md`: Workplace amounts): a simulated worker at
+//! the skill's cap makes `madePerDay` a game day, give or take a batch, at each kind of workplace.
 
 mod build_common;
 

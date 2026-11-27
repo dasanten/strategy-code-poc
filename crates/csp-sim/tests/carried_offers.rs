@@ -1,6 +1,5 @@
-//! `apps/server/src/carried-offers.test.ts`, one test per `it`, from `setup()` of
-//! `transfers.fixture.ts` as the TypeScript wrote it (`fixtures/trade/transfers.json`). The ways
-//! a realm can name (`carriedWaysFor`) are a client view and come with the server.
+//! Carried offers, one test per case, from the fixture `fixtures/trade/transfers.json`. The ways a
+//! realm can name (`carriedWaysFor`) are a client view and come with the server.
 
 mod common;
 #[path = "goods_support/mod.rs"]

@@ -1,5 +1,4 @@
-//! `apps/server/src/script-waiting.test.ts`, ported one to one. The TypeScript keeps the script
-//! in a database (`createScript`); here a host holds the one script.
+//! A host here holds the one script, with no script library.
 //!
 //! Waiting (`CONTEXT.md`: Running a script, Waiting): a script that calls `wait()` is not run
 //! again until its order ends, is replaced, or the resident is struck.

@@ -1,5 +1,5 @@
-//! `npc-roads.test.ts`, its slow simulations: an NPC city's road crew on the map (`CONTEXT.md`: NPC
-//! road, Spare hands' work).
+//! Slow simulations of an NPC city's road crew on the map (`CONTEXT.md`: NPC road, Spare hands'
+//! work).
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

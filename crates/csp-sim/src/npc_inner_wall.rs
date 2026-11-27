@@ -1,7 +1,6 @@
-//! A big NPC city's inner ring of wall (`apps/server/src/npc-inner-wall.ts`, `CONTEXT.md`: Bigger
-//! projects; ADR 0029): round its town hall and storage, with a gate its own pass through, from
-//! materials above its reserve. Its outer wall goes on growing as before: `wall_rings` only ever
-//! reads the outer one (`outer_walls`).
+//! A big NPC city's inner ring of wall (`CONTEXT.md`: Bigger projects; ADR 0029): round its town
+//! hall and storage, with a gate its own pass through, from materials above its reserve. Its outer
+//! wall goes on growing as before: `wall_rings` only ever reads the outer one (`outer_walls`).
 
 use std::collections::{HashMap, HashSet};
 use std::f64::consts::{FRAC_1_SQRT_2, PI};

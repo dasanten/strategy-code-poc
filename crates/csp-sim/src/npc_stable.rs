@@ -1,7 +1,6 @@
-//! An NPC city feeds its stable (`apps/server/src/npc-stable.ts`, `CONTEXT.md`: NPC horses,
-//! Feeding the stable): one of its residents runs the game's Feed the stable default, as a
-//! Player's would. The city only says who, and how much Food they may take (`memory.spareFood`):
-//! its people come first.
+//! An NPC city feeds its stable (`CONTEXT.md`: NPC horses, Feeding the stable): one of its
+//! residents runs the game's Feed the stable default, as a Player's would. The city only says who,
+//! and how much Food they may take (`memory.spareFood`): its people come first.
 
 use std::collections::HashSet;
 

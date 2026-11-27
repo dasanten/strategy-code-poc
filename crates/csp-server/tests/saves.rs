@@ -1,5 +1,5 @@
-//! World saves through the database: the cases of `saves.test.ts` that are not migration steps,
-//! and the live save fixture: refused as a save from before the reset (ADR 0035), read as it is.
+//! World saves through the database: the save and prune cases, and the live save fixture: refused
+//! as a save from before the reset (ADR 0035), read as it is.
 use std::{cell::RefCell, path::PathBuf, sync::OnceLock};
 
 use csp_server::{

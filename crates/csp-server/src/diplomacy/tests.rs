@@ -1,5 +1,5 @@
-//! `diplomacyFor` and its parts, as `alliances.test.ts`, `persuasion.test.ts`, the deliveries'
-//! and the carried offers' tests see them, on starting cities (`foundStartingCity`).
+//! `diplomacyFor` and its parts: alliances, persuasion, the deliveries and the carried offers, on
+//! starting cities (`foundStartingCity`).
 
 use csp_shared::balance::ALLIANCE_LEAVE_DELAY;
 use csp_shared::terrain::{Terrain, TerrainMap};

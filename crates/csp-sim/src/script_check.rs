@@ -1,8 +1,7 @@
-//! The game's side of the script checker (`packages/shared/src/script-check.ts`; `check_names` in
-//! `csp-lang`; `CONTEXT.md`: Script view): the API names a script gets and the shapes of the
-//! script views, in the checker's terms. A script isn't typed as a resident's or an army's, so
-//! both APIs are in, and `me` holds either; a default script (it has a task) runs only as a
-//! resident's and gets that API alone.
+//! The game's side of the script checker (`check_names` in `csp-lang`; `CONTEXT.md`: Script
+//! view): the API names a script gets and the shapes of the script views, in the checker's terms.
+//! A script isn't typed as a resident's or an army's, so both APIs are in, and `me` holds either;
+//! a default script (it has a task) runs only as a resident's and gets that API alone.
 
 use std::collections::{HashMap, HashSet};
 

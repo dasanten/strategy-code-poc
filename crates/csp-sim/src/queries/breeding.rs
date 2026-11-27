@@ -1,5 +1,5 @@
-//! The breeding queries of `packages/shared/src/horses.ts` (`CONTEXT.md`: Breeding): which pair a
-//! stable keeps progress for, and why two horses can't be bred.
+//! The breeding queries (`CONTEXT.md`: Breeding): which pair a stable keeps progress for, and why
+//! two horses can't be bred.
 
 use csp_shared::balance::{MAP_SIZE, STABLE_CAPACITY};
 use csp_shared::footprint::is_at;

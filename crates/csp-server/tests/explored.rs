@@ -1,4 +1,4 @@
-//! Explored terrain saved to and loaded from the database: the storage cases of `explored.test.ts`.
+//! Explored terrain saved to and loaded from the database: the storage cases.
 use std::{path::Path, time::Instant};
 
 use csp_server::{

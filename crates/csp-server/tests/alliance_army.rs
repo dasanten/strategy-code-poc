@@ -1,5 +1,5 @@
-//! `apps/server/src/alliance-army.test.ts`, ported (T86.17). Here and not in `csp-sim`, as the
-//! alliance matters a member sees (`diplomacy_for`) are the server's.
+//! Alliance armies (T86.17). Here and not in `csp-sim`, as the alliance matters a member sees
+//! (`diplomacy_for`) are the server's.
 
 use csp_server::diplomacy::diplomacy_for;
 use csp_shared::balance::{ALLIANCE_LEAVE_DELAY, ALLIANCE_RECALL_DELAY};

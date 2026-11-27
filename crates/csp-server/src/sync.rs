@@ -1,10 +1,9 @@
-//! What each connection was sent, so each tick sends only the difference (ADR 0006;
-//! `apps/server/src/sync.ts`): entities in sight that changed, and ids that left sight.
+//! What each connection was sent, so each tick sends only the difference (ADR 0006): entities in
+//! sight that changed, and ids that left sight.
 //!
-//! The TypeScript keys its caches by object identity (`Map<readonly T[], Sent>`). Here a list is
-//! an `Arc<Vec<T>>` and what a view was sent an `Arc` too, keyed by address while the round holds a
-//! clone (so no address is reused within the round): views that diff against one list end up
-//! holding one `Sent`, and from then on they share one diff, worked out once.
+//! Here a list is an `Arc<Vec<T>>` and what a view was sent an `Arc` too, keyed by address while
+//! the round holds a clone (so no address is reused within the round): views that diff against one
+//! list end up holding one `Sent`, and from then on they share one diff, worked out once.
 
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -1,5 +1,5 @@
-//! Buying an NPC city (`apps/server/src/buying.ts`, `CONTEXT.md`: Buying a city): the buy order,
-//! carried out the tick it is given, and its invariants.
+//! Buying an NPC city (`CONTEXT.md`: Buying a city): the buy order, carried out the tick it is
+//! given, and its invariants.
 
 use csp_shared::balance::{CITY_PRICE_STANDING_SWING, MAP_SIZE};
 use csp_shared::footprint::is_at;

@@ -1,6 +1,5 @@
-//! Transfers between realms, read only (`packages/shared/src/transfer.ts`, `CONTEXT.md`:
-//! Transfer): fees, loads, the warehouses whose caravans carry them, and the checks of the
-//! transfer orders.
+//! Transfers between realms, read only (`CONTEXT.md`: Transfer): fees, loads, the warehouses whose
+//! caravans carry them, and the checks of the transfer orders.
 
 use csp_shared::balance::{DELIVERY_LOAD, MAP_SIZE, TRANSFER_FEE_FACTOR};
 use csp_shared::footprint::is_at;

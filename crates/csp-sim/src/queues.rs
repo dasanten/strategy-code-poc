@@ -1,14 +1,13 @@
-//! Queues (`apps/server/src/queues.ts`, `CONTEXT.md`: Queue). The queue order gives a resident a
-//! list of steps, each an order request; the edit-queue order replaces the steps of the one they
-//! work through. Every tick, after the orders are applied and before scripts run, [`QueueRunner`]
-//! starts the current step by applying its request as if it had been given on its own, and moves
-//! on once it is done or its duration is up. Any order that isn't a step ends the queue
-//! ([`crate::orders::OrderQueue`]). While a defence script runs, the queue waits, its step kept
-//! aside with what it interrupted.
+//! Queues (`CONTEXT.md`: Queue). The queue order gives a resident a list of steps, each an order
+//! request; the edit-queue order replaces the steps of the one they work through. Every tick, after
+//! the orders are applied and before scripts run, [`QueueRunner`] starts the current step by
+//! applying its request as if it had been given on its own, and moves on once it is done or its
+//! duration is up. Any order that isn't a step ends the queue ([`crate::orders::OrderQueue`]).
+//! While a defence script runs, the queue waits, its step kept aside with what it interrupted.
 //!
 //! A step may act somewhere else than where the resident stands (Planning ahead): adding it only
-//! checks that the places it names could make sense ([`step_place_problem`]); whether it can
-//! start is checked when its turn comes.
+//! checks that the places it names could make sense ([`step_place_problem`]); whether it can start
+//! is checked when its turn comes.
 
 use std::collections::HashSet;
 use std::sync::Arc;

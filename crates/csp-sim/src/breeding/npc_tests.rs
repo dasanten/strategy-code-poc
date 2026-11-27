@@ -1,6 +1,5 @@
-//! `breeding.test.ts`'s slow simulation (#1038): an NPC city breeding its horses through the
-//! default task. Its world is `worldWithCity` as the TypeScript builds it: `found_starting_city` on
-//! `city_terrain`.
+//! The slow simulation of breeding (#1038): an NPC city breeding its horses through the default
+//! task. Its world is `worldWithCity`: `found_starting_city` on `city_terrain`.
 
 use std::sync::Arc;
 

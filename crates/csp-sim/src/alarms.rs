@@ -1,9 +1,9 @@
-//! Alarms (`apps/server/src/alarms.ts`, `CONTEXT.md`: Alarm, Alarm script; ADR 0028). Something
-//! happening in a City area starts the Alarm script of its realm's residents at home. It runs as
-//! `script` like any other, holding the alarm for `me.alarm`, with what they were doing kept aside
-//! in `interrupted` as for a defence script (ADR 0015). A blow still starts the defence script,
-//! which keeps the Alarm script aside in turn and hands back to it. NPC villages, towns and
-//! self-managed cities run the same for their armed residents, with the game's default only.
+//! Alarms (`CONTEXT.md`: Alarm, Alarm script; ADR 0028). Something happening in a City area starts
+//! the Alarm script of its realm's residents at home. It runs as `script` like any other, holding
+//! the alarm for `me.alarm`, with what they were doing kept aside in `interrupted` as for a defence
+//! script (ADR 0015). A blow still starts the defence script, which keeps the Alarm script aside in
+//! turn and hands back to it. NPC villages, towns and self-managed cities run the same for their
+//! armed residents, with the game's default only.
 //!
 //! [`GameAlarms`] is T86.7's [`Alarms`] trait for the conflict rules.
 

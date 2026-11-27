@@ -1,6 +1,6 @@
-//! `apps/server/src/relocating.test.ts`, ported one to one. Walking is T86.4's, so "walks there"
-//! is the resident set down on the order's target before `step_relocating` runs, as the walk
-//! would bring them; `untilDone` is then one step. The invariants are T86.13's.
+//! Relocating tests. Walking is T86.4's, so "walks there" is the resident set down on the order's
+//! target before `step_relocating` runs, as the walk would bring them; `untilDone` is then one
+//! step. The invariants are T86.13's.
 
 use csp_shared::balance::HOUSING_ROOM;
 use csp_shared::terrain::{terrain_at, wrap_distance, Terrain, TerrainMap};

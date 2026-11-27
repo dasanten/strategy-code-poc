@@ -1,4 +1,4 @@
-//! The world's side of the script library (`apps/server/src/scripts.ts`): a script that can run.
+//! The world's side of the script library: a script that can run.
 //! The library itself, its versions and checks, is the database's (Epic 1004, `csp-server`),
 //! which hands scripts to the simulation through [`ScriptLibrary`].
 

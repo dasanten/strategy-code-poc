@@ -1,5 +1,4 @@
-//! `self-managed.test.ts`: a dead Leader's cities become self-managed (`CONTEXT.md`: Self-managed
-//! city).
+//! A dead Leader's cities become self-managed (`CONTEXT.md`: Self-managed city).
 
 use std::collections::HashSet;
 

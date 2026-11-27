@@ -1,9 +1,8 @@
 //! The views the client imports that a query in this crate builds (T88.1, ADR 0030): a Player's
-//! diplomacy card and its parts (`alliance.ts`, `direct-offer.ts`, `warehouse.ts`,
-//! `persuasion.ts`, `demand.ts`), the admin's directives and places (`api.ts`, `admin-map.ts`) and
-//! the quotes the trade screens show (`offers.ts`, `swap.ts`). Written so `ts-rs` generates the
-//! TypeScript the client already uses; the queries that fill them come with the Rust server's
-//! protocol port, until then the server sends these as plain JSON values.
+//! diplomacy card and its parts (alliances, direct offers, warehouses, persuasion, demands), the
+//! admin's directives and places, and the quotes the trade screens show (offers, swaps). Written
+//! so `ts-rs` generates the TypeScript the client already uses; the queries that fill them come
+//! with the Rust server's protocol port, until then the server sends these as plain JSON values.
 
 use csp_shared::world::{AllianceArmyPart, DeliveryKind, DemandTerms, Heading, PricedGood};
 use ts_rs::TS;

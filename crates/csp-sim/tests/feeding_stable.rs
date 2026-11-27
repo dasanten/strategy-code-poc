@@ -1,7 +1,7 @@
-//! `feeding-stable.test.ts`, one test per `it`. Feeding the stable (`CONTEXT.md`: Feeding the
-//! stable): a resident given the task keeps Food for `STABLE_FEED_DAYS` game days for the horses
-//! in the stable, fetching what is missing from the nearest storage with Food or the one picked,
-//! and waits there while it has enough.
+//! Feeding the stable (`CONTEXT.md`: Feeding the stable), one test per case: a resident given the
+//! task keeps Food for `STABLE_FEED_DAYS` game days for the horses in the stable, fetching what is
+//! missing from the nearest storage with Food or the one picked, and waits there while it has
+//! enough.
 
 mod goods_support;
 mod tasks_support;

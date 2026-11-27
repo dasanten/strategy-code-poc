@@ -2,9 +2,8 @@
 //! building's `x`, `y` is the north-west tile of its footprint; the footprint runs east and south
 //! from there, across the map's joins like everything else, and is never turned.
 //!
-//! Ported from `packages/shared/src/footprint.ts`. A building kind is its TypeScript name for now
-//! (`"farm"`): the `BuildingKind` enum comes with the world types. The map's `size` is always
-//! passed, where TypeScript defaults it to `MAP_SIZE`.
+//! A building kind is its name for now (`"farm"`): the `BuildingKind` enum comes with the world
+//! types. The map's `size` is always passed.
 
 use crate::balance::Table;
 use crate::building_spec::spec_table;

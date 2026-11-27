@@ -1,7 +1,7 @@
-//! `tasks-started-directly.test.ts`, one test per `it`. Tear down, Feed the stable and Breed
-//! horses started directly (`CONTEXT.md`: Default script, Started directly; Breeding; Feeding the
-//! stable): their target is the param `building` or `stable`; unset, the one on the resident's
-//! tile when it starts, never kept between starts. With none there each ends with a reason.
+//! Tear down, Feed the stable and Breed horses started directly (`CONTEXT.md`: Default script,
+//! Started directly; Breeding; Feeding the stable), one test per case: their target is the param
+//! `building` or `stable`; unset, the one on the resident's tile when it starts, never kept
+//! between starts. With none there each ends with a reason.
 
 mod goods_support;
 mod tasks_support;

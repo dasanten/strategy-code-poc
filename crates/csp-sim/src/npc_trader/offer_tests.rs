@@ -1,6 +1,6 @@
-//! `npc-offers.test.ts`: NPC cities at an offer (`CONTEXT.md`): a city sends its trader to a
-//! Player's offer in reach that gives what it is short of, for what it has spare or Coins, at a
-//! rate at least as good as its own prices. The trader goes by the orders a Player could give.
+//! NPC cities at an offer (`CONTEXT.md`): a city sends its trader to a Player's offer in reach that
+//! gives what it is short of, for what it has spare or Coins, at a rate at least as good as its own
+//! prices. The trader goes by the orders a Player could give.
 
 use csp_shared::balance::{
     NPC_CITY_REFUSES_STANDING, NPC_OFFER_REACH, NPC_VILLAGE, STANDING_NPC_TRADE_COINS_PER_POINT,

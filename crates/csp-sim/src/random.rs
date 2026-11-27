@@ -1,8 +1,8 @@
 //! Random numbers and hashes, ported bit for bit from the frozen TypeScript (ADR 0030): a world
 //! generated or stepped from the same seed must be the same world in Rust.
 //!
-//! Sources: `mulberry32` and the string `hash` in `apps/server/src/residents.ts`, the lattice
-//! `hash(x, y, seed)` in `apps/server/src/terrain-gen.ts`, `newId` in `starting-city.ts`.
+//! Sources: `mulberry32` and the string `hash` of the resident code, the lattice
+//! `hash(x, y, seed)` of the terrain generator, and `newId` of the starting city.
 //!
 //! JavaScript semantics relied on, made explicit:
 //! - `Math.imul(a, b)`: both arguments go through `ToInt32`, the product is taken modulo 2^32 and

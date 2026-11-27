@@ -1,6 +1,6 @@
-//! `trade-org-debt.test.ts`: paying the debt, the end of a debt and the invariants. What the army
-//! can't take and later crimes need `trade-org-punishment.ts` (T86.9), and the debt's end with
-//! the Fall of the HQ needs `hq-fall.ts` (T86.9); their cases come with those.
+//! Tests of Trade Org debt: paying the debt, the end of a debt and the invariants. What the army
+//! can't take and later crimes need the Trade Org punishment rules (T86.9), and the debt's end
+//! with the Fall of the HQ needs the HQ's fall (T86.9); their cases come with those.
 
 use std::sync::Arc;
 

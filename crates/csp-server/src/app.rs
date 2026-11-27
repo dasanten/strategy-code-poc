@@ -1,7 +1,6 @@
-//! The HTTP side of the server (`apps/server/src/app.ts`; ADR 0005, ADR 0006): accounts, the
-//! first-day card, explored terrain, the script library, the admin routes, health and, in
-//! production, the built client. Same paths, bodies and error shapes (`{ error, message }` with
-//! the status of `STATUS`) as the TypeScript, so the client does not notice the change.
+//! The HTTP side of the server (ADR 0005, ADR 0006): accounts, the first-day card, explored
+//! terrain, the script library, the admin routes, health and, in production, the built client.
+//! Errors are `{ error, message }` with the status of `STATUS`.
 //!
 //! The accounts and the script library use the HTTP side's own database connection (SQLite in WAL
 //! mode lets the game thread's connection work beside it); the world and the explored terrain are

@@ -1,4 +1,4 @@
-//! `waypoint-places.test.ts`: a waypoint is a place like a tile (`CONTEXT.md`: Waypoint): picked
+//! A waypoint is a place like a tile (`CONTEXT.md`: Waypoint): picked
 //! for a walk-to or a queue step, the UI gives the order the waypoint's tile; scripts read, add
 //! and remove their Player's waypoints.
 

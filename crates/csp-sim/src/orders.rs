@@ -1,5 +1,5 @@
-//! UI orders (`apps/server/src/orders.ts`, ADR 0002): the order kinds, the queue of orders
-//! accepted during a tick and applied together at the start of the next one.
+//! UI orders (ADR 0002): the order kinds, the queue of orders accepted during a tick and applied
+//! together at the start of the next one.
 //!
 //! The registry ([`order_kinds`]) is built from what each kind says about itself
 //! (`order_meta::ORDER_METAS`).

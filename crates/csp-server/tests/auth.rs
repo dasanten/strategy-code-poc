@@ -1,5 +1,5 @@
-//! Accounts, sessions and invite codes against a real database (`auth.ts`); the login back-off
-//! cases of `auth.test.ts` are unit tests in `src/auth.rs`.
+//! Accounts, sessions and invite codes against a real database; the login back-off cases are unit
+//! tests in `src/auth.rs`.
 use std::cell::RefCell;
 
 use csp_server::{

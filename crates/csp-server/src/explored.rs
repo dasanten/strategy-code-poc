@@ -1,7 +1,5 @@
-//! Explored terrain in the database (`ExploredTerrain.load` and `save` of
-//! `apps/server/src/explored.ts`): one row per Player in `explored`, the bitmap as the blob, in the
-//! TypeScript's bit layout, so either server reads what the other wrote. The in-memory half is
-//! `csp_sim::explored`.
+//! Explored terrain in the database (`ExploredTerrain.load` and `save`): one row per Player in
+//! `explored`, the bitmap as the blob. The in-memory half is `csp_sim::explored`.
 
 use csp_shared::{terrain::TerrainMap, world::ResourceNode};
 use csp_sim::explored::ExploredTerrain;

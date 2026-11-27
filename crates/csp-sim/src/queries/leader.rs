@@ -1,4 +1,4 @@
-//! Leader queries of `packages/shared/src/leader.ts` (`CONTEXT.md`: Leader, Leader handover).
+//! Leader queries (`CONTEXT.md`: Leader, Leader handover).
 
 use csp_shared::world::{Resident, WorldState};
 

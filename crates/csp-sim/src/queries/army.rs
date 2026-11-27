@@ -1,5 +1,4 @@
-//! Army queries of `packages/shared/src/army.ts` (`CONTEXT.md`: Army, Supply line, Refilling
-//! from a carriage).
+//! Army queries (`CONTEXT.md`: Army, Supply line, Refilling from a carriage).
 
 use csp_shared::balance::HAUL_HORSE_FOOD;
 use csp_shared::terrain::wrap_distance;

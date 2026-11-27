@@ -1,5 +1,4 @@
-//! Where a crew stands at a building (`packages/shared/src/crew.ts`, `CONTEXT.md`: Spreading over
-//! the footprint).
+//! Where a crew stands at a building (`CONTEXT.md`: Spreading over the footprint).
 
 use std::collections::HashMap;
 

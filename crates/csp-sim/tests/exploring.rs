@@ -1,5 +1,3 @@
-//! `apps/server/src/exploring.test.ts`, ported one to one.
-//!
 //! Explore (`CONTEXT.md`: Explore): a resident given the task sets out with as much Food as they
 //! can carry, walks to the edge of their Player's explored terrain the way asked, turns back while
 //! the Food on them still covers the way home plus a margin, refills and goes back out to where

@@ -1,6 +1,5 @@
-//! The people queries of `packages/shared`: relocating (`relocate.ts`), the Leader handover
-//! (`leader.ts`), the names Players give (`names.ts`) and the first-day card (`first-day.ts`).
-//! `CONTEXT.md`: Relocate, Leader handover, Renaming a resident, Renaming a city, Renaming a
+//! The people queries: relocating, the Leader handover, the names Players give and the first-day
+//! card. `CONTEXT.md`: Relocate, Leader handover, Renaming a resident, Renaming a city, Renaming a
 //! horse, Realm name, First day.
 
 use std::collections::HashSet;

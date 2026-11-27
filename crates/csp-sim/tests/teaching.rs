@@ -1,7 +1,6 @@
-//! `apps/server/src/teaching.test.ts`, ported (T86.6). Left for the tickets whose parts they need:
-//! `teaching in scripts` (the game API, T86.12), `teachers sound` and the invariant checks
-//! (T86.13); in "ends on leaving the ground or taking another order" the walk order (T86.4) is
-//! given by setting it directly.
+//! Teaching (T86.6). Left for the tickets whose parts they need: `teaching in scripts` (the game
+//! API, T86.12), `teachers sound` and the invariant checks (T86.13); in "ends on leaving the
+//! ground or taking another order" the walk order (T86.4) is given by setting it directly.
 
 mod build_common;
 

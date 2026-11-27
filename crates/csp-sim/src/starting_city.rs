@@ -1,6 +1,6 @@
-//! The starting city (`CONTEXT.md`: Starting city, Realm name, Game-given names), ported from
-//! `apps/server/src/starting-city.ts`: where a new realm's walled city goes and what it starts
-//! with. The same world and Player always get the same city.
+//! The starting city (`CONTEXT.md`: Starting city, Realm name, Game-given names): where a new
+//! realm's walled city goes and what it starts with. The same world and Player always get the
+//! same city.
 
 use std::collections::HashSet;
 

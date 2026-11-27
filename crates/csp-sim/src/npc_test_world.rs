@@ -1,6 +1,5 @@
-//! The setup the NPC cities' tests share (`apps/server/src/npc-growth.fixture.ts`): a village
-//! alone on a Plains map with a forest node east of it, and helpers to fill it and run it.
-//! Test-only.
+//! The setup the NPC cities' tests share: a village alone on a Plains map with a forest node east
+//! of it, and helpers to fill it and run it. Test-only.
 
 use std::collections::HashSet;
 use std::sync::Arc;

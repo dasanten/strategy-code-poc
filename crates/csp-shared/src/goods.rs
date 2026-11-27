@@ -1,7 +1,7 @@
-//! Goods (`CONTEXT.md`: Good, Weapons and armour): the list of them and the one helper of
-//! `packages/shared/src/goods.ts` that needs no world state. The world queries there (`pileAt`,
-//! `storageAt`, `goodsAtSpot`, `unitsThatFit`, …) take the world types and come with them, in
-//! `csp-sim`. What a unit weighs is `GOOD_WEIGHT` in [`crate::balance`].
+//! Goods (`CONTEXT.md`: Good, Weapons and armour): the list of them and the one helper that needs
+//! no world state. The world queries (`pileAt`, `storageAt`, `goodsAtSpot`, `unitsThatFit`, …) take
+//! the world types and come with them, in `csp-sim`. What a unit weighs is `GOOD_WEIGHT` in
+//! [`crate::balance`].
 
 use crate::building_spec::kinds_where;
 use crate::good_spec::ProtectionKind;

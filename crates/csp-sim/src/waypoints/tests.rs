@@ -1,5 +1,5 @@
-//! `waypoints.test.ts`. The TypeScript sets up `worldWithPost` (a generated world with Player
-//! 1's starting city); these need only Player 1's realm and a map. Its Leader-death case needs
+//! Tests of waypoints. The TypeScript sets up `worldWithPost` (a generated world with Player 1's
+//! starting city); these need only Player 1's realm and a map. Its Leader-death case needs
 //! `dieAll` (T86.3) and `foundStartingCity` (T86.8): T86.14 runs it.
 
 use super::*;

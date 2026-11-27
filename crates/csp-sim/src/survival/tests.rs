@@ -1,5 +1,4 @@
-//! `survival.test.ts`, ported one to one where its rules are here; each test the port leaves out
-//! says why and which ticket brings it.
+//! Tests of survival; each test left out says why and which ticket brings it.
 
 use super::*;
 use csp_shared::balance::{

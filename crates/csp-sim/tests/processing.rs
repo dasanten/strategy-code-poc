@@ -1,5 +1,5 @@
-//! `apps/server/src/processing.test.ts`, ported (T86.17, part 5): the smelter and the mint, the
-//! conversion rates, and where smelters, mints and smithies may stand.
+//! The smelter and the mint, the conversion rates, and where smelters, mints and smithies may
+//! stand (T86.17, part 5).
 
 mod build_common;
 

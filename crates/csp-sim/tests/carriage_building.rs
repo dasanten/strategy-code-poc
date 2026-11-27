@@ -1,7 +1,6 @@
-//! `apps/server/src/carriage-building.test.ts`, ported (T86.6). The drop orders that deliver
-//! materials (T86.5) are put in directly; "is built by the Build default" needs the default
-//! scripts and walking (T86.12, T86.4); `carriage site invariants` and the invariant checks come
-//! with the invariants (T86.13).
+//! Building carriages (T86.6). The drop orders that deliver materials (T86.5) are put in directly;
+//! "is built by the Build default" needs the default scripts and walking (T86.12, T86.4);
+//! `carriage site invariants` and the invariant checks come with the invariants (T86.13).
 
 mod build_common;
 

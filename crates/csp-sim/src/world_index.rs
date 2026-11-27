@@ -1,13 +1,12 @@
-//! Lookups the server builds once a tick instead of scanning the world's lists inside
-//! per-resident and per-action loops (`apps/server/src/world-index.ts`, Epic 49). Scratch memory
-//! like the pathfinder's: never saved, never world state (ADR 0006). Each lookup gives the same
-//! answer as the scan it replaces.
+//! Lookups the server builds once a tick instead of scanning the world's lists inside per-resident
+//! and per-action loops (Epic 49). Scratch memory like the pathfinder's: never saved, never world
+//! state (ADR 0006). Each lookup gives the same answer as the scan it replaces.
 //!
 //! The index holds no reference to the world (ADR 0030: no entity holds a reference to another),
 //! only positions in its lists, so the tick can keep it while it changes the world: every lookup
-//! takes the world, and an id lookup checks the id at the position it remembers, scanning when
-//! the list has changed under it. What it was built from is its [`Revision`]; the tick builds a
-//! new index when that changes ([`world_index`]), as `worldIndex` does in the TypeScript.
+//! takes the world, and an id lookup checks the id at the position it remembers, scanning when the
+//! list has changed under it. What it was built from is its [`Revision`]; the tick builds a new
+//! index when that changes ([`world_index`]).
 
 use std::cell::{OnceCell, RefCell};
 use std::collections::hash_map::DefaultHasher;

@@ -1,7 +1,7 @@
-//! The syntax tree the parser produces: the twin of `packages/lang/src/ast.ts`. Every node is
-//! plain serialisable data with the line and column (both 1-based) where it starts, so the
-//! interpreter and the editor can point at it. Through serde a node is the same JSON as the
-//! TypeScript node: `{ "kind": "Let", "name": …, "init": …, "line": …, "column": … }`.
+//! The syntax tree the parser produces. Every node is plain serialisable data with the line and
+//! column (both 1-based) where it starts, so the interpreter and the editor can point at it.
+//! Through serde a node is the JSON the editor reads: `{ "kind": "Let", "name": …, "init": …,
+//! "line": …, "column": … }`.
 
 use serde::{Deserialize, Serialize};
 

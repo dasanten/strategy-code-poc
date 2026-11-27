@@ -1,6 +1,5 @@
-//! `workplace-settings.test.ts`: the set-work-settings order, dropping settings and their
-//! invariant. Its "working by Workplace settings" cases run the Work default through the whole
-//! tick and come with T86.14.
+//! The set-work-settings order, dropping settings and their invariant. The "working by Workplace
+//! settings" cases run the Work default through the whole tick and come with T86.14.
 
 use super::*;
 use crate::default_scripts::default_script;

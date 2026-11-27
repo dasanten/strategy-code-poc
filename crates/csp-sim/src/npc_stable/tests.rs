@@ -1,6 +1,6 @@
-//! `npc-stable.test.ts`: an NPC city feeds its stable (`CONTEXT.md`: NPC horses, NPC reserve,
-//! Feeding the stable): one resident at a time runs the game's default, from what is above the
-//! reserve for its people, or below that a little while its horses are hungry.
+//! An NPC city feeds its stable (`CONTEXT.md`: NPC horses, NPC reserve, Feeding the stable): one
+//! resident at a time runs the game's default, from what is above the reserve for its people, or
+//! below that a little while its horses are hungry.
 
 use csp_shared::balance::{
     HORSE_FOOD_PER_DAY, HORSE_HUNGRY_SHARE, HORSE_WAKE_HEALTH, MAX_HEALTH, MAX_HUNGER,

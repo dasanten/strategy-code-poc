@@ -1,5 +1,5 @@
-//! The gate order (`apps/server/src/gates.ts`, `CONTEXT.md`: Walls in combat): a city's realm
-//! opens or closes one of its gates, at the start of the next tick like an alliance's decision.
+//! The gate order (`CONTEXT.md`: Walls in combat): a city's realm opens or closes one of its
+//! gates, at the start of the next tick like an alliance's decision.
 
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{BuildingKind, OrderRequest, WorldState};

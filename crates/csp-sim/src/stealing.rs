@@ -1,6 +1,5 @@
-//! Stealing a carriage or horse (`apps/server/src/stealing.ts`, `CONTEXT.md`: Stealing a carriage
-//! or horse, with its vessel part): taking it over for the thief's realm, once the shared check
-//! allows it.
+//! Stealing a carriage or horse (`CONTEXT.md`: Stealing a carriage or horse, with its vessel
+//! part): taking it over for the thief's realm, once the shared check allows it.
 
 use csp_shared::world::{CrimeKind, RealmEventWhat, Stock, WorldState};
 
