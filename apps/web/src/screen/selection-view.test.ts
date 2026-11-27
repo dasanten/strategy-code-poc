@@ -81,6 +81,7 @@ import {
   tileActions,
   commandedCarriages,
   strangersCarriage,
+  strangersOnTile,
   thiefAmong,
   thiefOf,
   hitchChoice,
@@ -1488,6 +1489,25 @@ describe('the card for a tile', () => {
   it('shows strangers on it in their realm’s colour', () => {
     const r = { name: 'Brann', owner: 'them', cityId: null, carried: {} } as Resident
     expect(tile({ strangers: [r] })).toMatchObject({ title: 'Brann', rel: 'otherRealm' })
+  })
+
+  it('counts only the strangers on the tile, not every one in sight (#1663)', () => {
+    const at = (id: string, x: number, y: number, owner: string | null = 'them') =>
+      ({ id, name: id, owner, cityId: null, carried: {}, x, y }) as Resident
+    const mine = at('ana', 5, 5, 'me')
+    const all = [at('brann', 5, 5), at('cora', 9, 2), mine]
+    const strangers = strangersOnTile(all, [mine], { x: 5, y: 5 })
+    expect(strangers.map((r) => r.id)).toEqual(['brann'])
+    expect(tile({ strangers, residents: all })).toMatchObject({ title: 'brann' })
+  })
+
+  it('counts the strangers on a building’s whole footprint (#1663)', () => {
+    const farm = { id: 'f1', kind: 'farm' as const, cityId: 'c-npc', x: 4, y: 4 }
+    const at = (id: string, x: number, y: number) =>
+      ({ id, name: id, owner: 'them', cityId: null, carried: {}, x, y }) as Resident
+    const all = [at('brann', 4, 4), at('cora', 5, 5), at('dov', 20, 20)]
+    const strangers = strangersOnTile(all, [], { x: 5, y: 5 }, farm)
+    expect(strangers.map((r) => r.id)).toEqual(['brann', 'cora'])
   })
 
   it('shows a resident of no realm and no city as a drifter', () => {
