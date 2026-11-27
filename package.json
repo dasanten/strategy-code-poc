@@ -26,6 +26,7 @@
     "test:year": "cargo nextest run --cargo-profile slow --profile slow -p csp-sim --lib --run-ignored only -E \"test(/npc_slow::game_year::/)\"",
     "test:ignored": "cargo nextest run --cargo-profile slow --profile ignored --workspace --run-ignored only",
     "nightly:ignored": "node scripts/nightly-ignored.mjs",
+    "mutants": "node scripts/mutants.mjs",
     "lint": "eslint .",
     "knip": "knip --no-progress",
     "format": "prettier --write ."

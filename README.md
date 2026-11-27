@@ -35,6 +35,7 @@ Needs:
   (the "Desktop development with C++" workload), `cargo install cargo-nextest --locked`, and for
   the editor's checker `rustup target add wasm32-unknown-unknown` plus
   `cargo install wasm-bindgen-cli --version <the wasm-bindgen version in Cargo.lock> --locked`.
+  For `pnpm mutants`, `cargo install cargo-mutants --locked`.
 - Node 22.12+ (Vite 8 needs it) and pnpm 10, for the client. The exact Node version is pinned in
   `.node-version` and pnpm in `package.json` (`packageManager`). With fnm and corepack:
 
@@ -94,6 +95,7 @@ pnpm test:slow     # the slow NPC runs (npc_slow without the year runs): an epic
 pnpm test:year     # the year and season runs (about 50 and 15 min): nightly on dev
 pnpm test:ignored  # every test ignored for time but the year runs and measurements, ~7 min: nightly
 pnpm nightly:ignored  # test:ignored, appended to .claude/worktrees/nightly-year-report.md
+pnpm mutants <base>   # cargo mutants on the Rust lines changed since base: the lines no test holds (≤30 min)
 pnpm generate      # all generated files (the two below and script-data.json); run it after a merge
 pnpm types:rust    # the client's types from the crates (commit packages/shared-types/src/generated)
 pnpm balance:rust  # the client's balance numbers from csp-shared/src/balance

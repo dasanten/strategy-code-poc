@@ -35,6 +35,27 @@ Every recipe ends the same way:
   sees, `pnpm types:rust`, and commit `packages/shared-types/src/generated/` (a Rust test fails
   when it is stale; `docs/architecture/generated.md`).
 
+## A missed mutant
+
+`pnpm mutants <base>` (ADR 0048) runs `cargo mutants` on the Rust lines changed since `<base>`:
+each mutant changes one line (a `<` to `<=`, a `+` to `-`, a function's body to a default value)
+and runs the tests of its crate (and `csp-sim`'s for `csp-shared`). It never fails; it writes
+`target/mutants/report.md` and stops at a 30 min cap (`--minutes <n>` for another). Tests,
+the bench binaries, logging, messages and balance numbers are left out (`.cargo/mutants.toml`).
+
+A missed mutant is a line whose change no test noticed. Read the line and the change:
+
+1. **A rule no test holds**: the change would play differently (a fight lost instead of won, a good
+   not consumed). Write the test that fails with the mutant, in the rule's test file, and run
+   `cargo mutants -f <file> --re '<the mutant's name>'` to see it caught.
+2. **A line that does nothing**: the change gives the same results, because the case cannot happen
+   or another line already covers it (a `>` to `>=` where the two are never equal, a guard the
+   caller already made). Simplify the line, or leave it if it reads better; no test.
+3. **Only felt in time or text**: a cache, a fast path, a message. Leave it.
+
+"Unviable" mutants did not build and say nothing; "timed out" ones made a loop never end, which a
+test caught by its time limit.
+
 ## A new rule in the simulation
 
 1. The rule, in its section file of `docs/context/`.
