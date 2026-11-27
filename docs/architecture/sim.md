@@ -217,4 +217,6 @@ script sees, one module per table), `script_views` (ADR 0011), `script_check`, `
 **Tests and fixtures.** `fixture_ages` (fixtures aged by today's rules), `goods_deps` (what the
 goods rules call in other modules), and, test-only, `test_support`, `test_world`,
 `game_test_world`, `movement_test_world`, `realm_test_world`, `npc_test_world`, `npc_slow` (the
-slow NPC runs), `poc_tests`, `stone_upgrade_tests`.
+slow NPC runs), `random_orders` (the random-order run: random requests to `test_world`'s
+`two_realms_world`, every invariant after every tick, a failure named by its seed; ADR 0048),
+`poc_tests`, `stone_upgrade_tests`.
