@@ -287,3 +287,4 @@ Every epic below is closed. The State column is what `docs/tasks.md` said when t
 | 121 | [Content defined once](https://github.com/dasanten/strategy-code-poc/issues/1568) | done |
 | 122 | [One copy of the rules](https://github.com/dasanten/strategy-code-poc/issues/1579) | done |
 | 123 | [Client tidy](https://github.com/dasanten/strategy-code-poc/issues/1588) | done |
+| 124 | [Agent docs](https://github.com/dasanten/strategy-code-poc/issues/1595) | done |

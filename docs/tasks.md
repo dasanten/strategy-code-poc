@@ -62,7 +62,6 @@ number one above the highest in either table (`docs/coordination.md`: Epic numbe
 | #   | Epic                                                                                            | State                   |
 | --- | ----------------------------------------------------------------------------------------------- | ----------------------- |
 | 16  | [Bandits](https://github.com/dasanten/strategy-code-poc/issues/144)                             | scope only              |
-| 124 | [Agent docs](https://github.com/dasanten/strategy-code-poc/issues/1595) | in progress (`epic/124-agent-docs`) |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
