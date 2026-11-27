@@ -3,6 +3,10 @@
 This session never works a ticket itself. It starts ticket sessions, merges their PRs and starts
 the next ones. Never stop an app running on Daniel's computer.
 
+The why of each step, and what every session needs to know (own worktrees, the merge loop, what
+collides, checks under load, the build cache): `docs/coordination.md`. Work in your own worktree,
+`.claude/worktrees/coord-<epic>`, never the main checkout.
+
 ## Workable ticket
 
 Open, in an open epic, no `in progress` / `needs Daniel` / `blocked` label, and every
@@ -25,11 +29,12 @@ For every workable ticket at once, without asking Daniel first:
 
 Check the PR itself, not just the note.
 
-1. **Ticket PR into the epic branch:** check it out, merge `origin/epic/<n>-<slug>` into it,
-   run `pnpm generate` and commit what it changed (never merge a generated file by hand),
-   run `pnpm check origin/epic/<n>-<slug>` (lint, typecheck and the affected client tests, ADR 0013)
-   and, when it touches `crates/`, `pnpm check:rust`. Green: merge the PR, close its tickets
-   by hand and remove `in progress`. Red: send the failure to that session with `SendMessage`.
+1. **Ticket PR into the epic branch:** `bash scripts/coord-merge.sh epic/<n>-<slug> <pr>...` in
+   the background. A PR that contains the epic tip merges at once; the others are merged with the
+   tip and checked (`pnpm check:rust`, `pnpm check origin/epic/<n>-<slug>`). Merged: close its
+   tickets by hand and remove `in progress`. Skipped for a conflict: one in generated files is
+   settled by `pnpm generate`, never by hand; otherwise ask the worker to merge the tip in. Red:
+   send the failure to that session with `SendMessage`.
    **Merged:** delete that session's worktree `target/` folder (Rust build cache, about 10–20 GB;
    third-party crates come back from the shared sccache). Before starting more Rust sessions,
    check `(Get-PSDrive C).Free` and keep at least 25 GB free.
@@ -41,8 +46,11 @@ Check the PR itself, not just the note.
 4. **Next tickets:** after each merge, look for tickets that just became workable and start them.
 5. **Epic done:** when an epic's last ticket is merged, merge `origin/dev` into the epic branch
    locally and run `pnpm test:slow` (the slow NPC runs without the year runs, about 8 min; ADR
-   0040). Green: open one PR `epic/<n>-…` → `dev` with `Closes #<epic>`. The year and season runs
-   (`pnpm test:year`) are no gate: they run each night on `dev`. Merge it once all CI checks are green, then close the epic by hand.
+   0040). Green: open one PR `epic/<n>-…` → `dev` with `Closes #<epic>` and merge it without
+   waiting for CI, then close the epic by hand. The year and season runs (`pnpm test:year`) are
+   no gate: they run each night on `dev`.
+6. **Bug PR into `dev`:** merge it after the local checks and close the bug with a comment naming
+   the PR.
 
 ## Don't
 

@@ -3,7 +3,8 @@ description: Pick the next GitHub ticket and work it into a pull request
 ---
 
 Work the next ticket of this repo (dasanten/strategy-code-poc) into a ready-for-review PR,
-following `docs/tasks.md` and `CLAUDE.md`. `$ARGUMENTS` may name a ticket number to take instead.
+following `docs/tasks.md` and `CLAUDE.md`. Working beside other sessions (a check that fails
+under load, a conflict in a generated file, the build cache): `docs/coordination.md`. `$ARGUMENTS` may name a ticket number to take instead.
 
 ## 1. Pick
 
@@ -61,8 +62,9 @@ branches from `origin/dev` instead (ADR 0010).
   `Closes #<ticket>` line per ticket and `Part of #<epic>`.
 - Turn on Auto-fix for the PR.
 - Leave `in progress` on the ticket until the PR merges. Never merge yourself: the coordinating
-  session merges into the epic branch after its own local run and closes the tickets by hand
-  (GitHub only closes them on merges into `main`).
+  session merges into the epic branch (at once when the PR contains the epic tip, else after its
+  own run on the merge; `docs/coordination.md`) and closes the tickets by hand (GitHub only
+  closes them on merges into `main`).
 
 ## 5. Keep going
 
