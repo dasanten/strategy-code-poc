@@ -1,6 +1,6 @@
-//! `apps/server/src/offers.test.ts`'s slow simulation (#1038): a pick-up from a storage with an
-//! offer standing at it, from `setup()` of `deliveries.fixture.ts`
-//! (`fixtures/trade/deliveries.json`). The file's other cases are `src/offers/tests.rs`.
+//! The slow simulation of offers (#1038): a pick-up from a storage with an offer standing at it,
+//! from the fixture `fixtures/trade/deliveries.json`. The other offer cases are
+//! `src/offers/tests.rs`.
 
 mod common;
 #[path = "goods_support/mod.rs"]

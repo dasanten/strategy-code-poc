@@ -1,7 +1,7 @@
-//! World queries about admin directives (`packages/shared/src/directive.ts`, `CONTEXT.md`: Admin
-//! directive), for the game API (ADR 0002). Every Player sees each directive's target, reason and
-//! goals; who gave it and how far its goals have come stay with admins. Here rather than in
-//! `csp-shared` because a soldier is told by `is_armed`, which `crate::queries` holds.
+//! World queries about admin directives (`CONTEXT.md`: Admin directive), for the game API (ADR
+//! 0002). Every Player sees each directive's target, reason and goals; who gave it and how far its
+//! goals have come stay with admins. Here rather than in `csp-shared` because a soldier is told by
+//! `is_armed`, which `crate::queries` holds.
 
 use csp_lang::js::number_to_string;
 use csp_shared::world::{Directive, DirectiveGoal, Resident, WorldState};

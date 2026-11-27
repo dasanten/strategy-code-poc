@@ -1,4 +1,4 @@
-//! The rest of `npc-scores.test.ts`: a city shares out its adults by the scores.
+//! A city shares out its adults by the scores.
 
 use csp_shared::balance::{NpcJobWeights, NPC_BUILDERS};
 use csp_shared::world::{

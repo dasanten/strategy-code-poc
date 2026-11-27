@@ -1,4 +1,4 @@
-//! The world-state types of `packages/shared/src/default-scripts.ts`.
+//! The world-state types of default scripts.
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;

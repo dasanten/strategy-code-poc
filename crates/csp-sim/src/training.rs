@@ -1,6 +1,6 @@
-//! The train order (`apps/server/src/training.ts`, `CONTEXT.md`: Trainee, Training): a grown
-//! resident trains at the finished training ground they stand on, gaining in what its teacher
-//! teaches, up to `TRAINING_GROUND_MAX_TRAINEES` at a ground.
+//! The train order (`CONTEXT.md`: Trainee, Training): a grown resident trains at the finished
+//! training ground they stand on, gaining in what its teacher teaches, up to
+//! `TRAINING_GROUND_MAX_TRAINEES` at a ground.
 
 use std::collections::HashMap;
 

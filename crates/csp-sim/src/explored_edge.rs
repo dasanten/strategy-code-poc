@@ -1,5 +1,4 @@
-//! The edge of a Player's explored terrain (`apps/server/src/explored-edge.ts`, `CONTEXT.md`:
-//! Explored terrain, Explore).
+//! The edge of a Player's explored terrain (`CONTEXT.md`: Explored terrain, Explore).
 
 use std::f64::consts::FRAC_1_SQRT_2;
 

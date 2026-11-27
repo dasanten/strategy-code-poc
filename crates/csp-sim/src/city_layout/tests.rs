@@ -1,4 +1,4 @@
-//! `apps/server/src/city-layout.test.ts`, ported one to one.
+//! The layout an NPC city gets when it comes to be, and what it says about a tile.
 
 use std::collections::{HashMap, HashSet};
 use std::f64::consts::{FRAC_1_SQRT_2, PI};

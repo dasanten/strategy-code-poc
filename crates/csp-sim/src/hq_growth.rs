@@ -1,9 +1,8 @@
-//! How the Trade Org HQ grows (`hq-growth.ts`, `CONTEXT.md`: Trade Org HQ): while it is too weak
-//! against the strongest Organization and has too few adults to arm, it grows like an NPC city
-//! (`city_growth`: pairing and houses), its houses between its rings; with no room left for a
-//! house it puts up another round ring of wall `TRADE_ORG_HQ.ring_step` further out, its gates in
-//! line with the others, and keeps the old ones. All through the orders a Player's residents take
-//! (ADR 0002).
+//! How the Trade Org HQ grows (`CONTEXT.md`: Trade Org HQ): while it is too weak against the
+//! strongest Organization and has too few adults to arm, it grows like an NPC city (`city_growth`:
+//! pairing and houses), its houses between its rings; with no room left for a house it puts up
+//! another round ring of wall `TRADE_ORG_HQ.ring_step` further out, its gates in line with the
+//! others, and keeps the old ones. All through the orders a Player's residents take (ADR 0002).
 
 use std::collections::{HashMap, HashSet};
 

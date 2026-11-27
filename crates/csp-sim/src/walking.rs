@@ -1,6 +1,6 @@
-//! Walking, driving and riding along paths (`apps/server/src/walking.ts`, `CONTEXT.md`: Step,
-//! Road, Walls in combat, Carriage, Riding, Passenger): the walk-to order, and `Walking`, which
-//! finds paths a little at a time and turns moving orders into steps, then resolves the steps.
+//! Walking, driving and riding along paths (`CONTEXT.md`: Step, Road, Walls in combat, Carriage,
+//! Riding, Passenger): the walk-to order, and `Walking`, which finds paths a little at a time and
+//! turns moving orders into steps, then resolves the steps.
 
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;

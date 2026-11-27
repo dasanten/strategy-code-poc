@@ -1,6 +1,6 @@
-//! The world-state types of `packages/shared/src/protocol.ts`: an order request as a queue step
-//! keeps it, and what a Player remembers of buildings and cities (`WorldState.lastSeen`). The
-//! wire messages themselves come with the protocol port.
+//! The world-state types of the protocol: an order request as a queue step keeps it, and what a
+//! Player remembers of buildings and cities (`WorldState.lastSeen`). The wire messages themselves
+//! are in `wire.rs` of `csp-server`.
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};

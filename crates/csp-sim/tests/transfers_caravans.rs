@@ -1,5 +1,4 @@
-//! `apps/server/src/transfers-caravans.test.ts`, one test per `it`, from `setup()` of
-//! `transfers.fixture.ts` (`fixtures/trade/transfers.json`).
+//! Transfers by caravan, one test per case, from the fixture `fixtures/trade/transfers.json`.
 
 mod common;
 #[path = "goods_support/mod.rs"]

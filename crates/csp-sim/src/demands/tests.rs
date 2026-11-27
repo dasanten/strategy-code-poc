@@ -1,5 +1,5 @@
-//! `demands.test.ts`: sending, answering, accepting a city, lapsing and the invariant. The views
-//! of a realm's diplomacy (`diplomacyFor`) come with the server.
+//! Demands: sending, answering, accepting a city, lapsing and the invariant. The views of a
+//! realm's diplomacy (`diplomacyFor`) come with the server.
 
 use super::*;
 use crate::invariants::{check_invariants, world_invariants};

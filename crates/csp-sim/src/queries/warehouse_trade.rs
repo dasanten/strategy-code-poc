@@ -1,6 +1,6 @@
-//! The trade half of `packages/shared/src/warehouse.ts` (`CONTEXT.md`: Trading with the Trade
-//! Organization, Warehouse prices, Delivery, Trade Org debt): quotes and the checks of trade,
-//! buy-off and pay-debt orders. Pure: nothing moves; `trading.rs` moves what they quote.
+//! The trade half of the warehouse queries (`CONTEXT.md`: Trading with the Trade Organization,
+//! Warehouse prices, Delivery, Trade Org debt): quotes and the checks of trade, buy-off and
+//! pay-debt orders. Pure: nothing moves; `trading.rs` moves what they quote.
 
 use crate::mending::{share_of, worn_price};
 use csp_shared::balance::{DELIVERY_FEE_BASE, DELIVERY_FEE_PER_KG_TILE, DELIVERY_LOAD, MAP_SIZE};

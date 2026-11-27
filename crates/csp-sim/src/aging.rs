@@ -1,6 +1,5 @@
-//! Aging (`apps/server/src/aging.ts`, `CONTEXT.md`: Aging, Child): children grow up, residents
-//! die of old age at their lifespan, and declining Strength puts down what it can no longer
-//! carry.
+//! Aging (`CONTEXT.md`: Aging, Child): children grow up, residents die of old age at their
+//! lifespan, and declining Strength puts down what it can no longer carry.
 
 use csp_shared::balance::{GOOD_WEIGHT, MAP_SIZE};
 use csp_shared::world::{DeathCause, Good, Realm, RealmEventWhat, Resident, Stock, WorldState};

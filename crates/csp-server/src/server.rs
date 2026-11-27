@@ -1,6 +1,6 @@
-//! The server's loop (`apps/server/src/index.ts`): opens the database (backing it up before
-//! migrations), loads or creates the world, then ticks once every `TICK_MS` on a schedule that
-//! never drifts, runs the daily jobs, and on SIGINT or SIGTERM saves the world and stops.
+//! The server's loop: opens the database (backing it up before migrations), loads or creates the
+//! world, then ticks once every `TICK_MS` on a schedule that never drifts, runs the daily jobs, and
+//! on SIGINT or SIGTERM saves the world and stops.
 //!
 //! The world lives in a [`Game`] behind a mutex: a tick takes it on the runtime's blocking
 //! threads, and anything else (the sockets, HTTP) reads it only between ticks.

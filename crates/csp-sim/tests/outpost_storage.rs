@@ -1,6 +1,6 @@
-//! `apps/server/src/outpost-storage.test.ts`. Outpost storage (`CONTEXT.md`: Outpost storage): a
-//! storage of no city belongs to the realm whose residents finished it and counts as a storage of
-//! that realm everywhere; a city that grows over it takes it in.
+//! Outpost storage (`CONTEXT.md`: Outpost storage): a storage of no city belongs to the realm
+//! whose residents finished it and counts as a storage of that realm everywhere; a city that grows
+//! over it takes it in.
 
 mod build_common;
 mod ts_match;

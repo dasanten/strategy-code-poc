@@ -1,6 +1,6 @@
-//! Rough walk times and Food for a way (`apps/server/src/walk-time.ts`, `CONTEXT.md`: Step,
-//! Riding, Explore): step by step along the straight way, at the resident's pace on each tile's
-//! terrain, Plains where they haven't explored.
+//! Rough walk times and Food for a way (`CONTEXT.md`: Step, Riding, Explore): step by step along
+//! the straight way, at the resident's pace on each tile's terrain, Plains where they haven't
+//! explored.
 
 use csp_shared::terrain::{terrain_at, wrap, wrap_delta, Terrain, TerrainMap, DIAGONAL_STEP};
 use csp_shared::world::{Resident, WorldState};

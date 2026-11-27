@@ -1,4 +1,4 @@
-//! Wandering traders (`traders.ts`, `CONTEXT.md`: Wandering trader): Trade Org carriages the HQ
+//! Wandering traders (`CONTEXT.md`: Wandering trader): Trade Org carriages the HQ
 //! sends round a fixed loop of its trading posts and itself, apart from the caravans, so posts can
 //! hold goods they don't produce and new Food and Coins reach them. Crew, escort, Food on board and
 //! a lost carriage go as for a caravan, and share its code (`step_crew`). The trader is plain data

@@ -1,9 +1,8 @@
-//! How a city the game runs thinks (`apps/server/src/npc-plan.ts`, `CONTEXT.md`: NPC city;
-//! ADR 0016): once a game hour (`NPC_PLAN_TICKS`), staggered by its id, a planning pass decides
-//! everything that takes thought and keeps the result in the city's plan
-//! (`WorldState.city_plans`): pairs, the next project, and a job for every adult. Between passes the
-//! city only hands idle residents their planned job, and a worker stays where the plan put them
-//! until the next pass moves them.
+//! How a city the game runs thinks (`CONTEXT.md`: NPC city; ADR 0016): once a game hour
+//! (`NPC_PLAN_TICKS`), staggered by its id, a planning pass decides everything that takes thought
+//! and keeps the result in the city's plan (`WorldState.city_plans`): pairs, the next project, and
+//! a job for every adult. Between passes the city only hands idle residents their planned job, and
+//! a worker stays where the plan put them until the next pass moves them.
 
 use std::collections::{HashMap, HashSet};
 

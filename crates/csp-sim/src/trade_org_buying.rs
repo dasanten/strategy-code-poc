@@ -1,4 +1,4 @@
-//! A Trade Org army buys Food on the way (`trade-org-buying.ts`, `CONTEXT.md`: Trade Org debt).
+//! A Trade Org army buys Food on the way (`CONTEXT.md`: Trade Org debt).
 //! Each soldier packs Coins at the HQ, and one short of Food with Coins left goes to a trading
 //! post, NPC city or Player's Food offer near them and buys, by the same trade and accept orders
 //! anyone uses (ADR 0002). Their purse and what they buy are their own (`Punishment.members`), so

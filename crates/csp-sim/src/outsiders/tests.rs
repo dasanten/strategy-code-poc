@@ -1,7 +1,7 @@
-//! `outsiders.test.ts`: who is in a City area, the alarm raised once for each who comes in, and
-//! the `outsiders-sound` invariant. The tests that tick the whole game to watch the Alarm default
-//! script and the `outsidersIn`/`cityAreaAt` script calls run here on `step_outsiders`, where what
-//! they look at is what it decides: the list and the alarm it starts.
+//! Who is in a City area, the alarm raised once for each who comes in, and the `outsiders-sound`
+//! invariant. The tests that tick the whole game to watch the Alarm default script and the
+//! `outsidersIn`/`cityAreaAt` script calls run here on `step_outsiders`, where what they look at is
+//! what it decides: the list and the alarm it starts.
 
 use super::*;
 use crate::combat::attack_order;

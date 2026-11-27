@@ -1,6 +1,6 @@
-//! The game API bound for a running script (`apps/server/src/script-bindings.ts`, `CONTEXT.md`:
-//! Script, Memory, Step budget; ADR 0002). [`crate::script_api`] lists the names and their step
-//! costs; this gives them their meaning for one resident or army in one tick.
+//! The game API bound for a running script (`CONTEXT.md`: Script, Memory, Step budget; ADR 0002).
+//! [`crate::script_api`] lists the names and their step costs; this gives them their meaning for
+//! one resident or army in one tick.
 //!
 //! Queries read only what the Player sees and has explored, and every value a script gets is
 //! built from its script view (ADR 0011), so it holds exactly the view's fields

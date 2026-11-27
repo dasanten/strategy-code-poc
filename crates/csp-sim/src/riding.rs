@@ -1,5 +1,5 @@
-//! Riding (`apps/server/src/riding.ts`, `CONTEXT.md`: Riding): the mount and dismount orders, and
-//! riding ending at the end of a tick when it can't go on.
+//! Riding (`CONTEXT.md`: Riding): the mount and dismount orders, and riding ending at the end of
+//! a tick when it can't go on.
 
 use std::collections::HashSet;
 

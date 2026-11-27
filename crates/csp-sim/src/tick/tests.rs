@@ -1,4 +1,4 @@
-//! `tick.test.ts`. Its tests run on `worldWithCity` (`test_support::world_with_city`), a starting
+//! Tests of the tick. They run on `worldWithCity` (`test_support::world_with_city`), a starting
 //! city whose eight residents work its farm; the ones that only need a world run on an empty one.
 
 use super::*;

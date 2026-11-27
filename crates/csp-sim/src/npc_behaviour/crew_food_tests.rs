@@ -1,5 +1,5 @@
-//! `crew-food.test.ts`'s slow simulation (#1038): a far lumber camp of an NPC village kept at
-//! work for 30 game days, its carrier bringing the crew's Food. The file's other cases are not
+//! The slow simulation of crews' Food (#1038): a far lumber camp of an NPC village kept at work
+//! for 30 game days, its carrier bringing the crew's Food. The other crew Food cases are not
 //! ported yet.
 
 use std::collections::HashMap;

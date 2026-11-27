@@ -1,7 +1,7 @@
-//! Hiring from an NPC city (`apps/server/src/npc-hire.ts`, `CONTEXT.md`: Hiring from an NPC
-//! city): a Player asks an NPC city for a number of its residents, and the city answers at once,
-//! here. Paying and ending go as in any mercenary contract (`step_contracts`). It accepts or
-//! declines, and its lent residents take weapons and armour from its storage.
+//! Hiring from an NPC city (`CONTEXT.md`: Hiring from an NPC city): a Player asks an NPC city for
+//! a number of its residents, and the city answers at once, here. Paying and ending go as in any
+//! mercenary contract (`step_contracts`). It accepts or declines, and its lent residents take
+//! weapons and armour from its storage.
 
 use std::collections::HashSet;
 

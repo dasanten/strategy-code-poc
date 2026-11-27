@@ -1,8 +1,8 @@
-//! `apps/server/src/test-default-scripts.ts`, for the integration tests (T86.17): tasks given as
-//! from the UI, every Player running the game's default scripts unedited (`CONTEXT.md`: Default
-//! script). A Player's version of a task's default has the id `userId * 100` plus the task's
-//! place in `TASKS`, from 1; Run script runs it by that id. Other scripts of theirs go in
-//! `library`, by id. Every Player has explored the whole map.
+//! A test host for the integration tests (T86.17): tasks given as from the UI, every Player
+//! running the game's default scripts unedited (`CONTEXT.md`: Default script). A Player's version
+//! of a task's default has the id `userId * 100` plus the task's place in `TASKS`, from 1; Run
+//! script runs it by that id. Other scripts of theirs go in `library`, by id. Every Player has
+//! explored the whole map.
 
 #![allow(dead_code)]
 

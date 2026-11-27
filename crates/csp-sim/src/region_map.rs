@@ -1,4 +1,4 @@
-//! The Region map's invariant (`apps/server/src/region-map.ts`, ADR 0004).
+//! The Region map's invariant (ADR 0004).
 
 use std::collections::HashSet;
 

@@ -1,8 +1,7 @@
-//! `build-line.test.ts`: Build line (`CONTEXT.md`: Build line; ADR 0018), a task with its own
-//! default script, given with the line's two picked ends. The builder walks to the line, builds
-//! each tile still to build with what they carry first and stone fetched from storage when it
-//! runs out; with none in any storage they lay out every tile's site and end, saying why. Started
-//! without a line it ends.
+//! Build line (`CONTEXT.md`: Build line; ADR 0018), a task with its own default script, given with
+//! the line's two picked ends. The builder walks to the line, builds each tile still to build with
+//! what they carry first and stone fetched from storage when it runs out; with none in any storage
+//! they lay out every tile's site and end, saying why. Started without a line it ends.
 
 use std::collections::HashSet;
 use std::sync::Arc;

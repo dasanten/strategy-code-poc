@@ -1,6 +1,6 @@
-//! `apps/server/src/invariants.test.ts`, ported (T86.13). Its `worldWithCity()` is the fixture
-//! `sight/city.json` (`createWorld(cityTerrain())` and `foundStartingCity` for Player 1) on
-//! `cityTerrain()`, generated here (`generateTerrain(1, 1536)`).
+//! The invariants (T86.13). Its `worldWithCity()` is the fixture `sight/city.json`
+//! (`createWorld(cityTerrain())` and `foundStartingCity` for Player 1) on `cityTerrain()`,
+//! generated here (`generateTerrain(1, 1536)`).
 
 mod common;
 

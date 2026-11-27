@@ -22,8 +22,8 @@ The server is Rust (ADR 0030), the client TypeScript. One cargo workspace at the
 | `packages/balance`      | The balance numbers the client reads, generated (`pnpm balance:rust`)                                 |
 | `packages/lang-wasm`    | The module as the client loads it (`pnpm wasm:build`) and the script tables (`pnpm script-data:rust`) |
 
-The TypeScript server, `packages/shared` and `packages/lang` were the frozen specification of the
-port and were deleted at the cutover (T88.6); the last commit with them is `21f7a29e`. The Rust
+The TypeScript server and its packages were the frozen specification of the port and were deleted
+at the cutover (T88.6); the last commit with them is `21f7a29e`. The Rust
 tests still compare against what they wrote, in `crates/csp-sim/fixtures/` (frozen; see its
 README).
 
@@ -97,11 +97,15 @@ pnpm nightly:ignored  # test:ignored, appended to .claude/worktrees/nightly-year
 pnpm generate      # all generated files (the two below and script-data.json); run it after a merge
 pnpm types:rust    # the client's types from the crates (commit packages/shared-types/src/generated)
 pnpm balance:rust  # the client's balance numbers from csp-shared/src/balance
+pnpm script-data:rust  # the script tables the editor checks against (packages/lang-wasm/script-data.json)
+pnpm wasm:build    # the rules and checker as WebAssembly (typecheck and test run it first)
+pnpm art:pixel     # the pixel art from art/pixel (needs Aseprite)
 pnpm build         # type-check and bundle the client
 pnpm start         # run the server in release
 pnpm test          # Vitest, the client's full suite
 pnpm check [base]  # regenerate, lint, typecheck and the client tests affected by changes against base
 pnpm lint          # ESLint
+pnpm knip          # unused exports, files and dependencies
 pnpm format        # Prettier
 ```
 
@@ -189,8 +193,7 @@ checkpoints into the same directory, over the old ones of the same days.
 
 The server stores everything in `data/world.db` (override with `DB_PATH`). The world lives in
 memory and is saved as a gzipped snapshot every 30 ticks and on shutdown; old saves are pruned
-(ADR 0006). A dev world the TypeScript server made sits in `apps/server/data/world.db` of an older
-checkout; copy it to `data/world.db` to keep playing it.
+(ADR 0006).
 
 - **Table changes:** a new step in `crates/csp-server/src/db/migrations.rs`; migrations run on
   startup.

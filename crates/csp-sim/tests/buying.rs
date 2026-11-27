@@ -1,5 +1,4 @@
-//! `apps/server/src/buying.test.ts`, one test per `it`. The invariants (`checkInvariants`) come
-//! with T86.13.
+//! Buying, one test per case. The invariants (`checkInvariants`) come with T86.13.
 
 mod common;
 mod goods_support;

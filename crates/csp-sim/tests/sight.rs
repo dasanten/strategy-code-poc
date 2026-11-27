@@ -1,6 +1,5 @@
-//! `apps/server/src/sight.test.ts`, ported one to one. The worlds it starts from
-//! (`worldWithCity`, two and three Players' starting cities on `cityTerrain()`) come from
-//! `fixtures/sight/`, written by `scripts/dump-fixtures.mts`; sight needs only the map's size.
+//! Sight. The worlds it starts from (`worldWithCity`, two and three Players' starting cities on
+//! `cityTerrain()`) come from `fixtures/sight/`; sight needs only the map's size.
 
 mod common;
 

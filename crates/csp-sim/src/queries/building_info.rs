@@ -1,6 +1,5 @@
 //! What each kind of building is for, in words, and everything the ⓘ on a building's card says
-//! about its kind (`packages/shared/src/building-info.ts`). No numbers typed into the text: they
-//! come from the balance.
+//! about its kind. No numbers typed into the text: they come from the balance.
 
 use csp_shared::balance::Recipe;
 use csp_shared::building_spec::BuildMenu;

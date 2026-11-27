@@ -1,6 +1,5 @@
-//! The world's territory (`apps/server/src/territory.ts`, `CONTEXT.md`: Territory), recomputed
-//! once a game hour. Derived from the world, never saved; shown only, so being up to a game hour
-//! old matters to no rule.
+//! The world's territory (`CONTEXT.md`: Territory), recomputed once a game hour. Derived from the
+//! world, never saved; shown only, so being up to a game hour old matters to no rule.
 
 use csp_shared::terrain::TerrainMap;
 use csp_shared::time::TICKS_PER_GAME_HOUR;

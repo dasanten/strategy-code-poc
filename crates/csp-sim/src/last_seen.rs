@@ -1,6 +1,6 @@
-//! Last seen (`apps/server/src/last-seen.ts`, `CONTEXT.md`: Last seen): what each Player
-//! remembers of buildings and cities once out of their sight, brought up to date for each realm
-//! once every `LAST_SEEN_EVERY_TICKS`, staggered by its id (T49.9).
+//! Last seen (`CONTEXT.md`: Last seen): what each Player remembers of buildings and cities once
+//! out of their sight, brought up to date for each realm once every `LAST_SEEN_EVERY_TICKS`,
+//! staggered by its id (T49.9).
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

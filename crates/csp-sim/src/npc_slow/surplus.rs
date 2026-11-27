@@ -1,4 +1,4 @@
-//! `npc-surplus.test.ts`, its slow simulation: a town's spare hands work for surplus on the map.
+//! Slow simulation: a town's spare hands work for surplus on the map.
 
 use csp_shared::balance::{NPC_SURPLUS_CAP, NPC_TOWN};
 use csp_shared::time::TICKS_PER_GAME_DAY;

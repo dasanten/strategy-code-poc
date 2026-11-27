@@ -1,4 +1,4 @@
-//! The world-state types of `packages/shared/src/warehouse.ts`.
+//! The world-state types of warehouses.
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;

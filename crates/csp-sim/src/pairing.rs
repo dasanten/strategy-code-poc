@@ -1,7 +1,7 @@
-//! Pairing, carrying and children (`CONTEXT.md`: Pairing, Carrying, Child), ported from
-//! `apps/server/src/pairing.ts`: a pair requests a carry once its wait is over and a birth once the
-//! carrying is done (ADR 0002); the world resolves them at the end of the tick. The pair order is
-//! a plain `validate`/`apply` pair for the order queue (T86.2) to wire.
+//! Pairing, carrying and children (`CONTEXT.md`: Pairing, Carrying, Child): a pair requests a carry
+//! once its wait is over and a birth once the carrying is done (ADR 0002); the world resolves them
+//! at the end of the tick. The pair order is a plain `validate`/`apply` pair for the order queue
+//! (T86.2) to wire.
 
 use std::collections::HashMap;
 

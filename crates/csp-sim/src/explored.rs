@@ -1,7 +1,7 @@
 //! Every Player's explored terrain (`CONTEXT.md`: Explored terrain), one bit per tile, kept in
-//! memory: the in-memory half of `apps/server/src/explored.ts`. The database comes with Epic 87,
-//! so the bitmaps go in and out as `Vec<u8>` ([`ExploredTerrain::from_bitmaps`],
-//! [`ExploredTerrain::bitmap`]) and [`ExploredTerrain::take_dirty`] says which to write.
+//! memory. The database comes with Epic 87, so the bitmaps go in and out as `Vec<u8>`
+//! ([`ExploredTerrain::from_bitmaps`], [`ExploredTerrain::bitmap`]) and
+//! [`ExploredTerrain::take_dirty`] says which to write.
 //!
 //! The bit layout is the TypeScript's: tile `t = y * size + x` is bit `t & 7` of byte `t >> 3`.
 

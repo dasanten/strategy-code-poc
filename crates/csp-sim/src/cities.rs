@@ -1,5 +1,4 @@
-//! Cities as places (`CONTEXT.md`: City building, Outpost storage, Town hall), ported from
-//! `apps/server/src/cities.ts`.
+//! Cities as places (`CONTEXT.md`: City building, Outpost storage, Town hall).
 
 use std::collections::{HashMap, HashSet};
 

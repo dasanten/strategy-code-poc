@@ -1,9 +1,10 @@
-//! `npc-big-city.test.ts`: a staged city of about 110 run for 40 game days (ADR 0029), held to
-//! what it shows (T80.11). `--nocapture` shows its jobs and who stands on the storage.
+//! A staged city of about 110 run for 40 game days (ADR 0029), held to what it shows (T80.11).
+//! `--nocapture` shows its jobs and who stands on the storage.
 //!
-//! On a map with room it holds its idle share, as it goes on founding. Alone on a map too small for
-//! a daughter, with no warehouse for its traders, it stays busy to game day 60 all the same (T97.9):
-//! its idle share counts its soldiers just standing on a post (`CONTEXT.md`: Soldiers in peace).
+//! On a map with room it holds its idle share, as it goes on founding. Alone on a map too small
+//! for a daughter, with no warehouse for its traders, it stays busy to game day 60 all the same
+//! (T97.9): its idle share counts its soldiers just standing on a post (`CONTEXT.md`: Soldiers in
+//! peace).
 
 use csp_shared::balance::{NPC_FOUND_PARTY_MOST, NPC_PLAN_TICKS, NPC_VILLAGE};
 use csp_shared::time::TICKS_PER_GAME_DAY;

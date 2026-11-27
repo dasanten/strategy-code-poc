@@ -1,11 +1,9 @@
-//! `lost-post.test.ts`, one test per `it`: a captured trading post is a crime nobody knows of
-//! until a wandering trader or a witness brings the news (`CONTEXT.md`: Trading post, Crime,
-//! Wandering trader).
+//! A captured trading post is a crime nobody knows of until a wandering trader or a witness brings
+//! the news (`CONTEXT.md`: Trading post, Crime, Wandering trader), one test per case.
 //!
-//! lost-post.test.ts: saves from before / stay as they are: posts lost before were never heard of.
-//! That is the TypeScript's migration step 83, long before the freeze: the Rust server reads saves
-//! from the freeze (format 111) on (`csp-server`'s `world_format.rs`, ADR 0030), so the step
-//! and its test stay in TypeScript.
+//! Saves from before stay as they are: posts lost before were never heard of. That was a migration
+//! step long before the freeze: the Rust server reads saves from the freeze (format 111) on
+//! (`csp-server`'s `world_format.rs`, ADR 0030), so the step and its test are not in Rust.
 
 use std::sync::Arc;
 

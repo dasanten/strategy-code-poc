@@ -1,6 +1,6 @@
-//! The teach order (`apps/server/src/teaching.ts`, `CONTEXT.md`: Teacher): a grown resident
-//! teaches a stat or a skill at the finished training ground they stand on. A ground has one
-//! teacher at a time; teaching itself puts nothing into the world, trainees learn from it.
+//! The teach order (`CONTEXT.md`: Teacher): a grown resident teaches a stat or a skill at the
+//! finished training ground they stand on. A ground has one teacher at a time; teaching itself
+//! puts nothing into the world, trainees learn from it.
 
 use std::collections::HashSet;
 

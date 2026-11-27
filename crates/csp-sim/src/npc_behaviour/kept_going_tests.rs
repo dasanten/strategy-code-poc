@@ -1,6 +1,5 @@
-//! `apps/server/src/npc-residents-kept-going.test.ts`: residents an NPC city runs are never left
-//! doing nothing (`CONTEXT.md`: NPC city), whether Carrying a child, taken on after a Leader's
-//! death, or stuck in a running world.
+//! Residents an NPC city runs are never left doing nothing (`CONTEXT.md`: NPC city), whether
+//! Carrying a child, taken on after a Leader's death, or stuck in a running world.
 
 use std::sync::Arc;
 

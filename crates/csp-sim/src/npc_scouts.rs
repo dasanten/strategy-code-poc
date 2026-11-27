@@ -1,8 +1,8 @@
-//! An NPC city's scouts (`apps/server/src/npc-scouts.ts`, `CONTEXT.md`: Scout; ADR 0026). They
-//! run the game's Explore default like a Player's explorer, but what is unexplored is what their
-//! city doesn't know. A city's knowledge goes by sectors (`NPC_SCOUT_SECTOR`), so it stays small
-//! plain data: `City.scouted`, the sectors scouts brought home, and `CityPlan.scouts`, what each
-//! scout out has seen and not brought home yet.
+//! An NPC city's scouts (`CONTEXT.md`: Scout; ADR 0026). They run the game's Explore default like
+//! a Player's explorer, but what is unexplored is what their city doesn't know. A city's knowledge
+//! goes by sectors (`NPC_SCOUT_SECTOR`), so it stays small plain data: `City.scouted`, the sectors
+//! scouts brought home, and `CityPlan.scouts`, what each scout out has seen and not brought home
+//! yet.
 
 use std::f64::consts::{FRAC_1_SQRT_2, PI};
 

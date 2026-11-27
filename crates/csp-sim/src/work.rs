@@ -1,6 +1,6 @@
-//! The work-at order (`apps/server/src/work.ts`, `CONTEXT.md`: Workplace): a resident works the
-//! finished workplace on their tile, making its good, or at a smelter, mint or smithy the batches
-//! of their recipe while its input is there.
+//! The work-at order (`CONTEXT.md`: Workplace): a resident works the finished workplace on their
+//! tile, making its good, or at a smelter, mint or smithy the batches of their recipe while its
+//! input is there.
 
 use std::collections::HashMap;
 

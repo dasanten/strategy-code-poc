@@ -1,8 +1,8 @@
-//! Orders along a line (`apps/server/src/road-line.ts`, `CONTEXT.md`: Road, Wall / Gate): one of
-//! the Player's adult residents builds road or wall on each tile of the straight or diagonal line
-//! between two tiles, one after another, walking from tile to tile. Walking, laying out and
-//! working happen in later ticks (`building.rs`); the puts of materials (`requestRoadMaterials`)
-//! are requested here and resolved with carrying.
+//! Orders along a line (`CONTEXT.md`: Road, Wall / Gate): one of the Player's adult residents
+//! builds road or wall on each tile of the straight or diagonal line between two tiles, one after
+//! another, walking from tile to tile. Walking, laying out and working happen in later ticks
+//! (`building.rs`); the puts of materials (`requestRoadMaterials`) are requested here and resolved
+//! with carrying.
 
 use csp_shared::balance::{MAP_SIZE, ROAD_LINE_MAX_TILES};
 use csp_shared::terrain::TerrainMap;

@@ -1,4 +1,4 @@
-//! `apps/server/src/alliances.test.ts`, on hand-made realms instead of starting cities (T86.8).
+//! The alliance orders and tick, on hand-made realms instead of starting cities (T86.8).
 //! Left out: `checkInvariants`/`alliancesSound` (T86.13) and the `diplomacyFor` view (T87.6, with
 //! the sync); a Leader's death goes through `leave_on_leader_death` and ends the realm by hand, as
 //! `dieAll` (T86.3) does.

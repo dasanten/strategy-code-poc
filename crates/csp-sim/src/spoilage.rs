@@ -1,4 +1,4 @@
-//! Spoilage (`apps/server/src/spoilage.ts`, `CONTEXT.md`: Spoilage).
+//! Spoilage (`CONTEXT.md`: Spoilage).
 
 use csp_shared::balance::FOOD_SPOIL_PER_DAY;
 use csp_shared::time::TICKS_PER_GAME_DAY;

@@ -1,8 +1,7 @@
-//! The game's default scripts (`packages/shared/src/default-scripts.ts`, `CONTEXT.md`: Default
-//! script; ADR 0009): the script behind each task the UI can give, written in the game's own
-//! language. Their names and sources are in [`crate::script_tables`]; what giving a
-//! task writes into `memory` (`TaskMemory`) is plain data the task order builds (T86.12's
-//! `task` order in `script_runner`).
+//! The game's default scripts (`CONTEXT.md`: Default script; ADR 0009): the script behind each
+//! task the UI can give, written in the game's own language. Their names and sources are in
+//! [`crate::script_tables`]; what giving a task writes into `memory` (`TaskMemory`) is plain data
+//! the task order builds (T86.12's `task` order in `script_runner`).
 
 use csp_lang::{ParamInfo, ParamType};
 use csp_shared::world::Task;

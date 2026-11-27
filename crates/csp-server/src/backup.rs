@@ -1,4 +1,4 @@
-//! Backups (`backup.ts`, ADR 0007): SQLite's online backup into a dated file, 14 days kept.
+//! Backups (ADR 0007): SQLite's online backup into a dated file, 14 days kept.
 use std::{
     fs,
     path::{Path, PathBuf},

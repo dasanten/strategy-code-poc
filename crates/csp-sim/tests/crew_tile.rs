@@ -1,5 +1,3 @@
-//! `apps/server/src/crew-tile.test.ts`, ported one to one.
-//!
 //! Crews spread over the footprint (`CONTEXT.md`: Spreading over the footprint): the Work, Build
 //! and Breed horses defaults send each resident to the footprint tile with the fewest of the crew
 //! on it, the nearest on ties, through `crewTile`. Which tile they stand on changes nothing else.

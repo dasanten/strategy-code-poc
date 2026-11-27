@@ -1,4 +1,4 @@
-//! `apps/server/src/region-map.test.ts`, and the Region map per chunk (T99.8, ADR 0034).
+//! The Region map's tests, and the Region map per chunk (T99.8, ADR 0034).
 
 use std::collections::BTreeMap;
 

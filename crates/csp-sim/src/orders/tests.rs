@@ -1,6 +1,5 @@
-//! `orders.ts` has no test file of its own: the TypeScript tests it through every order kind's
-//! tests. These check the queue itself (`receive`, `applyAll`) with the queue tests' stand-in
-//! kinds.
+//! The order queue itself is tested through every order kind's tests. These check the queue
+//! (`receive`, `applyAll`) with the queue tests' stand-in kinds.
 
 use super::*;
 use crate::queues::tests::{me, setup};

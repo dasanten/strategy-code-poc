@@ -1,4 +1,4 @@
-//! `packages/lang/src/interpreter.test.ts`, ported one to one.
+//! The interpreter's cases: evaluation, scopes and closures, the step budget and runtime errors.
 
 mod support;
 

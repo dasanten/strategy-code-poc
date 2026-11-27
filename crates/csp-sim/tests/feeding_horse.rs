@@ -1,5 +1,5 @@
-//! `apps/server/src/feeding-horse.test.ts`, ported (T86.17): feeding a horse (`CONTEXT.md`): any
-//! grown resident next to a horse that isn't full can Feed it.
+//! Feeding a horse (T86.17; `CONTEXT.md`): any grown resident next to a horse that isn't full can
+//! Feed it.
 
 mod build_common;
 mod p_scripts_host;

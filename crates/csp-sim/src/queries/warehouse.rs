@@ -1,5 +1,4 @@
-//! Trade Org warehouse queries of `packages/shared/src/warehouse.ts`, read only (`CONTEXT.md`:
-//! Warehouse, Stock floor, Warehouse prices).
+//! Trade Org warehouse queries, read only (`CONTEXT.md`: Warehouse, Stock floor, Warehouse prices).
 
 use csp_shared::balance::{
     BUY_SHARE, HQ_FLOOR_FACTOR, HQ_FOOD_FLOOR_FACTOR, PRICE_ELASTICITY, PRICE_RANGE,

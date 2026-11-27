@@ -1,4 +1,4 @@
-//! The founding invariants (`npc-founding.ts`; ADR 0004).
+//! The founding invariants (ADR 0004).
 
 use std::collections::HashMap;
 

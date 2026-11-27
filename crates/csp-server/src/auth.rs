@@ -1,6 +1,5 @@
-//! Accounts, sessions and invite codes (`apps/server/src/auth.ts`, ADR 0005): scrypt password hashes
-//! the TypeScript server wrote verify here and the other way round, session tokens kept only as a
-//! hash, single-use invite codes and the per-name login back-off.
+//! Accounts, sessions and invite codes (ADR 0005): scrypt password hashes, session tokens kept only
+//! as a hash, single-use invite codes and the per-name login back-off.
 //!
 //! Times are milliseconds since the epoch, as `Date.now()`; the database keeps whole seconds, as
 //! Drizzle's `mode: 'timestamp'` columns do.

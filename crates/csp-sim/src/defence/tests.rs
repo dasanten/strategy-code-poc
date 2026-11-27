@@ -1,6 +1,6 @@
-//! `apps/server/src/defence.test.ts`: the defence invariants. The rest of that file runs the Defend
-//! default and Players' defence scripts through the script runner, T86.12's; `start_defence` and
-//! the drivers' and passengers' reactions are covered by `combat`'s tests.
+//! The defence invariants. Running the Defend default and Players' defence scripts through the
+//! script runner is T86.12's; `start_defence` and the drivers' and passengers' reactions are
+//! covered by `combat`'s tests.
 
 use csp_shared::world::{
     DriveOrder, Interrupted, ResidentOrder, RunningScript, Struck, Tile, WorldState,

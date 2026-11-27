@@ -1,6 +1,5 @@
-//! "climbing a wall" of `apps/server/src/wall-breaking.test.ts`. "a climber can’t defend
-//! themselves" is combat's (T86.7) and "the invariant catches a climber away from their tile"
-//! comes with `climbOrdersSound` (T86.13).
+//! Climbing a wall. "A climber can’t defend themselves" is combat's (T86.7) and "the invariant
+//! catches a climber away from their tile" comes with `climbOrdersSound` (T86.13).
 
 use csp_shared::balance::CLIMB_TICKS;
 use csp_shared::terrain::TerrainMap;

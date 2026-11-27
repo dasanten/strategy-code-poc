@@ -1,5 +1,5 @@
-//! Trade Organization queries of `packages/shared/src/trade-org.ts` and `tradeOrgRefuses` of
-//! `standing.ts` (`CONTEXT.md`: Trade Organization, Trade Org HQ, Trade Org reaction).
+//! Trade Organization queries, and `tradeOrgRefuses` (`CONTEXT.md`: Trade Organization, Trade Org
+//! HQ, Trade Org reaction).
 
 use csp_shared::balance::TRADE_ORG_REFUSES_TRADE_BELOW;
 use std::collections::{HashMap, HashSet};

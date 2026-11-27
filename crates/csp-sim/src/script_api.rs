@@ -1,8 +1,7 @@
-//! The game API as a script sees it (`packages/shared/src/script-api.ts`, `CONTEXT.md`: Script,
-//! Memory, Step budget; ADR 0002): the built-in names a running script gets, as plain data, so
-//! the server binds them and the editor can list them. A resident's script gets [`SCRIPT_API`],
-//! an army's [`ARMY_SCRIPT_API`]: the same values and queries, but army actions. The tables are
-//! in [`crate::script_tables`].
+//! The game API as a script sees it (`CONTEXT.md`: Script, Memory, Step budget; ADR 0002): the
+//! built-in names a running script gets, as plain data, so the server binds them and the editor
+//! can list them. A resident's script gets [`SCRIPT_API`], an army's [`ARMY_SCRIPT_API`]: the same
+//! values and queries, but army actions. The tables are in [`crate::script_tables`].
 
 use csp_lang::{ParamInfo, ParamType, PARAM_TYPES};
 use serde_json::Value;

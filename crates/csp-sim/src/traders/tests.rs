@@ -1,4 +1,4 @@
-//! `apps/server/src/traders.test.ts`, ported one to one.
+//! Tests of wandering traders.
 
 use std::sync::Arc;
 

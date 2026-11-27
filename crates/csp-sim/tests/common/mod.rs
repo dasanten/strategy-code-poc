@@ -1,5 +1,4 @@
-//! Loading the fixtures of `scripts/dump-fixtures.mts` and comparing JSON as the TypeScript
-//! wrote it.
+//! Loading the fixtures under `crates/csp-sim/fixtures/` and comparing JSON.
 
 #![allow(dead_code)]
 

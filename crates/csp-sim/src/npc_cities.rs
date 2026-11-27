@@ -1,6 +1,6 @@
-//! The world's NPC cities come to be (`apps/server/src/npc-cities.ts`, `npc-horses.ts`,
-//! `CONTEXT.md`: NPC city, NPC horses): towns and villages by region (`land_sites`), each laid out
-//! as a starting city is, on a site out of every Player's sight, with its first horses.
+//! The world's NPC cities come to be (`CONTEXT.md`: NPC city, NPC horses): towns and villages by
+//! region (`land_sites`), each laid out as a starting city is, on a site out of every Player's
+//! sight, with its first horses.
 
 use std::collections::HashSet;
 

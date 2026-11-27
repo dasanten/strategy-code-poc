@@ -1,6 +1,5 @@
-//! `npc-alliances.test.ts`: NPC cities in alliances (`CONTEXT.md`: Alliance). Its case on the
-//! `diplomacyFor` view and the shared walls is in `crates/csp-server/tests/npc_alliances.rs`,
-//! where `diplomacy_for` is.
+//! NPC cities in alliances (`CONTEXT.md`: Alliance). Its case on the `diplomacyFor` view and the
+//! shared walls is in `crates/csp-server/tests/npc_alliances.rs`, where `diplomacy_for` is.
 
 use std::sync::Arc;
 

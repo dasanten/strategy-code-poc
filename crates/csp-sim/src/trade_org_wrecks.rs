@@ -1,4 +1,4 @@
-//! The Trade Organization's second step on a debt (`trade-org-wrecks.ts`, `CONTEXT.md`: Trade Org
+//! The Trade Organization's second step on a debt (`CONTEXT.md`: Trade Org
 //! debt; ADR 0025): past the deadline its army goes to that city and tears down workplaces of it,
 //! each counting for its worth against the debt, until the debt is covered or none are left. Its
 //! soldiers only hold tear-down orders like any Player's (ADR 0002); the crime and what falls to the

@@ -1,6 +1,6 @@
-//! `horses-down-crews.test.ts`, one test per `it`: caravans and wandering traders whose horse is
-//! Down (`CONTEXT.md`: Down; bug #993) stand on the road with their load, their drivers given no
-//! drive order, and give up nothing for the drives they don't make.
+//! Caravans and wandering traders whose horse is Down (`CONTEXT.md`: Down; bug #993), one test per
+//! case: they stand on the road with their load, their drivers given no drive order, and give up
+//! nothing for the drives they don't make.
 
 mod common;
 mod goods_support;

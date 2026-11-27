@@ -1,4 +1,4 @@
-//! A resident's script log (`apps/server/src/script-log.ts`, `CONTEXT.md`: Script log).
+//! A resident's script log (`CONTEXT.md`: Script log).
 
 use csp_lang::js::{number_to_string, utf16_len};
 use csp_shared::balance::{DOING_MAX_LENGTH, SCRIPT_LOG_LINES};

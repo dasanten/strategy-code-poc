@@ -1,5 +1,4 @@
-//! The helpers of `packages/shared/src/balance.ts` and `world.ts` that take a world type: age,
-//! stats, Hunger, weapons, weights, Down, horse stats.
+//! The helpers that take a world type: age, stats, Hunger, weapons, weights, Down, horse stats.
 
 use csp_shared::balance::{
     ADULT_AGE, AGILITY_AVERAGE, AGILITY_LIMIT, AGILITY_SPEED_EFFECT, AGILITY_TERRAIN_EFFECT,

@@ -1,8 +1,8 @@
-//! `apps/server/src/hauling.test.ts`, one test per `it`, the routes by the haul order. Carriages
-//! drive with the goods tests' stand-in for `Walking` (`StraightWalk`, until T86.4). Left to
-//! later tickets: the routes as the Haul task (the default scripts, T86.12), "breaks the
-//! invariants when broken" (`drivers-on-carriages`, `haul-routes-sound`, T86.13) and the restart
-//! through the database (T87); here the restart is a round trip of the world through its JSON.
+//! Hauling, one test per case, the routes by the haul order. Carriages drive with the goods tests'
+//! stand-in for `Walking` (`StraightWalk`, until T86.4). Left to later tickets: the routes as the
+//! Haul task (the default scripts, T86.12), "breaks the invariants when broken"
+//! (`drivers-on-carriages`, `haul-routes-sound`, T86.13) and the restart through the database
+//! (T87); here the restart is a round trip of the world through its JSON.
 
 mod common;
 #[macro_use]

@@ -1,8 +1,7 @@
-//! The live-world check for undeclared fields (`field-check.test.ts`, the `check-fields` half).
+//! The live-world check for undeclared fields (the `check-fields` half).
 //!
-//! The first tests check against a small environment with the names the TypeScript tests' scripts
-//! use; the rest against the game's own (`scriptCheckEnv`), with the realm-log notes
-//! (`noteScriptViewChanges`).
+//! The first tests check against a small environment with names of their own; the rest against the
+//! game's own (`scriptCheckEnv`), with the realm-log notes (`noteScriptViewChanges`).
 use std::collections::HashMap;
 
 use csp_lang::{CheckEnv, CheckedGlobal, CheckedType};

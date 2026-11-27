@@ -1,8 +1,8 @@
-//! `apps/server/src/output-food-storages.test.ts`, ported (T86.17, part 5): separate output and
-//! food storages (`CONTEXT.md`: Script parameter, Carrying the output, Getting food, Crew food).
-//! The Work default keeps `storage` as its main storage, and `output` and `food` each take its
-//! place for one use while picked; Build, Build line and Tear down get Food at `food`, else their
-//! `source`. Unset, each falls back to the main one, then the nearest storage.
+//! Separate output and food storages (T86.17, part 5; `CONTEXT.md`: Script parameter, Carrying the
+//! output, Getting food, Crew food). The Work default keeps `storage` as its main storage, and
+//! `output` and `food` each take its place for one use while picked; Build, Build line and Tear
+//! down get Food at `food`, else their `source`. Unset, each falls back to the main one, then the
+//! nearest storage.
 
 mod build_common;
 mod scripts_common;

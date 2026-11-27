@@ -1,5 +1,6 @@
-//! Paying an NPC city's demand (`CONTEXT.md`: NPC demand, Demand): by a Transfer to the city, which
-//! settles its threat and standing toward the payer. From `setup()` of `transfers.fixture.ts`.
+//! Paying an NPC city's demand (`CONTEXT.md`: NPC demand, Demand): by a Transfer to the city,
+//! which settles its threat and standing toward the payer. From the fixture
+//! `fixtures/trade/transfers.json`.
 
 mod common;
 #[path = "goods_support/mod.rs"]

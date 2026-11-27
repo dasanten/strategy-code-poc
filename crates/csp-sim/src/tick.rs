@@ -1,5 +1,5 @@
-//! One tick of the simulation with monitoring around it (`apps/server/src/tick.ts`, ADR 0004):
-//! the phases in their order, their timer, tick health and the reporter it goes to.
+//! One tick of the simulation with monitoring around it (ADR 0004): the phases in their order,
+//! their timer, tick health and the reporter it goes to.
 //!
 //! What the TypeScript passes in as optional collaborators (`TickOptions.orders`, `queues`,
 //! `scripts`, `walking`) are traits here, so this file does not change when the tickets that

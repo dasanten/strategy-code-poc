@@ -1,6 +1,6 @@
-//! `npc-founding.test.ts`: full cities found daughters (`CONTEXT.md`: Full city, Founding): a
-//! city idle and short of nothing for a game week sends a founding party to a free site, which
-//! builds a town hall there and grows into a village of its own.
+//! Full cities found daughters (`CONTEXT.md`: Full city, Founding): a city idle and short of
+//! nothing for a game week sends a founding party to a free site, which builds a town hall there
+//! and grows into a village of its own.
 
 use csp_shared::balance::ticks_for_age;
 use csp_shared::balance::{

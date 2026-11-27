@@ -1,7 +1,7 @@
-//! `npc-needs-grow.test.ts`, one test per `it` (two for its `it.each`): needs grow with the city
-//! (`CONTEXT.md`: NPC reserve, Spare hands' work, NPC road, NPC city; ADR 0029): the Wood and Stone
-//! it keeps, its surplus caps, builders and road crew; a big city's second workplace; and farms
-//! built only for the farmers it wants. The big city is `npc_slow`'s staged one (`bigCity()`).
+//! Needs grow with the city (`CONTEXT.md`: NPC reserve, Spare hands' work, NPC road, NPC city; ADR
+//! 0029): the Wood and Stone it keeps, its surplus caps, builders and road crew; a big city's
+//! second workplace; and farms built only for the farmers it wants. The big city is `npc_slow`'s
+//! staged one.
 
 use csp_shared::balance::{
     BUILD_MATERIALS, NPC_BUILDERS, NPC_FOUND_FOOD_SURPLUS_SHARE, NPC_RESIDENTS_PER_NEEDS_STEP,

@@ -1,4 +1,4 @@
-//! `alarm-theft.test.ts`: a theft seen, and force at home (`CONTEXT.md`: Alarm, Crime; ADR 0028).
+//! A theft seen, and force at home (`CONTEXT.md`: Alarm, Crime; ADR 0028).
 //! A theft from a realm in its City area raises an alarm for those there who see it, and in that
 //! area striking someone occupying the town hall, or a thief the realm knows of, is no crime.
 

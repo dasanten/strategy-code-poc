@@ -1,7 +1,6 @@
-//! Where an NPC city's soldiers stand between fights (`apps/server/src/npc-posts.ts`,
-//! `CONTEXT.md`: Soldier posts; ADR 0029): first on its town hall, then at its gates and along its
-//! wall. Nothing about it is stored: their posts follow from their ids and what the city has,
-//! worked out in the pass that sends them.
+//! Where an NPC city's soldiers stand between fights (`CONTEXT.md`: Soldier posts; ADR 0029):
+//! first on its town hall, then at its gates and along its wall. Nothing about it is stored: their
+//! posts follow from their ids and what the city has, worked out in the pass that sends them.
 
 use std::collections::{HashMap, HashSet};
 

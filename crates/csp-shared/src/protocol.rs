@@ -1,8 +1,6 @@
-//! What a Player sees (`CONTEXT.md`: Sight): the `Seen*` views of `packages/shared/src/protocol.ts`
-//! and `world.ts` that sight hands out and sync sends. They serialise to the JSON the TypeScript
-//! server sends, field for field, since the client reads them unchanged until the cutover
-//! (ADR 0030). A field the TypeScript leaves out is an `Option` skipped when `None`; one it sends
-//! as `null` is an `Option` without the skip.
+//! What a Player sees (`CONTEXT.md`: Sight): the `Seen*` views that sight hands out and sync sends.
+//! They serialise to the JSON the client reads, field for field. A field that is left out is an
+//! `Option` skipped when `None`; one that is sent as `null` is an `Option` without the skip.
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};

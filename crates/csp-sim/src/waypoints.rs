@@ -1,8 +1,7 @@
-//! Waypoints (`apps/server/src/waypoints.ts` and shared `waypoints.ts`, `CONTEXT.md`: Waypoint):
-//! the Player's own marks on the map. Putting one down, renaming or removing it is plain data,
-//! free, at once and from anywhere, which a script could request as well (ADR 0002). They are
-//! kept by account id (`WorldState.waypoints`), not by realm, so a Leader death leaves them where
-//! they are.
+//! Waypoints (`CONTEXT.md`: Waypoint): the Player's own marks on the map. Putting one down,
+//! renaming or removing it is plain data, free, at once and from anywhere, which a script could
+//! request as well (ADR 0002). They are kept by account id (`WorldState.waypoints`), not by realm,
+//! so a Leader death leaves them where they are.
 
 use csp_lang::js::{number_to_string, trim, utf16_len};
 use csp_shared::balance::{WAYPOINTS_MAX, WAYPOINT_NAME_MAX_LENGTH};

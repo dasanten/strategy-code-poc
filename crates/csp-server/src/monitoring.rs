@@ -1,7 +1,7 @@
-//! Monitoring (`apps/server/src/monitoring.ts`, ADR 0004): the tick reporter that sends what a
-//! tick found to the log and to Sentry, with the same tags, fingerprints and metrics as the
-//! TypeScript, plus the rolling tick health summary ([`crate::tick_window`]) logged once a minute.
-//! Without a Sentry DSN every Sentry call is a no-op and only logs are written.
+//! Monitoring (ADR 0004): the tick reporter that sends what a tick found to the log and to Sentry,
+//! with tags, fingerprints and metrics, plus the rolling tick health summary
+//! ([`crate::tick_window`]) logged once a minute. Without a Sentry DSN every Sentry call is a no-op
+//! and only logs are written.
 
 use std::{
     sync::{Arc, Mutex},

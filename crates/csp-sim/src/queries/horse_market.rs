@@ -1,5 +1,5 @@
-//! The Horse market, read only (`packages/shared/src/horse-market.ts`, `CONTEXT.md`: Horse
-//! market): what an NPC city asks for a horse or pays for one, and whether it sells or buys it.
+//! The Horse market, read only (`CONTEXT.md`: Horse market): what an NPC city asks for a horse or
+//! pays for one, and whether it sells or buys it.
 
 use csp_shared::balance::{
     HORSE_PRICE_AGE_FLOOR, HORSE_PRICE_AGE_PER_YEAR, HORSE_PRICE_BASE, HORSE_PRICE_GLUT,

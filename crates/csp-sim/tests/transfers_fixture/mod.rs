@@ -1,6 +1,6 @@
-//! `transfers.fixture.ts`: the Trade Org HQ, a trading post with its caravan, Mara's and Ivo's
-//! starting cities, and Mara's resident p1 on the post's warehouse with 1,000 coins, as the
-//! TypeScript wrote it (`fixtures/trade/transfers.json`), and the helpers its tests share.
+//! The Trade Org HQ, a trading post with its caravan, Mara's and Ivo's starting cities, and Mara's
+//! resident p1 on the post's warehouse with 1,000 coins, as in the fixture
+//! `fixtures/trade/transfers.json`, and the helpers the transfer tests share.
 
 #![allow(dead_code)]
 

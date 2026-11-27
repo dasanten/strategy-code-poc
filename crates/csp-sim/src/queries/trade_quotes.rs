@@ -1,6 +1,5 @@
-//! The order-side quotes and checks of trading with an NPC city (`npc-trade.ts`), swapping
-//! (`swap.ts`), a wandering trader (`trader-trade.ts`), the horse market (`horse-market.ts`) and
-//! buying a city (`city.ts`). Pure: nothing moves; `trading.rs` and `buying.rs` move what they
+//! The order-side quotes and checks of trading with an NPC city, swapping, a wandering trader, the
+//! horse market and buying a city. Pure: nothing moves; `trading.rs` and `buying.rs` move what they
 //! quote.
 
 use crate::mending::{share_of, worn_price};

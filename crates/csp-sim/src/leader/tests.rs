@@ -1,5 +1,5 @@
-//! `apps/server/src/leader.test.ts`, ported one to one. Where only the invariant is tested, an
-//! alliance or contract is set up as data.
+//! The Leader handover. Where only the invariant is tested, an alliance or contract is set up as
+//! data.
 
 use std::sync::Arc;
 

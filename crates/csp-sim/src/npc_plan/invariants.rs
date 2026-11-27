@@ -1,4 +1,4 @@
-//! The planning pass's invariants (`npc-plan.ts`; ADR 0016, ADR 0004).
+//! The planning pass's invariants (ADR 0016, ADR 0004).
 
 use std::collections::HashMap;
 

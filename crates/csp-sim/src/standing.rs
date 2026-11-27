@@ -1,7 +1,7 @@
-//! Standing (`CONTEXT.md`: Standing, Self-managed city), ported from `apps/server/src/standing.ts`:
-//! how one Organization regards another. Known crimes lower the victim's standing toward the
-//! culprit's Organization (`step_crimes`); trades and paid contract weeks raise it both ways; every
-//! day it drifts back toward neutral. A self-managed city remembers its former Player.
+//! Standing (`CONTEXT.md`: Standing, Self-managed city): how one Organization regards another.
+//! Known crimes lower the victim's standing toward the culprit's Organization (`step_crimes`);
+//! trades and paid contract weeks raise it both ways; every day it drifts back toward neutral. A
+//! self-managed city remembers its former Player.
 
 use std::collections::HashSet;
 

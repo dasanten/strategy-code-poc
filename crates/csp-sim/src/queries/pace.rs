@@ -1,6 +1,6 @@
-//! The movement functions of `packages/shared/src/balance.ts`: how fast a resident walks, a
-//! carriage goes and a rider rides, the horse stat factors behind them, and the Driving skill
-//! learned on the way (`CONTEXT.md`: Terrain, Stats, Carriage, Horse stats, Riding).
+//! The movement functions: how fast a resident walks, a carriage goes and a rider rides, the horse
+//! stat factors behind them, and the Driving skill learned on the way (`CONTEXT.md`: Terrain,
+//! Stats, Carriage, Horse stats, Riding).
 
 use csp_shared::balance::{
     AGILITY_AVERAGE, AGILITY_LIMIT, AGILITY_SPEED_EFFECT, AGILITY_TERRAIN_EFFECT, CARRIAGE_SPEED,

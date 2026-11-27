@@ -1,4 +1,4 @@
-//! `apps/server/src/down.test.ts`, ported one to one.
+//! Residents going Down (`CONTEXT.md`: Down, Reviving).
 
 use std::sync::Arc;
 

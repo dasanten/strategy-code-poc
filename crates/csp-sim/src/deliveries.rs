@@ -1,8 +1,7 @@
-//! Deliveries (`apps/server/src/deliveries.ts`, `CONTEXT.md`: Delivery, Guaranteed carriage): a
-//! caravan standing at a warehouse takes on the oldest delivery or pick-up ordered there and
-//! carries it out instead of going on along its route (`CaravanJob`), then goes back to its
-//! route. Each step is one drive, pick-up or drop order of the driver's, which request actions
-//! like a Player's do (ADR 0002).
+//! Deliveries (`CONTEXT.md`: Delivery, Guaranteed carriage): a caravan standing at a warehouse
+//! takes on the oldest delivery or pick-up ordered there and carries it out instead of going on
+//! along its route (`CaravanJob`), then goes back to its route. Each step is one drive, pick-up or
+//! drop order of the driver's, which request actions like a Player's do (ADR 0002).
 
 use csp_shared::balance::{
     DELIVERY_DRIVE_TRIES, DELIVERY_LOAD, MAP_SIZE, STANDING_TRADE_COINS_PER_POINT,

@@ -1,12 +1,11 @@
-//! The request, reply and view types the client imports from `packages/shared` that have no other
-//! home in Rust (T88.1, ADR 0030): the HTTP API's request bodies (`api.ts`), the script-language
-//! tables' shapes (`script-api.ts`, `script-views.ts`) and the admin map's views (`admin-map.ts`).
-//! They are written so that `ts-rs` generates the TypeScript the client already uses; the server
-//! parses and writes the same JSON with plain `serde_json` values today, so these describe the
-//! wire rather than carrying it.
+//! The request, reply and view types the client imports from `@csp/shared-types` that have no other
+//! home in Rust (T88.1, ADR 0030): the HTTP API's request bodies, the script-language tables'
+//! shapes and the admin map's views. They are written so that `ts-rs` generates the TypeScript the
+//! client uses; the server parses and writes the same JSON with plain `serde_json` values today, so
+//! these describe the wire rather than carrying it.
 //!
-//! A type the TypeScript builds with `Omit`, `Pick` or an intersection is a [`ts_type!`]: the
-//! TypeScript text itself, with the imports it needs added when the files are written.
+//! A type built with `Omit`, `Pick` or an intersection is a [`ts_type!`]: the TypeScript text
+//! itself, with the imports it needs added when the files are written.
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;

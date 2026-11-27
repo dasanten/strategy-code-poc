@@ -1,5 +1,4 @@
-//! `apps/server/src/demand-goods.test.ts`, one test per `it`, from `setup()` of
-//! `transfers.fixture.ts` (`fixtures/trade/transfers.json`).
+//! Demands for goods, one test per case, from the fixture `fixtures/trade/transfers.json`.
 
 mod common;
 #[path = "goods_support/mod.rs"]

@@ -1,5 +1,5 @@
-//! The Trade Org HQ (`apps/server/src/trade-org.ts`, `CONTEXT.md`: Trade Org HQ): its round
-//! layout, where it may stand, and laying it out.
+//! The Trade Org HQ (`CONTEXT.md`: Trade Org HQ): its round layout, where it may stand, and laying
+//! it out.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};

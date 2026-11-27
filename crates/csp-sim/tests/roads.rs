@@ -1,5 +1,4 @@
-//! `apps/server/src/roads.test.ts`: building roads, and moving and finding paths on them
-//! (`CONTEXT.md`: Road).
+//! Building roads, and moving and finding paths on them (`CONTEXT.md`: Road).
 
 mod build_common;
 mod ts_match;

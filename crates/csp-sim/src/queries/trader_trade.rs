@@ -1,5 +1,5 @@
-//! A wandering trader at a stop, read only (`packages/shared/src/trader-trade.ts`, `CONTEXT.md`:
-//! Trader stop): where it stands and its prices.
+//! A wandering trader at a stop, read only (`CONTEXT.md`: Trader stop): where it stands and its
+//! prices.
 
 use csp_shared::balance::{TRADER_FLOOR_SHARE, WAREHOUSE_FLOOR};
 use csp_shared::protocol::{ShownTraderPrice, StandingTrader};

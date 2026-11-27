@@ -1,7 +1,7 @@
-//! World queries of `packages/shared/src/goods.ts` about where goods are (ADR 0002: the game API
-//! orders and scripts share). `put_away_units`, which needs no world, is in `csp_shared::goods`.
-//! The rest, for the goods rules (T86.5): sites, Down residents, a spot's goods, free stock,
-//! carriage room, `canHandle`, `materialsNeeded` and moving units between two stocks.
+//! World queries about where goods are (ADR 0002: the game API orders and scripts share).
+//! `put_away_units`, which needs no world, is in `csp_shared::goods`. The rest, for the goods rules
+//! (T86.5): sites, Down residents, a spot's goods, free stock, carriage room, `canHandle`,
+//! `materialsNeeded` and moving units between two stocks.
 
 use csp_shared::balance::{CHILD_GOODS, MAP_SIZE, OWN_FOOD, PASSENGER_WEIGHT};
 use csp_shared::footprint::covers;
