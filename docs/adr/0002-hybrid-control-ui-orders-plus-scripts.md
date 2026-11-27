@@ -21,7 +21,8 @@ it enables.
   on top of the same actions scripts use.
 - The script language stays in scope (ADR 0001), but the first playable slices can ship with
   UI orders only. Scripting is built last, so everything before it must keep adding it cheap:
-  - Every action and world query lives in one game API (in `packages/shared`), with
+  - Every action and world query lives in one game API (since the Rust rewrite in
+    `crates/csp-sim/src/script_api.rs`, ADR 0030), with
     plain-data inputs and outputs, no UI or server types.
   - An order is a small piece of logic that each tick reads world queries and requests actions,
     exactly what a script will do. Orders never mutate the world directly.

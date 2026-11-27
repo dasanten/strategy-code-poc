@@ -1,5 +1,5 @@
-//! The WebSocket messages (`ServerMessage` and `ClientMessage` of `packages/shared/src/protocol.ts`,
-//! ADR 0006), as types, so `ts-rs` can write the client's twin of them (T88.1, ADR 0030).
+//! The WebSocket messages (`ServerMessage` and `ClientMessage`, ADR 0006), as types, so `ts-rs` can
+//! write the client's twin of them (T88.1, ADR 0030).
 //!
 //! `realtime.rs` builds the same JSON with `json!` today; these describe it field for field and
 //! are not what it serialises through, so a change to a message there needs the matching change

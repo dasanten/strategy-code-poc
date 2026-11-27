@@ -1,6 +1,6 @@
-//! Path finding across the map (`CONTEXT.md`: Step, Road, Walls in combat), ported from
-//! `apps/server/src/pathfinding.ts` so residents and carriages find the same paths, not just paths
-//! of the same cost (ADR 0030).
+//! Path finding across the map (`CONTEXT.md`: Step, Road, Walls in combat), ported from the
+//! TypeScript so residents and carriages find the same paths, not just paths of the same cost
+//! (ADR 0030).
 //!
 //! What keeps a path the same path as the TypeScript's:
 //! - `MinHeap` is the same binary heap with the same sift rules (`<=` stops a push, the right

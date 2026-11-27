@@ -1,5 +1,4 @@
-//! `apps/server/src/building.test.ts`, ported (T86.6). Its `building invariants` block is in
-//! `invariants_rules.rs`.
+//! Building (T86.6). The `building invariants` cases are in `invariants_rules.rs`.
 
 mod build_common;
 

@@ -1,6 +1,5 @@
-//! A script value as the plain data it stands for, in one bounded walk (`CONTEXT.md`: Memory):
-//! the twin of `apps/server/src/plain-value.ts`, which keeps a script's memory as plain data and
-//! caps its size.
+//! A script value as the plain data it stands for, in one bounded walk (`CONTEXT.md`: Memory): a
+//! script's memory is kept as plain data and its size is capped.
 //!
 //! Script lists and objects are shared by reference, so a value where each level points at the
 //! previous one twice is built in a few steps per level but stands for a tree that doubles with

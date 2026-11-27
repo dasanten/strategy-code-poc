@@ -1,5 +1,4 @@
-//! `waiting-for-food.test.ts`'s slow simulations (#1038). The file's other cases are not ported
-//! yet.
+//! The slow simulations of Waiting for Food (#1038).
 
 use std::sync::Arc;
 

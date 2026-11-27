@@ -1,5 +1,5 @@
-//! World state types, balance numbers, terrain helpers and the wire protocol (ADR 0030): the
-//! Rust twin of `packages/shared`. Plain serialisable data; no I/O, no rules.
+//! World state types, balance numbers, terrain helpers and the wire protocol (ADR 0030). Plain
+//! serialisable data; no I/O, no rules.
 
 pub mod balance;
 pub mod balance_export;

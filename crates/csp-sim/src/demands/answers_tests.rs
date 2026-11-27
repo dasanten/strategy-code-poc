@@ -1,5 +1,5 @@
-//! `demand-answers.test.ts`: how NPC cities and the Trade Organization answer demands. The views of
-//! a realm's diplomacy (`diplomacyFor`) come with the server.
+//! How NPC cities and the Trade Organization answer demands. The views of a realm's diplomacy
+//! (`diplomacyFor`) come with the server.
 
 use super::*;
 use crate::invariants::{check_invariants, world_invariants};

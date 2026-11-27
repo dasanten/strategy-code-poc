@@ -1,11 +1,11 @@
-//! Outsiders in a City area (`apps/server/src/outsiders.ts`; `CONTEXT.md`: Alarm, outsider;
-//! ADR 0028). Who is inside is plain data on the city (`City::outsiders`), brought up to date once
-//! a tick: one who wasn't on it last tick just came in, which raises the alarm once, and one who
-//! left drops off it, so coming back raises it again. This runs for every city each tick, so the
-//! areas are indexed once and each resident looks only at those near them (ADR 0016).
+//! Outsiders in a City area (`CONTEXT.md`: Alarm, outsider; ADR 0028). Who is inside is plain data
+//! on the city (`City::outsiders`), brought up to date once a tick: one who wasn't on it last tick
+//! just came in, which raises the alarm once, and one who left drops off it, so coming back raises
+//! it again. This runs for every city each tick, so the areas are indexed once and each resident
+//! looks only at those near them (ADR 0016).
 //!
-//! The TypeScript keeps its area index between ticks and checks with one walk over the buildings
-//! that it still stands; building it is that same walk, so it is built afresh each call here.
+//! The area index is not kept between ticks: building it is one walk over the buildings, so it is
+//! built afresh each call.
 
 use std::collections::{HashMap, HashSet};
 

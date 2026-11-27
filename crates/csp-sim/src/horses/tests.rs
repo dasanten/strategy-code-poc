@@ -1,6 +1,6 @@
-//! `apps/server/src/horses.test.ts`, the parts on horses' hunger and riding. "stables in the world"
-//! needs build orders, the order queue and starting cities (T86.2, T86.6, T86.8) and the invariant
-//! cases need `horseStatsSound` and friends (T86.13): those come with T86.14.
+//! Horses, the parts on hunger and riding. "stables in the world" needs build orders, the order
+//! queue and starting cities (T86.2, T86.6, T86.8) and the invariant cases need `horseStatsSound`
+//! and friends (T86.13): those come with T86.14.
 
 use csp_shared::balance::{
     AVERAGE_HORSE_STATS, DOWN_DAYS, HORSE_FOOD_PER_DAY, HORSE_HUNGRY_SHARE, HORSE_START_AGE_MAX,

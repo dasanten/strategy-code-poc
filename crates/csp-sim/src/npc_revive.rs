@@ -1,8 +1,8 @@
-//! A city the game runs revives its own (`apps/server/src/npc-revive.ts`, `CONTEXT.md`:
-//! Reviving). Its planning pass gives one grown resident per Down resident a `revive` job
-//! (ADR 0016); between passes the city walks them through it with orders a Player could give
-//! (`run_reviver`, ADR 0002): take Food at the storage, walk there, Feed. A reviver lost on the
-//! way is replaced at the next pass, which sees the Down resident still has nobody.
+//! A city the game runs revives its own (`CONTEXT.md`: Reviving). Its planning pass gives one
+//! grown resident per Down resident a `revive` job (ADR 0016); between passes the city walks them
+//! through it with orders a Player could give (`run_reviver`, ADR 0002): take Food at the storage,
+//! walk there, Feed. A reviver lost on the way is replaced at the next pass, which sees the Down
+//! resident still has nobody.
 
 use std::collections::HashSet;
 

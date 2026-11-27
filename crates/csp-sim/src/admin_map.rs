@@ -1,9 +1,8 @@
-//! The admin map's world (`apps/server/src/admin-map.ts` with the shapes of shared
-//! `admin-map.ts`, `CONTEXT.md`: Admin, admin map): everything in the world for admins, read
+//! The admin map's world (`CONTEXT.md`: Admin, admin map): everything in the world for admins, read
 //! between ticks and never changing it. Script sources are never in it.
 //!
-//! The TypeScript builds these views by spreading entities into objects (`{ is, ...entity, org }`);
-//! here they are JSON values built the same way, key for key, so the wire shape is the same.
+//! The views are JSON values built by spreading entities into objects (`{ is, ...entity, org }`),
+//! key for key, so the wire shape is stable.
 
 use std::collections::{HashMap, HashSet};
 use ts_rs::TS;

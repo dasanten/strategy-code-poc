@@ -1,4 +1,4 @@
-//! `npc-scouts.test.ts`, its slow simulation: a scout out past the set reach.
+//! Slow simulation: a scout out past the set reach.
 
 use csp_shared::balance::{
     NPC_NODE_REACH, NPC_SCOUT_LIMIT, NPC_SCOUT_SECTOR, NPC_SURPLUS_CAP, NPC_TOWN, SIGHT_RANGE,

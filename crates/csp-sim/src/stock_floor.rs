@@ -1,5 +1,4 @@
-//! The stock floor (`apps/server/src/stock-floor.ts`, `CONTEXT.md`: Stock floor, ADR 0003,
-//! ADR 0023).
+//! The stock floor (`CONTEXT.md`: Stock floor, ADR 0003, ADR 0023).
 
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{BuildingKind, Stock, WorldState};

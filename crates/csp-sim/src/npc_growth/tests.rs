@@ -1,5 +1,4 @@
-//! `npc-growth.test.ts` and `npc-growth-village.test.ts`, over the shared village
-//! (`npc_test_world`).
+//! How an NPC city and an NPC village grow, over the shared village (`npc_test_world`).
 
 use std::collections::HashSet;
 

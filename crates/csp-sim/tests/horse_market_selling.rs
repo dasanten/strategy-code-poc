@@ -1,6 +1,5 @@
-//! `apps/server/src/horse-market-selling.test.ts`, ported (T86.17): selling a horse at an NPC
-//! city's stable (`CONTEXT.md`: Horse market): what it pays, the Coins and the horse both moving,
-//! and each reason it won't go.
+//! Selling a horse at an NPC city's stable (T86.17; `CONTEXT.md`: Horse market): what it pays, the
+//! Coins and the horse both moving, and each reason it won't go.
 
 mod build_common;
 

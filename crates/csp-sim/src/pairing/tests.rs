@@ -1,7 +1,7 @@
-//! `apps/server/src/pairing.test.ts`, ported one to one where pairing itself runs it. Other order
-//! kinds' "carrying a child" checks (work, build, tear down, haul, lines) are theirs to test
-//! (T86.5, T86.6); the running-world test steps the whole world. `die` is the `die_all`
-//! stand-in; `buildProblem` for a house is the `Ground` stand-in plus the city's area.
+//! Pairing, carrying and births, where pairing itself runs them. Other order kinds' "carrying a
+//! child" checks (work, build, tear down, haul, lines) are theirs to test (T86.5, T86.6); the
+//! running-world test steps the whole world. `die` is the `die_all` stand-in; `buildProblem` for a
+//! house is the `Ground` stand-in plus the city's area.
 
 use csp_shared::balance::{CARRYING_TICKS, CHILD_STAT_SPREAD, HOUSING_ROOM, PAIRING_WAIT_TICKS};
 use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR};

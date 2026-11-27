@@ -1,5 +1,5 @@
-//! The recursive-descent parser: turns tokens into a syntax tree (ADR 0001, version 1). The twin
-//! of `packages/lang/src/parser.ts`. Semicolons between statements are optional.
+//! The recursive-descent parser: turns tokens into a syntax tree (ADR 0001, version 1). Semicolons
+//! between statements are optional.
 
 use crate::ast::*;
 use crate::js;

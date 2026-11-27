@@ -1,5 +1,4 @@
-//! The HQ (`hqLayout`, `foundTradeOrgHq`) against the one the TypeScript founded in the `hq-0`
-//! fixture (`hq()` of `trade-org.test.ts`, rebuilt in `scripts/dump-fixtures.mts`).
+//! The HQ (`hqLayout`, `foundTradeOrgHq`) against the one founded in the `hq-0` fixture.
 
 mod common;
 

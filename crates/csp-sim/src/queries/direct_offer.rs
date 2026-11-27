@@ -1,6 +1,5 @@
-//! World queries about Direct offers (`packages/shared/src/direct-offer.ts`, `CONTEXT.md`: Direct
-//! offer). The views a Player's client gets (`directOffersFor`, `carriedWaysFor`) come with the
-//! server.
+//! World queries about Direct offers (`CONTEXT.md`: Direct offer). The views a Player's client gets
+//! (`directOffersFor`, `carriedWaysFor`) come with the server.
 
 use csp_shared::balance::DIRECT_OFFERS_TO_ONE_REALM;
 use csp_shared::world::{CarriedFeeBy, City, Good, WorldState};

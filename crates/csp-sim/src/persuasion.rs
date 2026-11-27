@@ -1,8 +1,7 @@
-//! Persuading a city (`CONTEXT.md`: Persuading a city, Respect), ported from
-//! `apps/server/src/persuasion.ts`: an NPC city that holds a realm in high standing and sees more
-//! of its armed residents and walls than it has soldiers asks to join it. The Player accepts, and
-//! the city joins the realm as when bought, or declines, and the city doesn't ask that realm again
-//! for `PERSUADE_ASK_AGAIN_DAYS`.
+//! Persuading a city (`CONTEXT.md`: Persuading a city, Respect): an NPC city that holds a realm in
+//! high standing and sees more of its armed residents and walls than it has soldiers asks to join
+//! it. The Player accepts, and the city joins the realm as when bought, or declines, and the city
+//! doesn't ask that realm again for `PERSUADE_ASK_AGAIN_DAYS`.
 //!
 //! The two orders (`acceptJoin`, `declineJoin`) are plain `validate`/`apply` functions here; the
 //! order queue (T86.2) wires them under their kinds.

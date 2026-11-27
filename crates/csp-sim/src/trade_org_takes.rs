@@ -1,4 +1,4 @@
-//! The Trade Organization's last step on a debt (`trade-org-takes.ts`, `CONTEXT.md`: Trade Org
+//! The Trade Organization's last step on a debt (`CONTEXT.md`: Trade Org
 //! debt; ADR 0025): its army holds the town hall of the culprit's city as anyone occupies one
 //! (`occupier_of`), and the city joins it as a new trading post (`take_city`). This is what its
 //! soldiers fight there and what holds true after.

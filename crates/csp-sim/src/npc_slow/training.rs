@@ -1,5 +1,5 @@
-//! `npc-training.test.ts`, its slow simulations: a big NPC city's training ground (`CONTEXT.md`:
-//! Bigger projects, Who trains), and training and patrols sharing its soldiers.
+//! Slow simulations of a big NPC city's training ground (`CONTEXT.md`: Bigger projects, Who
+//! trains), and training and patrols sharing its soldiers.
 
 use std::collections::HashSet;
 

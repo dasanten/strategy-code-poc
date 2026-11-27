@@ -1,6 +1,6 @@
-//! Building the `WallMap` from the world (`wallMap`, T86.6): the first test of
-//! `apps/server/src/walls.test.ts`, ported. Its path and step tests are pathfinding's (T85.3,
-//! `walls.rs`), its combat and gate-order tests the conflict ticket's (T86.7).
+//! Building the `WallMap` from the world (`wallMap`, T86.6). Its path and step tests are
+//! pathfinding's (T85.3, `walls.rs`), its combat and gate-order tests the conflict ticket's
+//! (T86.7).
 
 mod build_common;
 

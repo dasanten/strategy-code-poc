@@ -1,5 +1,5 @@
-//! Who sent an order and who may order whom (`apps/server/src/order-sender.ts`). Kept apart from
-//! `orders.rs`, as in the TypeScript, so the order kinds can use it.
+//! Who sent an order and who may order whom. Kept apart from `orders.rs` so the order kinds can use
+//! it.
 
 use csp_shared::world::{City, Realm, Resident, WorldState};
 

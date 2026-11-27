@@ -1,6 +1,6 @@
-//! Soldiers on patrol (`apps/server/src/npc-patrols.ts`, `CONTEXT.md`: Soldier posts; ADR 0029).
-//! A few of an NPC city's soldiers on its wall walk a round along it and its roads, one after
-//! another by id, and end where they set out from. A round is plain walks to a few stops.
+//! Soldiers on patrol (`CONTEXT.md`: Soldier posts; ADR 0029). A few of an NPC city's soldiers on
+//! its wall walk a round along it and its roads, one after another by id, and end where they set
+//! out from. A round is plain walks to a few stops.
 
 use std::collections::{HashMap, HashSet};
 

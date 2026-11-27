@@ -1,6 +1,6 @@
-//! `apps/server/src/standing.test.ts`, ported one to one. The Trade Org HQ is a city with its
-//! town hall (`add_city`) in place of `foundTradeOrgHq` (T86.9); standing only asks whether a
-//! city is the Trade Organization's. `diplomacyFor` is T86.11's.
+//! Tests of standing. The Trade Org HQ is a city with its town hall (`add_city`) in place of
+//! `foundTradeOrgHq` (T86.9); standing only asks whether a city is the Trade Organization's.
+//! `diplomacyFor` is T86.11's.
 
 use csp_shared::balance::{STANDING_DRIFT_PER_DAY, STANDING_RANGE};
 use csp_shared::time::TICKS_PER_GAME_DAY;

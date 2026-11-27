@@ -1,6 +1,6 @@
-//! `apps/server/src/teardown.test.ts`, ported (T86.6) for the bare tear-down order. The same tests
-//! given as the Tear down task (`describe.each`'s second case) need the default scripts (T86.12);
-//! the invariant checks and the `tear-down invariants` block come with the invariants (T86.13).
+//! The bare tear-down order (T86.6). The same tests given as the Tear down task need the default
+//! scripts (T86.12); the invariant checks and the `tear-down invariants` block come with the
+//! invariants (T86.13).
 
 mod build_common;
 

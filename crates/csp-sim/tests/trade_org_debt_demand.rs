@@ -1,6 +1,6 @@
-//! `apps/server/src/trade-org-debt-demand.test.ts`, one test per `it`, from `setup()` of
-//! `transfers.fixture.ts` (`fixtures/trade/transfers.json`). How a realm's Demands read to its
-//! client (`demandsFor`) is a client view and comes with the server.
+//! Trade Org debt demands, one test per case, from the fixture `fixtures/trade/transfers.json`.
+//! How a realm's Demands read to its client (`demandsFor`) is a client view and comes with the
+//! server.
 
 mod common;
 #[path = "goods_support/mod.rs"]

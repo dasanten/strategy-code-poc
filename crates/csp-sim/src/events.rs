@@ -1,7 +1,7 @@
-//! The Players' realm logs (`apps/server/src/events.ts`): writing down what happened in a realm.
+//! The Players' realm logs: writing down what happened in a realm.
 //!
-//! Ported with the residents (T86.3), who write the most of it; T86.13 adds the rest of
-//! `events.ts` and the invariants over it here.
+//! Written with the residents (T86.3), who write the most of it; T86.13 adds the rest and the
+//! invariants over it here.
 
 use csp_shared::balance::REALM_LOG_LENGTH;
 use csp_shared::world::{RealmEvent, RealmEventWhat, WorldState};

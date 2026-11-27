@@ -1,5 +1,5 @@
-//! `open_db` against a database the TypeScript server's code made (`tests/data/make-ts-db.mjs`),
-//! and the ports of `backup.test.ts`'s cases.
+//! `open_db` against a database an earlier server made (`tests/data/make-ts-db.mjs`), and the
+//! backup cases.
 use std::{
     fs,
     path::{Path, PathBuf},

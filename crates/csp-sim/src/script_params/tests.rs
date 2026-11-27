@@ -1,6 +1,6 @@
-//! `script-params.test.ts`: the params in a script and the set-script-param order. Its cases over
-//! the Work and Build defaults storing and fetching by their params run the whole game and come
-//! with T86.14; the sight case belongs to the sync tests (Epic 87).
+//! Tests of script parameters: the params in a script and the set-script-param order. Its cases
+//! over the Work and Build defaults storing and fetching by their params run the whole game and
+//! come with T86.14; the sight case belongs to the sync tests (Epic 87).
 
 use std::sync::{Arc, Mutex};
 

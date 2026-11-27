@@ -1,8 +1,8 @@
-//! Trading posts (`apps/server/src/trading-posts.ts`, `CONTEXT.md`: Trading post, Trade Org debt):
-//! one in every heartland and others across the frontier, an NPC village of the Trade Organization's with a warehouse.
+//! Trading posts (`CONTEXT.md`: Trading post, Trade Org debt): one in every heartland and others
+//! across the frontier, an NPC village of the Trade Organization's with a warehouse.
 //!
 //! Laying a post out is `found_npc_city` with a warehouse beside its storage, and finding its site
-//! is `npc_site_fits` (`npc-cities.ts`).
+//! is `npc_site_fits`.
 
 use csp_shared::balance::{NpcCitySize, NPC_CITY_MIN_DISTANCE, TRADING_POST, TRADING_POST_REGION};
 use csp_shared::footprint::{covers, footprint_tiles, Placed, FOOTPRINT};

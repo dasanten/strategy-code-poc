@@ -1,6 +1,5 @@
-//! `apps/server/src/what-joins.test.ts`, ported (T86.17, part 5): what joins a city a realm gets
-//! (`CONTEXT.md`: What joins with a city). The three ways an NPC city comes in each run the
-//! TypeScript's `describe.each` cases.
+//! What joins a city a realm gets (`CONTEXT.md`: What joins with a city), T86.17 part 5. The three
+//! ways an NPC city comes in each run the same cases.
 
 use std::sync::Arc;
 

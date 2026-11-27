@@ -1,8 +1,8 @@
-//! `apps/server/src/getting-food.test.ts`, ported (T86.17, part 5): Getting food (`CONTEXT.md`:
-//! Getting food, Own food). A resident running the Work, Build or Tear down default goes to get
-//! Food below `foodAt` units on them, up to `foodTake`, and comes back; storing a load or
-//! fetching materials tops their own food up to `foodTake` too. Both params have defaults, so they
-//! do it without any set; `foodAt` 0 turns it off.
+//! Getting food (T86.17, part 5; `CONTEXT.md`: Getting food, Own food). A resident running the
+//! Work, Build or Tear down default goes to get Food below `foodAt` units on them, up to
+//! `foodTake`, and comes back; storing a load or fetching materials tops their own food up to
+//! `foodTake` too. Both params have defaults, so they do it without any set; `foodAt` 0 turns it
+//! off.
 
 mod build_common;
 mod scripts_common;

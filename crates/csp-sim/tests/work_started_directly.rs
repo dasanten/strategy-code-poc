@@ -1,7 +1,6 @@
-//! `apps/server/src/work-started-directly.test.ts`, ported (T86.17, part 5): Work started
-//! directly (`CONTEXT.md`: Default script, Started directly; ADR 0014). Its workplace is the param
-//! `workplace`; unset, the one on the resident's tile when it starts, never kept between starts.
-//! With none there it ends with a reason.
+//! Work started directly (T86.17, part 5; `CONTEXT.md`: Default script, Started directly; ADR
+//! 0014). Its workplace is the param `workplace`; unset, the one on the resident's tile when it
+//! starts, never kept between starts. With none there it ends with a reason.
 
 mod build_common;
 mod scripts_common;

@@ -1,6 +1,6 @@
-//! `apps/server/src/driving.test.ts`. The `checkInvariants` checks and "carriage invariants" come
-//! with T86.13; loading by `drop` and `pickUp` orders ("loading a carriage" and the second half of
-//! the Strength case) with T86.5.
+//! Driving cases. The `checkInvariants` checks and "carriage invariants" come with T86.13; loading
+//! by `drop` and `pickUp` orders ("loading a carriage" and the second half of the Strength case)
+//! with T86.5.
 
 use std::sync::Arc;
 

@@ -1,5 +1,5 @@
-//! `packages/lang/src/index.test.ts`, ported one to one. The long trees are what the TypeScript
-//! parser gives (`tests/expected/parse.json`, written by `tests/expected/generate.mjs`).
+//! The language as a whole, through the crate's entry points: tokenising, parsing and checking. The
+//! long trees are the frozen output of the original parser (`tests/expected/parse.json`).
 
 mod support;
 

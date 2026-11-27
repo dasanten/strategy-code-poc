@@ -1,5 +1,5 @@
-//! `apps/server/src/capture.test.ts`, ported one to one where the conflict phases run it
-//! (`test_world::step` for `stepWorld`); refilling and the trading posts step the whole world.
+//! Occupying and capturing, where the conflict phases run it (`test_world::step` for `stepWorld`);
+//! refilling and the trading posts step the whole world.
 
 use csp_shared::balance::{MAX_HEALTH, MAX_HUNGER, OCCUPATION_GAME_DAYS};
 use csp_shared::terrain::TerrainMap;

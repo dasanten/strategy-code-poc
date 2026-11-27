@@ -1,4 +1,4 @@
-//! The world-state types of `packages/shared/src/horse-market.ts`.
+//! The world-state types of the horse market.
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;

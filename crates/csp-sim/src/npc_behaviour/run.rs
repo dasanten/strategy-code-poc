@@ -1,4 +1,4 @@
-//! One tick of NPC city behaviour (`stepNpcCities` and `runCity` of `npc-behaviour.ts`).
+//! One tick of NPC city behaviour (`step_npc_cities` and `run_city`).
 
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;

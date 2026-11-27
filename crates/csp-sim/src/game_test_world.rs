@@ -1,6 +1,6 @@
-//! A running game for the tests that step the whole world as the TypeScript tests' `stepWorld`
-//! did, with the order queue, walking and the default scripts (`test-default-scripts.ts`): the
-//! tests ported late (T89.1) from cases first stubbed while those were missing. Test-only.
+//! A running game for the tests that step the whole world, with the order queue, walking and the
+//! default scripts: the tests ported late (T89.1) from cases first stubbed while those were
+//! missing. Test-only.
 
 use std::sync::Arc;
 

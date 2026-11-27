@@ -1,8 +1,8 @@
-//! Caravans (`apps/server/src/caravans.ts`, `CONTEXT.md`: Caravan, Caravan crew lost, Waiting
-//! for Food, Guaranteed carriage): the Trade Organization's carriages, each on the fixed route
-//! between one trading post and the HQ, driven by an HQ resident and escorted by others on foot.
-//! The caravan is plain data (ADR 0002); each tick the game gives its crew drive, pick-up, drop
-//! and walk orders, which request actions like a Player's do.
+//! Caravans (`CONTEXT.md`: Caravan, Caravan crew lost, Waiting for Food, Guaranteed carriage): the
+//! Trade Organization's carriages, each on the fixed route between one trading post and the HQ,
+//! driven by an HQ resident and escorted by others on foot. The caravan is plain data (ADR 0002);
+//! each tick the game gives its crew drive, pick-up, drop and walk orders, which request actions
+//! like a Player's do.
 
 use std::collections::HashSet;
 

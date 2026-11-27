@@ -1,6 +1,5 @@
-//! `apps/server/src/cities.test.ts`: city membership and the city area, ported one to one.
-//! A torn-down town hall's city is dissolved here directly (`dissolve_city`), as teardown calls
-//! it; storages laid out and finished are building's to test.
+//! City membership and the city area. A torn-down town hall's city is dissolved here directly
+//! (`dissolve_city`), as teardown calls it; storages laid out and finished are building's to test.
 
 use csp_shared::balance::{CITY_AREA_MARGIN, CITY_BUILDING_REACH, HOME_FOOD_LOW};
 use csp_shared::terrain::TerrainMap;

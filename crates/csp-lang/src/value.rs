@@ -1,9 +1,9 @@
-//! The values a script works with: the twin of `Value` in `packages/lang/src/interpreter.ts`.
+//! The values a script works with.
 //!
 //! `null`, booleans, numbers (`f64`), strings, lists, objects and functions. Lists and objects are
 //! shared by reference, as JavaScript arrays and objects are: `==` on them is identity, and a
-//! change through one name shows through every other. A host value may be frozen (read-only to
-//! the script), as the TypeScript host froze its views with `Object.freeze`.
+//! change through one name shows through every other. A host value may be frozen (read-only to the
+//! script): the host freezes its views.
 
 use std::borrow::Cow;
 use std::cell::{Ref, RefCell, RefMut};

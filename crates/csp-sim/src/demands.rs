@@ -1,8 +1,8 @@
-//! Demands (`apps/server/src/demands.ts`, `CONTEXT.md`: Demand; ADR 0024): a realm sends another
-//! realm it knows of terms, a note and a deadline. It arrives at once, wherever the other is. They
-//! accept or decline it, or let it lapse, and both realm logs say so. Accepting carries out the
-//! terms. Otherwise it is only words. The game answers for an NPC city and the Trade Organization,
-//! at the next planning pass (ADR 0016).
+//! Demands (`CONTEXT.md`: Demand; ADR 0024): a realm sends another realm it knows of terms, a note
+//! and a deadline. It arrives at once, wherever the other is. They accept or decline it, or let it
+//! lapse, and both realm logs say so. Accepting carries out the terms. Otherwise it is only words.
+//! The game answers for an NPC city and the Trade Organization, at the next planning pass (ADR
+//! 0016).
 
 use csp_shared::balance::{
     DEMANDS_PER_GAME_DAY, DEMAND_DECLINED_STANDING_LOSS, DEMAND_MAX_DAYS, DEMAND_NOTE_MAX_LENGTH,

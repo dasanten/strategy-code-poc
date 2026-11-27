@@ -1,4 +1,4 @@
-//! Standing queries of `packages/shared/src/standing.ts` (`CONTEXT.md`: Standing).
+//! Standing queries (`CONTEXT.md`: Standing).
 
 use csp_shared::balance::{
     FORMER_PLAYER_STANDING, STANDING_DRIFT_PER_DAY, STANDING_NPC_TRADE_COINS_PER_POINT,

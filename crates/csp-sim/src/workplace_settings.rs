@@ -1,7 +1,7 @@
-//! Workplace settings (`apps/server/src/workplace-settings.ts`, `CONTEXT.md`; ADR 0020): for each
-//! workplace, or construction site of a workplace kind, it knows, a realm keeps a work script and
-//! values for its params, set on the building's card (`WorldState.workplaceSettings`). Other
-//! realms never see them; NPC cities keep none.
+//! Workplace settings (`CONTEXT.md`; ADR 0020): for each workplace, or construction site of a
+//! workplace kind, it knows, a realm keeps a work script and values for its params, set on the
+//! building's card (`WorldState.workplaceSettings`). Other realms never see them; NPC cities keep
+//! none.
 
 use std::sync::Arc;
 

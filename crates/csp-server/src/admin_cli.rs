@@ -1,5 +1,4 @@
-//! What the `admin` binary does (`apps/server/src/cli/admin.ts`), apart from its terminal, so it is
-//! testable.
+//! What the `admin` binary does, apart from its terminal, so it is testable.
 use std::{path::PathBuf, time::SystemTime};
 
 use csp_sim::terrain_gen::generate_full_terrain;

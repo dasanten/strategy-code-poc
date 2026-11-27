@@ -1,6 +1,6 @@
-//! The script language (ADR 0001, ADR 0030): lexer, parser, checker and a tree-walking
-//! interpreter with a step budget. Pure: no I/O, threads or clocks, so it also builds to
-//! WebAssembly for the editor. The twin of `packages/lang`; its `index.ts` is this file.
+//! The script language (ADR 0001, ADR 0030): lexer, parser, checker and a tree-walking interpreter
+//! with a step budget. Pure: no I/O, threads or clocks, so it also builds to WebAssembly for the
+//! editor.
 //!
 //! Parsing and running recurse once per nested node, up to `MAX_NESTING` and
 //! `MAX_EVALUATION_DEPTH`. At those caps either needs a little under 512 KB of stack (debug and

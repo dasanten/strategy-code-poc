@@ -1,7 +1,6 @@
-//! The driving, hitching, stealing and boarding checks of `packages/shared/src/carriages.ts` and
-//! `building.ts`' `carriageCanGoTo` (`CONTEXT.md`: Carriage, Hitched horse, Passenger, Stealing a
-//! carriage or horse). Each `*_problem` says why something can't be done now, or `None` when it
-//! can, in the TypeScript's words.
+//! The driving, hitching, stealing and boarding checks, and `carriageCanGoTo` (`CONTEXT.md`:
+//! Carriage, Hitched horse, Passenger, Stealing a carriage or horse). Each `*_problem` says why
+//! something can't be done now, or `None` when it can, in the game's words.
 
 use csp_shared::balance::{carriage_can_enter, CARAVAN_GUARD_RANGE, PASSENGER_WEIGHT};
 use csp_shared::terrain::{terrain_at, wrap_distance, Terrain, TerrainMap};

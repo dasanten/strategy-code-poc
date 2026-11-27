@@ -1,4 +1,4 @@
-//! `apps/server/src/trading-posts.test.ts`, ported one to one.
+//! Tests of trading posts.
 
 use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};

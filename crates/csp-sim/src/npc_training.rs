@@ -1,7 +1,6 @@
-//! A big NPC city's training ground and who trains there (`apps/server/src/npc-training.ts`,
-//! `CONTEXT.md`: Bigger projects, Who trains; ADR 0029). Nothing about it is stored but the jobs
-//! of its plan: its ground is the one in its area, and whose turn it is follows from the tick and
-//! their ids.
+//! A big NPC city's training ground and who trains there (`CONTEXT.md`: Bigger projects, Who
+//! trains; ADR 0029). Nothing about it is stored but the jobs of its plan: its ground is the one in
+//! its area, and whose turn it is follows from the tick and their ids.
 
 use std::collections::HashSet;
 

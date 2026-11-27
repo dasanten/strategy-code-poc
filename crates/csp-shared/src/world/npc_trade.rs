@@ -1,4 +1,4 @@
-//! The world-state types of `packages/shared/src/npc-trade.ts`.
+//! The world-state types of NPC trade.
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;

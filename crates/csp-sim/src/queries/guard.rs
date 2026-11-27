@@ -1,5 +1,4 @@
-//! Guarding of `packages/shared/src/city.ts` (`CONTEXT.md`: Outpost storage, Stealing a carriage
-//! or horse).
+//! Guarding (`CONTEXT.md`: Outpost storage, Stealing a carriage or horse).
 
 use csp_shared::footprint::near_footprint;
 use csp_shared::world::{Building, BuildingKind, Resident, WorldState};

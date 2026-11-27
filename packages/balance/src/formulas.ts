@@ -71,8 +71,7 @@ import {
 /**
  * The formulas the Wiki works its figures out with, written from the numbers in `balance.json`.
  * The game's own rules are in Rust (`csp-sim`, `csp-shared::balance`); these are the few of them
- * the Wiki shows, over plain structural types so the package needs nothing but the JSON. Until
- * the cutover `formulas.test.ts` checks each against its twin in `packages/shared`.
+ * the Wiki shows, over plain structural types so the package needs nothing but the JSON.
  */
 
 /** A stat: what the resident was born with plus what training added. */

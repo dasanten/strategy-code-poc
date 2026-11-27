@@ -1,5 +1,4 @@
-//! `apps/server/src/crimes.test.ts`, ported one to one where the conflict phases run it
-//! (`test_world::step` in place of `stepWorld`).
+//! Crimes and witnesses, where the conflict phases run them (`test_world::step`).
 
 use csp_shared::balance::{CRIME_MEMORY_DAYS, CRIME_STANDING_LOSS, SIGHT_RANGE};
 use csp_shared::time::TICKS_PER_GAME_DAY;

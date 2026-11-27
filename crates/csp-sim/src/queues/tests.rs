@@ -1,9 +1,9 @@
-//! `queues.test.ts`. Its tests run the real game: walking (T86.4), the task order and default
-//! scripts (T86.12), work, storing and building. Until those are ported, these run the queue
-//! logic itself with stand-in order kinds: `walkTo` moves a resident one tile a tick towards its
-//! target, `pickUp` can never start, `rename` keeps scripts running. The TypeScript cases that
-//! need the real kinds (the timed `task` step, a script step ending itself, Planning ahead's
-//! work/store/road/teach/mount steps, sight) are left to T86.14, which runs the whole file.
+//! Queue tests. They run the real game: walking (T86.4), the task order and default scripts
+//! (T86.12), work, storing and building. Until those are ported, these run the queue logic itself
+//! with stand-in order kinds: `walkTo` moves a resident one tile a tick towards its target,
+//! `pickUp` can never start, `rename` keeps scripts running. The cases that need the real kinds
+//! (the timed `task` step, a script step ending itself, Planning ahead's
+//! work/store/road/teach/mount steps, sight) are left to T86.14.
 
 use super::*;
 use crate::order_sender::OrderSender;

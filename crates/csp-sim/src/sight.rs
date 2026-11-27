@@ -1,4 +1,4 @@
-//! What each side sees (`apps/server/src/sight.ts`, `CONTEXT.md`: Sight): a realm's Player, or an
+//! What each side sees (`CONTEXT.md`: Sight): a realm's Player, or an
 //! NPC city, sees everything within `SIGHT_RANGE` of any resident it sees through, and what is
 //! inside or how someone fares only as `CONTEXT.md` says (Seeing inside a storage, Seeing how
 //! someone fares).

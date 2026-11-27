@@ -1,5 +1,4 @@
-//! The invariants of what NPC residents do between passes (`npc-behaviour.ts`, `npc-roads.ts`,
-//! `npc-posts.ts`; ADR 0004).
+//! The invariants of what NPC residents do between passes (ADR 0004).
 
 use std::collections::{HashMap, HashSet};
 

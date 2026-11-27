@@ -1,4 +1,4 @@
-//! Trade Org debt (`apps/server/src/trade-org-debt.ts`, `CONTEXT.md`: Trade Org debt; ADR 0025):
+//! Trade Org debt (`CONTEXT.md`: Trade Org debt; ADR 0025):
 //! what the Trade Organization came for and couldn't take stays owed by that Organization, and it
 //! rises by what later crimes cost. A resident pays it in Coins at any Trade Org warehouse. While
 //! it is owed the Trade Organization goes up its steps, the first a demand for it with a deadline.

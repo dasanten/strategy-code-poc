@@ -1,4 +1,4 @@
-//! Trader stops (`trader-stops.ts`, `CONTEXT.md`: Trader stop): on its way between two of its
+//! Trader stops (`CONTEXT.md`: Trader stop): on its way between two of its
 //! places a wandering trader stops for a while at each NPC or Player city near that way. Plain data
 //! (ADR 0002): the cities go into `Trader.calls`, the stop it is at into `Trader.stand`, and the game
 //! gives its driver the same drive orders as for the rest of its loop.

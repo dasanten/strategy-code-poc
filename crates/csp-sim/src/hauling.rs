@@ -1,6 +1,6 @@
-//! Haul routes and the stop order (`apps/server/src/hauling.ts`, `CONTEXT.md`: Haul route, Supply
-//! line): a resident drives a carriage between two stops, unloading and loading through the take
-//! and put actions of `carrying.rs`.
+//! Haul routes and the stop order (`CONTEXT.md`: Haul route, Supply line): a resident drives a
+//! carriage between two stops, unloading and loading through the take and put actions of
+//! `carrying.rs`.
 
 use csp_shared::balance::{CARRIAGE_CAPACITY, GOOD_WEIGHT};
 use csp_shared::terrain::TerrainMap;

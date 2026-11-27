@@ -1,6 +1,6 @@
-//! The riding and horse-food queries of `packages/shared/src/horses.ts` (`CONTEXT.md`: Riding,
-//! Horses have no inventory): which horse a resident rides, whose horse it is to ride, why a
-//! resident can't mount one, and where a horse finds Food.
+//! The riding and horse-food queries (`CONTEXT.md`: Riding, Horses have no inventory): which horse
+//! a resident rides, whose horse it is to ride, why a resident can't mount one, and where a horse
+//! finds Food.
 
 use csp_shared::balance::{HORSE_REACH, MAP_SIZE, OWN_FOOD};
 use csp_shared::footprint::covers;

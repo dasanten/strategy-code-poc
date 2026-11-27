@@ -1,5 +1,5 @@
-//! Terrain served to clients in chunks (ADR 0006): the constants, sizes and the chunk encoding of
-//! `packages/shared/src/chunks.ts` and `terrain.ts`, byte for byte.
+//! Terrain served to clients in chunks (ADR 0006): the constants, sizes and the chunk encoding,
+//! byte for byte what the client reads.
 
 use crate::world::{ResourceKind, Richness};
 use ts_rs::TS;

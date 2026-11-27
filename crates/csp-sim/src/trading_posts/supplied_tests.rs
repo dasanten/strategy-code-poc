@@ -1,4 +1,4 @@
-//! `posts-supplied.test.ts` (#1038): trading posts stay supplied with nobody interfering
+//! Trading posts stay supplied (#1038) with nobody interfering
 //! (`CONTEXT.md`: Stock floor, Wandering trader; ADR 0023). Nothing tops up their warehouses, so
 //! all they hold comes by caravan and trader, and those carriages' crews eat from the same
 //! storages as the posts' people.

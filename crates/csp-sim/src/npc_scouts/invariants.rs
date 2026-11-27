@@ -1,4 +1,4 @@
-//! The scouts' invariant (`npc-scouts.ts`; ADR 0004).
+//! The scouts' invariant (ADR 0004).
 
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::TerrainMap;

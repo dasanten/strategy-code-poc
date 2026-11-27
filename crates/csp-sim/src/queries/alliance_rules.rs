@@ -1,7 +1,7 @@
-//! The rest of `packages/shared/src/alliance.ts` (`CONTEXT.md`: Alliance, NPC city in an
-//! alliance, Alliance army) beside T85.5's `alliance.rs`: NPC cities as members, the alliance army's
-//! parts, the realms that stand together. `diplomacyFor` builds the client's view out of six other
-//! modules' views and goes with the sync (T87.6).
+//! The rest of the alliance queries (`CONTEXT.md`: Alliance, NPC city in an alliance, Alliance
+//! army) beside T85.5's `alliance.rs`: NPC cities as members, the alliance army's parts, the realms
+//! that stand together. `diplomacyFor` builds the client's view out of six other modules' views and
+//! goes with the sync (T87.6).
 
 use csp_shared::balance::{
     CRIME_MEMORY_DAYS, NPC_ALLIANCE_JOIN_STANDING, NPC_ALLIANCE_LEAVE_STANDING,

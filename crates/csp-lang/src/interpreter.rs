@@ -1,10 +1,9 @@
-//! The tree-walking interpreter (ADR 0001, `CONTEXT.md`: Step budget): the twin of
-//! `packages/lang/src/interpreter.ts`. It is pure: it reads and writes only the values it is
-//! given, so the same program, globals and budget always give the same result. Every evaluated
-//! node costs 1 step, a native function call costs its own `cost` on top, and the run stops when
-//! the budget is used up. What the script already did still counts. A value the script builds is
-//! bounded too (`CONTEXT.md`: Value limits, `RunOptions::limits`): a string, list or object past
-//! its cap is a runtime error.
+//! The tree-walking interpreter (ADR 0001, `CONTEXT.md`: Step budget). It is pure: it reads and
+//! writes only the values it is given, so the same program, globals and budget always give the same
+//! result. Every evaluated node costs 1 step, a native function call costs its own `cost` on top,
+//! and the run stops when the budget is used up. What the script already did still counts. A value
+//! the script builds is bounded too (`CONTEXT.md`: Value limits, `RunOptions::limits`): a string,
+//! list or object past its cap is a runtime error.
 //!
 //! The host gives the script its globals and runs its native functions through [`Host`]. Scopes
 //! and the script's functions live in tables owned by one run, so a closure that holds its own

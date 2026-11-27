@@ -1,6 +1,6 @@
-//! `npc-posts.test.ts`, one test per `it`: Soldier posts (`CONTEXT.md`): an NPC city's soldiers
-//! stand on its town hall, at its gates and along its wall, and the invariant that holds them
-//! there (`npc-soldiers-on-posts`).
+//! Soldier posts (`CONTEXT.md`), one test per case: an NPC city's soldiers stand on its town hall,
+//! at its gates and along its wall, and the invariant that holds them there
+//! (`npc-soldiers-on-posts`).
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

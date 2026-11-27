@@ -1,6 +1,6 @@
-//! How an NPC city sets out its town (`apps/server/src/city-layout.ts`, `CONTEXT.md`: City
-//! layout): the layout it gets when it comes to be, and what that says about a tile. Where the
-//! next building goes among those is `house_tile`'s (`npc-growth.ts`).
+//! How an NPC city sets out its town (`CONTEXT.md`: City layout): the layout it gets when it comes
+//! to be, and what that says about a tile. Where the next building goes among those is
+//! `house_tile`'s (in `npc_growth`).
 
 use std::collections::{HashMap, HashSet};
 use std::f64::consts::FRAC_1_SQRT_2;

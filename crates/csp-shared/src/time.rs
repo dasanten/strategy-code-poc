@@ -1,8 +1,7 @@
 //! Game time (`CONTEXT.md`: Game time, Tick): one tick is one real second and one game minute.
-//! Ported from `packages/shared/src/time.ts` and the tick constants of `world.ts`.
 //!
 //! The tick constants are `f64`: balance numbers multiply and divide them with other `f64`
-//! constants, as TypeScript does, and they are whole numbers well below 2^53.
+//! constants, and they are whole numbers well below 2^53.
 
 /// One game day is 24 real minutes: a real second is a game minute (`CONTEXT.md`: Game time).
 pub const TICKS_PER_GAME_DAY: f64 = 1440.0;
