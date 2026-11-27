@@ -1,13 +1,15 @@
 // A step of `pnpm check` (T124.5): every repo path written in backticks in the docs agents read
 // and in the module headers of the code exists, so no doc or comment sends a reader to a file
 // that is gone. A path is a backticked word with a `/` whose first folder is one of the repo's
-// own (`ROOTS`); a glob or placeholder (`*`, `<id>`, `{…}`) is not one. A path git ignores (a
-// build output) counts as there. In a crate's header a TypeScript file named alone (`x.ts`) is
+// own (`ROOTS`); a glob or placeholder (`*`, `<id>`, `{…}`) is not one. A path exists when git
+// tracks it, so the answer is the same on every checkout (#1684): a file that lies untracked on
+// one machine does not count. The paths a machine makes for itself (`LOCAL`) and the folders the
+// docs name to say they are gone (`GONE`) count as there. In a crate's header a TypeScript file named alone (`x.ts`) is
 // checked too: no tracked file may be missing that name. Exempt: the ADRs whose status says
 // another replaced them and the docs of what was (`HISTORY`, among them the log `docs/log.md`).
 import { execFileSync } from 'node:child_process'
 import console from 'node:console'
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
@@ -94,6 +96,31 @@ export const HISTORY = [
   'docs/proposals/rust-rewrite.md',
 ]
 
+/**
+ * Paths a machine makes for itself and git never tracks: a build output and the files of a
+ * developer's own setup. A path at or under one counts as there.
+ */
+export const LOCAL = ['packages/lang-wasm/generated', '.claude/launch.json', '.claude/worktrees']
+
+/** Folders that are gone and that the docs of today still name, to say what replaced them. */
+export const GONE = ['apps/web/src/shared']
+
+/** Whether `path` is at or under one of `bases`. */
+const within = (path, bases) => bases.some((b) => path === b || path.startsWith(`${b}/`))
+
+/** The test for whether a named path is there: git tracks it, as a file or a folder, or it is exempt. */
+function existence() {
+  const tracked = new Set()
+  for (const file of git('ls-files', '-z').split('\0').filter(Boolean)) {
+    const parts = file.split('/')
+    for (let i = 1; i <= parts.length; i++) tracked.add(parts.slice(0, i).join('/'))
+  }
+  return (named) => {
+    const path = named.replace(/\/$/, '')
+    return tracked.has(path) || within(path, LOCAL) || within(path, GONE)
+  }
+}
+
 /** The part of a doc that is checked: all of it, but for the exempt parts. */
 export function checkedPart(file, text) {
   if (HISTORY.includes(file)) return ''
@@ -138,7 +165,7 @@ export function bareScriptsIn(text) {
   return [...text.matchAll(/`([\w.-]+\.(?:ts|tsx|mts))`/g)].map(([, name]) => name)
 }
 
-/** `[file, path]` for every path named that is neither in the tree nor ignored by git. */
+/** `[file, path]` for every path named that git does not track and that is not exempt. */
 export function missingPaths({ docs, code } = trackedTexts()) {
   const names = new Set(git('ls-files', '-z').split('\0').map((f) => f.split('/').pop()))
   const named = [
@@ -149,23 +176,8 @@ export function missingPaths({ docs, code } = trackedTexts()) {
     .filter(([f]) => f.endsWith('.rs'))
     .flatMap(([f, text]) => bareScriptsIn(headerOf(text)).map((name) => [f, name]))
     .filter(([, name]) => !names.has(name))
-  const absent = [...new Set(named.map(([, p]) => p))].filter((p) => !existsSync(p))
-  const ignored = new Set(absent.length === 0 ? [] : ignoredOf(absent))
-  return [...named.filter(([, p]) => !existsSync(p) && !ignored.has(p)), ...bare]
-}
-
-/** The paths of `paths` that git ignores. */
-function ignoredOf(paths) {
-  try {
-    return execFileSync('git', ['check-ignore', '--no-index', '--stdin'], {
-      input: paths.join('\n'),
-      encoding: 'utf8',
-    })
-      .split(/\r?\n/)
-      .filter(Boolean)
-  } catch {
-    return [] // exit 1: none of them is ignored
-  }
+  const exists = existence()
+  return [...named.filter(([, p]) => !exists(p)), ...bare]
 }
 
 /** The tracked docs and code whose paths are checked, each `[file, text]`. */
