@@ -54,6 +54,16 @@ first, then Fewer collisions (Epic 120), Content defined once (121), One copy of
 Client tidy (123) and Agent docs (124), in that order; none changes a game rule. Bandits (16)
 stays set aside.
 
+**Agreed with Daniel on 2026-11-27,** from a review of how development could go faster and break
+less (ADR 0048): Random orders (Epic 125: the simulation is given random orders and checks its
+invariants), Browser smoke tests (126: the main flows in a real browser on a small creative
+world), New content can't be missed (127: no wildcard arm takes a new kind silently), Warm
+worktrees (128: reused worktree slots, and a measured Dev Drive trial), Smaller files (129: a
+check that big files only shrink, the five biggest split; after Epic 127 is on `dev`), Epic review
+(130: a code review before an epic goes into `dev`, a mutation report each night) and Split
+csp-sim (131: measured first, Daniel decides, the move runs alone). None changes a game rule.
+Epics 125 to 128, 130 and T131.1 run side by side; 125, 126 and 128 start first.
+
 ## Epics
 
 The open epics. A finished epic's row moves to the table in `docs/log.md`; a new epic takes the
@@ -62,6 +72,13 @@ number one above the highest in either table (`docs/coordination.md`: Epic numbe
 | #   | Epic                                                                                            | State                   |
 | --- | ----------------------------------------------------------------------------------------------- | ----------------------- |
 | 16  | [Bandits](https://github.com/dasanten/strategy-code-poc/issues/144)                             | scope only              |
+| 125 | [Random orders](https://github.com/dasanten/strategy-code-poc/issues/1688)                      | tickets written         |
+| 126 | [Browser smoke tests](https://github.com/dasanten/strategy-code-poc/issues/1693)                | tickets written         |
+| 127 | [New content can't be missed](https://github.com/dasanten/strategy-code-poc/issues/1698)        | tickets written         |
+| 128 | [Warm worktrees](https://github.com/dasanten/strategy-code-poc/issues/1703)                     | tickets written         |
+| 129 | [Smaller files](https://github.com/dasanten/strategy-code-poc/issues/1708)                      | tickets written         |
+| 130 | [Epic review](https://github.com/dasanten/strategy-code-poc/issues/1714)                        | tickets written         |
+| 131 | [Split csp-sim](https://github.com/dasanten/strategy-code-poc/issues/1718)                      | measuring, then Daniel  |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

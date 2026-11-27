@@ -101,3 +101,5 @@ States: **in force**; **amended by** (a later ADR changes part of it, the rest s
 - [0013](0013-fast-local-checks.md) Fast local checks, the full suite only in CI: amended by 0040.
 - [0040](0040-checks-share-the-machine.md) Checks share the machine; slow runs have their own
   profile: in force.
+- [0048](0048-random-orders-browser-tests-and-a-review-at-the-epic-gate.md) Random orders, browser
+  tests and a review at the epic gate: in force.
