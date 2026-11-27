@@ -10,3 +10,6 @@ packages/balance/balance.d.ts linguist-generated text eol=lf merge=union
 packages/balance/src/constants.ts linguist-generated text eol=lf merge=union
 packages/lang-wasm/script-data.json linguist-generated text eol=lf merge=union
 packages/shared-types/src/generated/** linguist-generated text eol=lf merge=union
+# The coordinator scripts run in Git Bash: LF, or bash reads a CR on every line.
+scripts/*.sh text eol=lf
+scripts/*.pl text eol=lf

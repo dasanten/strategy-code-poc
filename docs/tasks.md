@@ -302,7 +302,7 @@ its tickets or closes.
   `Closes #<ticket>` for each and `Part of #<epic>`. Ticket PRs get no CI: the ticket session runs
   `pnpm check origin/epic/<n>-<slug>` (lint, typecheck and the tests the change affects, ADR 0013),
   and before merging into the epic branch the coordinating session runs it again on the PR merged
-  with the epic branch. PR bodies say "Checked: `pnpm check` against …" with what it ran. Merging into a
+  with the epic branch, unless the PR already contains the epic tip (`docs/coordination.md`). PR bodies say "Checked: `pnpm check` against …" with what it ran. Merging into a
   non-default branch doesn't close the ticket, so whoever merges closes its tickets by hand.
 - **Slow tests:** a test that takes more than about 20 s on an idle machine (a long simulation)
   gets `{ tags: ['slow'] }` on its `it` or `describe`, with any timeout in the same object
@@ -310,7 +310,8 @@ its tickets or closes.
   `pnpm check` skips them, even when affected, and says how many; `pnpm test` runs them, and CI
   runs `pnpm test`.
 - **Epic PR:** when an epic's last ticket is on its branch, one PR `epic/<n>-…` → `dev` with
-  `Closes #<epic>` runs CI and is merged once green; whoever merges closes the epic by hand.
+  `Closes #<epic>` is merged after the local checks and `pnpm test:slow`, without waiting for its
+  CI (`docs/coordination.md`); whoever merges closes the epic by hand.
 - **Release:** when Daniel asks, one PR `dev` → `main` lists the epics and bugs it ships, runs CI
   and is merged once green. Only merges into `main` deploy.
 - **Rules vs numbers:** a missing game rule becomes a `needs Daniel` question and lands in
