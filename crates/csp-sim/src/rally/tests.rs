@@ -475,6 +475,21 @@ fn no_script_call_or_queue_step_can_start_it() {
 }
 
 #[test]
+fn it_ends_with_the_tick_its_workplace_falls_to_ruin_at_the_day_turn() {
+    // Bug #1722: the farm loses its last condition at the turn of the day, after the work.
+    let (mut world, t, _) = rallied_farm();
+    let day = csp_shared::time::TICKS_PER_GAME_DAY as u64;
+    world.tick = (world.tick / day + 1) * day - 1;
+    let days = crate::repair::decay_days(BuildingKind::Farm).unwrap();
+    let farm = world.buildings.iter_mut().find(|b| b.id == "farm").unwrap();
+    farm.decay = Some((days - 1.0) / days);
+    run(&mut world, &t, 1);
+    let farm = world.buildings.iter().find(|b| b.id == "farm").unwrap();
+    assert!(crate::ruins::is_ruin(farm));
+    assert!(!rallying(&world));
+}
+
+#[test]
 fn invariant_only_a_living_leader_at_the_building_rallies() {
     let (mut world, t, _) = rallied_farm();
     let sound = |w: &WorldState| rallies_sound(w).is_empty();

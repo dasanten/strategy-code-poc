@@ -370,6 +370,9 @@ fn step_rest(
     crate::gathering::step_patches(world);
     // One that lost all of it is a ruin, and a ruin left long enough collapses (`CONTEXT.md`: Ruin).
     crate::ruins::step_ruins(world, size, scratch);
+    // A rallied workplace that just fell to ruin ends its rally with this tick (`CONTEXT.md`:
+    // Rallying the crew).
+    crate::rally::end_rallies(world);
     let aging = step_aging(world, size);
     answer_demands(world, size, scratch);
     step_alliances(world);
