@@ -33,7 +33,7 @@ The `Dockerfile` builds it in a stage of its own, copies it in and sets `CSP_WAS
 - **`pnpm check <base>`** (`scripts/check-generated.mjs`, its first step): when the change touches
   `crates/`, `Cargo.*` or a generated file, it runs `pnpm generate` and fails if a file changed.
   The files it compares are those `.gitattributes` marks `linguist-generated`;
-  `packages/balance/src/specs.ts` is not marked, so only the crates' test below catches it stale.
+  `packages/balance/src/specs.ts` is not marked yet (#1675), so only the crates' test below catches it stale.
 - **`pnpm check:rust`** (the crates' tests): each generator has a test that fails while its output
   differs from what it would write:
   - `the_generated_types_are_not_stale` in `crates/csp-server/src/client_types.rs`;
