@@ -3,10 +3,6 @@
 //! when it starts, which they join. Haul's carriage is the param `carriage`, but its route comes
 //! only from the Haul order: started without one it ends. Neither target is kept between starts.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 mod build_common;
 mod p_scripts_host;
 
@@ -151,6 +147,8 @@ impl Setup {
         assert!(matches!(answer, OrderReply::Ack { .. }), "{answer:?}");
     }
 
+    // Picks one kind out of all: every other kind, also a later one, is not it.
+    #[allow(clippy::wildcard_enum_match_arm)]
     fn stopped(&self) -> Vec<String> {
         self.world
             .events

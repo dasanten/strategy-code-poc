@@ -2,10 +2,6 @@
 //! Hiring from an NPC city, NPC reserve): its stock, its reserve, its prices, what it asks for its
 //! residents and whom it would lend.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use csp_shared::world::PricedGood;
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -495,7 +491,15 @@ fn spare_hand(job: Option<&CityJob>, workplace_short: impl Fn(&str) -> bool) -> 
     match job.kind {
         CityJobKind::Idle | CityJobKind::Road | CityJobKind::Scout => true,
         CityJobKind::Work => job.building_id.as_deref().is_some_and(|b| !workplace_short(b)),
-        _ => false,
+        CityJobKind::Soldier
+        | CityJobKind::Teach
+        | CityJobKind::Train
+        | CityJobKind::Farm
+        | CityJobKind::Build
+        | CityJobKind::Trade
+        | CityJobKind::Found
+        | CityJobKind::Revive
+        | CityJobKind::Feed => false,
     }
 }
 

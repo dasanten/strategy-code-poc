@@ -2,10 +2,6 @@
 //! construction site, putting work into it, and what a finished one becomes. Road and wall lines
 //! build their tiles through here too (`road_line`).
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::{terrain_at, TerrainMap};
 use csp_shared::world::{
@@ -87,7 +83,45 @@ pub fn building_part(o: Option<&ResidentOrder>) -> Option<BuildingPart> {
                 material: l.material,
             })
         }
-        _ => None,
+        ResidentOrder::WalkTo(_)
+        | ResidentOrder::Drive(_)
+        | ResidentOrder::Haul(_)
+        | ResidentOrder::PickUp(_)
+        | ResidentOrder::Drop(_)
+        | ResidentOrder::Store(_)
+        | ResidentOrder::Fetch(_)
+        | ResidentOrder::TearDown(_)
+        | ResidentOrder::Repair(_)
+        | ResidentOrder::WorkAt(_)
+        | ResidentOrder::Breed(_)
+        | ResidentOrder::Attack(_)
+        | ResidentOrder::Climb(_)
+        | ResidentOrder::Teach(_)
+        | ResidentOrder::Train(_)
+        | ResidentOrder::RoadLine(_)
+        | ResidentOrder::WallLine(_)
+        | ResidentOrder::Pay(_)
+        | ResidentOrder::BuyCity(_)
+        | ResidentOrder::Trade(_)
+        | ResidentOrder::Swap(_)
+        | ResidentOrder::BuyHorse(_)
+        | ResidentOrder::SellHorse(_)
+        | ResidentOrder::HandIn(_)
+        | ResidentOrder::BuyOff(_)
+        | ResidentOrder::PayDebt(_)
+        | ResidentOrder::AcceptOffer(_)
+        | ResidentOrder::Relocate(_)
+        | ResidentOrder::Feed(_)
+        | ResidentOrder::Row(_)
+        | ResidentOrder::HaulByWater(_)
+        | ResidentOrder::Sail(_)
+        | ResidentOrder::Equip(_)
+        | ResidentOrder::Crew(_)
+        | ResidentOrder::Push(_)
+        | ResidentOrder::Ram(_)
+        | ResidentOrder::Throw(_)
+        | ResidentOrder::Gather(_)
+        | ResidentOrder::Rally(_) => None,
     }
 }
 

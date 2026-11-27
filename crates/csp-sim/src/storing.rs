@@ -2,10 +2,6 @@
 //! a stable or a carriage of their side and puts goods down or takes them there, through the take
 //! and put actions of `carrying.rs`.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use csp_shared::balance::OWN_FOOD;
 use csp_shared::footprint::covers;
 use csp_shared::terrain::wrap_distance;
@@ -67,7 +63,7 @@ pub fn read_wanted(goods: Option<&Value>) -> Option<GoodsWanted> {
                 out.insert(good, Some(n));
             }
         }
-        _ => return None,
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => return None,
     }
     (!out.is_empty()).then_some(out)
 }
@@ -84,7 +80,11 @@ fn side_of(world: &WorldState, sender: &OrderSender) -> Option<String> {
 fn named_place(world: &WorldState, side: Option<&str>, id: &Value) -> Option<GoodsPlace> {
     let key = match id {
         Value::Object(o) => o.get("id")?,
-        v => v,
+        v @ (Value::Null
+        | Value::Bool(_)
+        | Value::Number(_)
+        | Value::String(_)
+        | Value::Array(_)) => v,
     };
     let key = key.as_str()?;
     if let Some(b) = world.buildings.iter().find(|x| x.id == key) {
@@ -475,7 +475,44 @@ pub fn place_of(o: &ResidentOrder) -> Option<&GoodsPlace> {
     match o {
         ResidentOrder::Store(s) => Some(&s.to),
         ResidentOrder::Fetch(f) => Some(&f.from),
-        _ => None,
+        ResidentOrder::WalkTo(_)
+        | ResidentOrder::Drive(_)
+        | ResidentOrder::Haul(_)
+        | ResidentOrder::PickUp(_)
+        | ResidentOrder::Drop(_)
+        | ResidentOrder::Build(_)
+        | ResidentOrder::TearDown(_)
+        | ResidentOrder::Repair(_)
+        | ResidentOrder::WorkAt(_)
+        | ResidentOrder::Breed(_)
+        | ResidentOrder::Attack(_)
+        | ResidentOrder::Climb(_)
+        | ResidentOrder::Teach(_)
+        | ResidentOrder::Train(_)
+        | ResidentOrder::RoadLine(_)
+        | ResidentOrder::WallLine(_)
+        | ResidentOrder::Pay(_)
+        | ResidentOrder::BuyCity(_)
+        | ResidentOrder::Trade(_)
+        | ResidentOrder::Swap(_)
+        | ResidentOrder::BuyHorse(_)
+        | ResidentOrder::SellHorse(_)
+        | ResidentOrder::HandIn(_)
+        | ResidentOrder::BuyOff(_)
+        | ResidentOrder::PayDebt(_)
+        | ResidentOrder::AcceptOffer(_)
+        | ResidentOrder::Relocate(_)
+        | ResidentOrder::Feed(_)
+        | ResidentOrder::Row(_)
+        | ResidentOrder::HaulByWater(_)
+        | ResidentOrder::Sail(_)
+        | ResidentOrder::Equip(_)
+        | ResidentOrder::Crew(_)
+        | ResidentOrder::Push(_)
+        | ResidentOrder::Ram(_)
+        | ResidentOrder::Throw(_)
+        | ResidentOrder::Gather(_)
+        | ResidentOrder::Rally(_) => None,
     }
 }
 
@@ -526,6 +563,8 @@ pub fn request_storing(world: &mut WorldState) -> Vec<CarryAction> {
             end_order(world, ri, Some(reason.into()));
             continue;
         }
+        // Only store and fetch orders get past `place_of` above.
+        #[allow(clippy::wildcard_enum_match_arm)]
         let walking = match order {
             ResidentOrder::Store(s) => s.phase == StorePhase::Walking,
             ResidentOrder::Fetch(f) => f.phase == FetchPhase::Walking,
@@ -559,6 +598,8 @@ pub fn request_storing(world: &mut WorldState) -> Vec<CarryAction> {
             }
             GoodsPlace::Vessel { vessel_id } => GoodsSpot::Vessel { vessel_id: vessel_id.clone() },
         };
+        // Only store and fetch orders get past `place_of` above.
+        #[allow(clippy::wildcard_enum_match_arm)]
         let (kind, goods) = match order {
             // As many as there are: take clips them to what is there and fits.
             ResidentOrder::Fetch(f) => (

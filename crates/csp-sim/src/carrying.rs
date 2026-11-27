@@ -2,10 +2,6 @@
 //! pick-up and drop orders, and the take and put actions every goods order requests, resolved one
 //! after another at the end of the tick (ADR 0002).
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use std::collections::HashSet;
 
 use csp_shared::balance::MAP_SIZE;
@@ -134,7 +130,12 @@ fn check(
         {
             return Err("nobody of that id lies Down on the resident’s tile".into());
         }
-        _ => {}
+        GoodsSpot::Ground
+        | GoodsSpot::Storage { .. }
+        | GoodsSpot::Site { .. }
+        | GoodsSpot::Carriage { .. }
+        | GoodsSpot::Resident { .. }
+        | GoodsSpot::Vessel { .. } => {}
     }
     Ok(Checked { r: ri, spot, goods })
 }
@@ -384,7 +385,11 @@ fn take(
     let (x, y) = (world.residents[ri].x, world.residents[ri].y);
     let source = match a.spot {
         GoodsSpot::Ground => pile_index_at(world, x as i32, y as i32, MAP_SIZE).map(Holder::Pile),
-        _ => spot_holder(world, ri, &a.spot),
+        GoodsSpot::Storage { .. }
+        | GoodsSpot::Site { .. }
+        | GoodsSpot::Carriage { .. }
+        | GoodsSpot::Resident { .. }
+        | GoodsSpot::Vessel { .. } => spot_holder(world, ri, &a.spot),
     };
     let Some(source) = source else { return };
     if guarded_from(world, ri, &a.spot, size) {
@@ -397,7 +402,11 @@ fn take(
             let r = &world.residents[ri];
             collects_from(world, r, storage_id) || collects_transfer_from(world, r, storage_id)
         }
-        _ => false,
+        GoodsSpot::Ground
+        | GoodsSpot::Site { .. }
+        | GoodsSpot::Carriage { .. }
+        | GoodsSpot::Resident { .. }
+        | GoodsSpot::Vessel { .. } => false,
     };
     // A daughter's builder fetching from its supplying mother takes what the daughter lacks and
     // Food, and steals nothing (`CONTEXT.md`: Founding; #1379).
@@ -407,7 +416,11 @@ fn take(
             world.residents[ri].city_id.as_deref(),
             storage_id,
         ),
-        _ => None,
+        GoodsSpot::Ground
+        | GoodsSpot::Site { .. }
+        | GoodsSpot::Carriage { .. }
+        | GoodsSpot::Resident { .. }
+        | GoodsSpot::Vessel { .. } => None,
     };
     let sold = sold || from_mother.is_some();
     let free = takeable_from(world, ri, &a.spot, &stock_of(world, source), sold);
@@ -427,7 +440,11 @@ fn take(
     if let Some(victim_org) = victim_org.filter(|_| !sold && !taken.is_empty()) {
         let victim = match &a.spot {
             GoodsSpot::Resident { resident_id } => down_index_on(world, x, y, resident_id),
-            _ => None,
+            GoodsSpot::Ground
+            | GoodsSpot::Storage { .. }
+            | GoodsSpot::Site { .. }
+            | GoodsSpot::Carriage { .. }
+            | GoodsSpot::Vessel { .. } => None,
         };
         commit_theft(world, size, ri, &victim_org, &taken, victim);
         thefts.push(Theft { thief: ri, victim_org });
@@ -498,7 +515,7 @@ fn spot_organization(world: &WorldState, spot: &GoodsSpot) -> Option<String> {
         GoodsSpot::Vessel { vessel_id } => {
             world.vessels.iter().find(|v| &v.id == vessel_id).and_then(|v| v.realm_id.clone())
         }
-        _ => None,
+        GoodsSpot::Ground | GoodsSpot::Site { .. } => None,
     }
 }
 

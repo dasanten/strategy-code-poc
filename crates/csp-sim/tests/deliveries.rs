@@ -4,10 +4,6 @@
 //! ported `Walking` (T86.4); `checkInvariants` comes with T86.13, so the runs check
 //! `deliveries-sound`.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 mod common;
 #[path = "goods_support/mod.rs"]
 #[macro_use]
@@ -190,6 +186,8 @@ mod ordering_a_delivery {
             (DeliveryKind::Delivery, Good::Iron, 4.0, q.fee)
         );
         assert_eq!(owed_by(&s.world, &s.w().id, Good::Iron), 4.0);
+        // Picks one kind out of all: every other kind, also a later one, is not it.
+        #[allow(clippy::wildcard_enum_match_arm)]
         let ordered: Vec<_> = s
             .world
             .events
@@ -296,6 +294,8 @@ mod caravans_carrying_out_deliveries {
         let before = held_in(s.storage().stock.as_ref(), Good::Iron);
         run_until(&mut s, |w| w.deliveries.is_empty(), 20_000);
         assert_eq!(held_in(s.storage().stock.as_ref(), Good::Iron), before + 6.0);
+        // Picks one kind out of all: every other kind, also a later one, is not it.
+        #[allow(clippy::wildcard_enum_match_arm)]
         let delivered: Vec<_> = s
             .world
             .events

@@ -1,9 +1,5 @@
 //! Building queries: what stands on a tile, the finished roads, recipes.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use std::collections::HashSet;
 
 use csp_shared::balance::{
@@ -276,7 +272,27 @@ pub fn construction_index_at(
         BuildingKind::Wall | BuildingKind::Gate => {
             wall_site_index_at(world, x, y).or_else(|| building_index_at(world, x, y, MAP_SIZE))
         }
-        _ => building_index_at(world, x, y, MAP_SIZE),
+        BuildingKind::TownHall
+        | BuildingKind::House
+        | BuildingKind::Storage
+        | BuildingKind::Warehouse
+        | BuildingKind::Tower
+        | BuildingKind::Farm
+        | BuildingKind::Stable
+        | BuildingKind::Mine
+        | BuildingKind::Quarry
+        | BuildingKind::LumberCamp
+        | BuildingKind::Smelter
+        | BuildingKind::Mint
+        | BuildingKind::Smithy
+        | BuildingKind::TrainingGround
+        | BuildingKind::Road
+        | BuildingKind::Carriage
+        | BuildingKind::Haven
+        | BuildingKind::Boat
+        | BuildingKind::Ship
+        | BuildingKind::Ram
+        | BuildingKind::Catapult => building_index_at(world, x, y, MAP_SIZE),
     }
 }
 
@@ -940,7 +956,44 @@ pub fn line_building(o: &ResidentOrder) -> Option<BuildingKind> {
     match o {
         ResidentOrder::RoadLine(_) => Some(BuildingKind::Road),
         ResidentOrder::WallLine(_) => Some(BuildingKind::Wall),
-        _ => None,
+        ResidentOrder::WalkTo(_)
+        | ResidentOrder::Drive(_)
+        | ResidentOrder::Haul(_)
+        | ResidentOrder::PickUp(_)
+        | ResidentOrder::Drop(_)
+        | ResidentOrder::Store(_)
+        | ResidentOrder::Fetch(_)
+        | ResidentOrder::Build(_)
+        | ResidentOrder::TearDown(_)
+        | ResidentOrder::Repair(_)
+        | ResidentOrder::WorkAt(_)
+        | ResidentOrder::Breed(_)
+        | ResidentOrder::Attack(_)
+        | ResidentOrder::Climb(_)
+        | ResidentOrder::Teach(_)
+        | ResidentOrder::Train(_)
+        | ResidentOrder::Pay(_)
+        | ResidentOrder::BuyCity(_)
+        | ResidentOrder::Trade(_)
+        | ResidentOrder::Swap(_)
+        | ResidentOrder::BuyHorse(_)
+        | ResidentOrder::SellHorse(_)
+        | ResidentOrder::HandIn(_)
+        | ResidentOrder::BuyOff(_)
+        | ResidentOrder::PayDebt(_)
+        | ResidentOrder::AcceptOffer(_)
+        | ResidentOrder::Relocate(_)
+        | ResidentOrder::Feed(_)
+        | ResidentOrder::Row(_)
+        | ResidentOrder::HaulByWater(_)
+        | ResidentOrder::Sail(_)
+        | ResidentOrder::Equip(_)
+        | ResidentOrder::Crew(_)
+        | ResidentOrder::Push(_)
+        | ResidentOrder::Ram(_)
+        | ResidentOrder::Throw(_)
+        | ResidentOrder::Gather(_)
+        | ResidentOrder::Rally(_) => None,
     }
 }
 

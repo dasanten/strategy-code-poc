@@ -2,10 +2,6 @@
 //! card. `CONTEXT.md`: Relocate, Leader handover, Renaming a resident, Renaming a city, Renaming a
 //! horse, Realm name, First day.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use std::collections::HashSet;
 
 use csp_shared::balance::{
@@ -112,7 +108,7 @@ impl<'a> Given<'a> {
     fn text(self) -> Option<&'a str> {
         match self {
             Given::Text(s) => Some(s),
-            _ => None,
+            Given::Missing | Given::NotText => None,
         }
     }
 }

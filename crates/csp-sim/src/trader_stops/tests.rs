@@ -1,9 +1,5 @@
 //! Tests of wandering traders' stops.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use std::sync::Arc;
 
 use csp_shared::balance::{
@@ -554,6 +550,8 @@ fn buys_goods_from_its_load_into_their_hands_coins_the_other_way_with_standing()
     assert_eq!(held(&l, Good::Wood), 38.0);
     assert_eq!(held(&l, Good::Coins), 200.0 + price);
     assert!(crate::queries::standing::standing_of(&s.world, "r1", trade_org()) > 0.0);
+    // Picks one kind out of all: every other kind, also a later one, is not it.
+    #[allow(clippy::wildcard_enum_match_arm)]
     let traded = s.world.events.iter().find_map(|e| match &e.what {
         csp_shared::world::RealmEventWhat::Traded { with_trader, units, side, .. } => {
             Some((*with_trader, *units, *side))
