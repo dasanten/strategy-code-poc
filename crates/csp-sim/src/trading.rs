@@ -2,10 +2,6 @@
 //! stop, Swap, Horse market, Delivery): the buy, sell, swap and horse orders, carried out the
 //! tick they are given, and the invariants over this tick's trades.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use csp_shared::balance::{
     DELIVERY_LOAD, GOOD_WEIGHT, MAP_SIZE, NPC_HORSES_KEPT, STANDING_TRADE_COINS_PER_POINT,
 };
@@ -342,7 +338,9 @@ fn holder_stock(world: &WorldState, h: Holder) -> &Stock {
     match h {
         Holder::Carriage(k) => &world.carriages[k].load,
         Holder::Resident(i) => &world.residents[i].carried,
-        _ => unreachable!("a trader holds goods in hands or on a carriage"),
+        Holder::Pile(_) | Holder::Storage(_) | Holder::Site(_) | Holder::Vessel(_) => {
+            unreachable!("a trader holds goods in hands or on a carriage")
+        }
     }
 }
 
@@ -381,7 +379,41 @@ pub fn resolve_trades(world: &mut WorldState, size: i32, ledger: &mut TradeLedge
                 continue;
             }
             ResidentOrder::Trade(_) | ResidentOrder::HandIn(_) => {}
-            _ => continue,
+            ResidentOrder::WalkTo(_)
+            | ResidentOrder::Drive(_)
+            | ResidentOrder::Haul(_)
+            | ResidentOrder::PickUp(_)
+            | ResidentOrder::Drop(_)
+            | ResidentOrder::Store(_)
+            | ResidentOrder::Fetch(_)
+            | ResidentOrder::Build(_)
+            | ResidentOrder::TearDown(_)
+            | ResidentOrder::Repair(_)
+            | ResidentOrder::WorkAt(_)
+            | ResidentOrder::Breed(_)
+            | ResidentOrder::Attack(_)
+            | ResidentOrder::Climb(_)
+            | ResidentOrder::Teach(_)
+            | ResidentOrder::Train(_)
+            | ResidentOrder::RoadLine(_)
+            | ResidentOrder::WallLine(_)
+            | ResidentOrder::Pay(_)
+            | ResidentOrder::BuyCity(_)
+            | ResidentOrder::BuyOff(_)
+            | ResidentOrder::PayDebt(_)
+            | ResidentOrder::AcceptOffer(_)
+            | ResidentOrder::Relocate(_)
+            | ResidentOrder::Feed(_)
+            | ResidentOrder::Row(_)
+            | ResidentOrder::HaulByWater(_)
+            | ResidentOrder::Sail(_)
+            | ResidentOrder::Equip(_)
+            | ResidentOrder::Crew(_)
+            | ResidentOrder::Push(_)
+            | ResidentOrder::Ram(_)
+            | ResidentOrder::Throw(_)
+            | ResidentOrder::Gather(_)
+            | ResidentOrder::Rally(_) => continue,
         }
         world.residents[ri].order = None;
         let (x, y) = (world.residents[ri].x, world.residents[ri].y);
@@ -411,6 +443,8 @@ pub fn resolve_trades(world: &mut WorldState, size: i32, ledger: &mut TradeLedge
         if realm.as_deref().is_some_and(|realm| trade_org_refuses(world, realm)) {
             continue;
         }
+        // Only trade and hand-in orders get past the match above.
+        #[allow(clippy::wildcard_enum_match_arm)]
         let carriage_id = match &order {
             ResidentOrder::Trade(o) => o.carriage_id.clone(),
             ResidentOrder::HandIn(o) => o.carriage_id.clone(),
@@ -433,6 +467,8 @@ pub fn resolve_trades(world: &mut WorldState, size: i32, ledger: &mut TradeLedge
         ensure_stock(world, cw);
         let parties = [holder, Holder::Storage(w), Holder::Storage(cw)];
         let before = total(world, &parties);
+        // Only trade and hand-in orders get past the match above.
+        #[allow(clippy::wildcard_enum_match_arm)]
         let delivery = match &order {
             ResidentOrder::HandIn(_) => true,
             ResidentOrder::Trade(o) => o.city_id.is_some(),
@@ -440,6 +476,8 @@ pub fn resolve_trades(world: &mut WorldState, size: i32, ledger: &mut TradeLedge
         };
         if delivery {
             let Some(realm) = realm else { continue };
+            // Only trade and hand-in orders get past the match above.
+            #[allow(clippy::wildcard_enum_match_arm)]
             let ordered = match &order {
                 ResidentOrder::HandIn(o) => hand_in_order(world, size, ri, &realm, o, w, holder),
                 ResidentOrder::Trade(o) => order_delivery(world, size, ri, &realm, o, w, holder),

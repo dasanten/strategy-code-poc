@@ -1,9 +1,5 @@
 //! Tests of wandering traders.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use std::sync::Arc;
 
 use csp_shared::balance::{
@@ -1352,6 +1348,8 @@ fn is_what_is_seen_of_a_caravan_seen_through_its_carriage_and_crew() {
     let ri = found_starting_city(&mut world, &terrain, 7, None);
     let realm = world.realms[ri].id.clone();
     let size = terrain.size;
+    // Picks one kind out of all: every other kind, also a later one, is not it.
+    #[allow(clippy::wildcard_enum_match_arm)]
     let seen = |w: &WorldState| -> Vec<SeenTrader> {
         let index = WorldIndex::new(w, size);
         entities_in_sight(w, &index, Some(&realm), None)

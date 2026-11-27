@@ -1,10 +1,6 @@
 //! The wall queries that combat and respect need (`CONTEXT.md`: Walls in combat). Movement's wall
 //! map (`wallMap`, `mayStep`, `climbLanding`) is T86.6's to add here.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use csp_shared::balance::{
     BROKEN_MATERIALS_RETURNED, MAP_SIZE, SIGHT_RANGE, STONE_WALL_STRENGTH, TOWER_SIGHT_RANGE,
     WALL_STRENGTH,
@@ -41,7 +37,27 @@ pub fn wall_or_tower_at(world: &WorldState, x: f64, y: f64) -> Option<&Building>
                 && match b.kind {
                     BuildingKind::Wall => b.x == x && b.y == y,
                     BuildingKind::Tower => covers(placed(b), x as i32, y as i32, MAP_SIZE),
-                    _ => false,
+                    BuildingKind::TownHall
+                    | BuildingKind::House
+                    | BuildingKind::Storage
+                    | BuildingKind::Warehouse
+                    | BuildingKind::Gate
+                    | BuildingKind::Farm
+                    | BuildingKind::Stable
+                    | BuildingKind::Mine
+                    | BuildingKind::Quarry
+                    | BuildingKind::LumberCamp
+                    | BuildingKind::Smelter
+                    | BuildingKind::Mint
+                    | BuildingKind::Smithy
+                    | BuildingKind::TrainingGround
+                    | BuildingKind::Road
+                    | BuildingKind::Carriage
+                    | BuildingKind::Haven
+                    | BuildingKind::Boat
+                    | BuildingKind::Ship
+                    | BuildingKind::Ram
+                    | BuildingKind::Catapult => false,
                 }
         })
 }
@@ -91,7 +107,27 @@ pub fn wall_strength(b: &Building) -> f64 {
     match b.kind {
         BuildingKind::Gate => of.gate,
         BuildingKind::Tower => of.tower,
-        _ => of.wall,
+        BuildingKind::TownHall
+        | BuildingKind::House
+        | BuildingKind::Storage
+        | BuildingKind::Warehouse
+        | BuildingKind::Wall
+        | BuildingKind::Farm
+        | BuildingKind::Stable
+        | BuildingKind::Mine
+        | BuildingKind::Quarry
+        | BuildingKind::LumberCamp
+        | BuildingKind::Smelter
+        | BuildingKind::Mint
+        | BuildingKind::Smithy
+        | BuildingKind::TrainingGround
+        | BuildingKind::Road
+        | BuildingKind::Carriage
+        | BuildingKind::Haven
+        | BuildingKind::Boat
+        | BuildingKind::Ship
+        | BuildingKind::Ram
+        | BuildingKind::Catapult => of.wall,
     }
 }
 

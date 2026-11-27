@@ -8,7 +8,7 @@
 use std::path::{Path, PathBuf};
 
 /// The files that allow the lint for the whole file. Lower it as their arms are named.
-const ALLOWED_FILES: usize = 88;
+const ALLOWED_FILES: usize = 73;
 
 const FILE_ALLOW: &str = "#![allow(clippy::wildcard_enum_match_arm)]";
 

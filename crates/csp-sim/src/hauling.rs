@@ -2,10 +2,6 @@
 //! carriage between two stops, unloading and loading through the take and put actions of
 //! `carrying.rs`.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use csp_shared::balance::{CARRIAGE_CAPACITY, GOOD_WEIGHT};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
@@ -383,7 +379,11 @@ fn next_transfer(
     // A haul route leaves what is set aside for an offer alone (`CONTEXT.md`: Offer).
     let there: Stock = match spot {
         GoodsSpot::Storage { storage_id } => free_stock(world, storage_id, Some(&held_there)),
-        _ => held_there,
+        GoodsSpot::Ground
+        | GoodsSpot::Site { .. }
+        | GoodsSpot::Carriage { .. }
+        | GoodsSpot::Resident { .. }
+        | GoodsSpot::Vessel { .. } => held_there,
     };
     let tick = world.tick as f64;
     let hands = |g: Good| units_that_fit(r, g, tick);

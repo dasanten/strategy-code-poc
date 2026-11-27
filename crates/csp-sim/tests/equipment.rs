@@ -3,10 +3,6 @@
 //! putting the equipped one down equips the next, and a save from before Equipment equips each
 //! resident's best carried gear on its first tick.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 mod common;
 #[macro_use]
 mod goods_support;
@@ -212,6 +208,8 @@ mod seen {
         world
     }
 
+    // Picks one kind out of all: every other kind, also a later one, is not it.
+    #[allow(clippy::wildcard_enum_match_arm)]
     fn seen_w1(world: &WorldState, side: &str) -> Option<SeenResident> {
         let index = WorldIndex::new(world, WIDE);
         let sent = entities_in_sight(world, &index, Some(side), None);
