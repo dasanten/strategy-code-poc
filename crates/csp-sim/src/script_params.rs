@@ -2,10 +2,6 @@
 //! `params.name`, and the values the Player picks for them on a resident's card, kept per resident
 //! per script (`Resident.scriptParams`) as plain ids.
 
-// Epic 127: this file still has `_ =>` arms over enums; its tickets name each variant or say
-// why the wildcard is right, then remove this line.
-#![allow(clippy::wildcard_enum_match_arm)]
-
 use std::sync::Arc;
 
 use csp_lang::{script_params, ParamDefault, ParamType};
@@ -232,6 +228,8 @@ fn value_problem(
 }
 
 /// A picked value as it is kept: an id or word, or a number.
+// A JSON value: every other shape, also one to come, is kept as nothing.
+#[allow(clippy::wildcard_enum_match_arm)]
 fn kept_value(value: &Value) -> Option<ScriptParamValue> {
     match value {
         Value::String(s) => Some(ScriptParamValue::Id(s.clone())),
@@ -385,8 +383,12 @@ impl OrderKind for SetScriptParamOrder {
                 }
                 Some(_) => Some("takes a word, not a pick".into()),
             },
-            _ if value.is_some() => Some("takes no number or word".into()),
-            _ => value_problem(world, &realm.id, param, target.unwrap_or(&Value::Null)),
+            ParamType::Building | ParamType::Storage | ParamType::Waypoint if value.is_some() => {
+                Some("takes no number or word".into())
+            }
+            ParamType::Building | ParamType::Storage | ParamType::Waypoint => {
+                value_problem(world, &realm.id, param, target.unwrap_or(&Value::Null))
+            }
         }
     }
 
